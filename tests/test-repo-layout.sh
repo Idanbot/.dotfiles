@@ -66,7 +66,6 @@ for tool in yq zoxide direnv git-delta hyperfine duf; do
   fi
 done
 
-
 for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"'; do
   if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
     echo -e "  ${GREEN}✓${NC} language installer contains $expected"
