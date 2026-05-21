@@ -22,6 +22,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
   lint:
     name: Lint
@@ -51,7 +52,7 @@ jobs:
           # shfmt
           if ! command -v shfmt &>/dev/null; then
             mkdir -p ~/.local/bin
-            shfmt_url=https://github.com/mvdan/sh/releases/latest/download
+            shfmt_url=https://github.com/mvdan/sh/releases/download/v3.10.0
             curl -fsSLo ~/.local/bin/shfmt \
               "$shfmt_url/shfmt_v3.10.0_linux_amd64"
             chmod +x ~/.local/bin/shfmt
