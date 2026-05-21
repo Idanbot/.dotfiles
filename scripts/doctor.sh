@@ -42,7 +42,8 @@ check_file() {
 }
 
 check_version() {
-  local cmd="$1" expected="$2" actual_cmd="$3" label="${4:-$cmd}"
+  local cmd="$1" expected="$2" actual_cmd="$3"
+  local label="${4:-$cmd}"
   ((CHECKS++)) || true
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo -e "  ${RED}✗${NC} missing $label"
