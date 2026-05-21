@@ -22,7 +22,7 @@ data:
   is_wsl: false
 EOF
 
-chezmoi init --source="$DOTFILES_DIR" --promptString="name=Test User" --promptString="email=test@example.com" --promptString="sessionizer_dirs=~/Code ~/Scripts"
+chezmoi init --source="$DOTFILES_DIR" --promptString="Full name=Test User" --promptString="Git email=test@example.com" --promptString="tmux-sessionizer search dirs (space-separated)=~/Code ~/Scripts"
 chezmoi apply --source="$DOTFILES_DIR" --destination="$HOME" --force --exclude=scripts
 
 test -f "$HOME/.zshrc"
