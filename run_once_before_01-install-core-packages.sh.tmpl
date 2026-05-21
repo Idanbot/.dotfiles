@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing Core Packages"
+
+require_sudo
+sudo apt-get update -qq
+
+apt_install \
+  git \
+  curl \
+  wget \
+  jq \
+  make \
+  build-essential \
+  unzip \
+  zip \
+  tar \
+  gzip \
+  software-properties-common \
+  apt-transport-https \
+  ca-certificates \
+  gnupg \
+  lsb-release \
+  xclip \
+  xsel \
+  tree \
+  net-tools \
+  dnsutils \
+  whois \
+  nmap \
+  traceroute \
+  stow \
+  age \
+  file \
+  less \
+  man-db \
+  openssh-client \
+  python3 \
+  python3-pip \
+  python3-venv \
+  poppler-utils \
+  chafa
+
+print_summary "Core Packages"

@@ -1,0 +1,35 @@
+" ──────────────────────────────────────────────────────────────────────────
+" Basic Vim configuration (~/.vimrc)
+
+" — Visual & performance
+set number                " show absolute line numbers
+set relativenumber        " relative line numbers
+set cursorline            " highlight current line
+set termguicolors         " enable 24-bit colors
+
+" — Syntax & filetype
+syntax on                 " turn on syntax highlighting
+filetype plugin indent on " enable filetype detection & indent
+
+" — Tabs & indentation
+set expandtab             " convert tabs to spaces
+set tabstop=4             " display width of a tab
+set shiftwidth=4          " indent size for autoindent
+set autoindent            " copy indent from previous line
+set smartindent           " C-style auto-indent
+
+" — Search
+set incsearch             " incremental search
+set hlsearch              " highlight all matches
+set ignorecase            " case-insensitive…
+set smartcase             " …unless search has uppercase
+
+" — Command-line completion
+set wildmenu              " visual autocomplete for :cmds and filenames
+
+" — Clipboard & mouse
+set clipboard=unnamedplus " use system clipboard
+set mouse=a               " enable mouse in all modes
+
+" — Theme
+colorscheme desert        " one of Vim's built-in themes

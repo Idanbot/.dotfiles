@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing Terminal Tools"
+
+require_sudo
+ARCH=$(get_arch)
+
+# ── fzf ───────────────────────────────────────────────────────────────────────
+# fzf is handled by .chezmoiexternal.yaml (cloned to ~/.fzf)
+# Run the install script if not already done
+if [[ -d "$HOME/.fzf" ]] && ! is_installed fzf; then
+  log_info "Installing fzf from ~/.fzf..."
+  "$HOME/.fzf/install" --all --no-update-rc --no-bash --no-fish
+  log_success "fzf installed"
+elif is_installed fzf; then
+  log_skip "fzf already installed"
+else
+  log_warn "fzf source not found at ~/.fzf — will be set up by chezmoi externals"
+fi
+
+# ── fd-find ───────────────────────────────────────────────────────────────────
+apt_install fd-find
+
+# ── ripgrep ───────────────────────────────────────────────────────────────────
+apt_install ripgrep
+
+# ── bat ───────────────────────────────────────────────────────────────────────
+if ! is_installed bat && ! is_installed batcat; then
+  apt_install bat
+  # Create bat symlink if only batcat exists
+  if is_installed batcat && ! is_installed bat; then
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
+    log_success "Created bat -> batcat symlink"
+  fi
+else
+  log_skip "bat already installed"
+fi
+
+# ── eza ───────────────────────────────────────────────────────────────────────
+if ! is_installed eza; then
+  log_info "Installing eza..."
+  sudo mkdir -p /etc/apt/keyrings
+  wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
+  sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+  sudo apt-get update -qq
+  sudo apt-get install -y eza
+  log_success "eza installed"
+else
+  log_skip "eza already installed"
+fi
+
+# ── lazygit ───────────────────────────────────────────────────────────────────
+if ! is_installed lazygit; then
+  log_info "Installing lazygit..."
+  LAZYGIT_VERSION=$(github_latest_release "jesseduffield/lazygit" | tr -d 'v')
+  curl -fsSLo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${ARCH}.tar.gz"
+  tar -xf /tmp/lazygit.tar.gz -C /tmp lazygit
+  sudo install /tmp/lazygit /usr/local/bin/lazygit
+  rm -f /tmp/lazygit /tmp/lazygit.tar.gz
+  log_success "lazygit ${LAZYGIT_VERSION} installed"
+else
+  log_skip "lazygit already installed"
+fi
+
+# ── btop ──────────────────────────────────────────────────────────────────────
+apt_install btop
+
+# ── htop ──────────────────────────────────────────────────────────────────────
+apt_install htop
+
+# ── starship ──────────────────────────────────────────────────────────────────
+if ! is_installed starship; then
+  log_info "Installing starship..."
+  curl -fsSL https://starship.rs/install.sh | sh -s -- -y
+  log_success "starship installed"
+else
+  log_skip "starship already installed"
+fi
+
+# ── jq (usually from core but just in case) ───────────────────────────────────
+apt_install jq
+
+print_summary "Terminal Tools"

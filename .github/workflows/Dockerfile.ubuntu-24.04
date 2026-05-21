@@ -1,0 +1,31 @@
+FROM ubuntu:24.04
+
+# Avoid interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install base dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      sudo \
+      curl \
+      git \
+      ca-certificates \
+      locales \
+      fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up locale
+RUN locale-gen en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# Create test user with sudo
+RUN useradd -m -s /bin/bash testuser && \
+    echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER testuser
+WORKDIR /home/testuser
+
+# Ensure ~/.local/bin is on PATH
+ENV PATH="/home/testuser/.local/bin:${PATH}"

@@ -1,0 +1,210 @@
+# ~/.config/starship.toml
+# "Deep Stealth Gradient" - Fixed Version
+# Optimized for Catppuccin Mocha
+
+"$schema" = "https://starship.rs/config-schema.json"
+
+add_newline = true
+command_timeout = 1000
+scan_timeout = 500
+palette = "catppuccin_mocha"
+
+# ── Layout ────────────────────────────────────────────────────────────────────
+format = """
+[](custom_start)\
+$hostname\
+$directory\
+[](fg:custom_start bg:base)\
+$git_branch\
+$git_status\
+[](fg:base bg:mantle)\
+$nodejs\
+$python\
+$golang\
+$rust\
+$java\
+$terraform\
+$docker_context\
+$kubernetes\
+$aws\
+$gcloud\
+[](fg:mantle)\
+$line_break\
+$character"""
+
+right_format = """$status$cmd_duration $jobs$memory_usage$time"""
+
+[palettes.catppuccin_mocha]
+custom_start = "#28293a"
+
+rosewater = "#f5e0dc"
+flamingo  = "#f2cdcd"
+pink      = "#f5c2e7"
+mauve     = "#cba6f7"
+red       = "#f38ba8"
+maroon    = "#eba0ac"
+peach     = "#fab387"
+yellow    = "#f9e2af"
+green     = "#a6e3a1"
+teal      = "#94e2d5"
+sky       = "#89dceb"
+sapphire  = "#74c7ec"
+blue      = "#89b4fa"
+lavender  = "#b4befe"
+text      = "#cdd6f4"
+subtext1  = "#bac2de"
+subtext0  = "#a6adc8"
+overlay2  = "#9399b2"
+overlay1  = "#7f849c"
+overlay0  = "#6c7086"
+surface2  = "#585b70"
+surface1  = "#45475a"
+surface0  = "#313244"
+base      = "#1e1e2e"
+mantle    = "#181825"
+crust     = "#11111b"
+
+[hostname]
+ssh_only = true
+style = "bold fg:green bg:custom_start"
+format = "[ $ssh_symbol$hostname ]($style)"
+ssh_symbol = " "
+
+[directory]
+style = "bold fg:teal bg:custom_start"
+format = "[ $path]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+read_only = " "
+
+[git_branch]
+symbol = " "
+style = "fg:maroon bg:base"
+format = '[ $symbol $branch]($style)'
+
+[git_status]
+style = "fg:red bg:base"
+format = '[ $all_status$ahead_behind]($style)'
+conflicted = " "
+ahead      = "${count} "
+behind     = "${count} "
+diverged   = " ${ahead_count}/${behind_count} "
+untracked  = " "
+stashed    = " "
+modified   = " "
+staged     = " "
+renamed    = " "
+deleted    = " "
+
+[nodejs]
+symbol = ""
+style = "fg:green bg:mantle"
+format = '[ $symbol ($version) ]($style)'
+
+[python]
+symbol = ""
+style = "fg:yellow bg:mantle"
+format = '[($virtualenv) $symbol ($version) ]($style)'
+
+[golang]
+symbol = ""
+style = "fg:sapphire bg:mantle"
+format = '[ $symbol ($version) ]($style)'
+
+[rust]
+symbol = ""
+style = "fg:maroon bg:mantle"
+format = '[ $symbol ($version) ]($style)'
+
+[java]
+symbol = ""
+style = "fg:peach bg:mantle"
+format = '[ $symbol ($version) ]($style)'
+
+[terraform]
+symbol = ""
+style = "fg:pink bg:mantle"
+format = '[($workspace) $symbol ($version) ]($style)'
+
+[docker_context]
+symbol = ""
+style = "fg:blue bg:mantle"
+format = '[ $symbol $context ]($style)'
+
+[kubernetes]
+disabled = false
+detect_files = []
+detect_folders = []
+symbol = " "
+style = "fg:sapphire bg:mantle"
+format = '[ $symbol$context( \($namespace\)) ]($style)'
+
+[[kubernetes.contexts]]
+context_pattern = "^(x|minikube|docker-desktop)$"
+context_alias = ""
+symbol = ""
+
+[[kubernetes.contexts]]
+context_pattern = "arn:aws:eks:.*:cluster/(?P<clustername>.*)"
+context_alias = "$clustername"
+
+[aws]
+symbol = ""
+style = "fg:peach bg:mantle"
+format = '[ $symbol $profile( $region) ]($style)'
+
+[aws.region_aliases]
+us-east-1 = "us-east-1"
+
+[gcloud]
+symbol = " "
+style = "fg:sky bg:mantle"
+format = '[ $symbol $project( $region) ]($style)'
+
+[gcloud.project_aliases]
+"idan-gcp-pca" = "idan-pca"
+
+[gcloud.region_aliases]
+"me-west1-a" = "il-a"
+"me-west1-b" = "il-b"
+"me-west1-c" = "il-c"
+"us-east1-b" = "us-east1-b"
+"us-west1-a" = "us-west1-a"
+"us-central1" = "uc1"
+"europe-west1" = "ew1"
+
+[status]
+disabled = false
+style = "bold red"
+symbol = "✘ "
+success_symbol = ""
+format = "[$symbol$int]($style) "
+
+[time]
+disabled = false
+time_format = "%H:%M:%S"
+style = "fg:overlay0"
+format = "[$time]($style)"
+
+[cmd_duration]
+min_time = 2_000
+style = "bold yellow"
+format = "  $duration "
+
+[jobs]
+disabled = false
+symbol = " "
+style = "bold overlay0"
+format = "[$symbol$number]($style) "
+
+[memory_usage]
+disabled = false
+threshold = 75
+symbol = " "
+style = "bold red"
+format = "[$symbol${ram}]($style) "
+
+[character]
+success_symbol = "[❯](bold blue)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold blue)"

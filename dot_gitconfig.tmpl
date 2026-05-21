@@ -1,0 +1,23 @@
+[user]
+	email = {{ .email }}
+	name = {{ .name }}
+[credential]
+	helper = manager-core
+	helper =
+	helper = /usr/local/bin/git-credential-manager
+	credentialStore = secretservice
+[credential "https://dev.azure.com"]
+	useHttpPath = true
+[credential "https://git.idanbot.uk"]
+	provider = generic
+[push]
+	autoSetupRemote = true
+[init]
+	defaultBranch = main
+[core]
+	editor = nvim
+	pager = bat --paging=always --style=plain
+[diff]
+	tool = nvimdiff
+[merge]
+	tool = nvimdiff

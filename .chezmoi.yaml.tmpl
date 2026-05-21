@@ -1,0 +1,22 @@
+{{- $name := promptStringOnce . "name" "Full name" "Idan Botbol" -}}
+{{- $email := promptStringOnce . "email" "Git email" "botbolidan@gmail.com" -}}
+{{- $sessionizerDirs := promptStringOnce . "sessionizer_dirs" "tmux-sessionizer search dirs (space-separated)" "~/Code ~/Scripts ~/Education" -}}
+
+{{- $isWsl := false -}}
+{{- if eq .chezmoi.os "linux" -}}
+{{-   if (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
+{{-     $isWsl = true -}}
+{{-   end -}}
+{{- end -}}
+
+data:
+  name: {{ $name | quote }}
+  email: {{ $email | quote }}
+  is_wsl: {{ $isWsl }}
+  is_native: {{ not $isWsl }}
+  sessionizer_dirs: {{ $sessionizerDirs | quote }}
+
+encryption: age
+age:
+  identity: ~/.config/chezmoi/key.txt
+  recipient: "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"

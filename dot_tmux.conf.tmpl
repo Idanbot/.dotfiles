@@ -1,0 +1,178 @@
+##### ============================================
+##### 1. CORE SETTINGS
+##### ============================================
+
+# Prefix: Ctrl+s
+unbind C-b
+set -g prefix C-s
+bind C-s send-prefix
+
+# Reload config
+unbind r
+bind r source-file ~/.tmux.conf \; display-message "Config reloaded!"
+
+# General options
+set -g mouse on
+set -g base-index 1              # Start windows at 1
+setw -g pane-base-index 1        # Start panes at 1
+set -g renumber-windows on       # Re-order windows when one is closed
+set -g set-clipboard on          # Use system clipboard (OSC 52)
+set -g status-position top       # Status bar at the top
+set -g history-limit 10000
+set -g detach-on-destroy off     # Don't exit tmux when closing a session
+
+# Performance & Terminal
+{{ if not .is_wsl }}
+set -g default-terminal "xterm-kitty"
+set -ag terminal-overrides ",xterm-kitty:Tc"
+set -g allow-passthrough on      # Allow image previews (requires tmux >= 3.4)
+{{ else }}
+set -g default-terminal "tmux-256color"
+set -ag terminal-overrides ",xterm-256color:Tc"
+{{ end }}
+set -s escape-time 0             # Zero delay for Vim modes
+set -g focus-events on
+
+# Activity (Disabled for visual cleanness)
+set -g visual-activity off
+set -g visual-bell off
+set -g visual-silence off
+setw -g monitor-activity off
+set -g bell-action none
+
+##### ============================================
+##### 2. NAVIGATION & BINDINGS
+##### ============================================
+
+# --- SMART SPLIT NAVIGATION (Vim + Tmux) ---
+is_vim="ps -o state= -o comm= -t '#{pane_tty}' \
+    | grep -iqE '^[^TXZ ]+ +(\\S+\\/)?g?(view|l?n?vim?x?|fzf)(diff)?$'"
+
+bind-key -n 'C-h' if-shell "$is_vim" 'send-keys C-h'  'select-pane -L'
+bind-key -n 'C-j' if-shell "$is_vim" 'send-keys C-j'  'select-pane -D'
+bind-key -n 'C-k' if-shell "$is_vim" 'send-keys C-k'  'select-pane -U'
+bind-key -n 'C-l' if-shell "$is_vim" 'send-keys C-l'  'select-pane -R'
+
+bind C-l send-keys 'C-l'
+
+# Resize panes (repeatable)
+bind -r H resize-pane -L 5
+bind -r L resize-pane -R 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+
+# Window splitting (New panes open in current directory)
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+unbind '"'
+unbind %
+
+# Window navigation
+bind -r ^ last-window
+
+# Session/Window Management (Popups)
+bind-key -r f run-shell "tmux neww ~/.local/bin/tmux-sessionizer"
+bind-key -r i run-shell "tmux neww ~/.tmux/tmux-cht.sh"
+bind -r M-n display-popup -w 80% -h 80% -E "tmux new-session -A -s scratchpad"
+bind-key M-s display-popup -E "tmux list-sessions | less"
+bind-key M-w display-popup -E "tmux list-windows | less"
+{{ if not .is_wsl }}
+bind-key M-m display-popup -w 80% -h 80% -E "rmpc"
+{{ end }}
+bind-key M-h display-popup -w 80% -h 80% -E "btop"
+
+# Sync panes toggle
+bind y setw synchronize-panes \; display-message "synchronize-panes #{?synchronize-panes,on,off}"
+
+##### ============================================
+##### 3. VISUAL THEME (CATPPUCCIN MOCHA)
+##### ============================================
+
+# Pane borders
+set -g pane-border-style         "fg=#313244"
+set -g pane-active-border-style  "fg=#89b4fa"
+
+# Messages
+set -g message-style         "bg=#313244,fg=#cdd6f4"
+set -g message-command-style "bg=#313244,fg=#cdd6f4"
+
+# Window styles (transparent over terminal theme)
+set -g window-style         "fg=#a6adc8,bg=default"
+set -g window-active-style  "fg=default,bg=default"
+
+# Popups
+set -g popup-border-lines rounded
+set -g popup-border-style "fg=#6c7086"
+
+# Status line base style
+set -g status on
+set -g status-interval 5
+set -g status-justify centre
+set -g status-style "bg=default,fg=#cdd6f4"
+
+# Windows in the middle
+set -g window-status-separator " "
+set -g window-status-format           "#[fg=#6c7086]#I:#W"
+set -g window-status-current-format   "#[fg=#89b4fa,bold]#I:#W"
+
+# Status lengths
+set -g status-left-length 80
+set -g status-right-length 120
+
+# Prefix highlight
+set -g @prefix_highlight_fg '#1e1e2e'
+set -g @prefix_highlight_bg '#f9e2af'
+set -g @prefix_highlight_show_copy_mode 'on'
+set -g @prefix_highlight_show_sync_mode 'on'
+
+# LEFT: session name + prefix/copy/sync indicator
+set -g status-left '#[fg=#89b4fa,bg=default,bold] #S #[fg=#6c7086]#{prefix_highlight}'
+
+{{ if not .is_wsl }}
+# BATTERY ICONS (native only)
+set -g @batt_icon_charge_tier8 " "
+set -g @batt_icon_charge_tier7 " "
+set -g @batt_icon_charge_tier6 " "
+set -g @batt_icon_charge_tier5 " "
+set -g @batt_icon_charge_tier4 " "
+set -g @batt_icon_charge_tier3 " "
+set -g @batt_icon_charge_tier2 " "
+set -g @batt_icon_charge_tier1 " "
+set -g @batt_icon_status_charging " "
+
+# RIGHT: kube context, battery, time
+set -g status-right '#[fg=#74c7ec] '\
+' #[fg=#6c7086]#(kubectl config current-context 2>/dev/null | sed "s/-context//" || echo "no-kube")'\
+' #[fg=#6c7086]| #{battery_color_charge_fg}#{battery_icon_charge}#{battery_percentage}#[default]'\
+' #[fg=#585b70]| %H:%M '
+{{ else }}
+# RIGHT: kube context, time (no battery on WSL)
+set -g status-right '#[fg=#74c7ec] '\
+' #[fg=#6c7086]#(kubectl config current-context 2>/dev/null | sed "s/-context//" || echo "no-kube")'\
+' #[fg=#585b70]| %H:%M '
+{{ end }}
+
+##### ============================================
+##### 4. PLUGINS
+##### ============================================
+
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-prefix-highlight'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+{{ if not .is_wsl }}
+set -g @plugin 'tmux-plugins/tmux-battery'
+{{ end }}
+
+# Resurrect Settings
+set -g @resurrect-strategy-nvim 'session'
+set -g @resurrect-capture-pane-contents 'on'
+
+# Continuum Settings
+set -g @continuum-restore 'off'
+
+# Environment
+set -g update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_CONNECTION SSH_TTY TERM LANG LC_ALL KUBECONFIG TERM_PROGRAM"
+
+# Initialize TPM (Keep at bottom)
+run -b '~/.tmux/plugins/tpm/tpm'

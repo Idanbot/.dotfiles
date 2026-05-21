@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# This script re-runs whenever packages.yaml changes
+# chezmoi:template:left-delimiter="# {{"
+# chezmoi:template:right-delimiter="}}"
+# hash: # {{ include "packages.yaml" | sha256sum }}
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Package Manifest Changed — Checking for Updates"
+
+log_info "packages.yaml has been modified"
+log_info "Re-running install scripts to apply version changes..."
+log_info "For targeted upgrades, run individual install scripts manually."
+log_info "Run: chezmoi apply --verbose to see what changed"
+
+print_summary "Package Update Check"

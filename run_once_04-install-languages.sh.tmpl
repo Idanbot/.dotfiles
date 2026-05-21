@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing Languages & Runtimes"
+
+require_sudo
+ARCH=$(get_arch)
+
+# ── Go ────────────────────────────────────────────────────────────────────────
+GO_VERSION="1.24.3"
+if ! is_installed go || [[ "$(go version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$GO_VERSION" ]]; then
+  log_info "Installing Go ${GO_VERSION}..."
+  curl -fsSLo /tmp/go.tar.gz "https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  sudo rm -rf /usr/local/go
+  sudo tar -C /usr/local -xzf /tmp/go.tar.gz
+  rm -f /tmp/go.tar.gz
+  export PATH="$PATH:/usr/local/go/bin"
+  log_success "Go $(go version | grep -oP '\d+\.\d+\.\d+') installed"
+else
+  log_skip "Go ${GO_VERSION} already installed"
+fi
+
+# ── Rust ──────────────────────────────────────────────────────────────────────
+if ! is_installed rustc; then
+  log_info "Installing Rust (stable)..."
+  curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+  source "$HOME/.cargo/env"
+  log_success "Rust $(rustc --version | awk '{print $2}') installed"
+else
+  log_skip "Rust already installed"
+fi
+
+# ── Node.js via nvm ──────────────────────────────────────────────────────────
+NODE_LTS="22"
+export NVM_DIR="$HOME/.nvm"
+if [[ ! -d "$NVM_DIR" ]]; then
+  log_info "Installing nvm..."
+  curl -fsSLo- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  log_success "nvm installed"
+fi
+# Source nvm
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+if ! nvm ls "$NODE_LTS" &>/dev/null; then
+  log_info "Installing Node.js LTS ${NODE_LTS}..."
+  nvm install "$NODE_LTS"
+  nvm alias default "$NODE_LTS"
+  log_success "Node.js $(node --version) installed"
+else
+  log_skip "Node.js LTS ${NODE_LTS} already installed"
+fi
+
+# ── Python (uv) ──────────────────────────────────────────────────────────────
+if ! is_installed uv; then
+  log_info "Installing uv (Python package manager)..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  log_success "uv installed"
+else
+  log_skip "uv already installed"
+fi
+
+# ── Java (OpenJDK 21) ────────────────────────────────────────────────────────
+if ! is_installed java || ! java -version 2>&1 | grep -q "21"; then
+  log_info "Installing OpenJDK 21..."
+  sudo apt-get install -y openjdk-21-jdk-headless
+  log_success "Java $(java -version 2>&1 | head -1 | awk -F '"' '{print $2}') installed"
+else
+  log_skip "OpenJDK 21 already installed"
+fi
+
+print_summary "Languages & Runtimes"

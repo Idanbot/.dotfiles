@@ -1,0 +1,63 @@
+# packages.yaml — Version-pinned tool manifest
+# Update versions here, then run `chezmoi apply` to trigger upgrades
+# via run_onchange_ scripts.
+
+# Core CLI tools
+core:
+  fzf: "0.62.0"
+  fd: "10.2.0"
+  ripgrep: "14.1.1"
+  bat: "0.25.0"
+  eza: "0.21.0"
+  lazygit: "0.51.1"
+  btop: "1.4.0"
+  starship: "1.23.0"
+  jq: latest    # via apt
+  htop: latest  # via apt
+
+# Languages & runtimes
+languages:
+  go: "1.24.3"
+  rust: "stable"
+  node_lts: "22"
+  python: "3.12"
+  java: "21"
+  uv: latest
+
+# Editor
+editor:
+  neovim: "0.11.1"
+
+# Container & Cloud
+cloud:
+  docker: latest  # via apt repo
+  kubectl: "1.32.0"
+  helm: "3.17.0"
+  terraform: "1.12.0"
+  ansible: latest  # via pip
+  k9s: "0.40.5"
+  aws_cli: "2"
+  gcloud: latest
+  azure_cli: latest
+
+# Terminal
+terminal:
+  kitty: latest
+  tmux: latest  # via apt
+
+# Fonts
+fonts:
+  nerd_font: "FiraMono"
+  nerd_font_version: "3.4.0"
+
+# AI tools (optional)
+ai_tools:
+  claude_cli: latest
+  antigravity_cli: latest
+  opencode: latest
+
+# Media (native only)
+media:
+  yt_dlp: latest
+  rmpc: latest
+  cava: latest

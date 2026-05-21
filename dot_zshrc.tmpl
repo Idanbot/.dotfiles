@@ -1,0 +1,216 @@
+# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Initialization code that may require console input (password prompts, [y/n]
+# confirmations, etc.) must go above this block; everything else may go below.
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export GOPATH=$HOME/go
+
+# If you come from bash you might have to change your $PATH.
+export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+export PATH="$PATH:/usr/local/go/bin:$GOPATH/bin"
+
+# Path to your Oh My Zsh installation.
+export ZSH="$HOME/.oh-my-zsh"
+
+# History
+HIST_STAMPS="mm-dd-yyyy-%T"
+
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=249'
+
+plugins=(
+  # System / OS helpers
+  ubuntu
+  systemd
+  systemadmin
+{{ if not .is_wsl }}
+  kitty
+{{ end }}
+  tmux
+
+  # Core tools
+  gitfast
+  ssh
+  ssh-agent
+  web-search
+  nmap
+  aws
+
+  # Container & Cloud tooling
+  docker
+  docker-compose
+  podman
+  kubectl
+  minikube
+  helm
+  terraform
+  ansible
+
+  # Languages & frameworks
+  python
+  npm
+  golang
+  spring
+
+  # Utilities
+  fzf-tab
+  you-should-use
+  jsontools
+  vscode
+
+  # Aesthetics & UX (load last for compatibility)
+  colored-man-pages
+  colorize
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+
+  my-functions
+)
+
+source $ZSH/oh-my-zsh.sh
+
+setopt NO_BEEP
+
+# --- Completion core ---
+zmodload zsh/complist
+
+setopt COMPLETE_IN_WORD
+
+# Matching and menu behavior
+zstyle ':completion:*' matcher-list \
+  'm:{a-z}={A-Za-z}' \
+  'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+zstyle ':completion:*' menu no
+zstyle ':completion:*:descriptions' format '%d'
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
+zstyle ':completion:*' use-cache yes
+zstyle ':completion:*' cache-path "$HOME/.zsh/.zcompcache"
+zstyle ':completion:*' group-name ''
+zstyle ':completion:*:matches' group 'yes'
+zstyle ':completion:*:(rm|kill|diff):*' ignore-line yes
+zstyle ':completion:*' special-dirs true
+_comp_options+=(globdots)
+
+zstyle ':completion:*' file-patterns '*:all-files'
+# ---- completion ignore set for rm/chmod/chown/chgrp/diff ----
+typeset -a _ignored_dev_artifacts
+_ignored_dev_artifacts=(
+  '*~' '*.bak' '*.tmp' '*.swp' '*.swo' '.*.sw?' '.DS_Store' 'Thumbs.db' '.Trash-*'
+  '*/.git/*' '*/.svn/*' '*/.hg/*'
+  '__pycache__/*' '*.pyc' '*.pyo'
+  'target/*' 'target/**' 'build/*' 'build/**' '.gradle/*' '.gradle/**'
+  '*.class' '*.jar' '*.war' '*.ear'
+  'node_modules/*' 'node_modules/**' 'dist/*' 'dist/**' 'build/*' 'build/**'
+  '.next/*' '.next/**' 'out/*' 'out/**' 'coverage/*' 'coverage/**' '.turbo/*' '.turbo/**'
+  'bin/*' 'bin/**' 'pkg/*' 'pkg/**' '*.test' 'coverage.out'
+  'target/*' 'target/**' '*.rlib' '*.rmeta'
+  '.terraform/*' '.terraform/**' '*.tfstate' '*.tfstate.*' 'crash.log' '*.plan'
+  '*.tar' '*/.docker/*' '*/.docker/**'
+  '.idea/*' '.idea/**' '.vscode/*' '.vscode/**' '.envrc' '.direnv/*' '.direnv/**'
+)
+
+zstyle ':completion:*:(rm|chmod|chown|chgrp|diff):*' ignored-patterns "${_ignored_dev_artifacts[@]}"
+
+# --- AWS CLI completion via aws_completer ---
+if command -v aws_completer >/dev/null 2>&1; then
+  complete -C "$(command -v aws_completer)" aws
+fi
+
+# Git zstyle
+zstyle ':completion:*:*:git:*' script /usr/share/zsh/functions/Completion/Unix/_git 2>/dev/null
+
+# FZF
+if command -v fdfind >/dev/null; then
+  export FZF_DEFAULT_COMMAND='fdfind --hidden --follow --exclude .git'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fdfind --type d --hidden --follow --exclude .git'
+elif command -v fd >/dev/null; then
+  export FZF_DEFAULT_COMMAND='fd --hidden --follow --exclude .git'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
+elif command -v rg >/dev/null; then
+  export FZF_DEFAULT_COMMAND='rg --files --hidden --follow -g "!{.git,node_modules}"'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='rg --files --hidden --follow -g "!{.git,node_modules}" | xargs -r dirname | sort -u'
+fi
+
+export FZF_DEFAULT_OPTS="
+  --ansi
+  --layout=reverse
+  --height=60%
+  --info=inline
+  --border=rounded
+  --color=fg:#cdd6f4,bg:#1e1e2e,hl:#f5c2e7
+  --color=fg+:#f5e0dc,bg+:#313244,hl+:#f38ba8
+  --color=info:#89b4fa,prompt:#fab387,pointer:#f38ba8
+  --color=marker:#a6e3a1,spinner:#f5c2e7,header:#94e2d5
+  --preview '~/.local/bin/fzf-preview.sh {}'
+  --preview-window=right,60%,wrap
+{{ if not .is_wsl }}
+  --bind 'start:execute-silent(kitty +kitten icat --clear >/dev/tty 2>/dev/null)'
+  --bind 'end:execute-silent(kitty +kitten icat --clear >/dev/tty 2>/dev/null)'
+{{ end }}
+"
+
+# Convert Zsh prompt escapes to ANSI so fzf shows real colors
+zstyle ':fzf-tab:*' ansi true
+zstyle ':fzf-tab:*' continuous-trigger '/'
+zstyle ':fzf-tab:complete:*' fzf-preview '~/.local/bin/fzf-preview.sh ${(q)realpath}'
+zstyle ':fzf-tab:complete:docker-*:*' fzf-preview 'docker inspect --format "{{ "{{" }}.Name{{ "}}" }} {{ "{{" }}.State.Status{{ "}}" }}" {1} 2>/dev/null'
+zstyle ':fzf-tab:complete:kubectl-*:*' fzf-preview 'kubectl get pod {1} -o wide 2>/dev/null'
+zstyle ':fzf-tab:complete:*' fzf-preview-options '--preview-window=down,60%,wrap,border-rounded'
+
+zstyle ':fzf-tab:*' switch-group '<' '>'
+zstyle ':fzf-tab:*' fzf-flags \
+  '--ansi' '--layout=reverse' '--border=rounded' '--height=60%' '--info=inline' '--bind=tab:accept'
+
+# AWS settings
+export AWS_CLI_AUTO_PROMPT="on-partial"
+export AWS_PAGER=""
+
+# Aliases
+alias c="clear"
+alias reload="source ~/.zshrc"
+alias reload-bash="source ~/.bashrc"
+alias fd="fdfind"
+alias rg="rg --pretty --column --line-number"
+alias vlg='valgrind --leak-check=yes --track-origins=yes'
+alias cpfile='xclip -selection clipboard <'
+alias gd='gcc -ansi -pedantic-errors -Wall -Wextra -g'
+alias gc='gcc -ansi -pedantic-errors -Wall -Wextra -DNDEBUG -O3'
+alias gd9='gcc -std=c99 -pedantic-errors -Wall -Wextra -g'
+alias gc9='gcc -std=c99 -pedantic-errors -Wall -Wextra -DNDEBUG -O3'
+alias ssh='TERM=xterm-256color ssh'
+alias ls='eza --icons=always -hg'
+alias cat='bat --paging=never --style=full'
+alias tm='tmuxp load -y -s "$(basename $PWD | tr . _)" $(tmuxp ls | fzf)'
+alias ytmp4='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"'
+
+# Tmux ThePrimeagen Sessioner magic
+bindkey -s '^f'  'tmux-sessionizer\n'     # Ctrl + f
+bindkey -s '\eh' 'tmux-sessionizer -s 0\n'  # Alt + h
+bindkey -s '\et' 'tmux-sessionizer -s 1\n'
+bindkey -s '\en' 'tmux-sessionizer -s 2\n'
+bindkey -s '\es' 'tmux-sessionizer -s 3\n'
+
+# Starship (ultra-fast cross-shell prompt)
+eval "$(starship init zsh)"
+
+[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
+
+export GOPATH=$HOME/go
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export CARGO_HOME=$HOME/.cargo
+
+export BAT_THEME=ansi
+
+# Deduplicate PATH
+typeset -U path PATH
+
+export FPATH="$HOME/Scripts/eza/completions/zsh:$FPATH"
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+export PATH=$HOME/bin:$PATH

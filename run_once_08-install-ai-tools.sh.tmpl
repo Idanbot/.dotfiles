@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing AI Coding Tools (Optional)"
+
+# ── Claude CLI ────────────────────────────────────────────────────────────────
+if ! is_installed claude; then
+  log_info "Installing Claude CLI..."
+  if is_installed npm; then
+    npm install -g @anthropic-ai/claude-cli 2>/dev/null && log_success "Claude CLI installed" || log_warn "Claude CLI install failed"
+  else
+    log_warn "npm not found — skipping Claude CLI"
+  fi
+else
+  log_skip "Claude CLI already installed"
+fi
+
+# ── Antigravity / Gemini CLI ──────────────────────────────────────────────────
+if ! is_installed antigravity && ! is_installed gemini; then
+  log_info "Installing Gemini CLI..."
+  if is_installed npm; then
+    npm install -g @anthropic-ai/antigravity-cli 2>/dev/null || \
+    npm install -g @google/gemini-cli 2>/dev/null && log_success "Gemini CLI installed" || \
+    log_warn "Gemini CLI install failed — install manually"
+  else
+    log_warn "npm not found — skipping Gemini CLI"
+  fi
+else
+  log_skip "Gemini/Antigravity CLI already installed"
+fi
+
+# ── OpenCode ──────────────────────────────────────────────────────────────────
+if ! is_installed opencode; then
+  log_info "Installing OpenCode..."
+  if is_installed go; then
+    go install github.com/opencode-ai/opencode@latest 2>/dev/null && log_success "OpenCode installed" || log_warn "OpenCode install failed"
+  else
+    log_warn "go not found — skipping OpenCode"
+  fi
+else
+  log_skip "OpenCode already installed"
+fi
+
+print_summary "AI Coding Tools"

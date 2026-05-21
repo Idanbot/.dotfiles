@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Configuring System"
+
+# ── Set Zsh as default shell ──────────────────────────────────────────────────
+if [[ "$SHELL" != *zsh* ]]; then
+  log_info "Setting Zsh as default shell..."
+  if is_installed zsh; then
+    chsh -s "$(which zsh)"
+    log_success "Default shell changed to Zsh (restart session to take effect)"
+  else
+    log_error "Zsh not found — cannot set as default"
+  fi
+else
+  log_skip "Zsh is already the default shell"
+fi
+
+# ── Git Credential Manager ────────────────────────────────────────────────────
+if ! is_installed git-credential-manager; then
+  log_info "Installing Git Credential Manager..."
+  ARCH=$(get_arch)
+  GCM_VERSION=$(github_latest_release "git-ecosystem/git-credential-manager" | tr -d 'v')
+  if [[ -n "$GCM_VERSION" ]]; then
+    curl -fsSLo /tmp/gcm.deb "https://github.com/git-ecosystem/git-credential-manager/releases/download/v${GCM_VERSION}/gcm-linux_${ARCH}.${GCM_VERSION}.deb"
+    sudo dpkg -i /tmp/gcm.deb 2>/dev/null || sudo apt-get install -f -y
+    rm -f /tmp/gcm.deb
+    git-credential-manager configure 2>/dev/null || true
+    log_success "Git Credential Manager installed"
+  else
+    log_warn "Could not determine GCM version"
+  fi
+else
+  log_skip "Git Credential Manager already installed"
+fi
+
+{{ if not .is_wsl }}
+# ── Set Kitty as default terminal (native only) ──────────────────────────────
+if is_installed kitty; then
+  log_info "Setting Kitty as default terminal..."
+  sudo update-alternatives --install /usr/bin/x-terminal-emulator x-terminal-emulator "$(which kitty)" 50 2>/dev/null || true
+  log_success "Kitty set as terminal alternative"
+fi
+{{ end }}
+
+print_summary "System Configuration"

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing Zsh Ecosystem"
+
+require_sudo
+
+# Install zsh
+apt_install zsh
+
+# Oh-My-Zsh is handled by .chezmoiexternal.yaml (downloaded as archive)
+# Zsh plugins (fzf-tab, autosuggestions, syntax-highlighting, you-should-use)
+# are also handled by .chezmoiexternal.yaml
+
+if [[ -d "$HOME/.oh-my-zsh" ]]; then
+  log_success "Oh-My-Zsh installed (via chezmoi externals)"
+else
+  log_warn "Oh-My-Zsh not yet installed — will be set up by chezmoi externals"
+fi
+
+print_summary "Zsh Ecosystem"

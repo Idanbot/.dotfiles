@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# chezmoi:template:left-delimiter="# {{"
+# chezmoi:template:right-delimiter="}}"
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Detecting Environment"
+
+if is_wsl; then
+  log_info "Environment: WSL (Windows Subsystem for Linux)"
+else
+  log_info "Environment: Native Linux"
+fi
+
+log_info "Architecture: $(get_arch) ($(uname -m))"
+log_info "Hostname: $(hostname)"
+log_info "User: $(whoami)"
+
+# Create standard directory structure
+log_step "Creating Directory Structure"
+for dir in "$HOME/Code" "$HOME/Scripts" "$HOME/Education" "$HOME/.local/bin" "$HOME/.config"; do
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir"
+    log_success "Created $dir"
+  else
+    log_skip "$dir already exists"
+  fi
+done
+
+print_summary "Environment Setup"

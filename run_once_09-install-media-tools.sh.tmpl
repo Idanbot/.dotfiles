@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing Media Tools"
+
+if is_wsl; then
+  log_skip "Skipping media tools on WSL"
+  print_summary "Media Tools"
+  exit 0
+fi
+
+# ── yt-dlp ────────────────────────────────────────────────────────────────────
+if ! is_installed yt-dlp; then
+  log_info "Installing yt-dlp..."
+  pip3 install --user yt-dlp 2>/dev/null || {
+    if is_installed uv; then
+      uv tool install yt-dlp
+    else
+      sudo curl -fsSLo /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+      sudo chmod a+rx /usr/local/bin/yt-dlp
+    fi
+  }
+  log_success "yt-dlp installed"
+else
+  log_skip "yt-dlp already installed"
+fi
+
+# ── cava (audio visualizer) ───────────────────────────────────────────────────
+apt_install cava 2>/dev/null || log_warn "cava not available in apt — install from source if needed"
+
+# ── rmpc + mpd ────────────────────────────────────────────────────────────────
+apt_install mpd 2>/dev/null || log_warn "mpd not available"
+if ! is_installed rmpc; then
+  log_info "Installing rmpc..."
+  RMPC_VERSION=$(github_latest_release "mierak/rmpc" 2>/dev/null || echo "")
+  if [[ -n "$RMPC_VERSION" ]]; then
+    curl -fsSLo /tmp/rmpc.tar.gz "https://github.com/mierak/rmpc/releases/download/${RMPC_VERSION}/rmpc-$(uname -m)-unknown-linux-gnu.tar.gz" 2>/dev/null
+    if [[ -f /tmp/rmpc.tar.gz ]]; then
+      tar -xf /tmp/rmpc.tar.gz -C /tmp 2>/dev/null
+      sudo install /tmp/rmpc /usr/local/bin/rmpc 2>/dev/null && log_success "rmpc installed" || log_warn "rmpc install failed"
+      rm -f /tmp/rmpc /tmp/rmpc.tar.gz
+    else
+      log_warn "rmpc download failed"
+    fi
+  else
+    log_warn "Could not determine rmpc version — skipping"
+  fi
+else
+  log_skip "rmpc already installed"
+fi
+
+print_summary "Media Tools"

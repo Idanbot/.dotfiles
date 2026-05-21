@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Applying Catppuccin Mocha Theme"
+
+# ── bat ───────────────────────────────────────────────────────────────────────
+log_info "bat: Using BAT_THEME=ansi (set in .zshrc)"
+
+# ── btop ──────────────────────────────────────────────────────────────────────
+BTOP_THEME_DIR="$HOME/.config/btop/themes"
+if [[ ! -f "$BTOP_THEME_DIR/catppuccin_mocha.theme" ]]; then
+  log_info "Installing Catppuccin Mocha theme for btop..."
+  mkdir -p "$BTOP_THEME_DIR"
+  curl -fsSLo "$BTOP_THEME_DIR/catppuccin_mocha.theme" \
+    "https://raw.githubusercontent.com/catppuccin/btop/main/themes/catppuccin_mocha.theme"
+  log_success "btop Catppuccin theme installed"
+else
+  log_skip "btop Catppuccin theme already installed"
+fi
+
+# ── lazygit ───────────────────────────────────────────────────────────────────
+LAZYGIT_CONFIG="$HOME/.config/lazygit/config.yml"
+if [[ -f "$LAZYGIT_CONFIG" ]] && grep -q "catppuccin" "$LAZYGIT_CONFIG" 2>/dev/null; then
+  log_skip "lazygit Catppuccin theme already configured"
+else
+  log_info "Configuring Catppuccin Mocha theme for lazygit..."
+  mkdir -p "$(dirname "$LAZYGIT_CONFIG")"
+  cat > "$LAZYGIT_CONFIG" <<'EOF'
+gui:
+  nerdFontsVersion: "3"
+  theme:
+    activeBorderColor:
+      - "#89b4fa"
+      - bold
+    inactiveBorderColor:
+      - "#45475a"
+    optionsTextColor:
+      - "#89b4fa"
+    selectedLineBgColor:
+      - "#313244"
+    cherryPickedCommitBgColor:
+      - "#45475a"
+    cherryPickedCommitFgColor:
+      - "#89b4fa"
+    unstagedChangesColor:
+      - "#f38ba8"
+    defaultFgColor:
+      - "#cdd6f4"
+    searchingActiveBorderColor:
+      - "#f9e2af"
+EOF
+  log_success "lazygit Catppuccin theme configured"
+fi
+
+{{ if not .is_wsl }}
+# ── Kitty ─────────────────────────────────────────────────────────────────────
+KITTY_THEME_DIR="$HOME/.config/kitty/themes"
+KITTY_THEME_FILE="$KITTY_THEME_DIR/catppuccin_mocha.conf"
+if [[ ! -f "$KITTY_THEME_FILE" ]]; then
+  log_info "Installing Catppuccin Mocha theme for Kitty..."
+  mkdir -p "$KITTY_THEME_DIR"
+  curl -fsSLo "$KITTY_THEME_FILE" \
+    "https://raw.githubusercontent.com/catppuccin/kitty/main/themes/mocha.conf"
+  log_success "Kitty Catppuccin theme installed"
+else
+  log_skip "Kitty Catppuccin theme already installed"
+fi
+{{ end }}
+
+log_info "Starship: already using Catppuccin Mocha palette"
+log_info "FZF: already using Catppuccin colors in .zshrc"
+log_info "Neovim: set your LazyVim colorscheme to 'catppuccin' in plugins/core.lua"
+
+print_summary "Catppuccin Mocha Theme"

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+source "$HOME/.dotfiles/scripts/lib.sh"
+
+log_step "Installing VS Code Extensions (Fallback)"
+
+if ! is_installed code; then
+  log_skip "VS Code not installed — skipping extension installation"
+  log_info "Recommendation: Use VS Code Settings Sync (GitHub account) for extensions"
+  print_summary "VS Code Extensions"
+  exit 0
+fi
+
+log_info "VS Code detected — installing extensions from saved list"
+log_info "Note: Prefer VS Code Settings Sync for ongoing sync"
+
+# Core extensions — install if not present
+EXTENSIONS=(
+  enkia.tokyo-night
+  impasse52.catppuccin-mocha-darker
+  pkief.material-icon-theme
+  vscodevim.vim
+  eamodio.gitlens
+  usernamehw.errorlens
+  esbenp.prettier-vscode
+  dbaeumer.vscode-eslint
+  ms-python.python
+  ms-python.vscode-pylance
+  golang.go
+  rust-lang.rust-analyzer
+  redhat.java
+  redhat.vscode-yaml
+  redhat.ansible
+  hashicorp.terraform
+  ms-azuretools.vscode-docker
+  ms-kubernetes-tools.vscode-kubernetes-tools
+  ms-vscode-remote.remote-ssh
+  ms-vscode-remote.remote-wsl
+  ms-vscode-remote.remote-containers
+  github.vscode-github-actions
+  github.vscode-pull-request-github
+  mads-hartmann.bash-ide-vscode
+  gruntfuggly.todo-tree
+  charliermarsh.ruff
+  streetsidesoftware.code-spell-checker
+  google.geminicodeassist
+)
+
+INSTALLED_EXTENSIONS=$(code --list-extensions 2>/dev/null)
+
+for ext in "${EXTENSIONS[@]}"; do
+  if echo "$INSTALLED_EXTENSIONS" | grep -qi "$ext"; then
+    log_skip "$ext"
+  else
+    log_info "Installing $ext..."
+    code --install-extension "$ext" --force 2>/dev/null && \
+      log_success "$ext installed" || \
+      log_warn "Failed to install $ext"
+  fi
+done
+
+print_summary "VS Code Extensions"
