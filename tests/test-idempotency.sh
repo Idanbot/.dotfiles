@@ -19,18 +19,18 @@ source "$HOME/.dotfiles/scripts/lib.sh"
 # Run core package install twice
 echo -e "${BOLD}── First run ──${NC}"
 sudo apt-get update -qq
-apt_install git curl wget jq
+apt_install git curl wget jq yq fzf fd-find ripgrep bat btop zoxide direnv git-delta hyperfine duf
 echo -e "\n${BOLD}── Second run (should all skip) ──${NC}"
 skipped_before_second_run=$_SKIPPED
-apt_install git curl wget jq
+apt_install git curl wget jq yq fzf fd-find ripgrep bat btop zoxide direnv git-delta hyperfine duf
 second_run_skipped=$((_SKIPPED - skipped_before_second_run))
 
 # Verify skip messages
 echo -e "\n${BOLD}── Idempotency Check ──${NC}"
-if [[ $second_run_skipped -eq 4 ]]; then
+if [[ $second_run_skipped -eq 15 ]]; then
   echo -e "  ${GREEN}✓${NC} All packages correctly skipped on second run ($second_run_skipped skipped)"
 else
-  echo -e "  ${RED}✗${NC} Expected 4 second-run skips, got $second_run_skipped"
+  echo -e "  ${RED}✗${NC} Expected 15 second-run skips, got $second_run_skipped"
   exit 1
 fi
 

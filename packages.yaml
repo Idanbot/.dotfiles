@@ -13,14 +13,27 @@ core:
   btop: "1.4.0"
   starship: "1.23.0"
   jq: latest    # via apt
+  yq: latest    # via apt
   htop: latest  # via apt
+  zoxide: "0.9.3"
+  direnv: "2.32.1"
+  git-delta: "0.16.5"
+  hyperfine: latest  # via apt
+  duf: latest        # via apt
+  sops: latest
+  dust: latest       # via cargo
+  xh: latest         # via cargo
+  lazydocker: "0.25.2"
+  tealdeer: "1.6.1"
 
 # Languages & runtimes
 languages:
   go: "1.24.3"
   rust: "stable"
-  node_lts: "22"
-  python: "3.12"
+  cargo: "stable"
+  node_lts: "24.15.0"
+  typescript: "5.9.3"
+  python: "3.14.5"
   java: "21"
   uv: latest
 

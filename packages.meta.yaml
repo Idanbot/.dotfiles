@@ -1,0 +1,173 @@
+# packages.meta.yaml — install source metadata for packages.yaml
+# Keep versions in packages.yaml; this describes each install source.
+
+core:
+  fzf:
+    source: external
+    repo: junegunn/fzf
+  fd:
+    source: apt
+    package: fd-find
+    binary: fdfind
+  ripgrep:
+    source: apt
+    package: ripgrep
+    binary: rg
+  bat:
+    source: apt
+    package: bat
+    binary: batcat
+  eza:
+    source: apt_repo
+    repo: eza-community/eza
+  lazygit:
+    source: github
+    repo: jesseduffield/lazygit
+    binary: lazygit
+    asset_template: lazygit_{version}_Linux_{arch}.tar.gz
+  btop:
+    source: apt
+    package: btop
+  starship:
+    source: install_script
+    url: https://starship.rs/install.sh
+  jq:
+    source: apt
+    package: jq
+  yq:
+    source: apt
+    package: yq
+  htop:
+    source: apt
+    package: htop
+  zoxide:
+    source: apt
+    package: zoxide
+  direnv:
+    source: apt
+    package: direnv
+  git-delta:
+    source: apt
+    package: git-delta
+    binary: delta
+  hyperfine:
+    source: apt
+    package: hyperfine
+  duf:
+    source: apt
+    package: duf
+  sops:
+    source: github
+    repo: getsops/sops
+    binary: sops
+    asset_template: sops-{tag}.linux.{arch}
+  dust:
+    source: cargo
+    crate: du-dust
+    binary: dust
+  xh:
+    source: cargo
+    crate: xh
+    binary: xh
+  lazydocker:
+    source: github
+    repo: jesseduffield/lazydocker
+    binary: lazydocker
+    asset_template: lazydocker_{version}_Linux_{arch}.tar.gz
+  tealdeer:
+    source: github
+    repo: dbrgn/tealdeer
+    binary: tldr
+    asset_template: tealdeer-linux-{arch}-musl
+
+languages:
+  go:
+    source: direct
+    url_template: https://dl.google.com/go/go{version}.linux-{arch}.tar.gz
+  rust:
+    source: rustup
+    channel: stable
+  cargo:
+    source: rustup
+    channel: stable
+  node_lts:
+    source: nvm
+  typescript:
+    source: npm
+    package: typescript
+    binary: tsc
+  python:
+    source: uv
+  java:
+    source: apt
+    package_template: openjdk-{version}-jdk-headless
+  uv:
+    source: install_script
+    url: https://astral.sh/uv/install.sh
+
+editor:
+  neovim:
+    source: github
+    repo: neovim/neovim
+    binary: nvim
+    asset_template: nvim-linux-x86_64.appimage
+
+cloud:
+  docker:
+    source: apt_repo
+  kubectl:
+    source: direct
+  helm:
+    source: install_script
+  terraform:
+    source: direct
+  ansible:
+    source: pip
+  k9s:
+    source: github
+    repo: derailed/k9s
+    binary: k9s
+    asset_template: k9s_Linux_{arch}.tar.gz
+  aws_cli:
+    source: direct
+  gcloud:
+    source: apt_repo
+  azure_cli:
+    source: apt_repo
+
+terminal:
+  kitty:
+    source: apt
+    package: kitty
+  tmux:
+    source: apt
+    package: tmux
+
+fonts:
+  nerd_font:
+    source: github
+    repo: ryanoasis/nerd-fonts
+  nerd_font_version:
+    source: github
+    repo: ryanoasis/nerd-fonts
+
+ai_tools:
+  claude_cli:
+    source: npm
+  antigravity_cli:
+    source: optional
+  opencode:
+    source: go
+
+media:
+  yt_dlp:
+    source: github
+    repo: yt-dlp/yt-dlp
+    binary: yt-dlp
+  rmpc:
+    source: github
+    repo: mierak/rmpc
+    binary: rmpc
+  cava:
+    source: apt
+    package: cava

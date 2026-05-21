@@ -23,9 +23,6 @@ if ! is_installed kitty; then
   mkdir -p "$HOME/.local/share/applications"
   cp "$HOME/.local/kitty.app/share/applications/kitty.desktop" "$HOME/.local/share/applications/"
   cp "$HOME/.local/kitty.app/share/applications/kitty-open.desktop" "$HOME/.local/share/applications/"
-  sed -i "s|Icon=kitty|Icon=$HOME/.local/kitty.app/share/icons/hicolor/256x256/apps/kitty.png|g" \
-    "$HOME/.local/share/applications/kitty.desktop" \
-    "$HOME/.local/share/applications/kitty-open.desktop"
   log_success "Kitty terminal installed"
 else
   log_skip "Kitty already installed"

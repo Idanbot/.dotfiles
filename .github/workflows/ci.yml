@@ -33,7 +33,7 @@ jobs:
       - name: Install linters
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y shellcheck yamllint
+          sudo apt-get install -y shellcheck yamllint tmux zsh
           # shfmt
           GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@latest || {
             shfmt_url=https://github.com/mvdan/sh/releases/latest/download
@@ -45,44 +45,37 @@ jobs:
       - name: shellcheck
         run: |
           echo "══ Running shellcheck ══"
-          find . -name '*.sh' -o -name '*.sh.tmpl' | while read -r f; do
-            # Strip chezmoi template directives for shellcheck
-            cleaned=$(mktemp)
-            sed -E '/^#\s*\{\{/d; s/\{\{[^}]*\}\}//g' "$f" > "$cleaned"
-            echo "Checking: $f"
-            shellcheck -x -S warning "$cleaned" || true
-            rm -f "$cleaned"
-          done
+          find . -name '*.sh' -print0 | \
+            xargs -0 shellcheck -x -S warning -e SC1090,SC1091
 
       - name: shfmt
         run: |
           echo "══ Running shfmt ══"
-          find . -name '*.sh' | xargs shfmt -d -i 2 -ci || true
+          find . -name '*.sh' -print0 | xargs -0 shfmt -d -i 2 -ci
 
       - name: yamllint
         run: |
           echo "══ Running yamllint ══"
-          yamllint -d relaxed . || true
+          yamllint -d relaxed .
 
       - name: Validate templates
-        run: |
-          echo "══ Validating chezmoi templates ══"
-          # Check that all .tmpl files have valid Go template syntax
-          find . -name '*.tmpl' | while read -r f; do
-            echo "Validating: $f"
-            # Basic syntax check: ensure {{ }} are balanced
-            opens=$(grep -oP '\{\{' "$f" | wc -l)
-            closes=$(grep -oP '\}\}' "$f" | wc -l)
-            if [[ "$opens" -ne "$closes" ]]; then
-              echo "ERROR: Unbalanced template delimiters in $f"
-              echo "{{ = $opens, }} = $closes"
-              exit 1
-            fi
-          done
-          echo "All templates valid"
+        run: tests/test-templates.sh "$PWD"
 
       - name: Repository layout
         run: tests/test-repo-layout.sh
+
+      - name: Package metadata and generated docs
+        run: tests/test-package-metadata.sh
+
+      - name: Install chezmoi
+        run: |
+          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b /usr/local/bin
+
+      - name: Chezmoi apply fixture
+        run: tests/test-chezmoi-apply.sh "$PWD"
+
+      - name: Interactive startup smoke
+        run: tests/test-interactive-startup.sh "$PWD"
 
   hadolint:
     name: Dockerfile Lint
@@ -96,9 +89,40 @@ jobs:
           dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
           failure-threshold: warning
 
+
+  cargo-tools:
+    name: Cargo Tool Install Smoke
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-tools-${{ runner.os }}-${{ hashFiles('packages.yaml') }}
+      - name: Install cargo tools
+        run: tests/test-cargo-tools.sh
+
+  github-release-tools:
+    name: GitHub Release Tool Smoke
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download and smoke GitHub release tools
+        run: tests/test-github-release-tools.sh "$PWD"
+
   test:
     name: Bootstrap Test (${{ matrix.profile.name }})
-    needs: [lint, hadolint]
+    needs: [gitleaks, lint, hadolint, cargo-tools, github-release-tools]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

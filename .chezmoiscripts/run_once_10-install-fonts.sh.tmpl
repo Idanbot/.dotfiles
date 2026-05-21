@@ -3,8 +3,8 @@ source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
 
 log_step "Installing Nerd Fonts"
 
-FONT_NAME="FiraMono"
-FONT_VERSION="3.4.0"
+FONT_NAME="$(package_version fonts nerd_font FiraMono)"
+FONT_VERSION="$(package_version fonts nerd_font_version 3.4.0)"
 FONT_DIR="$HOME/.local/share/fonts"
 
 if fc-list | grep -qi "FiraMono Nerd"; then

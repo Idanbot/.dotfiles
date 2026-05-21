@@ -3,11 +3,9 @@
 	name = {{ .name }}
 [credential]
 {{- if .is_wsl }}
-	helper = "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
+	helper = !f() { if [ -x '/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe' ]; then '/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe' "$@"; elif command -v git-credential-manager >/dev/null 2>&1; then git-credential-manager "$@"; fi; }; f
 {{- else }}
-	helper = manager-core
-	helper =
-	helper = /usr/local/bin/git-credential-manager
+	helper = !f() { if command -v git-credential-manager >/dev/null 2>&1; then git-credential-manager "$@"; elif command -v git-credential-manager-core >/dev/null 2>&1; then git-credential-manager-core "$@"; fi; }; f
 	credentialStore = secretservice
 {{- end }}
 [credential "https://dev.azure.com"]
@@ -20,7 +18,14 @@
 	defaultBranch = main
 [core]
 	editor = nvim
-	pager = bat --paging=always --style=plain
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	light = false
+	side-by-side = true
+	line-numbers = true
 [diff]
 	tool = nvimdiff
 [merge]

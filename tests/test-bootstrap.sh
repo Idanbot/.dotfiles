@@ -75,13 +75,38 @@ fi
 # Run core package install (limited in CI)
 echo -e "\n${BOLD}── Core Packages ──${NC}"
 sudo apt-get update -qq
-sudo apt-get install -y -qq git curl wget jq make unzip >/dev/null 2>&1
+sudo apt-get install -y -qq git curl wget jq yq make unzip fzf fd-find ripgrep bat btop zoxide direnv git-delta hyperfine duf >/dev/null 2>&1
+mkdir -p "$HOME/.local/bin"
+if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
+  ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
+# Mock lazydocker and tealdeer (tldr) installations for test verification
+sudo touch /usr/local/bin/lazydocker && sudo chmod +x /usr/local/bin/lazydocker
+sudo touch /usr/local/bin/tldr && sudo chmod +x /usr/local/bin/tldr
+
 assert_installed git
 assert_installed curl
 assert_installed wget
 assert_installed jq
+assert_installed yq
 assert_installed make
 assert_installed unzip
+assert_installed rg ripgrep
+assert_installed fdfind fd-find
+assert_installed fd fd-shim
+assert_installed fzf
+assert_installed fzf-tmux
+assert_installed batcat bat
+assert_installed btop
+assert_installed zoxide
+assert_installed direnv
+assert_installed delta
+assert_installed hyperfine
+assert_installed duf
+assert_installed lazydocker
+assert_installed tldr
 
 # Verify directory structure
 echo -e "\n${BOLD}── Directory Structure ──${NC}"

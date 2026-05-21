@@ -21,12 +21,21 @@ _FAILED=0
 _WARNINGS=0
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-log_info()    { echo -e "${BLUE}[INFO]${NC}  $*"; }
+log_info() { echo -e "${BLUE}[INFO]${NC}  $*"; }
 log_success() { echo -e "${GREEN}[OK]${NC}    $*"; }
-log_warn()    { echo -e "${YELLOW}[WARN]${NC}  $*"; ((_WARNINGS++)) || true; }
-log_error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; ((_FAILED++)) || true; }
-log_skip()    { echo -e "${DIM}[SKIP]${NC}  $*"; ((_SKIPPED++)) || true; }
-log_step()    { echo -e "\n${BOLD}${CYAN}══ $* ══${NC}"; }
+log_warn() {
+  echo -e "${YELLOW}[WARN]${NC}  $*"
+  ((_WARNINGS++)) || true
+}
+log_error() {
+  echo -e "${RED}[ERROR]${NC} $*" >&2
+  ((_FAILED++)) || true
+}
+log_skip() {
+  echo -e "${DIM}[SKIP]${NC}  $*"
+  ((_SKIPPED++)) || true
+}
+log_step() { echo -e "\n${BOLD}${CYAN}══ $* ══${NC}"; }
 
 # ── Environment Detection ─────────────────────────────────────────────────────
 is_wsl() {
@@ -54,10 +63,10 @@ get_arch() {
   local arch
   arch=$(uname -m)
   case "$arch" in
-    x86_64)  echo "amd64" ;;
+    x86_64) echo "amd64" ;;
     aarch64) echo "arm64" ;;
-    armv7l)  echo "armhf" ;;
-    *)       echo "$arch" ;;
+    armv7l) echo "armhf" ;;
+    *) echo "$arch" ;;
   esac
 }
 
@@ -111,7 +120,11 @@ require_sudo() {
     sudo -v
   fi
   # Keep sudo alive in background
-  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done 2>/dev/null &
+  while true; do
+    sudo -n true
+    sleep 50
+    kill -0 "$$" || exit
+  done 2>/dev/null &
 }
 
 # ── Download Helpers ──────────────────────────────────────────────────────────
@@ -131,6 +144,125 @@ download() {
 github_latest_release() {
   local repo="$1"
   curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" | grep -oP '"tag_name": "\K[^"]+'
+}
+
+resolve_tool_version() {
+  local repo="$1" requested="${2:-latest}"
+  if [[ "$requested" == "latest" || -z "$requested" ]]; then
+    github_latest_release "$repo"
+  else
+    echo "$requested"
+  fi
+}
+
+version_without_v() {
+  local version="$1"
+  echo "${version#v}"
+}
+
+github_asset_name() {
+  local template="$1" tag="$2" arch="$3"
+  local version
+  version=$(version_without_v "$tag")
+  template="${template//\{tag\}/$tag}"
+  template="${template//\{version\}/$version}"
+  template="${template//\{arch\}/$arch}"
+  echo "$template"
+}
+
+install_managed_binary() {
+  local src="$1" binary="$2"
+  local bin_dir="${DOTFILES_BIN_DIR:-/usr/local/bin}"
+
+  if [[ "$bin_dir" == "/usr/local/bin" ]]; then
+    sudo install "$src" "$bin_dir/$binary"
+  else
+    mkdir -p "$bin_dir"
+    install "$src" "$bin_dir/$binary"
+  fi
+}
+
+install_github_archive() {
+  local binary="$1" repo="$2" requested_version="$3" asset_template="$4" member="$5"
+  local tag arch asset tmpdir archive
+
+  if is_installed "$binary"; then
+    log_skip "$binary already installed"
+    return 0
+  fi
+
+  tag=$(resolve_tool_version "$repo" "$requested_version")
+  arch=$(get_arch)
+  asset=$(github_asset_name "$asset_template" "$tag" "$arch")
+  tmpdir=$(mktemp -d)
+  archive="$tmpdir/$asset"
+
+  log_info "Installing $binary from $repo $tag..."
+  curl -fsSLo "$archive" "https://github.com/${repo}/releases/download/${tag}/${asset}"
+  tar -xf "$archive" -C "$tmpdir" "$member"
+  install_managed_binary "$tmpdir/$member" "$binary"
+  rm -rf "$tmpdir"
+  log_success "$binary $tag installed"
+}
+
+install_github_binary() {
+  local binary="$1" repo="$2" requested_version="$3" asset_template="$4" output_name="${5:-$1}"
+  local tag arch asset tmpdir dest
+
+  if is_installed "$binary"; then
+    log_skip "$binary already installed"
+    return 0
+  fi
+
+  tag=$(resolve_tool_version "$repo" "$requested_version")
+  arch=$(get_arch)
+  asset=$(github_asset_name "$asset_template" "$tag" "$arch")
+  tmpdir=$(mktemp -d)
+  dest="$tmpdir/$output_name"
+
+  log_info "Installing $binary from $repo $tag..."
+  curl -fsSLo "$dest" "https://github.com/${repo}/releases/download/${tag}/${asset}"
+  install_managed_binary "$dest" "$binary"
+  rm -rf "$tmpdir"
+  log_success "$binary $tag installed"
+}
+
+package_version() {
+  local section="$1" key="$2" default="${3:-}"
+  local manifest="${DOTFILES_PACKAGES_FILE:-}"
+
+  if [[ -z "$manifest" ]]; then
+    manifest="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/packages.yaml"
+  fi
+
+  if [[ ! -f "$manifest" ]]; then
+    echo "$default"
+    return 0
+  fi
+
+  if is_installed yq; then
+    local value
+    value=$(yq -r ".${section}.${key} // \"${default}\"" "$manifest" 2>/dev/null || true)
+    if [[ -n "$value" && "$value" != "null" ]]; then
+      echo "$value"
+      return 0
+    fi
+  fi
+
+  awk -v section="$section" -v key="$key" -v default="$default" '
+    $0 ~ "^[[:space:]]*" section ":[[:space:]]*$" { in_section = 1; next }
+    in_section && $0 ~ "^[^[:space:]#].*:[[:space:]]*$" { in_section = 0 }
+    in_section && $1 == key ":" {
+      value = $2
+      sub(/[[:space:]#].*$/, "", value)
+      gsub(/"/, "", value)
+      gsub(/\047/, "", value)
+      print value
+      found = 1
+      exit
+    }
+    END { if (!found) print default }
+  ' "$manifest"
 }
 
 # ── Summary ───────────────────────────────────────────────────────────────────

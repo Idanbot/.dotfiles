@@ -8,7 +8,7 @@ ARCH=$(get_arch)
 
 if ! is_installed nvim; then
   log_info "Installing Neovim..."
-  NVIM_VERSION="v0.11.1"
+  NVIM_VERSION="v$(package_version editor neovim 0.11.1)"
   if [[ "$ARCH" == "amd64" ]]; then
     curl -fsSLo /tmp/nvim.appimage "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.appimage"
     chmod +x /tmp/nvim.appimage

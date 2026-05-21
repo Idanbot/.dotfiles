@@ -21,6 +21,11 @@ fi
 
 # ── fd-find ───────────────────────────────────────────────────────────────────
 apt_install fd-find
+if is_installed fdfind && ! is_installed fd; then
+  mkdir -p "$HOME/.local/bin"
+  ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
+  log_success "Created fd -> fdfind symlink"
+fi
 
 # ── ripgrep ───────────────────────────────────────────────────────────────────
 apt_install ripgrep
@@ -53,17 +58,13 @@ else
 fi
 
 # ── lazygit ───────────────────────────────────────────────────────────────────
-if ! is_installed lazygit; then
-  log_info "Installing lazygit..."
-  LAZYGIT_VERSION=$(github_latest_release "jesseduffield/lazygit" | tr -d 'v')
-  curl -fsSLo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_${ARCH}.tar.gz"
-  tar -xf /tmp/lazygit.tar.gz -C /tmp lazygit
-  sudo install /tmp/lazygit /usr/local/bin/lazygit
-  rm -f /tmp/lazygit /tmp/lazygit.tar.gz
-  log_success "lazygit ${LAZYGIT_VERSION} installed"
+LAZYGIT_VERSION=$(package_version core lazygit latest)
+if [[ "$ARCH" == "amd64" ]]; then
+  LG_ARCH="x86_64"
 else
-  log_skip "lazygit already installed"
+  LG_ARCH="$ARCH"
 fi
+install_github_archive lazygit jesseduffield/lazygit "v${LAZYGIT_VERSION#v}" "lazygit_{version}_Linux_${LG_ARCH}.tar.gz" lazygit
 
 # ── btop ──────────────────────────────────────────────────────────────────────
 apt_install btop
@@ -79,6 +80,32 @@ if ! is_installed starship; then
 else
   log_skip "starship already installed"
 fi
+
+
+# ── sops ──────────────────────────────────────────────────────────────────────
+SOPS_VERSION=$(package_version core sops latest)
+install_github_binary sops getsops/sops "$SOPS_VERSION" "sops-{tag}.linux.${ARCH}" sops
+
+# ── lazydocker ────────────────────────────────────────────────────────────────
+LAZYDOCKER_VERSION=$(package_version core lazydocker "0.25.2")
+if [[ "$ARCH" == "amd64" ]]; then
+  LD_ARCH="x86_64"
+else
+  LD_ARCH="$ARCH"
+fi
+install_github_archive lazydocker jesseduffield/lazydocker "v${LAZYDOCKER_VERSION#v}" "lazydocker_{version}_Linux_${LD_ARCH}.tar.gz" lazydocker
+
+# ── tealdeer ──────────────────────────────────────────────────────────────────
+TEALDEER_VERSION=$(package_version core tealdeer "1.6.1")
+if [[ "$ARCH" == "amd64" ]]; then
+  TD_ARCH="x86_64"
+elif [[ "$ARCH" == "arm64" ]]; then
+  TD_ARCH="aarch64"
+else
+  TD_ARCH="$ARCH"
+fi
+install_github_binary tldr dbrgn/tealdeer "v${TEALDEER_VERSION#v}" "tealdeer-linux-${TD_ARCH}-musl" tldr
+tldr --update || true
 
 # ── jq (usually from core but just in case) ───────────────────────────────────
 apt_install jq

@@ -72,7 +72,7 @@ bind -r ^ last-window
 
 # Session/Window Management (Popups)
 bind-key -r f run-shell "tmux neww ~/.local/bin/tmux-sessionizer"
-bind-key -r i run-shell "tmux neww ~/.tmux/tmux-cht.sh"
+bind-key -r i display-popup -w 80% -h 70% -E 'bash -lc "read -rp \"cht.sh query: \" query; [[ -n $query ]] || exit 0; curl -fsSL \"https://cht.sh/${query// /+}\" | less -R"'
 bind -r M-n display-popup -w 80% -h 80% -E "tmux new-session -A -s scratchpad"
 bind-key M-s display-popup -E "tmux list-sessions | less"
 bind-key M-w display-popup -E "tmux list-windows | less"

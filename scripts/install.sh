@@ -5,6 +5,14 @@
 
 set -euo pipefail
 
+if [[ "${1:-}" == "--only" ]]; then
+  if [[ -z "${2:-}" ]]; then
+    echo "Usage: ./scripts/install.sh --only <section>" >&2
+    exit 1
+  fi
+  exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-section.sh" "$2"
+fi
+
 echo "══════════════════════════════════════════════"
 echo "  Dotfiles Bootstrap — Idan Botbol"
 echo "══════════════════════════════════════════════"

@@ -1,0 +1,298 @@
+# packages.lock — generated from packages.yaml and packages.meta.yaml
+# Regenerate with: ./scripts/generate-package-lock.sh
+
+generated_from:
+  packages: 2fae901b443e4075bbc584820eb222f91b71257ceb2b6a114a83d5213bdfb4e4
+  metadata: 0d293748aaca421892cdb1800871899c75da4d0d36c31ebe955603fc98b991a6
+
+tools:
+  - section: core
+    name: fzf
+    version: 0.62.0
+    source: external
+    repo: junegunn/fzf
+    checksum: null
+  - section: core
+    name: fd
+    version: 10.2.0
+    source: apt
+    package: fd-find
+    binary: fdfind
+    checksum: null
+  - section: core
+    name: ripgrep
+    version: 14.1.1
+    source: apt
+    package: ripgrep
+    binary: rg
+    checksum: null
+  - section: core
+    name: bat
+    version: 0.25.0
+    source: apt
+    package: bat
+    binary: batcat
+    checksum: null
+  - section: core
+    name: eza
+    version: 0.21.0
+    source: apt_repo
+    repo: eza-community/eza
+    checksum: null
+  - section: core
+    name: lazygit
+    version: 0.51.1
+    source: github
+    repo: jesseduffield/lazygit
+    binary: lazygit
+    checksum: null
+  - section: core
+    name: btop
+    version: 1.4.0
+    source: apt
+    package: btop
+    checksum: null
+  - section: core
+    name: starship
+    version: 1.23.0
+    source: install_script
+    checksum: null
+  - section: core
+    name: jq
+    version: latest
+    source: apt
+    package: jq
+    checksum: null
+  - section: core
+    name: yq
+    version: latest
+    source: apt
+    package: yq
+    checksum: null
+  - section: core
+    name: htop
+    version: latest
+    source: apt
+    package: htop
+    checksum: null
+  - section: core
+    name: zoxide
+    version: 0.9.3
+    source: apt
+    package: zoxide
+    checksum: null
+  - section: core
+    name: direnv
+    version: 2.32.1
+    source: apt
+    package: direnv
+    checksum: null
+  - section: core
+    name: git-delta
+    version: 0.16.5
+    source: apt
+    package: git-delta
+    binary: delta
+    checksum: null
+  - section: core
+    name: hyperfine
+    version: latest
+    source: apt
+    package: hyperfine
+    checksum: null
+  - section: core
+    name: duf
+    version: latest
+    source: apt
+    package: duf
+    checksum: null
+  - section: core
+    name: sops
+    version: latest
+    source: github
+    repo: getsops/sops
+    binary: sops
+    checksum: null
+  - section: core
+    name: dust
+    version: latest
+    source: cargo
+    crate: du-dust
+    binary: dust
+    checksum: null
+  - section: core
+    name: xh
+    version: latest
+    source: cargo
+    crate: xh
+    binary: xh
+    checksum: null
+  - section: core
+    name: lazydocker
+    version: 0.25.2
+    source: github
+    repo: jesseduffield/lazydocker
+    binary: lazydocker
+    checksum: null
+  - section: core
+    name: tealdeer
+    version: 1.6.1
+    source: github
+    repo: dbrgn/tealdeer
+    binary: tldr
+    checksum: null
+  - section: languages
+    name: go
+    version: 1.24.3
+    source: direct
+    checksum: null
+  - section: languages
+    name: rust
+    version: stable
+    source: rustup
+    checksum: null
+  - section: languages
+    name: cargo
+    version: stable
+    source: rustup
+    checksum: null
+  - section: languages
+    name: node_lts
+    version: 24.15.0
+    source: nvm
+    checksum: null
+  - section: languages
+    name: typescript
+    version: 5.9.3
+    source: npm
+    package: typescript
+    binary: tsc
+    checksum: null
+  - section: languages
+    name: python
+    version: 3.14.5
+    source: uv
+    checksum: null
+  - section: languages
+    name: java
+    version: 21
+    source: apt
+    checksum: null
+  - section: languages
+    name: uv
+    version: latest
+    source: install_script
+    checksum: null
+  - section: editor
+    name: neovim
+    version: 0.11.1
+    source: github
+    repo: neovim/neovim
+    binary: nvim
+    checksum: null
+  - section: cloud
+    name: docker
+    version: latest
+    source: apt_repo
+    checksum: null
+  - section: cloud
+    name: kubectl
+    version: 1.32.0
+    source: direct
+    checksum: null
+  - section: cloud
+    name: helm
+    version: 3.17.0
+    source: install_script
+    checksum: null
+  - section: cloud
+    name: terraform
+    version: 1.12.0
+    source: direct
+    checksum: null
+  - section: cloud
+    name: ansible
+    version: latest
+    source: pip
+    checksum: null
+  - section: cloud
+    name: k9s
+    version: 0.40.5
+    source: github
+    repo: derailed/k9s
+    binary: k9s
+    checksum: null
+  - section: cloud
+    name: aws_cli
+    version: 2
+    source: direct
+    checksum: null
+  - section: cloud
+    name: gcloud
+    version: latest
+    source: apt_repo
+    checksum: null
+  - section: cloud
+    name: azure_cli
+    version: latest
+    source: apt_repo
+    checksum: null
+  - section: terminal
+    name: kitty
+    version: latest
+    source: apt
+    package: kitty
+    checksum: null
+  - section: terminal
+    name: tmux
+    version: latest
+    source: apt
+    package: tmux
+    checksum: null
+  - section: fonts
+    name: nerd_font
+    version: FiraMono
+    source: github
+    repo: ryanoasis/nerd-fonts
+    checksum: null
+  - section: fonts
+    name: nerd_font_version
+    version: 3.4.0
+    source: github
+    repo: ryanoasis/nerd-fonts
+    checksum: null
+  - section: ai_tools
+    name: claude_cli
+    version: latest
+    source: npm
+    checksum: null
+  - section: ai_tools
+    name: antigravity_cli
+    version: latest
+    source: optional
+    checksum: null
+  - section: ai_tools
+    name: opencode
+    version: latest
+    source: go
+    checksum: null
+  - section: media
+    name: yt_dlp
+    version: latest
+    source: github
+    repo: yt-dlp/yt-dlp
+    binary: yt-dlp
+    checksum: null
+  - section: media
+    name: rmpc
+    version: latest
+    source: github
+    repo: mierak/rmpc
+    binary: rmpc
+    checksum: null
+  - section: media
+    name: cava
+    version: latest
+    source: apt
+    package: cava
+    checksum: null

@@ -45,6 +45,97 @@ done < <(
     -print0
 )
 
+TERMINAL_TOOLS_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
+LANGUAGES_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"
+
+for tool in fzf fd-find ripgrep bat eza lazygit btop sops lazydocker tealdeer; do
+  if grep -q "$tool" "$TERMINAL_TOOLS_SCRIPT"; then
+    echo -e "  ${GREEN}✓${NC} terminal installer covers $tool"
+  else
+    echo -e "  ${RED}✗${NC} terminal installer missing $tool"
+    FAILED=1
+  fi
+done
+
+for tool in yq zoxide direnv git-delta hyperfine duf; do
+  if grep -q "$tool" "$DOTFILES_DIR/.chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl"; then
+    echo -e "  ${GREEN}✓${NC} core installer covers $tool"
+  else
+    echo -e "  ${RED}✗${NC} core installer missing $tool"
+    FAILED=1
+  fi
+done
+
+for tool in dust xh; do
+  if grep -q "$tool" "$LANGUAGES_SCRIPT"; then
+    echo -e "  ${GREEN}✓${NC} language installer covers $tool"
+  else
+    echo -e "  ${RED}✗${NC} language installer missing $tool"
+    FAILED=1
+  fi
+done
+
+for expected in 'install_cargo_tool dust du-dust "$(package_version core dust latest)"' 'install_cargo_tool xh xh "$(package_version core xh latest)"'; do
+  if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
+    echo -e "  ${GREEN}✓${NC} language installer contains $expected"
+  else
+    echo -e "  ${RED}✗${NC} language installer missing $expected"
+    FAILED=1
+  fi
+done
+
+for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"'; do
+  if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
+    echo -e "  ${GREEN}✓${NC} language installer contains $expected"
+  else
+    echo -e "  ${RED}✗${NC} language installer missing $expected"
+    FAILED=1
+  fi
+done
+
+if grep -Fq 'ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"' "$TERMINAL_TOOLS_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} terminal installer creates fd shim"
+else
+  echo -e "  ${RED}✗${NC} terminal installer missing fd shim"
+  FAILED=1
+fi
+
+if [[ -x "$DOTFILES_DIR/scripts/doctor.sh" ]]; then
+  echo -e "  ${GREEN}✓${NC} doctor script is executable"
+else
+  echo -e "  ${RED}✗${NC} doctor script missing or not executable"
+  FAILED=1
+fi
+
+if [[ -x "$DOTFILES_DIR/scripts/generate-package-lock.sh" && -f "$DOTFILES_DIR/packages.lock" && -f "$DOTFILES_DIR/packages.meta.yaml" ]]; then
+  echo -e "  ${GREEN}✓${NC} package lock generator and metadata are present"
+else
+  echo -e "  ${RED}✗${NC} package lock generator, metadata, or lockfile missing"
+  FAILED=1
+fi
+
+if [[ -x "$DOTFILES_DIR/scripts/generate-keybinding-docs.sh" && -f "$DOTFILES_DIR/docs/keybindings.md" ]]; then
+  echo -e "  ${GREEN}✓${NC} keybinding docs generator and doc are present"
+else
+  echo -e "  ${RED}✗${NC} keybinding docs generator or doc missing"
+  FAILED=1
+fi
+
+if [[ -x "$DOTFILES_DIR/scripts/generate-tool-inventory.sh" && -f "$DOTFILES_DIR/docs/tool-inventory.md" ]]; then
+  tmp_inventory=$(mktemp)
+  "$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmp_inventory"
+  if cmp -s "$tmp_inventory" "$DOTFILES_DIR/docs/tool-inventory.md"; then
+    echo -e "  ${GREEN}✓${NC} tool inventory is up to date"
+  else
+    echo -e "  ${RED}✗${NC} tool inventory is stale"
+    FAILED=1
+  fi
+  rm -f "$tmp_inventory"
+else
+  echo -e "  ${RED}✗${NC} tool inventory generator or doc missing"
+  FAILED=1
+fi
+
 if [[ $FAILED -gt 0 ]]; then
   echo -e "\n${RED}${BOLD}REPOSITORY LAYOUT TEST FAILED${NC}"
   exit 1

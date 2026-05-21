@@ -32,7 +32,7 @@ update_package_version() {
   local tool_key="$1"
   local repo="$2"
   local current_version
-  
+
   if [[ ! -f "$PACKAGES_FILE" ]]; then
     echo -e "${YELLOW}[WARN]${NC} Manifest file not found: $PACKAGES_FILE"
     return
@@ -70,6 +70,16 @@ update_package_version "ripgrep" "BurntSushi/ripgrep"
 update_package_version "bat" "sharkdp/bat"
 update_package_version "eza" "eza-community/eza"
 update_package_version "lazygit" "jesseduffield/lazygit"
+update_package_version "zoxide" "ajeetdsouza/zoxide"
+update_package_version "direnv" "direnv/direnv"
+update_package_version "git-delta" "dandavison/delta"
+update_package_version "hyperfine" "sharkdp/hyperfine"
+update_package_version "duf" "muesli/duf"
+update_package_version "sops" "getsops/sops"
+update_package_version "dust" "bootandy/dust"
+update_package_version "xh" "ducaale/xh"
+update_package_version "lazydocker" "jesseduffield/lazydocker"
+update_package_version "tealdeer" "dbrgn/tealdeer"
 update_package_version "btop" "aristocratos/btop"
 update_package_version "starship" "starship/starship"
 update_package_version "neovim" "neovim/neovim"

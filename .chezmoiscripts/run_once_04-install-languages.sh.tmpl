@@ -7,7 +7,7 @@ require_sudo
 ARCH=$(get_arch)
 
 # ── Go ────────────────────────────────────────────────────────────────────────
-GO_VERSION="1.24.3"
+GO_VERSION="$(package_version languages go 1.24.3)"
 if ! is_installed go || [[ "$(go version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$GO_VERSION" ]]; then
   log_info "Installing Go ${GO_VERSION}..."
   curl -fsSLo /tmp/go.tar.gz "https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz"
@@ -20,18 +20,50 @@ else
   log_skip "Go ${GO_VERSION} already installed"
 fi
 
-# ── Rust ──────────────────────────────────────────────────────────────────────
-if ! is_installed rustc; then
-  log_info "Installing Rust (stable)..."
-  curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+# ── Rust + Cargo ──────────────────────────────────────────────────────────────
+RUST_VERSION="$(package_version languages rust stable)"
+CARGO_VERSION="$(package_version languages cargo stable)"
+if ! is_installed rustc || ! is_installed cargo; then
+  log_info "Installing Rust/Cargo toolchain ${RUST_VERSION}..."
+  curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
   source "$HOME/.cargo/env"
   log_success "Rust $(rustc --version | awk '{print $2}') installed"
 else
-  log_skip "Rust already installed"
+  [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+  if is_installed rustup && [[ "$RUST_VERSION" != "stable" ]]; then
+    rustup toolchain install "$RUST_VERSION"
+    rustup default "$RUST_VERSION"
+  fi
+  log_skip "Rust/Cargo ${CARGO_VERSION} already installed"
+fi
+
+install_cargo_tool() {
+  local binary="$1" crate="$2" version="$3"
+  if is_installed "$binary"; then
+    log_skip "$binary already installed"
+    return 0
+  fi
+
+  log_info "Installing $binary with cargo..."
+  if [[ "$version" == "latest" || "$version" == "stable" ]]; then
+    cargo install "$crate"
+  else
+    cargo install "$crate" --version "$version"
+  fi
+  log_success "$binary installed"
+}
+
+# ── Rust CLI tools ────────────────────────────────────────────────────────────
+if is_installed cargo; then
+  install_cargo_tool dust du-dust "$(package_version core dust latest)"
+  install_cargo_tool xh xh "$(package_version core xh latest)"
+else
+  log_warn "cargo not found — skipping dust and xh"
 fi
 
 # ── Node.js via nvm ──────────────────────────────────────────────────────────
-NODE_LTS="22"
+NODE_VERSION="$(package_version languages node_lts 24.15.0)"
+TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"
 export NVM_DIR="$HOME/.nvm"
 if [[ ! -d "$NVM_DIR" ]]; then
   log_info "Installing nvm..."
@@ -40,31 +72,51 @@ if [[ ! -d "$NVM_DIR" ]]; then
 fi
 # Source nvm
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-if ! nvm ls "$NODE_LTS" &>/dev/null; then
-  log_info "Installing Node.js LTS ${NODE_LTS}..."
-  nvm install "$NODE_LTS"
-  nvm alias default "$NODE_LTS"
+if ! nvm ls "$NODE_VERSION" &>/dev/null; then
+  log_info "Installing Node.js ${NODE_VERSION}..."
+  nvm install "$NODE_VERSION"
+  nvm alias default "$NODE_VERSION"
   log_success "Node.js $(node --version) installed"
 else
-  log_skip "Node.js LTS ${NODE_LTS} already installed"
+  nvm use "$NODE_VERSION" >/dev/null
+  log_skip "Node.js ${NODE_VERSION} already installed"
+fi
+
+if ! is_installed tsc || [[ "$(tsc --version 2>/dev/null | awk '{print $2}')" != "$TYPESCRIPT_VERSION" ]]; then
+  log_info "Installing TypeScript ${TYPESCRIPT_VERSION}..."
+  npm install -g "typescript@${TYPESCRIPT_VERSION}"
+  log_success "TypeScript $(tsc --version | awk '{print $2}') installed"
+else
+  log_skip "TypeScript ${TYPESCRIPT_VERSION} already installed"
 fi
 
 # ── Python (uv) ──────────────────────────────────────────────────────────────
+PYTHON_VERSION="$(package_version languages python 3.14.5)"
 if ! is_installed uv; then
   log_info "Installing uv (Python package manager)..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
+  export PATH="$HOME/.local/bin:$PATH"
   log_success "uv installed"
 else
   log_skip "uv already installed"
 fi
 
-# ── Java (OpenJDK 21) ────────────────────────────────────────────────────────
-if ! is_installed java || ! java -version 2>&1 | grep -q "21"; then
-  log_info "Installing OpenJDK 21..."
-  sudo apt-get install -y openjdk-21-jdk-headless
+if ! uv python find "$PYTHON_VERSION" &>/dev/null; then
+  log_info "Installing Python ${PYTHON_VERSION} with uv..."
+  uv python install "$PYTHON_VERSION"
+  log_success "Python $(uv python find "$PYTHON_VERSION") installed"
+else
+  log_skip "Python ${PYTHON_VERSION} already installed"
+fi
+
+# ── Java ──────────────────────────────────────────────────────────────────────
+JAVA_VERSION="$(package_version languages java 21)"
+if ! is_installed java || ! java -version 2>&1 | grep -q "${JAVA_VERSION}"; then
+  log_info "Installing OpenJDK ${JAVA_VERSION}..."
+  sudo apt-get install -y "openjdk-${JAVA_VERSION}-jdk-headless"
   log_success "Java $(java -version 2>&1 | head -1 | awk -F '"' '{print $2}') installed"
 else
-  log_skip "OpenJDK 21 already installed"
+  log_skip "OpenJDK ${JAVA_VERSION} already installed"
 fi
 
 print_summary "Languages & Runtimes"

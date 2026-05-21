@@ -12,6 +12,18 @@ export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
 export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
 export PATH="$PATH:/usr/local/go/bin:$GOPATH/bin"
 
+{{- if .is_wsl }}
+# Clean Windows paths to speed up shell startup and autocomplete
+PATH=$(echo "$PATH" | tr ':' '\n' | grep -v -E '/mnt/c/Windows/|/System32/|/SystemApps/|OneDrive|WindowsApps|Microsoft/|WindowsPowerShell' | paste -sd: -)
+# Re-inject critical Windows toolpaths (Explorer, VS Code, Git)
+export PATH="$PATH:/mnt/c/Windows"
+for vscode_path in "/mnt/c/Users/{{ .chezmoi.username }}/AppData/Local/Programs/Microsoft VS Code/bin"; do
+  if [[ -d "$vscode_path" ]]; then
+    export PATH="$PATH:$vscode_path"
+  fi
+done
+{{- end }}
+
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
@@ -186,6 +198,33 @@ alias ls='eza --icons=always -hg'
 alias cat='bat --paging=never --style=full'
 alias tm='tmuxp load -y -s "$(basename $PWD | tr . _)" $(tmuxp ls | fzf)'
 alias ytmp4='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"'
+alias cheat="curl -s https://cht.sh/"
+alias dotfiles-doctor="echo '=== SSH Agent ===' && systemctl --user status ssh-agent.service | head -n 3 && echo '\n=== Chezmoi State ===' && chezmoi status && echo '\n=== Template Check ===' && bash ~/.dotfiles/tests/test-templates.sh"
+
+# Interactive Git & SSH Helpers
+gcb() {
+  local branch
+  branch=$(git branch --color=always | fzf --ansi --query="$*" --preview 'git log --oneline --graph --color=always {1}')
+  if [[ -n "$branch" ]]; then
+    git checkout "$(echo "$branch" | sed 's/^[ *]*//')"
+  fi
+}
+
+gco() {
+  local commit
+  commit=$(git log --oneline --color=always | fzf --ansi --no-sort --preview 'git show --color=always {1}')
+  if [[ -n "$commit" ]]; then
+    git checkout "$(echo "$commit" | awk '{print $1}')"
+  fi
+}
+
+fssh() {
+  local host
+  host=$(grep -i '^host ' ~/.ssh/config 2>/dev/null | awk '{print $2}' | grep -v '*' | fzf --height=40% --reverse)
+  if [[ -n "$host" ]]; then
+    ssh "$host"
+  fi
+}
 
 {{- if .is_wsl }}
 # Windows Interoperability
@@ -203,6 +242,19 @@ bindkey -s '\es' 'tmux-sessionizer -s 3\n'
 
 # Starship (ultra-fast cross-shell prompt)
 eval "$(starship init zsh)"
+
+# Tool initializations
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+
+if command -v direnv >/dev/null 2>&1; then
+  eval "$(direnv hook zsh)"
+fi
+
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi
 
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
