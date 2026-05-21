@@ -23,7 +23,7 @@ data:
 EOF
 
 chezmoi init --source="$DOTFILES_DIR" --promptString="Full name=Test User" --promptString="Git email=test@example.com" --promptString="tmux-sessionizer search dirs (space-separated)=~/Code ~/Scripts"
-chezmoi apply --source="$DOTFILES_DIR" --destination="$HOME" --force --exclude=scripts
+chezmoi apply --source="$DOTFILES_DIR" --destination="$HOME" --force --exclude=scripts,externals
 
 test -f "$HOME/.zshrc"
 test -f "$HOME/.tmux.conf"
