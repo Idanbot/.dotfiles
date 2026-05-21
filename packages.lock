@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 2fae901b443e4075bbc584820eb222f91b71257ceb2b6a114a83d5213bdfb4e4
-  metadata: 0d293748aaca421892cdb1800871899c75da4d0d36c31ebe955603fc98b991a6
+  packages: a6e93fdc491097f6b413040d0164e930a1688f585288ee32f26d06f086beedba
+  metadata: 370c2eda049bda412286d65e0bcedbfadb04abcaa3553427f3fec5d5fbfbb1a5
 
 tools:
   - section: core
@@ -112,20 +112,6 @@ tools:
     source: github
     repo: getsops/sops
     binary: sops
-    checksum: null
-  - section: core
-    name: dust
-    version: latest
-    source: cargo
-    crate: du-dust
-    binary: dust
-    checksum: null
-  - section: core
-    name: xh
-    version: latest
-    source: cargo
-    crate: xh
-    binary: xh
     checksum: null
   - section: core
     name: lazydocker

@@ -66,7 +66,7 @@ graph TD
 | **Shell** | Zsh, Oh-My-Zsh, Starship prompt, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting |
 | **Terminal** | Kitty (native), Ghostty (secondary), tmux + TPM, tmuxp |
 | **Editor** | Neovim (LazyVim), Vim |
-| **CLI Tools** | fzf, fd, ripgrep, bat, eza, lazygit, btop, htop, jq, yq, delta, zoxide, direnv, hyperfine, dust, duf, xh, sops |
+| **CLI Tools** | fzf, fd, ripgrep, bat, eza, lazygit, btop, htop, jq, yq, delta, zoxide, direnv, hyperfine, duf, sops |
 | **Languages** | Go 1.24, Rust/Cargo (stable), Node.js 24.15.0 (nvm), TypeScript 5.9.3 (npm), Python 3.14.5 (uv), Java 21 |
 | **Containers** | Docker, kubectl, Helm, k9s |
 | **Cloud** | AWS CLI v2, Google Cloud CLI, Azure CLI, Terraform, Ansible |
@@ -256,7 +256,6 @@ Rollback helper for locally managed tools:
 
 ```bash
 ./scripts/uninstall-tool.sh lazygit
-./scripts/uninstall-tool.sh dust
 ```
 
 ---
@@ -304,7 +303,7 @@ GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotf
 - **Lint**: shellcheck, shfmt, hadolint, yamllint, template validation, package metadata validation, generated doc freshness.
 - **Chezmoi fixture**: applies templates into a temporary home without running install scripts.
 - **Interactive startup**: smoke-tests rendered zsh and tmux startup.
-- **Network install smoke**: verifies cargo tools and GitHub-release tools can still be installed.
+- **Network install smoke**: verifies GitHub-release tools can still be installed.
 - **Test Matrix**: Bootstrap test in Docker for:
   - `ubuntu-24.04-native`
   - `ubuntu-24.04-wsl` (simulated)
@@ -319,7 +318,6 @@ GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotf
 | **Dockerfile Lint** | hadolint against `.github/workflows/Dockerfile.ubuntu-24.04` | Tracks container build hygiene |
 | **Chezmoi Apply Fixture** | Applies rendered dotfiles into a temporary home with scripts and externals excluded | Tracks template destination behavior without installing packages |
 | **Interactive Startup** | zsh interactive startup and tmux config source smoke tests | Tracks shell/tmux parse regressions |
-| **Cargo Tool Smoke** | Installs and runs `dust` and `xh` from cargo | Tracks Rust/Cargo tool install drift |
 | **GitHub Release Tool Smoke** | Downloads and runs `lazygit`, `lazydocker`, `sops`, and `tealdeer` | Tracks upstream release asset drift |
 | **Bootstrap Test** | Ubuntu 24.04 native + simulated WSL containers | Tracks core package availability, sourced libraries, directory creation, and config source files |
 | **Idempotency Test** | Re-runs package install logic in the same container | Tracks repeatability and skip behavior after first install |

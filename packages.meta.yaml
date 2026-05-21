@@ -61,14 +61,6 @@ core:
     repo: getsops/sops
     binary: sops
     asset_template: sops-{tag}.linux.{arch}
-  dust:
-    source: cargo
-    crate: du-dust
-    binary: dust
-  xh:
-    source: cargo
-    crate: xh
-    binary: xh
   lazydocker:
     source: github
     repo: jesseduffield/lazydocker

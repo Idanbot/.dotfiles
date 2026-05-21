@@ -37,29 +37,6 @@ else
   log_skip "Rust/Cargo ${CARGO_VERSION} already installed"
 fi
 
-install_cargo_tool() {
-  local binary="$1" crate="$2" version="$3"
-  if is_installed "$binary"; then
-    log_skip "$binary already installed"
-    return 0
-  fi
-
-  log_info "Installing $binary with cargo..."
-  if [[ "$version" == "latest" || "$version" == "stable" ]]; then
-    cargo install "$crate"
-  else
-    cargo install "$crate" --version "$version"
-  fi
-  log_success "$binary installed"
-}
-
-# ── Rust CLI tools ────────────────────────────────────────────────────────────
-if is_installed cargo; then
-  install_cargo_tool dust du-dust "$(package_version core dust latest)"
-  install_cargo_tool xh xh "$(package_version core xh latest)"
-else
-  log_warn "cargo not found — skipping dust and xh"
-fi
 
 # ── Node.js via nvm ──────────────────────────────────────────────────────────
 NODE_VERSION="$(package_version languages node_lts 24.15.0)"

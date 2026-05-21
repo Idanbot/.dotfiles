@@ -249,7 +249,7 @@ package_version() {
     fi
   fi
 
-  awk -v section="$section" -v key="$key" -v default="$default" '
+  awk -v section="$section" -v key="$key" -v fallback_value="$default" '
     $0 ~ "^[[:space:]]*" section ":[[:space:]]*$" { in_section = 1; next }
     in_section && $0 ~ "^[^[:space:]#].*:[[:space:]]*$" { in_section = 0 }
     in_section && $1 == key ":" {
@@ -261,7 +261,7 @@ package_version() {
       found = 1
       exit
     }
-    END { if (!found) print default }
+    END { if (!found) print fallback_value }
   ' "$manifest"
 }
 

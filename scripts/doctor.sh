@@ -71,8 +71,6 @@ check_optional_cmd lazygit
 check_optional_cmd lazydocker
 check_optional_cmd tldr tealdeer
 check_optional_cmd sops
-check_optional_cmd dust
-check_optional_cmd xh
 check_optional_cmd tmux
 
 log_step "Runtime Versions"

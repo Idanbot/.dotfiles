@@ -41,20 +41,6 @@ case "$tool" in
   fd | bat)
     remove_path "$HOME/.local/bin/$tool"
     ;;
-  dust)
-    if command -v cargo >/dev/null 2>&1; then
-      cargo uninstall du-dust || true
-      removed=1
-    fi
-    remove_path "$HOME/.cargo/bin/dust"
-    ;;
-  xh)
-    if command -v cargo >/dev/null 2>&1; then
-      cargo uninstall xh || true
-      removed=1
-    fi
-    remove_path "$HOME/.cargo/bin/xh"
-    ;;
   *)
     echo "No uninstall rule for $tool" >&2
     exit 2

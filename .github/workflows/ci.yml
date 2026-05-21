@@ -109,28 +109,6 @@ jobs:
           failure-threshold: warning
 
 
-  cargo-tools:
-    name: Cargo Tool Install Smoke
-    needs: [lint]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cargo/bin
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-tools-${{ runner.os }}-${{ hashFiles('packages.yaml') }}
-          restore-keys: |
-            cargo-tools-${{ runner.os }}-
-      - name: Install cargo tools
-        run: tests/test-cargo-tools.sh
-
   github-release-tools:
     name: GitHub Release Tool Smoke
     needs: [lint]
@@ -143,7 +121,7 @@ jobs:
 
   test:
     name: Bootstrap Test (${{ matrix.profile.name }})
-    needs: [gitleaks, lint, hadolint, cargo-tools, github-release-tools]
+    needs: [gitleaks, lint, hadolint, github-release-tools]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

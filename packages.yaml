@@ -21,8 +21,6 @@ core:
   hyperfine: latest  # via apt
   duf: latest        # via apt
   sops: latest
-  dust: latest       # via cargo
-  xh: latest         # via cargo
   lazydocker: "0.25.2"
   tealdeer: "1.6.1"
 

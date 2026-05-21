@@ -25,8 +25,6 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | hyperfine | latest | apt |
 | core | duf | latest | apt |
 | core | sops | latest | github |
-| core | dust | latest | cargo |
-| core | xh | latest | cargo |
 | core | lazydocker | 0.25.2 | github |
 | core | tealdeer | 1.6.1 | github |
 | languages | go | 1.24.3 | direct |
