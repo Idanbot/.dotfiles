@@ -14,15 +14,15 @@ fi
 export HOME="$TMP_HOME"
 mkdir -p "$HOME/.config/chezmoi"
 
-cat >"$HOME/.config/chezmoi/chezmoi.toml" <<EOF
-[data]
-name = "Test User"
-email = "test@example.com"
-sessionizer_dirs = "~/Code ~/Scripts"
-is_wsl = false
+cat >"$HOME/.config/chezmoi/chezmoi.yaml" <<EOF
+data:
+  name: "Test User"
+  email: "test@example.com"
+  sessionizer_dirs: "~/Code ~/Scripts"
+  is_wsl: false
 EOF
 
-chezmoi init --source="$DOTFILES_DIR"
+chezmoi init --source="$DOTFILES_DIR" --promptString="name=Test User" --promptString="email=test@example.com" --promptString="sessionizer_dirs=~/Code ~/Scripts"
 chezmoi apply --source="$DOTFILES_DIR" --destination="$HOME" --force --exclude=scripts
 
 test -f "$HOME/.zshrc"

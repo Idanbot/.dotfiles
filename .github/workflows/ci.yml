@@ -30,17 +30,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Add local bin to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache binaries
+        id: cache-binaries
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.local/bin/shfmt
+            ~/.local/bin/chezmoi
+          key: bin-cache-${{ runner.os }}-${{ hashFiles('packages.yaml') }}
+          restore-keys: |
+            bin-cache-${{ runner.os }}-
+
       - name: Install linters
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y shellcheck yamllint tmux zsh
           # shfmt
-          GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@latest || {
+          if ! command -v shfmt &>/dev/null; then
+            mkdir -p ~/.local/bin
             shfmt_url=https://github.com/mvdan/sh/releases/latest/download
-            curl -fsSLo /usr/local/bin/shfmt \
+            curl -fsSLo ~/.local/bin/shfmt \
               "$shfmt_url/shfmt_v3.10.0_linux_amd64"
-            chmod +x /usr/local/bin/shfmt
-          }
+            chmod +x ~/.local/bin/shfmt
+          fi
 
       - name: shellcheck
         run: |
@@ -69,7 +84,10 @@ jobs:
 
       - name: Install chezmoi
         run: |
-          sh -c "$(curl -fsLS get.chezmoi.io)" -- -b /usr/local/bin
+          if ! command -v chezmoi &>/dev/null; then
+            mkdir -p ~/.local/bin
+            sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin
+          fi
 
       - name: Chezmoi apply fixture
         run: tests/test-chezmoi-apply.sh "$PWD"
@@ -100,13 +118,15 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/bin
             ~/.cargo/registry
             ~/.cargo/git
           key: cargo-tools-${{ runner.os }}-${{ hashFiles('packages.yaml') }}
+          restore-keys: |
+            cargo-tools-${{ runner.os }}-
       - name: Install cargo tools
         run: tests/test-cargo-tools.sh
 
@@ -143,12 +163,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Build test container
-        run: |
-          docker build \
-            -f "${{ matrix.profile.dockerfile }}" \
-            -t dotfiles-test \
-            .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.profile.dockerfile }}
+          tags: dotfiles-test
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Run bootstrap test
         run: |

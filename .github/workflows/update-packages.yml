@@ -35,12 +35,16 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(deps): upgrade pinned package versions in packages.yaml"
+          commit-message: >-
+            chore(deps): upgrade pinned package versions
+            in packages.yaml
           title: "chore(deps): upgrade pinned package versions"
           body: |
-            Automated check detected newer releases of one or more of your pinned packages.
+            Automated check detected newer releases of one
+            or more of your pinned packages.
 
             This PR updates the versions in `packages.yaml`.
-            Please review the changes, run template validation tests, and merge if all checks pass.
+            Please review the changes, run template
+            validation tests, and merge if all checks pass.
           branch: auto-update-packages
           delete-branch: true
