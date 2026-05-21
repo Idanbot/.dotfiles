@@ -7,14 +7,14 @@
 ### Fresh Machine (one-liner)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/idanbotbol/dotfiles/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/idanbotbol/dotfiles/main/scripts/install.sh | bash
 ```
 
 ### Or clone and run:
 
 ```bash
 git clone git@github.com:idanbotbol/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles && ./install.sh
+cd ~/.dotfiles && ./scripts/install.sh
 ```
 
 ### Existing Machine (already have chezmoi)
@@ -47,7 +47,7 @@ chezmoi init --apply idanbotbol/dotfiles --ssh
 
 ```
 ~/.dotfiles/
-├── install.sh                    # Bootstrap entrypoint
+├── scripts/install.sh            # Bootstrap entrypoint
 ├── .chezmoi.yaml.tmpl            # chezmoi init prompts
 ├── .chezmoiexternal.yaml         # External deps (oh-my-zsh, TPM, etc.)
 ├── .chezmoiignore                # Platform-specific ignores
@@ -70,9 +70,10 @@ chezmoi init --apply idanbotbol/dotfiles --ssh
 │
 ├── encrypted_*                   # age-encrypted secrets
 │
-├── run_once_before_*.sh.tmpl     # Pre-apply install scripts
-├── run_once_*.sh.tmpl            # Install scripts
-├── run_onchange_*.sh.tmpl        # Re-run on manifest change
+├── .chezmoiscripts/              # chezmoi run scripts
+│   ├── run_once_before_*.sh.tmpl # Pre-apply install scripts
+│   ├── run_once_*.sh.tmpl        # Install scripts
+│   └── run_onchange_*.sh.tmpl    # Re-run on manifest change
 │
 ├── scripts/lib.sh                # Shared bash utilities
 ├── tests/                        # CI test scripts
@@ -140,7 +141,7 @@ The bootstrap auto-detects WSL by checking `/proc/version` for "microsoft".
 ## ➕ Adding a New Tool
 
 1. **Update `packages.yaml`** with the version
-2. **Create/update install script** in `run_once_*.sh.tmpl`
+2. **Create/update install script** in `.chezmoiscripts/run_once_*.sh.tmpl`
 3. **Add config** with `chezmoi add ~/.config/newtool/config`
 4. **Test**: `chezmoi apply --verbose`
 5. **Commit**: `cd ~/.dotfiles && git add -A && git commit -m "Add newtool" && git push`

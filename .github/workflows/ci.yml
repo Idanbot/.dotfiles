@@ -6,13 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install linters
         run: |
@@ -20,7 +23,9 @@ jobs:
           sudo apt-get install -y shellcheck yamllint
           # shfmt
           GOBIN=/usr/local/bin go install mvdan.cc/sh/v3/cmd/shfmt@latest || {
-            curl -fsSLo /usr/local/bin/shfmt https://github.com/mvdan/sh/releases/latest/download/shfmt_v3.10.0_linux_amd64
+            shfmt_url=https://github.com/mvdan/sh/releases/latest/download
+            curl -fsSLo /usr/local/bin/shfmt \
+              "$shfmt_url/shfmt_v3.10.0_linux_amd64"
             chmod +x /usr/local/bin/shfmt
           }
 
@@ -56,31 +61,57 @@ jobs:
             opens=$(grep -oP '\{\{' "$f" | wc -l)
             closes=$(grep -oP '\}\}' "$f" | wc -l)
             if [[ "$opens" -ne "$closes" ]]; then
-              echo "ERROR: Unbalanced template delimiters in $f ({{ = $opens, }} = $closes)"
+              echo "ERROR: Unbalanced template delimiters in $f"
+              echo "{{ = $opens, }} = $closes"
               exit 1
             fi
           done
           echo "All templates valid"
 
+      - name: Repository layout
+        run: tests/test-repo-layout.sh
+
+  hadolint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.3.0
+        with:
+          dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
+          failure-threshold: warning
+
   test:
     name: Bootstrap Test (${{ matrix.profile.name }})
-    needs: lint
+    needs: [lint, hadolint]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         profile:
-          - { name: "ubuntu-24.04-native", wsl: "false", dockerfile: ".github/workflows/Dockerfile.ubuntu-24.04" }
-          - { name: "ubuntu-24.04-wsl",    wsl: "true",  dockerfile: ".github/workflows/Dockerfile.ubuntu-24.04" }
+          - name: ubuntu-24.04-native
+            wsl: "false"
+            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
+          - name: ubuntu-24.04-wsl
+            wsl: "true"
+            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
           # Future distros:
-          # - { name: "arch-latest", wsl: "false", dockerfile: ".github/workflows/Dockerfile.arch" }
+          # - name: arch-latest
+          #   wsl: "false"
+          #   dockerfile: .github/workflows/Dockerfile.arch
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Build test container
-        run: docker build -f ${{ matrix.profile.dockerfile }} -t dotfiles-test .
+        run: |
+          docker build \
+            -f "${{ matrix.profile.dockerfile }}" \
+            -t dotfiles-test \
+            .
 
       - name: Run bootstrap test
         run: |
@@ -99,15 +130,3 @@ jobs:
             -v ${{ github.workspace }}:/dotfiles:ro \
             dotfiles-test \
             /dotfiles/tests/test-idempotency.sh
-
-  hadolint:
-    name: Dockerfile Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: hadolint
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
-          failure-threshold: warning

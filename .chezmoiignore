@@ -1,7 +1,6 @@
 # Ignore README and CI files — they're repo metadata, not dotfiles
 README.md
 LICENSE
-install.sh
 packages.yaml
 scripts/
 tests/

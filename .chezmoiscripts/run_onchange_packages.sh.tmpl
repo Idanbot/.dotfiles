@@ -3,7 +3,7 @@
 # chezmoi:template:left-delimiter="# {{"
 # chezmoi:template:right-delimiter="}}"
 # hash: # {{ include "packages.yaml" | sha256sum }}
-source "$HOME/.dotfiles/scripts/lib.sh"
+source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
 
 log_step "Package Manifest Changed — Checking for Updates"
 

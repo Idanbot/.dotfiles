@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lib.sh — Shared utility library for dotfiles install scripts
-# Sourced by all run_once_* and run_onchange_* scripts
+# Sourced by all .chezmoiscripts/run_once_* and run_onchange_* scripts
 
 set -euo pipefail
 

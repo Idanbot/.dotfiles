@@ -1,6 +1,6 @@
 # packages.yaml — Version-pinned tool manifest
 # Update versions here, then run `chezmoi apply` to trigger upgrades
-# via run_onchange_ scripts.
+# via .chezmoiscripts/run_onchange_ scripts.
 
 # Core CLI tools
 core:

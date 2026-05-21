@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — Minimal bootstrap for a fresh Ubuntu 24.04 (native or WSL)
-# Usage: curl -fsSL https://raw.githubusercontent.com/<user>/dotfiles/main/install.sh | bash
-# Or:    git clone ... && ./install.sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/<user>/dotfiles/main/scripts/install.sh | bash
+# Or:    git clone ... && ./scripts/install.sh
 
 set -euo pipefail
 
