@@ -47,7 +47,7 @@ render_template() {
     /^[[:space:]]*{{-? end }}[[:space:]]*$/ { include = stack[depth--]; next }
     BEGIN { include = 1; depth = 0 }
     { if (include) emit($0) }
-  ' "$src" > "$dest"
+  ' "$src" >"$dest"
 }
 
 echo -e "\n${BOLD}══ Template Validation Test ══${NC}\n"
@@ -75,7 +75,7 @@ for profile in native wsl; do
     render_template "$tmpl" "$rendered" "$is_wsl"
 
     case "$rel" in
-      .chezmoiscripts/*.tmpl|dot_local/bin/*.tmpl)
+      .chezmoiscripts/*.tmpl | dot_local/bin/*.tmpl)
         if bash -n "$rendered"; then
           pass "$rel renders as valid shell"
         else

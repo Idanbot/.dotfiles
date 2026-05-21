@@ -29,7 +29,7 @@ remove_path() {
 }
 
 case "$tool" in
-  lazygit|lazydocker|sops|tldr|k9s|rmpc|yt-dlp|nvim)
+  lazygit | lazydocker | sops | tldr | k9s | rmpc | yt-dlp | nvim)
     if [[ -w /usr/local/bin ]]; then
       remove_path "/usr/local/bin/$tool"
     else
@@ -38,7 +38,7 @@ case "$tool" in
       removed=1
     fi
     ;;
-  fd|bat)
+  fd | bat)
     remove_path "$HOME/.local/bin/$tool"
     ;;
   dust)

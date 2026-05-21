@@ -26,7 +26,7 @@ for file in packages.yaml packages.meta.yaml packages.lock docs/tool-inventory.m
   fi
 done
 
-if python3 - "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" <<'PYTEST'
+if python3 - "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" <<'PYTEST'; then
 import sys
 from pathlib import Path
 
@@ -69,7 +69,6 @@ if missing:
         print(f"missing source metadata: {section}.{tool}")
     raise SystemExit(1)
 PYTEST
-then
   pass "all packages have source metadata"
 else
   fail "some packages are missing source metadata"
