@@ -4,6 +4,26 @@ source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
 log_step "Installing Core Packages"
 
 require_sudo
+
+# Optimize apt sources to use mirrors.ubuntu.com for automatic geographic redirection
+optimize_apt_sources() {
+  if [[ -f /etc/apt/sources.list.d/ubuntu.sources ]]; then
+    if grep -qE "https?://[a-z.]*archive\.ubuntu\.com/ubuntu|https?://security\.ubuntu\.com/ubuntu" /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null; then
+      log_info "Optimizing apt sources in ubuntu.sources to use mirrors.ubuntu.com..."
+      sudo sed -i -E 's|https?://[a-z.]*archive\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list.d/ubuntu.sources
+      sudo sed -i -E 's|https?://security\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list.d/ubuntu.sources
+    fi
+  elif [[ -f /etc/apt/sources.list ]]; then
+    if grep -qE "https?://[a-z.]*archive\.ubuntu\.com/ubuntu|https?://security\.ubuntu\.com/ubuntu" /etc/apt/sources.list 2>/dev/null; then
+      log_info "Optimizing apt sources in sources.list to use mirrors.ubuntu.com..."
+      sudo sed -i -E 's|https?://[a-z.]*archive\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list
+      sudo sed -i -E 's|https?://security\.ubuntu\.com/ubuntu|mirror://mirrors.ubuntu.com/mirrors.txt|g' /etc/apt/sources.list
+    fi
+  fi
+}
+
+optimize_apt_sources
+
 sudo apt-get update -qq
 
 apt_install \

@@ -1,5 +1,11 @@
 # 🏠 Dotfiles — Idan Botbol
 
+[![CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
+[![Ubuntu 24.04](https://img.shields.io/badge/Ubuntu-24.04-E95420?logo=ubuntu&logoColor=white)](https://ubuntu.com/download)
+[![WSL Tested](https://img.shields.io/badge/WSL-tested-0078D4?logo=windows&logoColor=white)](https://learn.microsoft.com/windows/wsl/)
+[![chezmoi](https://img.shields.io/badge/managed%20by-chezmoi-6D57FF)](https://chezmoi.io)
+[![License](https://img.shields.io/badge/license-personal-lightgrey)](#-license)
+
 > One-command bootstrap for Ubuntu 24.04 LTS (native & WSL). Managed by [chezmoi](https://chezmoi.io) with [age](https://age-encryption.org) encryption for secrets.
 
 ## ⚡ Quick Start
@@ -186,7 +192,7 @@ Some things cannot be automated:
 
 ## 🧪 CI/CD
 
-GitHub Actions runs on every push/PR to `main`:
+GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml) on every push/PR to `main`:
 
 - **Lint**: shellcheck, shfmt, hadolint, yamllint, template validation
 - **Test Matrix**: Bootstrap test in Docker for:
@@ -194,6 +200,36 @@ GitHub Actions runs on every push/PR to `main`:
   - `ubuntu-24.04-wsl` (simulated)
   - (Extensible for Arch, Fedora, etc.)
 - **Idempotency**: Verifies bootstrap can run twice without errors
+
+### Status Tracking
+
+| Check | Coverage | Current Signal |
+|-------|----------|----------------|
+| **Lint** | shellcheck, shfmt, yamllint, template delimiter validation, repo layout | Tracks syntax, formatting, YAML, and expected file layout |
+| **Dockerfile Lint** | hadolint against `.github/workflows/Dockerfile.ubuntu-24.04` | Tracks container build hygiene |
+| **Bootstrap Test** | Ubuntu 24.04 native + simulated WSL containers | Tracks core package availability, sourced libraries, directory creation, and config source files |
+| **Idempotency Test** | Re-runs package install logic in the same container | Tracks repeatability and skip behavior after first install |
+
+### Latest Successful Run Review
+
+The supplied run is healthy:
+
+- **Bootstrap**: 20 passed, 0 failed, 0 skipped.
+- **Environment coverage**: exercised CI with `WSL=true`, so WSL detection and WSL-safe paths are covered.
+- **Core dependencies**: `git`, `curl`, `wget`, `jq`, `make`, and `unzip` were present after setup.
+- **Filesystem layout**: expected user directories under `~/Code`, `~/Scripts`, `~/.local/bin`, and `~/.config` were created.
+- **Config source coverage**: key chezmoi templates and manifests are present, including `.zshrc`, `.tmux.conf`, `.gitconfig`, `.vimrc`, `starship.toml`, `packages.yaml`, and `.chezmoi.yaml.tmpl`.
+- **Idempotency**: the first run installed missing `wget` and `jq`; the second run skipped already-installed packages, confirming repeatable package handling.
+
+One thing to watch: the idempotency output says "All packages correctly skipped on second run (6 skipped)" while the displayed second run shows four package skip lines. That may be expected if the script counts setup or helper operations too, but the log would be clearer if the skipped count matched visible package checks or printed the hidden skipped items.
+
+### CI Improvement Ideas
+
+1. **Make linters blocking**: remove the `|| true` fallbacks from shellcheck, shfmt, and yamllint once current findings are cleaned up, so regressions fail CI.
+2. **Add a scheduled drift check**: run weekly against `ubuntu:24.04` to catch upstream apt, curl, GitHub release, and install URL changes before the next code change.
+3. **Cache or prebuild the test image**: publish the Ubuntu CI image through GitHub Container Registry or use build cache to reduce repeated Docker build time.
+4. **Upload logs as artifacts on failure**: preserve bootstrap and idempotency logs so failures can be inspected without rerunning locally.
+5. **Expand template validation**: render chezmoi templates with native and WSL fixture data, then syntax-check the rendered shell files instead of only checking balanced `{{ }}` delimiters.
 
 ---
 

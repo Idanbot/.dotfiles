@@ -21,14 +21,16 @@ echo -e "${BOLD}── First run ──${NC}"
 sudo apt-get update -qq
 apt_install git curl wget jq
 echo -e "\n${BOLD}── Second run (should all skip) ──${NC}"
+skipped_before_second_run=$_SKIPPED
 apt_install git curl wget jq
+second_run_skipped=$((_SKIPPED - skipped_before_second_run))
 
 # Verify skip messages
 echo -e "\n${BOLD}── Idempotency Check ──${NC}"
-if [[ $_SKIPPED -ge 4 ]]; then
-  echo -e "  ${GREEN}✓${NC} All packages correctly skipped on second run ($_SKIPPED skipped)"
+if [[ $second_run_skipped -eq 4 ]]; then
+  echo -e "  ${GREEN}✓${NC} All packages correctly skipped on second run ($second_run_skipped skipped)"
 else
-  echo -e "  ${RED}✗${NC} Expected at least 4 skipped, got $_SKIPPED"
+  echo -e "  ${RED}✗${NC} Expected 4 second-run skips, got $second_run_skipped"
   exit 1
 fi
 

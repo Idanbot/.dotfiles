@@ -1,0 +1,8 @@
+# .gitleaksignore
+# Skip scanning for these paths if they contain false positives (like docs/tutorials)
+docs/candidate_paths.md
+docs/phases-0.md
+docs/phases-4.md
+docs/phases-7.md
+docs/universal_dotfiles_deployment_design.md
+README.md

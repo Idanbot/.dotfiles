@@ -76,8 +76,16 @@ bind-key -r i run-shell "tmux neww ~/.tmux/tmux-cht.sh"
 bind -r M-n display-popup -w 80% -h 80% -E "tmux new-session -A -s scratchpad"
 bind-key M-s display-popup -E "tmux list-sessions | less"
 bind-key M-w display-popup -E "tmux list-windows | less"
+bind-key M-g display-popup -w 90% -h 90% -d "#{pane_current_path}" -E 'bash -lc "command -v lazygit >/dev/null && exec lazygit || { printf \"lazygit not found\\n\\nPress enter to close...\"; read -r _; }"'
+bind-key M-d display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v docker >/dev/null || { printf \"docker not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; docker ps; printf \"\\nImages:\\n\"; docker images | head -25; printf \"\\nPress enter to close...\"; read -r _"'
+bind-key M-k display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v kubectl >/dev/null || { printf \"kubectl not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; printf \"Contexts:\\n\"; kubectl config get-contexts 2>/dev/null || true; printf \"\\nNamespaces:\\n\"; kubectl get namespaces 2>/dev/null || true; printf \"\\nPress enter to close...\"; read -r _"'
+bind-key M-p display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "test -x ~/.local/bin/tmux-sessionizer && exec ~/.local/bin/tmux-sessionizer || { printf \"tmux-sessionizer not found or not executable\\n\\nPress enter to close...\"; read -r _; }"'
 {{ if not .is_wsl }}
 bind-key M-m display-popup -w 80% -h 80% -E "rmpc"
+bind-key M-u display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"Host: %s\\nPath: %s\\nKernel: %s\\n\\n\" \"$(hostname -s)\" \"$PWD\" \"$(uname -srmo)\"; command -v docker >/dev/null && docker context ls 2>/dev/null || true; printf \"\\n\"; command -v kubectl >/dev/null && kubectl config get-contexts 2>/dev/null || true; printf \"\\nPress enter to close...\"; read -r _"'
+{{ else }}
+bind-key M-e display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"WSL distro: %s\\nHost: %s\\nLinux path: %s\\nWindows path: \" \"${WSL_DISTRO_NAME:-unknown}\" \"$(hostname -s)\" \"$PWD\"; command -v wslpath >/dev/null && wslpath -w \"$PWD\" || printf \"n/a\"; printf \"\\n\\nDISPLAY=%s\\nWAYLAND_DISPLAY=%s\\nWSLg=%s\\n\\n\" \"${DISPLAY:-unset}\" \"${WAYLAND_DISPLAY:-unset}\" \"${WSLGd:-unset}\"; command -v explorer.exe >/dev/null && printf \"explorer.exe is available\\n\" || printf \"explorer.exe not found\\n\"; command -v clip.exe >/dev/null && printf \"clip.exe is available\\n\" || printf \"clip.exe not found\\n\"; printf \"\\nPress enter to close...\"; read -r _"'
+bind-key M-o display-popup -w 70% -h 30% -d "#{pane_current_path}" -E 'bash -lc "command -v explorer.exe >/dev/null && { explorer.exe .; printf \"Opened current directory in Windows Explorer.\"; } || printf \"explorer.exe not found\"; printf \"\\n\\nPress enter to close...\"; read -r _"'
 {{ end }}
 bind-key M-h display-popup -w 80% -h 80% -E "btop"
 
@@ -125,8 +133,8 @@ set -g @prefix_highlight_bg '#f9e2af'
 set -g @prefix_highlight_show_copy_mode 'on'
 set -g @prefix_highlight_show_sync_mode 'on'
 
-# LEFT: session name + prefix/copy/sync indicator
-set -g status-left '#[fg=#89b4fa,bg=default,bold] #S #[fg=#6c7086]#{prefix_highlight}'
+# LEFT: session name + host/current path + prefix/copy/sync indicator
+set -g status-left '#[fg=#89b4fa,bg=default,bold] #S #[fg=#585b70]| #[fg=#a6e3a1]#H#[fg=#6c7086]:#{b:pane_current_path} #{prefix_highlight}'
 
 {{ if not .is_wsl }}
 # BATTERY ICONS (native only)

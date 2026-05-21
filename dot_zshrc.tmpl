@@ -6,6 +6,7 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 export GOPATH=$HOME/go
+export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
 
 # If you come from bash you might have to change your $PATH.
 export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
@@ -32,7 +33,6 @@ plugins=(
   # Core tools
   gitfast
   ssh
-  ssh-agent
   web-search
   nmap
   aws
@@ -187,6 +187,13 @@ alias cat='bat --paging=never --style=full'
 alias tm='tmuxp load -y -s "$(basename $PWD | tr . _)" $(tmuxp ls | fzf)'
 alias ytmp4='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"'
 
+{{- if .is_wsl }}
+# Windows Interoperability
+alias explorer="explorer.exe"
+alias cbcopy="clip.exe"
+alias cbpaste="powershell.exe -NoProfile -Command Get-Clipboard"
+{{- end }}
+
 # Tmux ThePrimeagen Sessioner magic
 bindkey -s '^f'  'tmux-sessionizer\n'     # Ctrl + f
 bindkey -s '\eh' 'tmux-sessionizer -s 0\n'  # Alt + h
@@ -214,3 +221,8 @@ export FPATH="$HOME/Scripts/eza/completions/zsh:$FPATH"
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 export PATH=$HOME/bin:$PATH
+
+# Compile .zshrc to byte-code (.zwc) in the background if it changes
+if [[ ~/.zshrc -nt ~/.zshrc.zwc ]]; then
+  (zcompile ~/.zshrc &) 2>/dev/null
+fi

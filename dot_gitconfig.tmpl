@@ -2,10 +2,14 @@
 	email = {{ .email }}
 	name = {{ .name }}
 [credential]
+{{- if .is_wsl }}
+	helper = "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"
+{{- else }}
 	helper = manager-core
 	helper =
 	helper = /usr/local/bin/git-credential-manager
 	credentialStore = secretservice
+{{- end }}
 [credential "https://dev.azure.com"]
 	useHttpPath = true
 [credential "https://git.idanbot.uk"]

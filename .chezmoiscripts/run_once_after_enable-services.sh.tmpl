@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# run_once_after_enable-services.sh.tmpl — Auto-enables configured systemd user services
+# Source: {{ .chezmoi.sourceFile }}
+source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
+
+log_step "Enabling Systemd User Services"
+
+# Check if systemd user session is available
+if ! systemctl --user show-environment &>/dev/null; then
+  log_skip "Systemd user session is not available (running in container or systemd disabled) — skipping"
+  exit 0
+fi
+
+# Reload systemd user daemon to recognize new files
+log_info "Reloading systemd user daemon..."
+systemctl --user daemon-reload
+
+# Enable and start the ssh-agent user service
+log_info "Enabling and starting ssh-agent service..."
+if systemctl --user enable --now ssh-agent.service &>/dev/null; then
+  log_success "ssh-agent user service successfully enabled and started"
+else
+  log_warn "Failed to enable ssh-agent user service"
+fi
+
+print_summary "Systemd User Services"
