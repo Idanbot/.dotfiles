@@ -115,7 +115,10 @@ fi
 
 echo "[INFO] Applying dotfiles..."
 if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
-  exclude_csv=$(IFS=,; echo "${APPLY_EXCLUDES[*]}")
+  exclude_csv=$(
+    IFS=,
+    echo "${APPLY_EXCLUDES[*]}"
+  )
   chezmoi apply --exclude="$exclude_csv"
 else
   chezmoi apply
