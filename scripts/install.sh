@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — Minimal bootstrap for a fresh Ubuntu 24.04 (native or WSL)
-# Usage: curl -fsSL https://raw.githubusercontent.com/<user>/dotfiles/main/scripts/install.sh | bash
-# Or:    git clone ... && ./scripts/install.sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
+# Or:    git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles && ~/.dotfiles/scripts/install.sh
 
 set -euo pipefail
 
@@ -11,6 +11,16 @@ if [[ "${1:-}" == "--only" ]]; then
     exit 1
   fi
   exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-section.sh" "$2"
+fi
+
+DOTFILES_REPO_URL="${DOTFILES_REPO_URL:-https://github.com/Idanbot/.dotfiles.git}"
+SCRIPT_DIR=""
+LOCAL_SOURCE=""
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+  if [[ -n "$SCRIPT_DIR" && -f "$SCRIPT_DIR/../.chezmoi.yaml.tmpl" ]]; then
+    LOCAL_SOURCE="$(cd "$SCRIPT_DIR/.." && pwd)"
+  fi
 fi
 
 echo "══════════════════════════════════════════════"
@@ -30,6 +40,16 @@ echo "[INFO] Installing prerequisites (git, curl)..."
 sudo apt-get update -qq
 sudo apt-get install -y -qq git curl
 
+CHEZMOI_INIT_ARGS=()
+DOTFILES_GIT_NAME="${DOTFILES_GIT_NAME:-$(git config --global user.name 2>/dev/null || true)}"
+DOTFILES_GIT_EMAIL="${DOTFILES_GIT_EMAIL:-$(git config --global user.email 2>/dev/null || true)}"
+if [[ -n "$DOTFILES_GIT_NAME" ]]; then
+  CHEZMOI_INIT_ARGS+=(--promptString="Full name=$DOTFILES_GIT_NAME")
+fi
+if [[ -n "$DOTFILES_GIT_EMAIL" ]]; then
+  CHEZMOI_INIT_ARGS+=(--promptString="Git email=$DOTFILES_GIT_EMAIL")
+fi
+
 # Install chezmoi
 if ! command -v chezmoi &>/dev/null; then
   echo "[INFO] Installing chezmoi..."
@@ -48,6 +68,8 @@ if ! command -v age &>/dev/null; then
 else
   echo "[SKIP] age already installed"
 fi
+
+APPLY_EXCLUDES=()
 
 # Check for age identity key
 if [[ ! -f "$HOME/.config/chezmoi/key.txt" ]]; then
@@ -75,17 +97,29 @@ if [[ ! -f "$HOME/.config/chezmoi/key.txt" ]]; then
     echo
     echo "[IMPORTANT] Back up ~/.config/chezmoi/key.txt to a safe location!"
     echo "[IMPORTANT] Update the 'recipient' field in .chezmoi.yaml with the public key above."
+    echo "[IMPORTANT] Encrypted secrets will be skipped until they are re-encrypted for this new key."
     echo
+    APPLY_EXCLUDES+=(encrypted)
   fi
 fi
 
 # Initialize and apply chezmoi
 echo "[INFO] Initializing chezmoi..."
-GITHUB_USER="${GITHUB_USER:-idanbotbol}"
-chezmoi init "$GITHUB_USER/dotfiles" --ssh
+if [[ -n "$LOCAL_SOURCE" ]]; then
+  echo "[INFO] Using local source: $LOCAL_SOURCE"
+  chezmoi init --source="$LOCAL_SOURCE" "${CHEZMOI_INIT_ARGS[@]}"
+else
+  echo "[INFO] Cloning source over HTTPS: $DOTFILES_REPO_URL"
+  chezmoi init "$DOTFILES_REPO_URL" "${CHEZMOI_INIT_ARGS[@]}"
+fi
 
 echo "[INFO] Applying dotfiles..."
-chezmoi apply
+if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
+  exclude_csv=$(IFS=,; echo "${APPLY_EXCLUDES[*]}")
+  chezmoi apply --exclude="$exclude_csv"
+else
+  chezmoi apply
+fi
 
 echo
 echo "══════════════════════════════════════════════"

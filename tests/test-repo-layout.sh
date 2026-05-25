@@ -26,6 +26,21 @@ else
   FAILED=1
 fi
 
+INSTALL_SCRIPT="$DOTFILES_DIR/scripts/install.sh"
+if grep -Fq 'https://github.com/Idanbot/.dotfiles.git' "$INSTALL_SCRIPT" && ! grep -Fq -- '--ssh' "$INSTALL_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} bootstrap uses HTTPS repo source"
+else
+  echo -e "  ${RED}✗${NC} bootstrap should use HTTPS repo source without --ssh"
+  FAILED=1
+fi
+
+if grep -Fq 'APPLY_EXCLUDES+=(encrypted)' "$INSTALL_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} bootstrap skips encrypted files after generating a new age key"
+else
+  echo -e "  ${RED}✗${NC} bootstrap missing encrypted-file skip for new age keys"
+  FAILED=1
+fi
+
 if grep -R '\$HOME/.dotfiles/scripts/lib.sh' \
   "$DOTFILES_DIR/.chezmoiscripts" >/dev/null; then
   echo -e "  ${RED}✗${NC} chezmoi scripts hard-code ~/.dotfiles"

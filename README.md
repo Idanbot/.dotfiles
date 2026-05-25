@@ -13,21 +13,25 @@
 ### Fresh Machine (one-liner)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/idanbotbol/dotfiles/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
 ```
 
 ### Or clone and run:
 
 ```bash
-git clone git@github.com:idanbotbol/dotfiles.git ~/.dotfiles
+git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles
 cd ~/.dotfiles && ./scripts/install.sh
 ```
 
 ### Existing Machine (already have chezmoi)
 
 ```bash
-chezmoi init --apply idanbotbol/dotfiles --ssh
+chezmoi init --apply https://github.com/Idanbot/.dotfiles.git
 ```
+
+By default the bootstrap uses HTTPS, so a fresh machine does not need a GitHub SSH key. If you generated a new age key instead of importing the existing one, the installer applies public dotfiles with encrypted files excluded; re-encrypt secrets for the new public recipient before applying encrypted files.
+
+To override the Git identity prompts during bootstrap, set `DOTFILES_GIT_NAME` and `DOTFILES_GIT_EMAIL`; otherwise the installer uses your existing `git config --global user.name` and `git config --global user.email` when present.
 
 ### Bootstrap Flow
 
@@ -201,8 +205,9 @@ Secrets are encrypted with [age](https://age-encryption.org) and stored in the r
 ### Key Management
 
 - **Identity key location**: `~/.config/chezmoi/key.txt`
-- **⚠️ BACK THIS UP**: Bitwarden, encrypted USB, or another secure location
-- **Generate new key**: `age-keygen -o ~/.config/chezmoi/key.txt`
+- **BACK THIS UP**: Bitwarden, encrypted USB, or another secure location
+- **Existing key**: import it before applying if you want encrypted secrets restored.
+- **New key**: `age-keygen -o ~/.config/chezmoi/key.txt`; encrypted secrets are skipped until they are re-encrypted for the new recipient.
 - **Encrypt a new file**: `chezmoi add --encrypt <file>`
 
 ---
