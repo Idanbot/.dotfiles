@@ -146,6 +146,12 @@ fonts:
 ai_tools:
   claude_cli:
     source: npm
+    package: "@anthropic-ai/claude-cli"
+    binary: claude
+  codex_cli:
+    source: npm
+    package: "@openai/codex"
+    binary: codex
   antigravity_cli:
     source: optional
   opencode:

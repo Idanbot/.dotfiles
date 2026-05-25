@@ -15,6 +15,24 @@ else
   log_skip "Claude CLI already installed"
 fi
 
+
+# ── Codex CLI ─────────────────────────────────────────────────────────────────
+if ! is_installed codex; then
+  log_info "Installing Codex CLI..."
+  if is_installed npm; then
+    CODEX_VERSION="$(package_version ai_tools codex_cli latest)"
+    if [[ "$CODEX_VERSION" == "latest" ]]; then
+      npm install -g @openai/codex 2>/dev/null && log_success "Codex CLI installed" || log_warn "Codex CLI install failed"
+    else
+      npm install -g "@openai/codex@${CODEX_VERSION}" 2>/dev/null && log_success "Codex CLI ${CODEX_VERSION} installed" || log_warn "Codex CLI install failed"
+    fi
+  else
+    log_warn "npm not found — skipping Codex CLI"
+  fi
+else
+  log_skip "Codex CLI already installed"
+fi
+
 # ── Antigravity / Gemini CLI ──────────────────────────────────────────────────
 if ! is_installed antigravity && ! is_installed gemini; then
   log_info "Installing Gemini CLI..."

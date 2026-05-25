@@ -74,7 +74,7 @@ graph TD
 | **Languages** | Go 1.24, Rust/Cargo (stable), Node.js 24.15.0 (nvm), TypeScript 5.9.3 (npm), Python 3.14.5 (uv), Java 21 |
 | **Containers** | Docker, kubectl, Helm, k9s |
 | **Cloud** | AWS CLI v2, Google Cloud CLI, Azure CLI, Terraform, Ansible |
-| **AI Tools** | Claude CLI, Gemini CLI, OpenCode |
+| **AI Tools** | Claude CLI, Codex CLI, Gemini CLI, OpenCode |
 | **Media** | yt-dlp, rmpc, cava (native only) |
 | **Fonts** | FiraMono Nerd Font |
 | **Theme** | Catppuccin Mocha (everywhere) |

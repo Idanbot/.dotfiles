@@ -71,6 +71,15 @@ def parse_meta(path: Path) -> dict[str, dict[str, dict[str, str]]]:
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
+
+def yaml_scalar(value: str) -> str:
+    if value == "":
+        return '""'
+    safe = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._/-")
+    if all(char in safe for char in value):
+        return value
+    return '"' + value.replace('\\', '\\\\').replace('\"', '\\"') + '"'
+
 versions = parse_versions(packages_file)
 metadata = parse_meta(meta_file)
 lines = [
@@ -88,14 +97,14 @@ for section, tools in versions.items():
     for name, version in tools.items():
         meta = metadata.get(section, {}).get(name, {})
         lines.extend([
-            f"  - section: {section}",
-            f"    name: {name}",
-            f"    version: {version}",
-            f"    source: {meta.get('source', 'unknown')}",
+            f"  - section: {yaml_scalar(section)}",
+            f"    name: {yaml_scalar(name)}",
+            f"    version: {yaml_scalar(version)}",
+            f"    source: {yaml_scalar(meta.get('source', 'unknown'))}",
         ])
         for field in ("repo", "package", "crate", "binary"):
             if field in meta:
-                lines.append(f"    {field}: {meta[field]}")
+                lines.append(f"    {field}: {yaml_scalar(meta[field])}")
         lines.append("    checksum: null")
 
 output_file.write_text("\n".join(lines) + "\n")
