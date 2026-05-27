@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# run_once_before_02b-fix-omz-git-wsl.sh.tmpl
+#
+# WSL-only — no-ops on native Linux.
+#
+# Problem: OMZ may have been originally installed via the official installer
+# (git clone). When chezmoi later took over via .chezmoiexternal.yaml it did
+# not remove the .git dir (exact: false). OMZ's built-in updater then tries
+# to run git fetch/merge inside ~/.oh-my-zsh, finds a stale .git and leaves
+# the index in a broken state:
+#
+#   error: Your local changes to the following files would be overwritten by merge:
+#     .github/workflows/scorecard.yml ...
+#   error: you need to resolve your current index first
+#
+# Fix: remove the .git dir and any leftover merge-state files so chezmoi's
+# archive extraction starts clean, and DISABLE_AUTO_UPDATE in .zshrc prevents
+# the updater from running again.
+{{ if not .is_wsl }}exit 0{{ end }}
+
+OMZ="$HOME/.oh-my-zsh"
+
+if [[ -d "$OMZ/.git" ]]; then
+  echo "[omz-wsl-fix] Removing stale .git dir from $OMZ"
+  rm -rf "$OMZ/.git"
+fi
+
+# Clean up any leftover merge / lock state files
+for f in MERGE_HEAD MERGE_MSG MERGE_MODE CHERRY_PICK_HEAD index.lock; do
+  if [[ -f "$OMZ/$f" ]]; then
+    rm -f "$OMZ/$f"
+    echo "[omz-wsl-fix] Removed $OMZ/$f"
+  fi
+done
+
+echo "[omz-wsl-fix] Done"

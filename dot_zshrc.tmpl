@@ -27,6 +27,15 @@ done
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
 
+{{- if .is_wsl }}
+# WSL: chezmoi manages ~/.oh-my-zsh as a plain archive — there is no .git dir.
+# OMZ's built-in updater attempts git fetch/merge anyway (finding a stale .git
+# from a prior manual install), corrupting the index (scorecard.yml etc.).
+# chezmoi handles updates via refreshPeriod in .chezmoiexternal.yaml instead.
+DISABLE_AUTO_UPDATE=true
+DISABLE_UPDATE_PROMPT=true
+{{- end }}
+
 # History
 HIST_STAMPS="mm-dd-yyyy-%T"
 
@@ -99,20 +108,9 @@ unset _clean_fpath _fpath_dir
 
 source $ZSH/oh-my-zsh.sh
 
-# OMZ plugins (e.g. docker) may add directories to fpath that don't exist on
-# this machine (e.g. /usr/share/zsh/vendor-completions on WSL with docker.io).
-# Strip any missing entries and reinitialise completions to silence compinit
-# "no such file or directory" warnings.
-() {
-  local -a _fpath_clean=()
-  local _dir
-  for _dir in "${fpath[@]}"; do
-    [[ -d "$_dir" ]] && _fpath_clean+=("$_dir")
-  done
-  fpath=("${_fpath_clean[@]}")
-  typeset -U fpath
-}
-autoload -Uz compinit && compinit -u
+# OMZ already called compinit internally. No second compinit call needed.
+# The fpath cleanup above (before source oh-my-zsh.sh) is sufficient to
+# prevent "no such file or directory" warnings for missing vendor completions.
 
 setopt NO_BEEP
 
