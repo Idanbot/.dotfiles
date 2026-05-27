@@ -130,9 +130,12 @@ jobs:
           sudo apt-get install -y jq python3
           mkdir -p ~/.local/bin
           actionlint_version=1.7.7
-          actionlint_url="https://github.com/rhysd/actionlint/releases/download/v${actionlint_version}"
+          actionlint_base="https://github.com/rhysd/actionlint"
+          actionlint_rel="releases/download/v${actionlint_version}"
+          actionlint_url="${actionlint_base}/${actionlint_rel}"
+          actionlint_tar="actionlint_${actionlint_version}_linux_amd64.tar.gz"
           curl -fsSLo /tmp/actionlint.tar.gz \
-            "$actionlint_url/actionlint_${actionlint_version}_linux_amd64.tar.gz"
+            "$actionlint_url/$actionlint_tar"
           tar -xzf /tmp/actionlint.tar.gz -C ~/.local/bin actionlint
 
       - name: actionlint
@@ -168,7 +171,9 @@ jobs:
             args: ""
             input: ""
             mode: full
-            sections: detect,core,zsh,terminal,languages,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services
+            sections: >-
+              detect,core,zsh,terminal,languages,cloud,tmux,neovim,ai,
+              media,fonts,desktop,system,theme,vscode,services
             apply_scripts: "true"
           - name: base-only
             args: "--base-only"
@@ -198,7 +203,9 @@ jobs:
             args: "--full --without cloud,vscode"
             input: ""
             mode: full
-            sections: detect,core,zsh,terminal,languages,tmux,neovim,ai,media,fonts,desktop,system,theme,services
+            sections: >-
+              detect,core,zsh,terminal,languages,tmux,neovim,ai,
+              media,fonts,desktop,system,theme,services
             apply_scripts: "false"
           - name: menu-base
             args: "--menu"
