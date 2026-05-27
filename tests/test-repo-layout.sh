@@ -41,6 +41,14 @@ else
   FAILED=1
 fi
 
+CONFIGURE_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_12-configure-system.sh.tmpl"
+if grep -Fq 'GCM_DEB="gcm-linux-${GCM_ARCH}-${GCM_VERSION}.deb"' "$CONFIGURE_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} system installer uses current GCM release asset names"
+else
+  echo -e "  ${RED}✗${NC} system installer should use current GCM release asset names"
+  FAILED=1
+fi
+
 if grep -R '\$HOME/.dotfiles/scripts/lib.sh' \
   "$DOTFILES_DIR/.chezmoiscripts" >/dev/null; then
   echo -e "  ${RED}✗${NC} chezmoi scripts hard-code ~/.dotfiles"
@@ -112,7 +120,7 @@ else
   FAILED=1
 fi
 
-if grep -Fq /user/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" && \
+if grep -Fq /user/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" &&
   grep -Fq _clean_fpath "$DOTFILES_DIR/dot_zshrc.tmpl"; then
   echo -e "  ${GREEN}✓${NC} zsh startup cleans stale completion paths before compinit"
 else
