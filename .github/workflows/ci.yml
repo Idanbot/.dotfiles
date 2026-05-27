@@ -268,14 +268,14 @@ jobs:
 
       - name: Install option e2e
         run: |
-          mkdir -p artifacts/pre-matrix-${{ matrix.profile.name }}
+          ARTIFACTS="artifacts/pre-matrix-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
             -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/artifacts/pre-matrix-\
-${{ matrix.profile.name }}:/artifacts \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
             dotfiles-pre-matrix \
             bash -lc '
               set -o pipefail
@@ -286,14 +286,14 @@ ${{ matrix.profile.name }}:/artifacts \
 
       - name: Chezmoi apply fixture
         run: |
-          mkdir -p artifacts/pre-matrix-${{ matrix.profile.name }}
+          ARTIFACTS="artifacts/pre-matrix-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
             -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/artifacts/pre-matrix-\
-${{ matrix.profile.name }}:/artifacts \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
             dotfiles-pre-matrix \
             bash -lc '
               set -o pipefail
@@ -354,14 +354,14 @@ ${{ matrix.profile.name }}:/artifacts \
 
       - name: Run bootstrap test
         run: |
-          mkdir -p artifacts/bootstrap-${{ matrix.profile.name }}
+          ARTIFACTS="artifacts/bootstrap-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
             -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/artifacts/bootstrap-\
-${{ matrix.profile.name }}:/artifacts \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
             dotfiles-test \
             bash -lc '
               set -o pipefail
@@ -374,14 +374,14 @@ ${{ matrix.profile.name }}:/artifacts \
 
       - name: Run idempotency test
         run: |
-          mkdir -p artifacts/idempotency-${{ matrix.profile.name }}
+          ARTIFACTS="artifacts/idempotency-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
             -e DOTFILES_LOG_DIR=/artifacts \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/artifacts/idempotency-\
-${{ matrix.profile.name }}:/artifacts \
             dotfiles-test \
             bash -lc '
               set -o pipefail
