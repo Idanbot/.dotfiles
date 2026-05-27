@@ -10,3 +10,6 @@ Thumbs.db
 
 # chezmoi
 .chezmoistate.boltdb
+
+# Tool runtime dirs (not dotfiles)
+.antigravitycli/
