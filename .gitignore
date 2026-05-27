@@ -13,3 +13,4 @@ Thumbs.db
 
 # Tool runtime dirs (not dotfiles)
 .antigravitycli/
+.codex/
