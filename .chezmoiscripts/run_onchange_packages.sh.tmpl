@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 # This script re-runs whenever packages.yaml changes
-# chezmoi:template:left-delimiter="# {{"
-# chezmoi:template:right-delimiter="}}"
-# hash: # {{ include "packages.yaml" | sha256sum }}
+# hash: {{ include "packages.yaml" | sha256sum }}
 source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
 
 log_step "Package Manifest Changed — Checking for Updates"
