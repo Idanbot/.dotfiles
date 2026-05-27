@@ -16,6 +16,15 @@ if ! is_installed docker; then
     log_info "WSL detected — installing Docker CLI only (use Docker Desktop on Windows)"
     sudo apt-get install -y docker.io docker-compose-v2
     # Don't start dockerd on WSL — Docker Desktop handles it
+    # docker.io on Ubuntu may not ship the zsh vendor completion; install it
+    # explicitly so the OMZ docker plugin's fpath entry resolves correctly.
+    if [[ ! -f /usr/share/zsh/vendor-completions/_docker ]]; then
+      log_info "Installing docker zsh completion for vendor-completions..."
+      sudo mkdir -p /usr/share/zsh/vendor-completions
+      curl -fsSL https://raw.githubusercontent.com/docker/cli/master/contrib/completion/zsh/_docker \
+        | sudo tee /usr/share/zsh/vendor-completions/_docker > /dev/null
+      log_success "Docker zsh completion installed"
+    fi
   else
     log_info "Installing Docker Engine (native)..."
     sudo install -m 0755 -d /etc/apt/keyrings

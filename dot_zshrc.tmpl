@@ -99,6 +99,21 @@ unset _clean_fpath _fpath_dir
 
 source $ZSH/oh-my-zsh.sh
 
+# OMZ plugins (e.g. docker) may add directories to fpath that don't exist on
+# this machine (e.g. /usr/share/zsh/vendor-completions on WSL with docker.io).
+# Strip any missing entries and reinitialise completions to silence compinit
+# "no such file or directory" warnings.
+() {
+  local -a _fpath_clean=()
+  local _dir
+  for _dir in "${fpath[@]}"; do
+    [[ -d "$_dir" ]] && _fpath_clean+=("$_dir")
+  done
+  fpath=("${_fpath_clean[@]}")
+  typeset -U fpath
+}
+autoload -Uz compinit && compinit -u
+
 setopt NO_BEEP
 
 # --- Completion core ---

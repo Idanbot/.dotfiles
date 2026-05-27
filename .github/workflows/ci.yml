@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Add local bin to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Cache binaries
         id: cache-binaries
@@ -118,7 +118,7 @@ jobs:
           fetch-depth: 2
 
       - name: Add local bin to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Install static policy tools
         run: |
