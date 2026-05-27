@@ -111,6 +111,11 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
 else
   echo "[INFO] Cloning source over HTTPS: $DOTFILES_REPO_URL"
   chezmoi init "$DOTFILES_REPO_URL" "${CHEZMOI_INIT_ARGS[@]}"
+  CHEZMOI_SOURCE="$(chezmoi source-path 2>/dev/null || true)"
+  if [[ -n "$CHEZMOI_SOURCE" && -d "$CHEZMOI_SOURCE/.git" ]]; then
+    echo "[INFO] Updating chezmoi source: $CHEZMOI_SOURCE"
+    git -C "$CHEZMOI_SOURCE" pull --ff-only
+  fi
 fi
 
 echo "[INFO] Applying dotfiles..."

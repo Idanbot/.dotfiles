@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # run_once_after_enable-services.sh.tmpl — Auto-enables configured systemd user services
 # Source: {{ .chezmoi.sourceFile }}
-source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
+if [[ -z "${DOTFILES_SOURCE_DIR:-}" ]]; then
+  DOTFILES_SOURCE_DIR="${CHEZMOI_SOURCE_DIR:-$HOME/.local/share/chezmoi}"
+fi
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Enabling Systemd User Services"
 

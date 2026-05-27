@@ -49,6 +49,21 @@ else
   echo -e "  ${GREEN}✓${NC} chezmoi scripts use the source directory"
 fi
 
+if grep -R "{{ .chezmoi.sourceDir }}/scripts/lib.sh" \
+  "$DOTFILES_DIR/.chezmoiscripts" >/dev/null; then
+  echo -e "  ${RED}✗${NC} chezmoi scripts rely on templating to load scripts/lib.sh"
+  FAILED=1
+else
+  echo -e "  ${GREEN}✓${NC} chezmoi scripts load scripts/lib.sh from CHEZMOI_SOURCE_DIR"
+fi
+
+if grep -Fq "git -C \"\$CHEZMOI_SOURCE\" pull --ff-only" "$INSTALL_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} bootstrap refreshes existing remote source before apply"
+else
+  echo -e "  ${RED}✗${NC} bootstrap should refresh existing remote source before apply"
+  FAILED=1
+fi
+
 while IFS= read -r -d '' script; do
   echo -e "  ${RED}✗${NC} root script found: ${script#$DOTFILES_DIR/}"
   FAILED=1

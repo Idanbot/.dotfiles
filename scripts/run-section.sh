@@ -71,4 +71,4 @@ if [[ ! -f "$script_path" ]]; then
   exit 1
 fi
 
-chezmoi execute-template <"$script_path" | bash
+DOTFILES_SOURCE_DIR="$DOTFILES_DIR" chezmoi execute-template <"$script_path" | DOTFILES_SOURCE_DIR="$DOTFILES_DIR" bash

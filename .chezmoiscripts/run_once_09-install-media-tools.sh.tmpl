@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-source "{{ .chezmoi.sourceDir }}/scripts/lib.sh"
+if [[ -z "${DOTFILES_SOURCE_DIR:-}" ]]; then
+  DOTFILES_SOURCE_DIR="${CHEZMOI_SOURCE_DIR:-$HOME/.local/share/chezmoi}"
+fi
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Media Tools"
 
