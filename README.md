@@ -16,12 +16,22 @@
 curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
 ```
 
+The default one-liner performs the full install. For unattended or smaller installs, pass flags through `bash -s --`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --base-only -y
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --with languages,tmux,neovim -y
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --sections core,languages -y
+```
+
 ### Or clone and run:
 
 ```bash
 git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles
 cd ~/.dotfiles && ./scripts/install.sh
 ```
+
+Run `./scripts/install.sh --menu` for the interactive selector, `./scripts/install.sh --list-options` to see valid sections, or `./scripts/install.sh --print-plan` to preview a selected install profile.
 
 ### Existing Machine (already have chezmoi)
 
@@ -309,6 +319,7 @@ GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotf
 - **Chezmoi fixture**: applies templates into a temporary home without running install scripts.
 - **Interactive startup**: smoke-tests rendered zsh and tmux startup.
 - **Network install smoke**: verifies GitHub-release tools can still be installed.
+- **Install option e2e**: Exercises full, base-only, selected-section, menu, and invalid flag paths in Docker.
 - **Test Matrix**: Bootstrap test in Docker for:
   - `ubuntu-24.04-native`
   - `ubuntu-24.04-wsl` (simulated)
@@ -325,6 +336,7 @@ GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotf
 | **Interactive Startup** | zsh interactive startup and tmux config source smoke tests | Tracks shell/tmux parse regressions |
 | **GitHub Release Tool Smoke** | Downloads and runs `lazygit`, `lazydocker`, `sops`, and `tealdeer` | Tracks upstream release asset drift |
 | **Bootstrap Test** | Ubuntu 24.04 native + simulated WSL containers | Tracks core package availability, sourced libraries, directory creation, and config source files |
+| **Install Option E2E** | Full, base-only, `--with`, `--sections`, `--without`, menu, and invalid flag plans | Tracks selector behavior without repeatedly installing packages |
 | **Idempotency Test** | Re-runs package install logic in the same container | Tracks repeatability and skip behavior after first install |
 
 ### Latest Successful Run Review

@@ -1,17 +1,9 @@
 #!/usr/bin/env bash
-# install.sh — Minimal bootstrap for a fresh Ubuntu 24.04 (native or WSL)
+# install.sh - Bootstrap for Ubuntu 24.04 (native or WSL)
 # Usage: curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
 # Or:    git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles && ~/.dotfiles/scripts/install.sh
 
 set -euo pipefail
-
-if [[ "${1:-}" == "--only" ]]; then
-  if [[ -z "${2:-}" ]]; then
-    echo "Usage: ./scripts/install.sh --only <section>" >&2
-    exit 1
-  fi
-  exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-section.sh" "$2"
-fi
 
 DOTFILES_REPO_URL="${DOTFILES_REPO_URL:-https://github.com/Idanbot/.dotfiles.git}"
 SCRIPT_DIR=""
@@ -22,6 +14,387 @@ if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
     LOCAL_SOURCE="$(cd "$SCRIPT_DIR/.." && pwd)"
   fi
 fi
+
+SECTION_ORDER=(
+  detect
+  core
+  zsh
+  terminal
+  languages
+  cloud
+  tmux
+  neovim
+  ai
+  media
+  fonts
+  desktop
+  system
+  theme
+  vscode
+  services
+)
+
+BASE_SECTIONS=(detect core zsh terminal)
+OPTIONAL_SECTIONS=(languages cloud tmux neovim ai media fonts desktop system theme vscode services)
+SELECTED_SECTIONS=()
+WITH_SECTIONS=()
+WITHOUT_SECTIONS=()
+SELECTION_MODE=""
+AUTO_APPROVE=false
+PRINT_PLAN=false
+LIST_OPTIONS=false
+MENU_REQUESTED=false
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/install.sh [options]
+
+Install profiles:
+  --full                    Install all sections (default for noninteractive use)
+  --base-only               Install base sections only: detect, core, zsh, terminal
+  --with <a,b>              Install base plus optional sections
+  --sections <a,b>          Install exactly these sections
+  --without <a,b>           Remove sections from the selected profile
+  --menu                    Show the interactive selector even if flags are absent
+  -y, --yes                 Do not prompt; accept the selected/default profile
+  --only <section>          Run one section from an existing local checkout
+
+Utility:
+  --list-options            Print available sections and exit
+  --print-plan              Print the resolved plan and exit without installing
+  -h, --help                Show this help
+
+Optional sections:
+  languages, cloud, tmux, neovim, ai, media, fonts, desktop, system, theme, vscode, services
+
+Examples:
+  scripts/install.sh --base-only -y
+  scripts/install.sh --with languages,tmux,neovim -y
+  scripts/install.sh --sections core,languages -y
+  curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --base-only -y
+USAGE
+}
+
+join_by_comma() {
+  local IFS=,
+  echo "$*"
+}
+
+contains_section() {
+  local needle="$1"
+  local section
+  for section in "${SECTION_ORDER[@]}"; do
+    if [[ "$section" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+array_has() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+add_section_once() {
+  local section="$1"
+  if ! array_has "$section" "${SELECTED_SECTIONS[@]}"; then
+    SELECTED_SECTIONS+=("$section")
+  fi
+}
+
+parse_csv_sections() {
+  local value="$1"
+  local -n out_ref="$2"
+  local raw section
+  IFS=',' read -ra raw <<<"$value"
+  for section in "${raw[@]}"; do
+    section="${section//[[:space:]]/}"
+    [[ -z "$section" ]] && continue
+    if ! contains_section "$section"; then
+      echo "Unknown section: $section" >&2
+      echo "Run scripts/install.sh --list-options for valid sections." >&2
+      exit 2
+    fi
+    out_ref+=("$section")
+  done
+}
+
+print_options() {
+  echo "Profiles: full, base-only, custom"
+  echo "Base sections: $(join_by_comma "${BASE_SECTIONS[@]}")"
+  echo "Optional sections: $(join_by_comma "${OPTIONAL_SECTIONS[@]}")"
+  echo "All sections: $(join_by_comma "${SECTION_ORDER[@]}")"
+}
+
+select_base() {
+  SELECTION_MODE="base"
+  SELECTED_SECTIONS=("${BASE_SECTIONS[@]}")
+}
+
+select_full() {
+  SELECTION_MODE="full"
+  SELECTED_SECTIONS=("${SECTION_ORDER[@]}")
+}
+
+select_exact() {
+  SELECTION_MODE="custom"
+  SELECTED_SECTIONS=("$@")
+}
+
+apply_with_sections() {
+  local section
+  for section in "${WITH_SECTIONS[@]}"; do
+    add_section_once "$section"
+  done
+}
+
+apply_without_sections() {
+  local filtered=()
+  local section skip
+  for section in "${SELECTED_SECTIONS[@]}"; do
+    skip=false
+    if array_has "$section" "${WITHOUT_SECTIONS[@]}"; then
+      skip=true
+    fi
+    if [[ "$skip" == "false" ]]; then
+      filtered+=("$section")
+    fi
+  done
+  SELECTED_SECTIONS=("${filtered[@]}")
+}
+
+sort_selected_sections() {
+  local sorted=()
+  local section
+  for section in "${SECTION_ORDER[@]}"; do
+    if array_has "$section" "${SELECTED_SECTIONS[@]}"; then
+      sorted+=("$section")
+    fi
+  done
+  SELECTED_SECTIONS=("${sorted[@]}")
+}
+
+show_menu() {
+  local choice extras
+  echo
+  echo "══════════════════════════════════════════════"
+  echo "  Install Profile"
+  echo "══════════════════════════════════════════════"
+  echo "  1. Full install"
+  echo "  2. Base only (${BASE_SECTIONS[*]})"
+  echo "  3. Base + selected optional sections"
+  echo "  4. Exact section list"
+  echo
+  read -rp "Choose install profile [1]: " choice
+  case "${choice:-1}" in
+    1)
+      select_full
+      ;;
+    2)
+      select_base
+      ;;
+    3)
+      select_base
+      echo "Optional sections: $(join_by_comma "${OPTIONAL_SECTIONS[@]}")"
+      read -rp "Add sections (comma-separated): " extras
+      parse_csv_sections "$extras" WITH_SECTIONS
+      apply_with_sections
+      SELECTION_MODE="custom"
+      ;;
+    4)
+      echo "All sections: $(join_by_comma "${SECTION_ORDER[@]}")"
+      read -rp "Sections (comma-separated): " extras
+      SELECTED_SECTIONS=()
+      parse_csv_sections "$extras" SELECTED_SECTIONS
+      SELECTION_MODE="custom"
+      ;;
+    *)
+      echo "Unknown menu choice: $choice" >&2
+      exit 2
+      ;;
+  esac
+}
+
+resolve_selection() {
+  if [[ -z "$SELECTION_MODE" ]]; then
+    if [[ ${#WITH_SECTIONS[@]} -gt 0 ]]; then
+      select_base
+    elif [[ ${#WITHOUT_SECTIONS[@]} -gt 0 ]]; then
+      select_full
+    elif [[ "$MENU_REQUESTED" == "true" || ("$AUTO_APPROVE" == "false" && -t 0) ]]; then
+      show_menu
+    else
+      select_full
+    fi
+  fi
+
+  apply_with_sections
+  apply_without_sections
+  sort_selected_sections
+
+  if [[ ${#SELECTED_SECTIONS[@]} -eq 0 ]]; then
+    echo "No install sections selected." >&2
+    exit 2
+  fi
+}
+
+print_plan() {
+  echo "mode=$SELECTION_MODE"
+  echo "sections=$(join_by_comma "${SELECTED_SECTIONS[@]}")"
+  if [[ "$SELECTION_MODE" == "full" && ${#WITHOUT_SECTIONS[@]} -eq 0 ]]; then
+    echo "apply_scripts=true"
+  else
+    echo "apply_scripts=false"
+  fi
+}
+
+if [[ "${1:-}" == "--only" ]]; then
+  if [[ -z "${2:-}" ]]; then
+    echo "Usage: ./scripts/install.sh --only <section>" >&2
+    exit 1
+  fi
+  exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-section.sh" "$2"
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --full)
+      select_full
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --base-only)
+      select_base
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --with)
+      [[ -n "${2:-}" ]] || {
+        echo "--with requires a comma-separated section list" >&2
+        exit 2
+      }
+      parse_csv_sections "$2" WITH_SECTIONS
+      AUTO_APPROVE=true
+      shift 2
+      ;;
+    --with=*)
+      parse_csv_sections "${1#--with=}" WITH_SECTIONS
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --sections)
+      [[ -n "${2:-}" ]] || {
+        echo "--sections requires a comma-separated section list" >&2
+        exit 2
+      }
+      SELECTED_SECTIONS=()
+      parse_csv_sections "$2" SELECTED_SECTIONS
+      SELECTION_MODE="custom"
+      AUTO_APPROVE=true
+      shift 2
+      ;;
+    --sections=*)
+      SELECTED_SECTIONS=()
+      parse_csv_sections "${1#--sections=}" SELECTED_SECTIONS
+      SELECTION_MODE="custom"
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --without)
+      [[ -n "${2:-}" ]] || {
+        echo "--without requires a comma-separated section list" >&2
+        exit 2
+      }
+      parse_csv_sections "$2" WITHOUT_SECTIONS
+      AUTO_APPROVE=true
+      shift 2
+      ;;
+    --without=*)
+      parse_csv_sections "${1#--without=}" WITHOUT_SECTIONS
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --menu)
+      MENU_REQUESTED=true
+      shift
+      ;;
+    -y | --yes)
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --print-plan)
+      PRINT_PLAN=true
+      AUTO_APPROVE=true
+      shift
+      ;;
+    --list-options)
+      LIST_OPTIONS=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$LIST_OPTIONS" == "true" ]]; then
+  print_options
+  exit 0
+fi
+
+resolve_selection
+
+if [[ "$PRINT_PLAN" == "true" ]]; then
+  print_plan
+  exit 0
+fi
+
+declare -A SECTION_SCRIPTS=(
+  [detect]=".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl"
+  [core]=".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl"
+  [zsh]=".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl"
+  [terminal]=".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
+  [languages]=".chezmoiscripts/run_once_04-install-languages.sh.tmpl"
+  [cloud]=".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
+  [tmux]=".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl"
+  [neovim]=".chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
+  [ai]=".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
+  [media]=".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl"
+  [fonts]=".chezmoiscripts/run_once_10-install-fonts.sh.tmpl"
+  [desktop]=".chezmoiscripts/run_once_11-install-desktop.sh.tmpl"
+  [system]=".chezmoiscripts/run_once_12-configure-system.sh.tmpl"
+  [theme]=".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl"
+  [vscode]=".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl"
+  [services]=".chezmoiscripts/run_once_after_enable-services.sh.tmpl"
+)
+
+run_install_section() {
+  local source_dir="$1" section="$2"
+  local script="${SECTION_SCRIPTS[$section]:-}"
+  local script_path
+  if [[ -z "$script" ]]; then
+    echo "Unknown section: $section" >&2
+    return 1
+  fi
+  script_path="$source_dir/$script"
+  if [[ ! -f "$script_path" ]]; then
+    echo "Missing section script: $script_path" >&2
+    return 1
+  fi
+  DOTFILES_SOURCE_DIR="$source_dir" chezmoi execute-template <"$script_path" | DOTFILES_SOURCE_DIR="$source_dir" bash
+}
 
 echo "══════════════════════════════════════════════"
 echo "  Dotfiles Bootstrap — Idan Botbol"
@@ -34,6 +407,9 @@ if grep -qi microsoft /proc/version 2>/dev/null; then
 else
   echo "[INFO] Native Linux environment detected"
 fi
+
+echo "[INFO] Install profile: $SELECTION_MODE"
+echo "[INFO] Selected sections: $(join_by_comma "${SELECTED_SECTIONS[@]}")"
 
 # Install prerequisites
 echo "[INFO] Installing prerequisites (git, curl)..."
@@ -85,7 +461,11 @@ if [[ ! -f "$HOME/.config/chezmoi/key.txt" ]]; then
   echo "  2. Generate new key:    age-keygen -o ~/.config/chezmoi/key.txt"
   echo "     (Then update the recipient in .chezmoi.yaml and re-encrypt secrets)"
   echo
-  read -rp "Do you have an existing key to import? [y/N] " response
+  if [[ "$AUTO_APPROVE" == "true" ]]; then
+    response=n
+  else
+    read -rp "Do you have an existing key to import? [y/N] " response
+  fi
   if [[ "$response" =~ ^[Yy]$ ]]; then
     echo "Please place your key at ~/.config/chezmoi/key.txt and re-run this script."
     exit 0
@@ -108,6 +488,7 @@ echo "[INFO] Initializing chezmoi..."
 if [[ -n "$LOCAL_SOURCE" ]]; then
   echo "[INFO] Using local source: $LOCAL_SOURCE"
   chezmoi init --source="$LOCAL_SOURCE" "${CHEZMOI_INIT_ARGS[@]}"
+  CHEZMOI_SOURCE="$LOCAL_SOURCE"
 else
   echo "[INFO] Cloning source over HTTPS: $DOTFILES_REPO_URL"
   chezmoi init "$DOTFILES_REPO_URL" "${CHEZMOI_INIT_ARGS[@]}"
@@ -118,15 +499,25 @@ else
   fi
 fi
 
+manual_sections=false
+if [[ "$SELECTION_MODE" != "full" || ${#WITHOUT_SECTIONS[@]} -gt 0 ]]; then
+  manual_sections=true
+  APPLY_EXCLUDES+=(scripts)
+fi
+
 echo "[INFO] Applying dotfiles..."
 if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
-  exclude_csv=$(
-    IFS=,
-    echo "${APPLY_EXCLUDES[*]}"
-  )
+  exclude_csv=$(join_by_comma "${APPLY_EXCLUDES[@]}")
   chezmoi apply --exclude="$exclude_csv"
 else
   chezmoi apply
+fi
+
+if [[ "$manual_sections" == "true" ]]; then
+  echo "[INFO] Running selected install sections..."
+  for section in "${SELECTED_SECTIONS[@]}"; do
+    run_install_section "$CHEZMOI_SOURCE" "$section"
+  done
 fi
 
 echo

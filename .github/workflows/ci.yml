@@ -164,6 +164,15 @@ jobs:
             dotfiles-test \
             /dotfiles/tests/test-bootstrap.sh
 
+      - name: Run install option e2e test
+        run: |
+          docker run --rm \
+            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
+            -e DOTFILES_CI=true \
+            -v ${{ github.workspace }}:/dotfiles:ro \
+            dotfiles-test \
+            /dotfiles/tests/test-install-options.sh
+
       - name: Run idempotency test
         run: |
           docker run --rm \
