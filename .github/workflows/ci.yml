@@ -80,6 +80,9 @@ jobs:
       - name: Repository layout
         run: tests/test-repo-layout.sh
 
+      - name: Bootstrap safety
+        run: tests/test-bootstrap-safety.sh "$PWD"
+
       - name: Package metadata and generated docs
         run: tests/test-package-metadata.sh
 
@@ -147,9 +150,92 @@ jobs:
       - name: Download and smoke GitHub release tools
         run: tests/test-github-release-tools.sh "$PWD"
 
+  install-selectors:
+    name: Selector E2E (${{ matrix.profile.name }}/${{ matrix.selector.name }})
+    needs: [github-release-tools]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - name: native
+            wsl: "false"
+          - name: wsl
+            wsl: "true"
+        selector:
+          - name: default-full
+            args: ""
+            input: ""
+            mode: full
+            sections: detect,core,zsh,terminal,languages,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services
+            apply_scripts: "true"
+          - name: base-only
+            args: "--base-only"
+            input: ""
+            mode: base
+            sections: detect,core,zsh,terminal
+            apply_scripts: "false"
+          - name: base-with-languages-tmux
+            args: "--with languages,tmux"
+            input: ""
+            mode: base
+            sections: detect,core,zsh,terminal,languages,tmux
+            apply_scripts: "false"
+          - name: base-with-ai-neovim
+            args: "--with=ai,neovim"
+            input: ""
+            mode: base
+            sections: detect,core,zsh,terminal,neovim,ai
+            apply_scripts: "false"
+          - name: exact-core-languages
+            args: "--sections core,languages"
+            input: ""
+            mode: custom
+            sections: core,languages
+            apply_scripts: "false"
+          - name: full-without-cloud-vscode
+            args: "--full --without cloud,vscode"
+            input: ""
+            mode: full
+            sections: detect,core,zsh,terminal,languages,tmux,neovim,ai,media,fonts,desktop,system,theme,services
+            apply_scripts: "false"
+          - name: menu-base
+            args: "--menu"
+            input: "2\\n"
+            mode: base
+            sections: detect,core,zsh,terminal
+            apply_scripts: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run selector profile in Docker
+        env:
+          INSTALL_SELECTOR_INPUT: ${{ matrix.selector.input }}
+        run: |
+          docker run --rm \
+            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
+            -e DOTFILES_CI=true \
+            -e INSTALL_SELECTOR_INPUT \
+            -v ${{ github.workspace }}:/dotfiles:ro \
+            ubuntu:24.04 \
+            bash -lc '
+              set -euo pipefail
+              selector_args=()
+              if [[ -n "${{ matrix.selector.args }}" ]]; then
+                read -ra selector_args <<< "${{ matrix.selector.args }}"
+              fi
+              /dotfiles/tests/test-install-selector-profile.sh \
+                "${{ matrix.selector.mode }}" \
+                "${{ matrix.selector.sections }}" \
+                "${{ matrix.selector.apply_scripts }}" \
+                -- "${selector_args[@]}"
+            '
+
   pre-matrix:
     name: Pre-Matrix Docker Checks
-    needs: [github-release-tools]
+    needs: [github-release-tools, install-selectors]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -181,25 +267,48 @@ jobs:
 
       - name: Install option e2e
         run: |
+          mkdir -p artifacts/pre-matrix-${{ matrix.profile.name }}
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/artifacts/pre-matrix-${{ matrix.profile.name }}:/artifacts \
             dotfiles-pre-matrix \
-            /dotfiles/tests/test-install-options.sh
+            bash -lc '
+              set -o pipefail
+              env | sort > /artifacts/install-options-env.txt
+              /dotfiles/tests/test-install-options.sh 2>&1 | tee /artifacts/install-options.log
+            '
 
       - name: Chezmoi apply fixture
         run: |
+          mkdir -p artifacts/pre-matrix-${{ matrix.profile.name }}
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/artifacts/pre-matrix-${{ matrix.profile.name }}:/artifacts \
             dotfiles-pre-matrix \
             bash -lc '
-              mkdir -p ~/.local/bin &&
-              sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin &&
-              /dotfiles/tests/test-chezmoi-apply.sh /dotfiles
+              set -o pipefail
+              env | sort > /artifacts/chezmoi-env.txt
+              {
+                mkdir -p ~/.local/bin &&
+                sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin &&
+                /dotfiles/tests/test-chezmoi-apply.sh /dotfiles
+              } 2>&1 | tee /artifacts/chezmoi-apply.log
+              find "$HOME" -maxdepth 3 -type f | sort > /artifacts/home-files.txt
             '
+
+      - name: Upload pre-matrix logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-matrix-logs-${{ matrix.profile.name }}
+          path: artifacts/pre-matrix-${{ matrix.profile.name }}
+          if-no-files-found: ignore
 
   test:
     name: Bootstrap Test (${{ matrix.profile.name }})
@@ -239,18 +348,42 @@ jobs:
 
       - name: Run bootstrap test
         run: |
+          mkdir -p artifacts/bootstrap-${{ matrix.profile.name }}
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/artifacts/bootstrap-${{ matrix.profile.name }}:/artifacts \
             dotfiles-test \
-            /dotfiles/tests/test-bootstrap.sh
+            bash -lc '
+              set -o pipefail
+              env | sort > /artifacts/bootstrap-env.txt
+              /dotfiles/tests/test-bootstrap.sh 2>&1 | tee /artifacts/bootstrap.log
+              find "$HOME" -maxdepth 3 -type f | sort > /artifacts/home-files-after-bootstrap.txt
+            '
 
       - name: Run idempotency test
         run: |
+          mkdir -p artifacts/idempotency-${{ matrix.profile.name }}
           docker run --rm \
             -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
             -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
             -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/artifacts/idempotency-${{ matrix.profile.name }}:/artifacts \
             dotfiles-test \
-            /dotfiles/tests/test-idempotency.sh
+            bash -lc '
+              set -o pipefail
+              env | sort > /artifacts/idempotency-env.txt
+              /dotfiles/tests/test-idempotency.sh 2>&1 | tee /artifacts/idempotency.log
+              find "$HOME" -maxdepth 3 -type f | sort > /artifacts/home-files-after-idempotency.txt
+            '
+
+      - name: Upload bootstrap logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-logs-${{ matrix.profile.name }}
+          path: artifacts/
+          if-no-files-found: ignore

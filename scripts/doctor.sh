@@ -52,7 +52,7 @@ check_version() {
   fi
   local actual
   actual=$(bash -o pipefail -c "$actual_cmd" 2>/dev/null || true)
-  if [[ "$actual" == "$expected" ]]; then
+  if version_equals "$actual" "$expected"; then
     echo -e "  ${GREEN}✓${NC} $label $actual"
   else
     echo -e "  ${YELLOW}⚠${NC} $label expected $expected, found ${actual:-unknown}"

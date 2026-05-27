@@ -10,20 +10,34 @@ log_step "Installing Neovim"
 require_sudo
 ARCH=$(get_arch)
 
-if ! is_installed nvim; then
-  log_info "Installing Neovim..."
-  NVIM_VERSION="v$(package_version editor neovim 0.11.1)"
+NVIM_REQUESTED="$(package_version editor neovim latest)"
+if [[ "$NVIM_REQUESTED" == "latest" ]]; then
+  NVIM_VERSION="$(resolve_tool_version neovim/neovim latest)"
+elif [[ "$NVIM_REQUESTED" == v* ]]; then
+  NVIM_VERSION="$NVIM_REQUESTED"
+else
+  NVIM_VERSION="v$NVIM_REQUESTED"
+fi
+NVIM_TARGET="${NVIM_VERSION#v}"
+NVIM_CURRENT=""
+if is_installed nvim; then
+  NVIM_CURRENT="$(nvim --version 2>/dev/null | awk 'NR == 1 {print $2}' | sed 's/^v//')"
+fi
+
+if ! is_installed nvim || ! version_equals "$NVIM_CURRENT" "$NVIM_TARGET"; then
+  log_info "Installing Neovim ${NVIM_VERSION}..."
   if [[ "$ARCH" == "amd64" ]]; then
     curl -fsSLo /tmp/nvim.appimage "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.appimage"
     chmod +x /tmp/nvim.appimage
-    sudo mv /tmp/nvim.appimage /usr/local/bin/nvim
+    sudo install /tmp/nvim.appimage /usr/local/bin/nvim
+    rm -f /tmp/nvim.appimage
   else
-    # Build from source or use package manager for non-x86
+    log_warn "Neovim AppImage is only configured for amd64; installing distro package"
     sudo apt-get install -y neovim
   fi
-  log_success "Neovim installed"
+  log_success "Neovim $(nvim --version | awk 'NR == 1 {print $2}') installed"
 else
-  log_skip "Neovim already installed"
+  log_skip "Neovim ${NVIM_TARGET} already installed"
 fi
 
 # LazyVim will bootstrap itself on first launch from ~/.config/nvim/

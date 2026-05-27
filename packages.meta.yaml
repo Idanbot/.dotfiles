@@ -149,8 +149,8 @@ ai_tools:
     package: "@anthropic-ai/claude-cli"
     binary: claude
   codex_cli:
-    source: npm
-    package: "@openai/codex"
+    source: install_script
+    url: https://chatgpt.com/codex/install.sh
     binary: codex
   antigravity_cli:
     source: optional

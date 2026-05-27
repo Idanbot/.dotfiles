@@ -254,6 +254,150 @@ print_plan() {
   fi
 }
 
+CHEZMOI_STATUS_OUTPUT=""
+SKIP_CHEZMOI_APPLY=false
+
+chezmoi_exclude_args() {
+  if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
+    echo "--exclude=$(join_by_comma "${APPLY_EXCLUDES[@]}")"
+  fi
+}
+
+collect_chezmoi_status() {
+  local exclude_arg
+  exclude_arg="$(chezmoi_exclude_args)"
+  if [[ -n "$exclude_arg" ]]; then
+    CHEZMOI_STATUS_OUTPUT="$(chezmoi status "$exclude_arg" 2>/dev/null || true)"
+  else
+    CHEZMOI_STATUS_OUTPUT="$(chezmoi status 2>/dev/null || true)"
+  fi
+}
+
+print_chezmoi_dry_run_summary() {
+  local total added modified deleted other exclude_arg diff_preview
+
+  echo "[INFO] Chezmoi dry-run summary:"
+  if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
+    echo "[INFO]   Excluding: $(join_by_comma "${APPLY_EXCLUDES[@]}")"
+  fi
+  if [[ -z "$CHEZMOI_STATUS_OUTPUT" ]]; then
+    echo "[INFO]   No dotfile changes pending"
+    return 0
+  fi
+
+  total=$(wc -l <<<"$CHEZMOI_STATUS_OUTPUT" | tr -d ' ')
+  added=$(grep -cE '(^| )[A][A-Z? ]*[[:space:]]' <<<"$CHEZMOI_STATUS_OUTPUT" || true)
+  modified=$(grep -cE '(^| )[M][A-Z? ]*[[:space:]]' <<<"$CHEZMOI_STATUS_OUTPUT" || true)
+  deleted=$(grep -cE '(^| )[D][A-Z? ]*[[:space:]]' <<<"$CHEZMOI_STATUS_OUTPUT" || true)
+  other=$((total - added - modified - deleted))
+
+  echo "[INFO]   Pending: $total total, $added create, $modified modify, $deleted delete, $other other"
+  echo "[INFO]   First pending paths:"
+  sed -n '1,25p' <<<"$CHEZMOI_STATUS_OUTPUT" | sed 's/^/[INFO]     /'
+  if [[ $total -gt 25 ]]; then
+    echo "[INFO]     ... $((total - 25)) more"
+  fi
+
+  exclude_arg="$(chezmoi_exclude_args)"
+  echo "[INFO]   Full dry-run diff command: chezmoi diff ${exclude_arg}"
+  if [[ -n "$exclude_arg" ]]; then
+    diff_preview="$(chezmoi diff "$exclude_arg" 2>/dev/null | sed -n '1,80p' || true)"
+  else
+    diff_preview="$(chezmoi diff 2>/dev/null | sed -n '1,80p' || true)"
+  fi
+  if [[ -n "$diff_preview" ]]; then
+    echo "[INFO]   Diff preview (first 80 lines):"
+    sed 's/^/[INFO]     /' <<<"$diff_preview"
+  fi
+}
+
+find_chezmoi_conflicts() {
+  local line trimmed state rel target
+  [[ -n "$CHEZMOI_STATUS_OUTPUT" ]] || return 0
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    state="${trimmed%%[[:space:]]*}"
+    rel="${trimmed#"$state"}"
+    rel="${rel#"${rel%%[![:space:]]*}"}"
+    [[ -n "$state" && -n "$rel" ]] || continue
+    target="$HOME/$rel"
+    if [[ "$state" == *A* && -e "$target" ]]; then
+      printf '%s\n' "$rel"
+    fi
+  done <<<"$CHEZMOI_STATUS_OUTPUT"
+}
+
+backup_chezmoi_conflicts() {
+  local backup_dir rel target dest
+  backup_dir="$HOME/.local/state/dotfiles/backups/$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
+  while IFS= read -r rel; do
+    [[ -n "$rel" ]] || continue
+    target="$HOME/$rel"
+    dest="$backup_dir/$rel"
+    mkdir -p "$(dirname "$dest")"
+    mv "$target" "$dest"
+    echo "[INFO]   Backed up ~/$rel -> ${dest/#$HOME/~}"
+  done
+  echo "[INFO] Conflict backup directory: ${backup_dir/#$HOME/~}"
+}
+
+handle_chezmoi_conflicts() {
+  local conflicts count action
+  conflicts="$(find_chezmoi_conflicts)"
+  [[ -n "$conflicts" ]] || return 0
+  count=$(wc -l <<<"$conflicts" | tr -d ' ')
+
+  echo "[WARN] Chezmoi would create $count path(s) that already exist locally:"
+  sed -n '1,25p' <<<"$conflicts" | sed 's/^/[WARN]   ~\//'
+  if [[ $count -gt 25 ]]; then
+    echo "[WARN]   ... $((count - 25)) more"
+  fi
+
+  if [[ "$AUTO_APPROVE" == "true" || ! -t 0 ]]; then
+    action=backup
+    echo "[INFO] Noninteractive run: backing up conflicts before apply"
+  else
+    echo "Options: [B]ack up and continue, [s]kip dotfile apply, [a]bort"
+    read -rp "Choose conflict action [B]: " action
+    case "${action:-b}" in
+      [Bb]*) action=backup ;;
+      [Ss]*) action=skip ;;
+      [Aa]*) action=abort ;;
+      *)
+        echo "Unknown action: $action" >&2
+        exit 2
+        ;;
+    esac
+  fi
+
+  case "$action" in
+    backup)
+      backup_chezmoi_conflicts <<<"$conflicts"
+      collect_chezmoi_status
+      ;;
+    skip)
+      SKIP_CHEZMOI_APPLY=true
+      echo "[WARN] Skipping chezmoi apply because local conflicts were preserved"
+      ;;
+    abort)
+      echo "[ERROR] Aborting before apply; no conflicting files were changed" >&2
+      exit 1
+      ;;
+  esac
+}
+
+run_chezmoi_apply() {
+  local exclude_arg
+  exclude_arg="$(chezmoi_exclude_args)"
+  if [[ -n "$exclude_arg" ]]; then
+    chezmoi apply "$exclude_arg"
+  else
+    chezmoi apply
+  fi
+}
+
 if [[ "${1:-}" == "--only" ]]; then
   if [[ -z "${2:-}" ]]; then
     echo "Usage: ./scripts/install.sh --only <section>" >&2
@@ -505,12 +649,15 @@ if [[ "$SELECTION_MODE" != "full" || ${#WITHOUT_SECTIONS[@]} -gt 0 ]]; then
   APPLY_EXCLUDES+=(scripts)
 fi
 
-echo "[INFO] Applying dotfiles..."
-if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
-  exclude_csv=$(join_by_comma "${APPLY_EXCLUDES[@]}")
-  chezmoi apply --exclude="$exclude_csv"
+collect_chezmoi_status
+print_chezmoi_dry_run_summary
+handle_chezmoi_conflicts
+
+if [[ "$SKIP_CHEZMOI_APPLY" == "false" ]]; then
+  echo "[INFO] Applying dotfiles..."
+  run_chezmoi_apply
 else
-  chezmoi apply
+  echo "[SKIP] Dotfile apply skipped"
 fi
 
 if [[ "$manual_sections" == "true" ]]; then

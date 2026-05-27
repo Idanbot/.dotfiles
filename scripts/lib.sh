@@ -75,6 +75,17 @@ is_installed() {
   command -v "$1" &>/dev/null
 }
 
+load_nvm() {
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "$NVM_DIR/nvm.sh"
+    nvm use --silent "${DOTFILES_NODE_VERSION:-default}" >/dev/null 2>&1 || true
+    return 0
+  fi
+  return 1
+}
+
 install_if_missing() {
   local cmd="$1"
   shift
@@ -158,6 +169,26 @@ resolve_tool_version() {
 version_without_v() {
   local version="$1"
   echo "${version#v}"
+}
+
+extract_version() {
+  local value="$1"
+  value="${value#v}"
+  grep -oE '[0-9]+([.][0-9]+){0,3}([+-][0-9A-Za-z._-]+)?' <<<"$value" | head -1
+}
+
+version_equals() {
+  local current expected
+  current="$(extract_version "${1:-}")"
+  expected="$(extract_version "${2:-}")"
+  [[ -n "$current" && -n "$expected" && "$current" == "$expected" ]]
+}
+
+version_major_matches() {
+  local current expected
+  current="$(extract_version "${1:-}")"
+  expected="$(extract_version "${2:-}")"
+  [[ -n "$current" && -n "$expected" && "${current%%.*}" == "${expected%%.*}" ]]
 }
 
 github_asset_name() {

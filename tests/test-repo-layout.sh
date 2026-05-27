@@ -72,6 +72,15 @@ else
   FAILED=1
 fi
 
+for expected in collect_chezmoi_status print_chezmoi_dry_run_summary handle_chezmoi_conflicts backup_chezmoi_conflicts run_chezmoi_apply; do
+  if grep -Fq "$expected" "$INSTALL_SCRIPT"; then
+    echo -e "  ${GREEN}✓${NC} bootstrap contains $expected"
+  else
+    echo -e "  ${RED}✗${NC} bootstrap missing $expected"
+    FAILED=1
+  fi
+done
+
 while IFS= read -r -d '' script; do
   echo -e "  ${RED}✗${NC} root script found: ${script#$DOTFILES_DIR/}"
   FAILED=1
@@ -104,7 +113,7 @@ for tool in yq zoxide direnv git-delta hyperfine duf; do
   fi
 done
 
-for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
+for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'load_nvm' 'version_equals' 'version_major_matches' 'nvm use --silent "$NODE_VERSION"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
   if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
     echo -e "  ${GREEN}✓${NC} language installer contains $expected"
   else
@@ -125,6 +134,40 @@ if grep -Fq /user/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" &&
   echo -e "  ${GREEN}✓${NC} zsh startup cleans stale completion paths before compinit"
 else
   echo -e "  ${RED}✗${NC} zsh startup should clean stale completion paths before compinit"
+  FAILED=1
+fi
+
+AI_TOOLS_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
+if grep -Fq "https://chatgpt.com/codex/install.sh | sh" "$AI_TOOLS_SCRIPT" &&
+  ! grep -Fq "@openai/codex" "$AI_TOOLS_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} Codex installer uses standalone CLI"
+else
+  echo -e "  ${RED}✗${NC} Codex installer should use standalone CLI, not npm"
+  FAILED=1
+fi
+
+NEOVIM_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
+if grep -Fq 'NVIM_CURRENT="$(nvim --version' "$NEOVIM_SCRIPT" &&
+  grep -Fq 'sudo install /tmp/nvim.appimage /usr/local/bin/nvim' "$NEOVIM_SCRIPT"; then
+  echo -e "  ${GREEN}✓${NC} Neovim installer upgrades stale nvim versions"
+else
+  echo -e "  ${RED}✗${NC} Neovim installer should upgrade stale nvim versions"
+  FAILED=1
+fi
+
+for preserved in dot_bash_history dot_zsh_history dot_lesshst 'dot_zcompdump*' dot_zsh_sessions/ dot_local/share/zsh/; do
+  if grep -Fxq "$preserved" "$DOTFILES_DIR/.chezmoiignore"; then
+    echo -e "  ${GREEN}✓${NC} preserves $preserved"
+  else
+    echo -e "  ${RED}✗${NC} .chezmoiignore should preserve $preserved"
+    FAILED=1
+  fi
+done
+
+if [[ -x "$DOTFILES_DIR/tests/test-install-selector-profile.sh" ]]; then
+  echo -e "  ${GREEN}✓${NC} install selector profile test is executable"
+else
+  echo -e "  ${RED}✗${NC} install selector profile test missing or not executable"
   FAILED=1
 fi
 

@@ -12,3 +12,20 @@ tests/
 # Skip desktop/GUI configs on WSL
 dot_config/private_kitty
 {{ end }}
+
+# Preserve local shell history, completion caches, and interactive session state.
+# These are useful machine-local files and should not be overwritten by chezmoi.
+dot_bash_history
+dot_zsh_history
+dot_lesshst
+dot_python_history
+dot_mysql_history
+dot_psql_history
+dot_sqlite_history
+dot_node_repl_history
+dot_rediscli_history
+dot_wget-hsts
+dot_zcompdump*
+dot_zsh_sessions/
+dot_local/share/zsh/
+dot_local/state/zsh/

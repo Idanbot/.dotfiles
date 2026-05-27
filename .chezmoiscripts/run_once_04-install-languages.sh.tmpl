@@ -15,14 +15,14 @@ GO_VERSION="$(package_version languages go 1.24.3)"
 if [[ -d /usr/local/go/bin ]]; then
   export PATH="/usr/local/go/bin:$PATH"
 fi
-if ! is_installed go || [[ "$(go version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$GO_VERSION" ]]; then
+if ! is_installed go || ! version_equals "$(go version 2>/dev/null || true)" "$GO_VERSION"; then
   log_info "Installing Go ${GO_VERSION}..."
   curl -fsSLo /tmp/go.tar.gz "https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz"
   sudo rm -rf /usr/local/go
   sudo tar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
   export PATH="/usr/local/go/bin:$PATH"
-  log_success "Go $(/usr/local/go/bin/go version | grep -oP '\d+\.\d+\.\d+') installed"
+  log_success "Go $(extract_version "$(/usr/local/go/bin/go version)") installed"
 else
   log_skip "Go ${GO_VERSION} already installed"
 fi
@@ -54,19 +54,28 @@ if [[ ! -d "$NVM_DIR" ]]; then
   curl -fsSLo- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
   log_success "nvm installed"
 fi
-# Source nvm
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+if ! load_nvm; then
+  log_error "nvm was installed but $NVM_DIR/nvm.sh is not available"
+  exit 1
+fi
+
 if ! nvm ls "$NODE_VERSION" &>/dev/null; then
   log_info "Installing Node.js ${NODE_VERSION}..."
   nvm install "$NODE_VERSION"
   nvm alias default "$NODE_VERSION"
+  nvm use --silent "$NODE_VERSION" >/dev/null
   log_success "Node.js $(node --version) installed"
 else
-  nvm use "$NODE_VERSION" >/dev/null
+  nvm use --silent "$NODE_VERSION" >/dev/null
   log_skip "Node.js ${NODE_VERSION} already installed"
 fi
 
-if ! is_installed tsc || [[ "$(tsc --version 2>/dev/null | awk '{print $2}')" != "$TYPESCRIPT_VERSION" ]]; then
+if ! is_installed node || ! is_installed npm; then
+  log_error "Node.js/npm are not available after nvm activation"
+  exit 1
+fi
+
+if ! is_installed tsc || ! version_equals "$(tsc --version 2>/dev/null || true)" "$TYPESCRIPT_VERSION"; then
   log_info "Installing TypeScript ${TYPESCRIPT_VERSION}..."
   npm install -g "typescript@${TYPESCRIPT_VERSION}"
   log_success "TypeScript $(tsc --version | awk '{print $2}') installed"
@@ -101,7 +110,7 @@ fi
 
 # ── Java ──────────────────────────────────────────────────────────────────────
 JAVA_VERSION="$(package_version languages java 21)"
-if ! is_installed java || ! java -version 2>&1 | grep -q "${JAVA_VERSION}"; then
+if ! is_installed java || ! version_major_matches "$(java -version 2>&1 | head -1 || true)" "$JAVA_VERSION"; then
   log_info "Installing OpenJDK ${JAVA_VERSION}..."
   sudo apt-get install -y "openjdk-${JAVA_VERSION}-jdk-headless"
   log_success "Java $(java -version 2>&1 | head -1 | awk -F '"' '{print $2}') installed"

@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 6242254bf0b4b7018b323cfb41006ed595aafcca727e3d3466d842adcd6e822c
-  metadata: 0d537673608bf6629704bc6f1e92df7bab8864c9bb267dc9a0c19fe445aeb886
+  packages: 9ed043e3db381a09dc8f2bd83fe3622e0439cd9e60e8b60019d9a389ec37f8fe
+  metadata: ff5b988da6148a370c44a5314c7ebd47eb431fd5566553de8b69b8c32f01e55a
 
 tools:
   - section: core
@@ -171,7 +171,7 @@ tools:
     checksum: null
   - section: editor
     name: neovim
-    version: 0.12.2
+    version: latest
     source: github
     repo: neovim/neovim
     binary: nvim
@@ -257,8 +257,7 @@ tools:
   - section: ai_tools
     name: codex_cli
     version: latest
-    source: npm
-    package: "@openai/codex"
+    source: install_script
     binary: codex
     checksum: null
   - section: ai_tools

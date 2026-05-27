@@ -7,6 +7,8 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing AI Coding Tools (Optional)"
 
+load_nvm || true
+
 # ── Claude CLI ────────────────────────────────────────────────────────────────
 if ! is_installed claude; then
   log_info "Installing Claude CLI..."
@@ -21,17 +23,19 @@ fi
 
 
 # ── Codex CLI ─────────────────────────────────────────────────────────────────
-if ! is_installed codex; then
-  log_info "Installing Codex CLI..."
-  if is_installed npm; then
-    CODEX_VERSION="$(package_version ai_tools codex_cli latest)"
-    if [[ "$CODEX_VERSION" == "latest" ]]; then
-      npm install -g @openai/codex 2>/dev/null && log_success "Codex CLI installed" || log_warn "Codex CLI install failed"
+CODEX_PATH="$(command -v codex || true)"
+if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
+  log_info "Installing Codex CLI standalone..."
+  export PATH="$HOME/.local/bin:$PATH"
+  if curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
+    export PATH="$HOME/.local/bin:$PATH"
+    if [[ -x "$HOME/.local/bin/codex" ]] || is_installed codex; then
+      log_success "Codex CLI standalone installed"
     else
-      npm install -g "@openai/codex@${CODEX_VERSION}" 2>/dev/null && log_success "Codex CLI ${CODEX_VERSION} installed" || log_warn "Codex CLI install failed"
+      log_warn "Codex CLI installer completed, but codex was not found in PATH"
     fi
   else
-    log_warn "npm not found — skipping Codex CLI"
+    log_warn "Codex CLI standalone install failed"
   fi
 else
   log_skip "Codex CLI already installed"

@@ -35,7 +35,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | languages | python | 3.14.5 | uv |
 | languages | java | 21 | apt |
 | languages | uv | latest | install_script |
-| editor | neovim | 0.12.2 | github |
+| editor | neovim | latest | github |
 | cloud | docker | latest | apt_repo |
 | cloud | kubectl | 1.32.0 | direct |
 | cloud | helm | 4.2.0 | install_script |
@@ -50,7 +50,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | fonts | nerd_font | FiraMono | github |
 | fonts | nerd_font_version | 3.4.0 | github |
 | ai_tools | claude_cli | latest | npm |
-| ai_tools | codex_cli | latest | npm |
+| ai_tools | codex_cli | latest | install_script |
 | ai_tools | antigravity_cli | latest | optional |
 | ai_tools | opencode | latest | go |
 | media | yt_dlp | latest | github |
