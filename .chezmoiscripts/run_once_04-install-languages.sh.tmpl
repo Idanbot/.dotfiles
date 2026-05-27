@@ -12,14 +12,17 @@ ARCH=$(get_arch)
 
 # ── Go ────────────────────────────────────────────────────────────────────────
 GO_VERSION="$(package_version languages go 1.24.3)"
+if [[ -d /usr/local/go/bin ]]; then
+  export PATH="/usr/local/go/bin:$PATH"
+fi
 if ! is_installed go || [[ "$(go version 2>/dev/null | grep -oP '\d+\.\d+\.\d+')" != "$GO_VERSION" ]]; then
   log_info "Installing Go ${GO_VERSION}..."
   curl -fsSLo /tmp/go.tar.gz "https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz"
   sudo rm -rf /usr/local/go
   sudo tar -C /usr/local -xzf /tmp/go.tar.gz
   rm -f /tmp/go.tar.gz
-  export PATH="$PATH:/usr/local/go/bin"
-  log_success "Go $(go version | grep -oP '\d+\.\d+\.\d+') installed"
+  export PATH="/usr/local/go/bin:$PATH"
+  log_success "Go $(/usr/local/go/bin/go version | grep -oP '\d+\.\d+\.\d+') installed"
 else
   log_skip "Go ${GO_VERSION} already installed"
 fi
@@ -82,10 +85,16 @@ else
   log_skip "uv already installed"
 fi
 
+PYTHON_MINOR="${PYTHON_VERSION%.*}"
 if ! uv python find "$PYTHON_VERSION" &>/dev/null; then
   log_info "Installing Python ${PYTHON_VERSION} with uv..."
-  uv python install "$PYTHON_VERSION"
-  log_success "Python $(uv python find "$PYTHON_VERSION") installed"
+  if uv python install "$PYTHON_VERSION"; then
+    log_success "Python $(uv python find "$PYTHON_VERSION") installed"
+  else
+    log_warn "Python ${PYTHON_VERSION} is not available from uv yet; installing latest ${PYTHON_MINOR}.x"
+    uv python install "$PYTHON_MINOR"
+    log_success "Python $(uv python find "$PYTHON_MINOR") installed"
+  fi
 else
   log_skip "Python ${PYTHON_VERSION} already installed"
 fi

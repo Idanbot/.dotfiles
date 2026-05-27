@@ -80,6 +80,23 @@ plugins=(
   my-functions
 )
 
+# Drop stale completion dumps that reference broken system completion paths.
+for _zcompdump in "$HOME"/.zcompdump*(N); do
+  if [[ -f "$_zcompdump" ]] && command grep -q /user/share/zsh/vendor-completions "$_zcompdump" 2>/dev/null; then
+    command rm -f "$_zcompdump" "$_zcompdump.zwc"
+  fi
+done
+unset _zcompdump
+
+# Keep compinit from scanning directories that no longer exist.
+typeset -ga _clean_fpath
+for _fpath_dir in "${fpath[@]}"; do
+  [[ -d "$_fpath_dir" ]] && _clean_fpath+=("$_fpath_dir")
+done
+fpath=("${_clean_fpath[@]}")
+typeset -U fpath
+unset _clean_fpath _fpath_dir
+
 source $ZSH/oh-my-zsh.sh
 
 setopt NO_BEEP

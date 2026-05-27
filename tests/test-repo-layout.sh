@@ -96,7 +96,7 @@ for tool in yq zoxide direnv git-delta hyperfine duf; do
   fi
 done
 
-for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"'; do
+for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
   if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
     echo -e "  ${GREEN}✓${NC} language installer contains $expected"
   else
@@ -109,6 +109,14 @@ if grep -Fq 'ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"' "$TERMINAL_TOO
   echo -e "  ${GREEN}✓${NC} terminal installer creates fd shim"
 else
   echo -e "  ${RED}✗${NC} terminal installer missing fd shim"
+  FAILED=1
+fi
+
+if grep -Fq /user/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" && \
+  grep -Fq _clean_fpath "$DOTFILES_DIR/dot_zshrc.tmpl"; then
+  echo -e "  ${GREEN}✓${NC} zsh startup cleans stale completion paths before compinit"
+else
+  echo -e "  ${RED}✗${NC} zsh startup should clean stale completion paths before compinit"
   FAILED=1
 fi
 
