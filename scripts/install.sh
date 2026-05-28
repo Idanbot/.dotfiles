@@ -44,6 +44,75 @@ AUTO_APPROVE=false
 PRINT_PLAN=false
 LIST_OPTIONS=false
 MENU_REQUESTED=false
+DOTFILES_LOG_FILE="${DOTFILES_LOG_FILE:-}"
+DOTFILES_LOG="${DOTFILES_LOG:-1}"
+DOTFILES_COLOR="${DOTFILES_COLOR:-auto}"
+COLOR_STDOUT=false
+LOG_FILE=""
+
+if [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
+  COLOR_STDOUT=true
+fi
+case "$DOTFILES_COLOR" in
+  always) COLOR_STDOUT=true ;;
+  never) COLOR_STDOUT=false ;;
+  auto) ;;
+  *)
+    echo "Unknown DOTFILES_COLOR value: $DOTFILES_COLOR" >&2
+    exit 2
+    ;;
+esac
+
+export DOTFILES_COLOR_ACTIVE="$COLOR_STDOUT"
+if [[ "$COLOR_STDOUT" == "true" ]]; then
+  RED=$'\033[0;31m'
+  GREEN=$'\033[0;32m'
+  YELLOW=$'\033[1;33m'
+  BLUE=$'\033[0;34m'
+  CYAN=$'\033[0;36m'
+  BOLD=$'\033[1m'
+  DIM=$'\033[2m'
+  NC=$'\033[0m'
+else
+  RED=""
+  GREEN=""
+  YELLOW=""
+  BLUE=""
+  CYAN=""
+  BOLD=""
+  DIM=""
+  NC=""
+fi
+
+log_info() { echo "${BLUE}[INFO]${NC} $*"; }
+log_success() { echo "${GREEN}[OK]${NC}   $*"; }
+log_warn() { echo "${YELLOW}[WARN]${NC} $*"; }
+log_error() { echo "${RED}[ERROR]${NC} $*" >&2; }
+log_skip() { echo "${DIM}[SKIP]${NC} $*"; }
+log_important() { echo "${YELLOW}[IMPORTANT]${NC} $*"; }
+log_step() { echo -e "\n${BOLD}${CYAN}══ $* ══${NC}"; }
+log_banner() {
+  echo "${BOLD}${CYAN}══════════════════════════════════════════════${NC}"
+  echo "${BOLD}${CYAN}  $*${NC}"
+  echo "${BOLD}${CYAN}══════════════════════════════════════════════${NC}"
+}
+
+start_run_log() {
+  [[ "$DOTFILES_LOG" != "0" ]] || return 0
+
+  if [[ -z "$DOTFILES_LOG_FILE" ]]; then
+    local log_dir
+    log_dir="$HOME/.local/state/dotfiles/logs"
+    mkdir -p "$log_dir"
+    LOG_FILE="$log_dir/bootstrap-$(date +%Y%m%d-%H%M%S).log"
+  else
+    LOG_FILE="$DOTFILES_LOG_FILE"
+    mkdir -p "$(dirname "$LOG_FILE")"
+  fi
+
+  touch "$LOG_FILE"
+  exec > >(tee -a "$LOG_FILE") 2>&1
+}
 
 usage() {
   cat <<'USAGE'
@@ -183,9 +252,7 @@ sort_selected_sections() {
 show_menu() {
   local choice extras
   echo
-  echo "══════════════════════════════════════════════"
-  echo "  Install Profile"
-  echo "══════════════════════════════════════════════"
+  log_banner "Install Profile"
   echo "  1. Full install"
   echo "  2. Base only (${BASE_SECTIONS[*]})"
   echo "  3. Base + selected optional sections"
@@ -276,12 +343,12 @@ collect_chezmoi_status() {
 print_chezmoi_dry_run_summary() {
   local total added modified deleted other exclude_arg diff_preview
 
-  echo "[INFO] Chezmoi dry-run summary:"
+  log_step "Chezmoi Dry Run"
   if [[ ${#APPLY_EXCLUDES[@]} -gt 0 ]]; then
-    echo "[INFO]   Excluding: $(join_by_comma "${APPLY_EXCLUDES[@]}")"
+    log_info "Excluding: $(join_by_comma "${APPLY_EXCLUDES[@]}")"
   fi
   if [[ -z "$CHEZMOI_STATUS_OUTPUT" ]]; then
-    echo "[INFO]   No dotfile changes pending"
+    log_info "No dotfile changes pending"
     return 0
   fi
 
@@ -291,24 +358,39 @@ print_chezmoi_dry_run_summary() {
   deleted=$(grep -cE '(^| )[D][A-Z? ]*[[:space:]]' <<<"$CHEZMOI_STATUS_OUTPUT" || true)
   other=$((total - added - modified - deleted))
 
-  echo "[INFO]   Pending: $total total, $added create, $modified modify, $deleted delete, $other other"
-  echo "[INFO]   First pending paths:"
-  sed -n '1,25p' <<<"$CHEZMOI_STATUS_OUTPUT" | sed 's/^/[INFO]     /'
-  if [[ $total -gt 25 ]]; then
-    echo "[INFO]     ... $((total - 25)) more"
+  log_info "Pending: $total total, $added create, $modified modify, $deleted delete, $other other"
+  log_info "Changed paths:"
+  sed -n '1,12p' <<<"$CHEZMOI_STATUS_OUTPUT" | while IFS= read -r status_line; do
+    log_info "  $status_line"
+  done
+  if [[ $total -gt 12 ]]; then
+    log_info "  ... $((total - 12)) more"
   fi
 
   exclude_arg="$(chezmoi_exclude_args)"
-  echo "[INFO]   Full dry-run diff command: chezmoi diff ${exclude_arg}"
+  log_info "Dry-run diff command: chezmoi diff ${exclude_arg}"
+  log_info "Set DOTFILES_DIFF_PREVIEW=1 to print the first 80 diff lines during bootstrap"
+
+  [[ "${DOTFILES_DIFF_PREVIEW:-0}" == "1" ]] || return 0
   if [[ -n "$exclude_arg" ]]; then
     diff_preview="$(chezmoi diff "$exclude_arg" 2>/dev/null | sed -n '1,80p' || true)"
   else
     diff_preview="$(chezmoi diff 2>/dev/null | sed -n '1,80p' || true)"
   fi
   if [[ -n "$diff_preview" ]]; then
-    echo "[INFO]   Diff preview (first 80 lines):"
-    sed 's/^/[INFO]     /' <<<"$diff_preview"
+    log_info "Diff preview (first 80 lines):"
+    sed 's/^/    /' <<<"$diff_preview"
   fi
+}
+
+explain_chezmoi_apply_prompt() {
+  [[ -n "$CHEZMOI_STATUS_OUTPUT" ]] || return 0
+  log_warn "If chezmoi prompts with diff/overwrite/all-overwrite/skip/quit:"
+  log_info "  diff: show the current file diff, then ask again"
+  log_info "  overwrite: replace this file with the dotfiles version"
+  log_info "  all-overwrite: replace this and all remaining conflicted files"
+  log_info "  skip: keep this local file unchanged and continue"
+  log_info "  quit: stop applying dotfiles immediately"
 }
 
 find_chezmoi_conflicts() {
@@ -338,9 +420,9 @@ backup_chezmoi_conflicts() {
     dest="$backup_dir/$rel"
     mkdir -p "$(dirname "$dest")"
     mv "$target" "$dest"
-    echo "[INFO]   Backed up ~/$rel -> ${dest/#$HOME/~}"
+    log_info "  Backed up ~/$rel -> ${dest/#$HOME/~}"
   done
-  echo "[INFO] Conflict backup directory: ${backup_dir/#$HOME/~}"
+  log_info "Conflict backup directory: ${backup_dir/#$HOME/~}"
 }
 
 handle_chezmoi_conflicts() {
@@ -349,15 +431,15 @@ handle_chezmoi_conflicts() {
   [[ -n "$conflicts" ]] || return 0
   count=$(wc -l <<<"$conflicts" | tr -d ' ')
 
-  echo "[WARN] Chezmoi would create $count path(s) that already exist locally:"
-  sed -n '1,25p' <<<"$conflicts" | sed 's/^/[WARN]   ~\//'
+  log_warn "Chezmoi would create $count path(s) that already exist locally:"
+  sed -n '1,25p' <<<"$conflicts" | sed "s#^#${YELLOW}[WARN]${NC}   ~/#"
   if [[ $count -gt 25 ]]; then
-    echo "[WARN]   ... $((count - 25)) more"
+    log_warn "  ... $((count - 25)) more"
   fi
 
   if [[ "$AUTO_APPROVE" == "true" || ! -t 0 ]]; then
     action=backup
-    echo "[INFO] Noninteractive run: backing up conflicts before apply"
+    log_info "Noninteractive run: backing up conflicts before apply"
   else
     echo "Options: [B]ack up and continue, [s]kip dotfile apply, [a]bort"
     read -rp "Choose conflict action [B]: " action
@@ -379,10 +461,10 @@ handle_chezmoi_conflicts() {
       ;;
     skip)
       SKIP_CHEZMOI_APPLY=true
-      echo "[WARN] Skipping chezmoi apply because local conflicts were preserved"
+      log_warn "Skipping chezmoi apply because local conflicts were preserved"
       ;;
     abort)
-      echo "[ERROR] Aborting before apply; no conflicting files were changed" >&2
+      log_error "Aborting before apply; no conflicting files were changed"
       exit 1
       ;;
   esac
@@ -498,6 +580,11 @@ if [[ "$LIST_OPTIONS" == "true" ]]; then
   exit 0
 fi
 
+start_run_log
+if [[ -n "$LOG_FILE" ]]; then
+  log_info "Writing run log to $LOG_FILE"
+fi
+
 resolve_selection
 
 if [[ "$PRINT_PLAN" == "true" ]]; then
@@ -540,23 +627,21 @@ run_install_section() {
   DOTFILES_SOURCE_DIR="$source_dir" chezmoi execute-template <"$script_path" | DOTFILES_SOURCE_DIR="$source_dir" bash
 }
 
-echo "══════════════════════════════════════════════"
-echo "  Dotfiles Bootstrap — Idan Botbol"
-echo "══════════════════════════════════════════════"
+log_banner "Dotfiles Bootstrap — Idan Botbol"
 echo
 
 # Detect environment
 if grep -qi microsoft /proc/version 2>/dev/null; then
-  echo "[INFO] WSL environment detected"
+  log_info "WSL environment detected"
 else
-  echo "[INFO] Native Linux environment detected"
+  log_info "Native Linux environment detected"
 fi
 
-echo "[INFO] Install profile: $SELECTION_MODE"
-echo "[INFO] Selected sections: $(join_by_comma "${SELECTED_SECTIONS[@]}")"
+log_info "Install profile: $SELECTION_MODE"
+log_info "Selected sections: $(join_by_comma "${SELECTED_SECTIONS[@]}")"
 
 # Install prerequisites
-echo "[INFO] Installing prerequisites (git, curl)..."
+log_info "Installing prerequisites (git, curl)..."
 sudo apt-get update -qq
 sudo apt-get install -y -qq git curl
 
@@ -572,21 +657,21 @@ fi
 
 # Install chezmoi
 if ! command -v chezmoi &>/dev/null; then
-  echo "[INFO] Installing chezmoi..."
+  log_info "Installing chezmoi..."
   sh -c "$(curl -fsLS get.chezmoi.io)" -- -b "$HOME/.local/bin"
   export PATH="$HOME/.local/bin:$PATH"
-  echo "[OK] chezmoi installed"
+  log_success "chezmoi installed"
 else
-  echo "[SKIP] chezmoi already installed"
+  log_skip "chezmoi already installed"
 fi
 
 # Install age for secret decryption
 if ! command -v age &>/dev/null; then
-  echo "[INFO] Installing age..."
+  log_info "Installing age..."
   sudo apt-get install -y -qq age
-  echo "[OK] age installed"
+  log_success "age installed"
 else
-  echo "[SKIP] age already installed"
+  log_skip "age already installed"
 fi
 
 APPLY_EXCLUDES=()
@@ -594,9 +679,7 @@ APPLY_EXCLUDES=()
 # Check for age identity key
 if [[ ! -f "$HOME/.config/chezmoi/key.txt" ]]; then
   echo
-  echo "══════════════════════════════════════════════"
-  echo "  Age Identity Key Required"
-  echo "══════════════════════════════════════════════"
+  log_banner "Age Identity Key Required"
   echo
   echo "No age identity key found at ~/.config/chezmoi/key.txt"
   echo
@@ -614,31 +697,31 @@ if [[ ! -f "$HOME/.config/chezmoi/key.txt" ]]; then
     echo "Please place your key at ~/.config/chezmoi/key.txt and re-run this script."
     exit 0
   else
-    echo "[INFO] Generating new age identity key..."
+    log_info "Generating new age identity key..."
     mkdir -p "$HOME/.config/chezmoi"
     age-keygen -o "$HOME/.config/chezmoi/key.txt" 2>&1 | tee /dev/stderr
     chmod 600 "$HOME/.config/chezmoi/key.txt"
     echo
-    echo "[IMPORTANT] Back up ~/.config/chezmoi/key.txt to a safe location!"
-    echo "[IMPORTANT] Update the 'recipient' field in .chezmoi.yaml with the public key above."
-    echo "[IMPORTANT] Encrypted secrets will be skipped until they are re-encrypted for this new key."
+    log_important "Back up ~/.config/chezmoi/key.txt to a safe location!"
+    log_important "Update the 'recipient' field in .chezmoi.yaml with the public key above."
+    log_important "Encrypted secrets will be skipped until they are re-encrypted for this new key."
     echo
     APPLY_EXCLUDES+=(encrypted)
   fi
 fi
 
 # Initialize and apply chezmoi
-echo "[INFO] Initializing chezmoi..."
+log_info "Initializing chezmoi..."
 if [[ -n "$LOCAL_SOURCE" ]]; then
-  echo "[INFO] Using local source: $LOCAL_SOURCE"
+  log_info "Using local source: $LOCAL_SOURCE"
   chezmoi init --source="$LOCAL_SOURCE" "${CHEZMOI_INIT_ARGS[@]}"
   CHEZMOI_SOURCE="$LOCAL_SOURCE"
 else
-  echo "[INFO] Cloning source over HTTPS: $DOTFILES_REPO_URL"
+  log_info "Cloning source over HTTPS: $DOTFILES_REPO_URL"
   chezmoi init "$DOTFILES_REPO_URL" "${CHEZMOI_INIT_ARGS[@]}"
   CHEZMOI_SOURCE="$(chezmoi source-path 2>/dev/null || true)"
   if [[ -n "$CHEZMOI_SOURCE" && -d "$CHEZMOI_SOURCE/.git" ]]; then
-    echo "[INFO] Updating chezmoi source: $CHEZMOI_SOURCE"
+    log_info "Updating chezmoi source: $CHEZMOI_SOURCE"
     git -C "$CHEZMOI_SOURCE" pull --ff-only
   fi
 fi
@@ -654,23 +737,22 @@ print_chezmoi_dry_run_summary
 handle_chezmoi_conflicts
 
 if [[ "$SKIP_CHEZMOI_APPLY" == "false" ]]; then
-  echo "[INFO] Applying dotfiles..."
+  log_info "Applying dotfiles..."
+  explain_chezmoi_apply_prompt
   run_chezmoi_apply
 else
-  echo "[SKIP] Dotfile apply skipped"
+  log_skip "Dotfile apply skipped"
 fi
 
 if [[ "$manual_sections" == "true" ]]; then
-  echo "[INFO] Running selected install sections..."
+  log_info "Running selected install sections..."
   for section in "${SELECTED_SECTIONS[@]}"; do
     run_install_section "$CHEZMOI_SOURCE" "$section"
   done
 fi
 
 echo
-echo "══════════════════════════════════════════════"
-echo "  Bootstrap Complete!"
-echo "══════════════════════════════════════════════"
+log_banner "Bootstrap Complete!"
 echo
 echo "Next steps:"
 echo "  1. Restart your shell: exec zsh"

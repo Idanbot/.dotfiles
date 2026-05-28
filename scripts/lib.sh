@@ -5,14 +5,31 @@
 set -euo pipefail
 
 # ── Colors ────────────────────────────────────────────────────────────────────
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly CYAN='\033[0;36m'
-readonly BOLD='\033[1m'
-readonly DIM='\033[2m'
-readonly NC='\033[0m' # No Color
+_COLOR_OUTPUT=false
+if [[ "${DOTFILES_COLOR_ACTIVE:-}" == "true" ]] ||
+  [[ -t 1 && -z "${NO_COLOR:-}" && "${TERM:-}" != "dumb" ]]; then
+  _COLOR_OUTPUT=true
+fi
+
+if [[ "$_COLOR_OUTPUT" == "true" ]]; then
+  readonly RED='\033[0;31m'
+  readonly GREEN='\033[0;32m'
+  readonly YELLOW='\033[1;33m'
+  readonly BLUE='\033[0;34m'
+  readonly CYAN='\033[0;36m'
+  readonly BOLD='\033[1m'
+  readonly DIM='\033[2m'
+  readonly NC='\033[0m'
+else
+  readonly RED=''
+  readonly GREEN=''
+  readonly YELLOW=''
+  readonly BLUE=''
+  readonly CYAN=''
+  readonly BOLD=''
+  readonly DIM=''
+  readonly NC=''
+fi
 
 # ── Counters ──────────────────────────────────────────────────────────────────
 _INSTALLED=0

@@ -13,9 +13,12 @@ fail() {
 }
 
 for expected in \
-  'Chezmoi dry-run summary' \
-  'Full dry-run diff command: chezmoi diff' \
-  'Diff preview (first 80 lines)' \
+  'Chezmoi Dry Run' \
+  'Dry-run diff command: chezmoi diff' \
+  'DOTFILES_DIFF_PREVIEW=1' \
+  'Writing run log to' \
+  'diff: show the current file diff, then ask again' \
+  'all-overwrite: replace this and all remaining conflicted files' \
   'Chezmoi would create' \
   'Noninteractive run: backing up conflicts before apply' \
   'Backed up ~/' \
