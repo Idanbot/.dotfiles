@@ -113,7 +113,7 @@ for tool in yq zoxide direnv git-delta hyperfine duf; do
   fi
 done
 
-for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'load_nvm' 'version_equals' 'version_major_matches' 'nvm use --silent "$NODE_VERSION"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
+for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'load_nvm' 'version_ge' 'version_major_matches' 'nvm use --silent "$NODE_VERSION"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
   if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
     echo -e "  ${GREEN}✓${NC} language installer contains $expected"
   else
@@ -129,7 +129,7 @@ else
   FAILED=1
 fi
 
-if grep -Fq /user/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" &&
+if grep -Fq /usr/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" &&
   grep -Fq _clean_fpath "$DOTFILES_DIR/dot_zshrc.tmpl"; then
   echo -e "  ${GREEN}✓${NC} zsh startup cleans stale completion paths before compinit"
 else
