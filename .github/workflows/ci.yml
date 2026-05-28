@@ -73,7 +73,7 @@ jobs:
       - name: yamllint
         run: |
           echo "══ Running yamllint ══"
-          yamllint -d relaxed .
+          yamllint .
 
       - name: Validate templates
         run: tests/test-templates.sh "$PWD"
@@ -234,91 +234,9 @@ jobs:
                 -- "${selector_args[@]}"
             '
 
-  pre-matrix:
-    name: Pre-Matrix Docker Checks
-    needs: [github-release-tools, install-selectors]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        profile:
-          - name: ubuntu-24.04-native
-            wsl: "false"
-            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
-          - name: ubuntu-24.04-wsl
-            wsl: "true"
-            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build test container
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: ${{ matrix.profile.dockerfile }}
-          tags: dotfiles-pre-matrix
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Install option e2e
-        run: |
-          ARTIFACTS="artifacts/pre-matrix-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            dotfiles-pre-matrix \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/install-options-env.txt
-              /dotfiles/tests/test-install-options.sh \
-                2>&1 | tee /artifacts/install-options.log
-            '
-
-      - name: Chezmoi apply fixture
-        run: |
-          ARTIFACTS="artifacts/pre-matrix-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            dotfiles-pre-matrix \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/chezmoi-env.txt
-              {
-                mkdir -p ~/.local/bin &&
-                sh -c "$(curl -fsLS get.chezmoi.io)" \
-                  -- -b ~/.local/bin &&
-                /dotfiles/tests/test-chezmoi-apply.sh /dotfiles
-              } 2>&1 | tee /artifacts/chezmoi-apply.log
-              find "$HOME" -maxdepth 3 -type f \
-                | sort > /artifacts/home-files.txt
-            '
-
-      - name: Upload pre-matrix logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pre-matrix-logs-${{ matrix.profile.name }}
-          path: artifacts/pre-matrix-${{ matrix.profile.name }}
-          if-no-files-found: ignore
-
   test:
     name: Bootstrap Test (${{ matrix.profile.name }})
-    needs: [pre-matrix]
+    needs: [github-release-tools, install-selectors]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -351,6 +269,48 @@ jobs:
           load: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Install option e2e
+        run: |
+          ARTIFACTS="artifacts/test-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
+          docker run --rm \
+            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
+            -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
+            -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
+            dotfiles-test \
+            bash -lc '
+              set -o pipefail
+              env | sort > /artifacts/install-options-env.txt
+              /dotfiles/tests/test-install-options.sh \
+                2>&1 | tee /artifacts/install-options.log
+            '
+
+      - name: Chezmoi apply fixture
+        run: |
+          ARTIFACTS="artifacts/test-${{ matrix.profile.name }}"
+          mkdir -p "$ARTIFACTS"
+          docker run --rm \
+            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
+            -e DOTFILES_CI=true \
+            -e DOTFILES_LOG_DIR=/artifacts \
+            -v ${{ github.workspace }}:/dotfiles:ro \
+            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
+            dotfiles-test \
+            bash -lc '
+              set -o pipefail
+              env | sort > /artifacts/chezmoi-env.txt
+              {
+                mkdir -p ~/.local/bin &&
+                sh -c "$(curl -fsLS get.chezmoi.io)" \
+                  -- -b ~/.local/bin &&
+                /dotfiles/tests/test-chezmoi-apply.sh /dotfiles
+              } 2>&1 | tee /artifacts/chezmoi-apply.log
+              find "$HOME" -maxdepth 3 -type f \
+                | sort > /artifacts/home-files.txt
+            '
 
       - name: Run bootstrap test
         run: |

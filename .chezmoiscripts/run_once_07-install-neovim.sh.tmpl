@@ -24,7 +24,7 @@ if is_installed nvim; then
   NVIM_CURRENT="$(nvim --version 2>/dev/null | awk 'NR == 1 {print $2}' | sed 's/^v//')"
 fi
 
-if ! is_installed nvim || ! version_equals "$NVIM_CURRENT" "$NVIM_TARGET"; then
+if ! is_installed nvim || ! version_ge "$NVIM_CURRENT" "$NVIM_TARGET"; then
   log_info "Installing Neovim ${NVIM_VERSION}..."
   if [[ "$ARCH" == "amd64" ]]; then
     curl -fsSLo /tmp/nvim.appimage "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.appimage"

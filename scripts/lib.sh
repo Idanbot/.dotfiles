@@ -184,6 +184,17 @@ version_equals() {
   [[ -n "$current" && -n "$expected" && "$current" == "$expected" ]]
 }
 
+version_ge() {
+  local current expected
+  current="$(extract_version "${1:-}")"
+  expected="$(extract_version "${2:-}")"
+  [[ -n "$current" && -n "$expected" ]] || return 1
+  if [[ "$current" == "$expected" ]]; then return 0; fi
+  local sorted
+  sorted=$(printf '%s\n%s\n' "$expected" "$current" | sort -V | head -n 1)
+  [[ "$sorted" == "$expected" ]]
+}
+
 version_major_matches() {
   local current expected
   current="$(extract_version "${1:-}")"

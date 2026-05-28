@@ -98,7 +98,7 @@ plugins=(
 
 # Drop stale completion dumps that reference broken system completion paths.
 for _zcompdump in "$HOME"/.zcompdump*(N); do
-  if [[ -f "$_zcompdump" ]] && command grep -q /user/share/zsh/vendor-completions "$_zcompdump" 2>/dev/null; then
+  if [[ -f "$_zcompdump" ]] && command grep -q /usr/share/zsh/vendor-completions "$_zcompdump" 2>/dev/null; then
     command rm -f "$_zcompdump" "$_zcompdump.zwc"
   fi
 done
@@ -107,7 +107,13 @@ unset _zcompdump
 # Keep compinit from scanning directories that no longer exist.
 typeset -ga _clean_fpath
 for _fpath_dir in "${fpath[@]}"; do
-  [[ -d "$_fpath_dir" ]] && _clean_fpath+=("$_fpath_dir")
+  if [[ "$_fpath_dir" == "/usr/share/zsh/vendor-completions" ]]; then
+    mkdir -p "$HOME/.zsh/vendor-completions"
+    cp -L /usr/share/zsh/vendor-completions/* "$HOME/.zsh/vendor-completions/" 2>/dev/null || true
+    _clean_fpath+=("$HOME/.zsh/vendor-completions")
+  elif [[ -d "$_fpath_dir" ]]; then
+    _clean_fpath+=("$_fpath_dir")
+  fi
 done
 fpath=("${_clean_fpath[@]}")
 typeset -U fpath
