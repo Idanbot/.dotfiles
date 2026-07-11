@@ -1,0 +1,4 @@
+title = "dotfiles secret scanning"
+
+# Deliberately no path-wide allowlist. Any false positive must be documented as
+# an exact rule or fingerprint so README and architecture docs remain scanned.

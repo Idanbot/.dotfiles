@@ -164,7 +164,7 @@ set -g status-right '#[fg=#74c7ec] '\
 ##### 4. PLUGINS
 ##### ============================================
 
-set -g @plugin 'tmux-plugins/tpm'
+set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/"
 set -g @plugin 'tmux-plugins/tmux-prefix-highlight'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @plugin 'tmux-plugins/tmux-continuum'
@@ -182,5 +182,9 @@ set -g @continuum-restore 'off'
 # Environment
 set -g update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_CONNECTION SSH_TTY TERM LANG LC_ALL KUBECONFIG TERM_PROGRAM"
 
-# Initialize TPM (Keep at bottom)
+# Machine-local additions are deliberately outside chezmoi ownership.
+if-shell '[ -f ~/.config/dotfiles/local.tmux.conf ]' \
+  'source-file ~/.config/dotfiles/local.tmux.conf'
+
+# Initialize TPM (keep after plugin declarations)
 run -b '~/.tmux/plugins/tpm/tpm'

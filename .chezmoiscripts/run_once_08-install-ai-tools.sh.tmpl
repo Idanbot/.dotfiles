@@ -5,66 +5,68 @@ fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-log_step "Installing AI Coding Tools (Optional)"
-
-load_nvm || true
-
-# ── Claude CLI ────────────────────────────────────────────────────────────────
-if ! is_installed claude; then
-  log_info "Installing Claude CLI..."
-  if is_installed npm; then
-    npm install -g @anthropic-ai/claude-cli 2>/dev/null && log_success "Claude CLI installed" || log_warn "Claude CLI install failed"
-  else
-    log_warn "npm not found — skipping Claude CLI"
-  fi
-else
-  log_skip "Claude CLI already installed"
+log_step "Installing AI Coding Tools"
+activate_node_paths
+if ! is_installed npm; then
+  log_error "npm is required for the pinned agent packages; include the languages section"
+  exit 1
 fi
 
+CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
+npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude
 
-# ── Codex CLI ─────────────────────────────────────────────────────────────────
-CODEX_PATH="$(command -v codex || true)"
+CODEX_INSTALLER_SHA=1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+CODEX_PATH="$(command -v codex 2>/dev/null || true)"
 if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
-  log_info "Installing Codex CLI standalone..."
+  tmpdir="$(mktemp -d)"
+  log_info "Installing Codex CLI with OpenAI's standalone installer"
+  download_verified \
+    https://chatgpt.com/codex/install.sh "$tmpdir/codex-install.sh" \
+    "sha256:$CODEX_INSTALLER_SHA" codex-install.sh
+  sh "$tmpdir/codex-install.sh"
+  rm -rf "$tmpdir"
   export PATH="$HOME/.local/bin:$PATH"
-  if curl -fsSL https://chatgpt.com/codex/install.sh | sh; then
-    export PATH="$HOME/.local/bin:$PATH"
-    if [[ -x "$HOME/.local/bin/codex" ]] || is_installed codex; then
-      log_success "Codex CLI standalone installed"
-    else
-      log_warn "Codex CLI installer completed, but codex was not found in PATH"
-    fi
-  else
-    log_warn "Codex CLI standalone install failed"
-  fi
+  is_installed codex || { log_error "Codex standalone installer did not expose codex in PATH"; exit 1; }
+  record_install codex "$(codex --version 2>/dev/null | head -1 || printf standalone)" openai-installer "$(command -v codex)"
+  ((_INSTALLED++)) || true
+  log_success "Codex standalone CLI installed"
 else
-  log_skip "Codex CLI already installed"
+  log_skip "Codex standalone CLI already installed"
 fi
 
-# ── Antigravity / Gemini CLI ──────────────────────────────────────────────────
-if ! is_installed antigravity && ! is_installed gemini; then
-  log_info "Installing Gemini CLI..."
-  if is_installed npm; then
-    npm install -g @anthropic-ai/antigravity-cli 2>/dev/null || \
-    npm install -g @google/gemini-cli 2>/dev/null && log_success "Gemini CLI installed" || \
-    log_warn "Gemini CLI install failed — install manually"
-  else
-    log_warn "npm not found — skipping Gemini CLI"
-  fi
+GEMINI_VERSION="$(package_version ai_tools gemini_cli 0.50.0)"
+npm_install_global @google/gemini-cli "$GEMINI_VERSION" gemini
+
+OPENCODE_VERSION="$(package_version ai_tools opencode 1.17.18)"
+npm_install_global opencode-ai "$OPENCODE_VERSION" opencode
+
+OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
+case "$(get_arch)" in
+  amd64)
+    OMP_ASSET=omp-linux-x64
+    OMP_SHA256=c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
+    ;;
+  arm64)
+    OMP_ASSET=omp-linux-arm64
+    OMP_SHA256=6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
+    ;;
+esac
+install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
+  "sha256:$OMP_SHA256" 'omp --version'
+
+if is_installed antigravity; then
+  log_skip "Antigravity CLI is already available"
 else
-  log_skip "Gemini/Antigravity CLI already installed"
+  log_warn "Antigravity has no approved automated installer in this repository; install it manually"
 fi
 
-# ── OpenCode ──────────────────────────────────────────────────────────────────
-if ! is_installed opencode; then
-  log_info "Installing OpenCode..."
-  if is_installed go; then
-    go install github.com/opencode-ai/opencode@latest 2>/dev/null && log_success "OpenCode installed" || log_warn "OpenCode install failed"
+for agent in claude codex gemini opencode omp; do
+  if "$agent" --version >/dev/null 2>&1; then
+    log_success "$agent executable validation passed"
   else
-    log_warn "go not found — skipping OpenCode"
+    log_error "$agent failed its noninteractive version check"
   fi
-else
-  log_skip "OpenCode already installed"
-fi
+done
+log_info "Agent authentication and session state are intentionally left to the user"
 
 print_summary "AI Coding Tools"

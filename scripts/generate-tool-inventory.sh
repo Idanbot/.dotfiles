@@ -39,8 +39,8 @@ def parse_versions(path: Path) -> dict[str, dict[str, str]]:
     return data
 
 
-def parse_sources(path: Path) -> dict[tuple[str, str], str]:
-    sources: dict[tuple[str, str], str] = {}
+def parse_metadata(path: Path) -> dict[tuple[str, str], dict[str, str]]:
+    metadata: dict[tuple[str, str], dict[str, str]] = {}
     section = ""
     tool = ""
     for raw in path.read_text().splitlines():
@@ -52,12 +52,14 @@ def parse_sources(path: Path) -> dict[tuple[str, str], str]:
             section = line[:-1].strip()
         elif indent == 2 and line.endswith(":"):
             tool = line[:-1].strip()
-        elif indent == 4 and line.strip().startswith("source:"):
-            sources[(section, tool)] = strip_value(line.split(":", 1)[1])
-    return sources
+            metadata[(section, tool)] = {}
+        elif indent == 4 and ":" in line and section and tool:
+            key, value = line.split(":", 1)
+            metadata[(section, tool)][key.strip()] = strip_value(value)
+    return metadata
 
 versions = parse_versions(packages_file)
-sources = parse_sources(meta_file) if meta_file.exists() else {}
+metadata = parse_metadata(meta_file) if meta_file.exists() else {}
 output_file.parent.mkdir(parents=True, exist_ok=True)
 
 lines = [
@@ -69,12 +71,16 @@ lines = [
     "./scripts/generate-tool-inventory.sh",
     "```",
     "",
-    "| Section | Tool | Version | Source |",
-    "|---------|------|---------|--------|",
+    "| Section | Tool | Version | Source | Owner | Integrity |",
+    "|---------|------|---------|--------|-------|-----------|",
 ]
 for section, tools in versions.items():
     for tool, version in tools.items():
-        lines.append(f"| {section} | {tool} | {version} | {sources.get((section, tool), 'unknown')} |")
+        meta = metadata.get((section, tool), {})
+        lines.append(
+            f"| {section} | {tool} | {version} | {meta.get('source', 'unknown')} "
+            f"| {meta.get('owner', 'unknown')} | {meta.get('integrity', 'missing')} |"
+        )
 
 output_file.write_text("\n".join(lines) + "\n")
 PYGEN

@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Render and launch the pinned tmuxp agent workspace for a project directory.
+
+set -euo pipefail
+
+TMUXP_VERSION="${DOTFILES_TMUXP_VERSION:-1.74.0}"
+WORKDIR="$PWD"
+SESSION_NAME=""
+PRINT_ONLY=false
+
+usage() {
+  cat <<'USAGE'
+Usage: dot-workspace [directory] [--name <session>] [--print]
+
+Creates one tmux window each for the main shell, Codex, Antigravity, Claude,
+OpenCode, and OMP. Missing optional commands leave an interactive shell.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name)
+      SESSION_NAME="${2:-}"
+      shift 2
+      ;;
+    --name=*)
+      SESSION_NAME="${1#--name=}"
+      shift
+      ;;
+    --print)
+      PRINT_ONLY=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      printf 'Unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+    *)
+      WORKDIR="$1"
+      shift
+      ;;
+  esac
+done
+
+WORKDIR="$(cd "$WORKDIR" && pwd -P)"
+if [[ -z "$SESSION_NAME" ]]; then
+  SESSION_NAME="$(basename "$WORKDIR" | tr -cs '[:alnum:]_-' '_')-agents"
+fi
+[[ "$SESSION_NAME" =~ ^[[:alnum:]_-]+$ ]] || {
+  printf 'Session name may contain only letters, numbers, underscore, and dash\n' >&2
+  exit 2
+}
+
+TEMPLATE="${XDG_CONFIG_HOME:-$HOME/.config}/tmuxp/agent-workspace.yaml"
+[[ -f "$TEMPLATE" ]] || {
+  printf 'Missing workspace template: %s\n' "$TEMPLATE" >&2
+  exit 1
+}
+command -v uvx >/dev/null 2>&1 || {
+  printf 'uvx is required; install the languages profile\n' >&2
+  exit 1
+}
+command -v tmux >/dev/null 2>&1 || {
+  printf 'tmux is required; install the tmux profile\n' >&2
+  exit 1
+}
+
+rendered="$(mktemp "${TMPDIR:-/tmp}/dot-workspace.XXXXXX.yaml")"
+trap 'rm -f "$rendered"' EXIT
+python3 - "$TEMPLATE" "$rendered" "$SESSION_NAME" "$WORKDIR" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+source, destination, session, workdir = sys.argv[1:]
+text = Path(source).read_text(encoding="utf-8")
+text = text.replace("__SESSION_NAME__", json.dumps(session))
+text = text.replace("__WORKDIR__", json.dumps(workdir))
+Path(destination).write_text(text, encoding="utf-8")
+PY
+
+if [[ "$PRINT_ONLY" == true ]]; then
+  cat "$rendered"
+  exit 0
+fi
+
+export TMUXP_PROGRESS=0
+exec uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp load -y "$rendered"

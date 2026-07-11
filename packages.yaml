@@ -1,75 +1,78 @@
-# packages.yaml — Version-pinned tool manifest
-# Update versions here, then run `chezmoi apply` to trigger upgrades
-# via .chezmoiscripts/run_onchange_ scripts.
+# Requested versions. Every non-package-manager download has a matching
+# integrity declaration in packages.meta.yaml.
 
-# Core CLI tools
+bootstrap:
+  chezmoi: "2.71.0"
+
 core:
-  fzf: "0.73.0"
+  fzf: "0.74.0"
   fd: "10.4.2"
   ripgrep: "15.1.0"
   bat: "0.26.1"
   eza: "0.23.4"
-  lazygit: "0.61.1"
+  lazygit: "0.63.0"
   btop: "1.4.7"
-  starship: "1.25.1"
-  jq: latest    # via apt
-  yq: latest    # via apt
-  htop: latest  # via apt
-  zoxide: "0.9.9"
-  direnv: "2.37.1"
-  git-delta: "0.19.2"
-  hyperfine: latest  # via apt
-  duf: latest        # via apt
-  sops: latest
+  starship: "1.26.0"
+  jq: distro
+  yq: distro
+  htop: distro
+  zoxide: distro
+  direnv: distro
+  git-delta: distro
+  hyperfine: distro
+  duf: distro
+  sops: "3.13.2"
   lazydocker: "0.25.2"
   tealdeer: "1.8.1"
 
-# Languages & runtimes
 languages:
-  go: "1.24.3"
-  rust: "stable"
-  cargo: "stable"
-  node_lts: "24.15.0"
-  typescript: "5.9.3"
-  python: "3.14.5"
+  go: "1.26.5"
+  rust: stable
+  cargo: stable
+  node_lts: "24.18.0"
+  typescript: "7.0.2"
+  python: "3.14.6"
   java: "21"
-  uv: latest
+  uv: "0.11.28"
 
-# Editor
+history:
+  atuin: "18.17.0"
+
 editor:
-  neovim: latest
+  neovim: "0.12.4"
 
-# Container & Cloud
 cloud:
-  docker: latest  # via apt repo
-  kubectl: "1.32.0"
-  helm: "4.2.0"
-  terraform: "1.15.4"
-  ansible: latest  # via pip
-  k9s: "0.50.18"
-  aws_cli: "2"
-  gcloud: latest
-  azure_cli: latest
+  docker: distro
+  kubectl: "1.36.2"
+  helm: "4.2.3"
+  terraform: "1.15.8"
+  ansible: distro
+  k9s: "0.51.0"
+  aws_cli: "2.34.54"
+  gcloud: distro
+  azure_cli: distro
 
-# Terminal
 terminal:
-  kitty: latest
-  tmux: latest  # via apt
+  kitty: distro
+  tmux: distro
+  tmuxp: "1.74.0"
 
-# Fonts
+system:
+  git_credential_manager: "2.8.0"
+
 fonts:
-  nerd_font: "FiraMono"
+  nerd_font: FiraMono
   nerd_font_version: "3.4.0"
 
-# AI tools (optional)
 ai_tools:
-  claude_cli: latest
-  codex_cli: latest
-  antigravity_cli: latest
-  opencode: latest
+  claude_cli: "2.1.206"
+  codex_cli: standalone
+  gemini_cli: "0.50.0"
+  antigravity_cli: manual
+  opencode: "1.17.18"
+  omp: "16.4.0"
 
-# Media (native only)
 media:
-  yt_dlp: latest
-  rmpc: latest
-  cava: latest
+  yt_dlp: "2026.07.04"
+  rmpc: "0.11.0"
+  cava: distro

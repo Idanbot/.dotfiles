@@ -10,9 +10,8 @@
 OMZ_PASSCI_DIR="${HOME}/.oh-my-zsh/plugins/pass-cli"
 
 if [[ -d "$OMZ_PASSCI_DIR" ]]; then
-  rm -f \
-    "$OMZ_PASSCI_DIR/README.md" \
-    "$OMZ_PASSCI_DIR/pass-cli.plugin.zsh"
-  rmdir --ignore-fail-on-non-empty "$OMZ_PASSCI_DIR" 2>/dev/null || true
-  echo "Removed stale pass-cli files from ~/.oh-my-zsh/plugins/"
+  backup="$HOME/.local/state/dotfiles/legacy/omz-pass-cli-$(date +%Y%m%d%H%M%S)"
+  mkdir -p "$(dirname "$backup")"
+  mv "$OMZ_PASSCI_DIR" "$backup"
+  echo "Preserved stale pass-cli files at $backup"
 fi

@@ -102,10 +102,22 @@ for section, tools in versions.items():
             f"    version: {yaml_scalar(version)}",
             f"    source: {yaml_scalar(meta.get('source', 'unknown'))}",
         ])
-        for field in ("repo", "package", "crate", "binary"):
+        for field in (
+            "owner",
+            "repo",
+            "package",
+            "crate",
+            "binary",
+            "url",
+            "asset_template",
+            "checksum_template",
+            "sha256",
+            "sha256_amd64",
+            "sha256_arm64",
+        ):
             if field in meta:
                 lines.append(f"    {field}: {yaml_scalar(meta[field])}")
-        lines.append("    checksum: null")
+        lines.append(f"    integrity: {yaml_scalar(meta.get('integrity', 'missing'))}")
 
 output_file.write_text("\n".join(lines) + "\n")
 PYGEN

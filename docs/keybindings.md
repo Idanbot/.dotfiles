@@ -58,10 +58,10 @@ Generated from tmux and zsh config. Regenerate with:
 | ssh | `TERM=xterm-256color ssh` |
 | ls | `eza --icons=always -hg` |
 | cat | `bat --paging=never --style=full` |
-| tm | `tmuxp load -y -s "$(basename $PWD \| tr . _)" $(tmuxp ls \| fzf)` |
+| tm | `dot-workspace` |
 | ytmp4 | `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"` |
 | cheat | `"curl -s https://cht.sh/"` |
-| dotfiles-doctor | `"echo '=== SSH Agent ===' && systemctl --user status ssh-agent.service \| head -n 3 && echo '\n=== Chezmoi State ===' && chezmoi status && echo '\n=== Template Check ===' && bash ~/.dotfiles/tests/test-templates.sh"` |
+| dotfiles-doctor | `dot doctor` |
 | explorer | `"explorer.exe"` |
 | cbcopy | `"clip.exe"` |
 | cbpaste | `"powershell.exe -NoProfile -Command Get-Clipboard"` |

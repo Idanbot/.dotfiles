@@ -16,10 +16,14 @@ if [ -d "$HOME/.local/bin" ]; then
 fi
 
 # Rust
-[[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # uv / pip
-[[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
+[ -f "$HOME/.local/bin/env" ] && . "$HOME/.local/bin/env"
+
+# Node.js shims and npm global tools managed by the bootstrap.
+PATH="$HOME/.local/share/npm/bin:$PATH"
+export PATH
 
 # Go
 export PATH="$PATH:/usr/local/go/bin"

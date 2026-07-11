@@ -3,6 +3,9 @@
 {{- $sessionizerDirs := promptStringOnce . "sessionizer_dirs" "tmux-sessionizer search dirs (space-separated)" "~/Code ~/Scripts ~/Education" -}}
 
 {{- $isWsl := false -}}
+{{- if eq (env "DOTFILES_WSL") "true" -}}
+{{-   $isWsl = true -}}
+{{- end -}}
 {{- if eq .chezmoi.os "linux" -}}
 {{-   if (.chezmoi.kernel.osrelease | lower | contains "microsoft") -}}
 {{-     $isWsl = true -}}
@@ -16,7 +19,5 @@ data:
   is_native: {{ not $isWsl }}
   sessionizer_dirs: {{ $sessionizerDirs | quote }}
 
-encryption: age
-age:
-  identity: ~/.config/chezmoi/key.txt
-  recipient: "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# This public repository intentionally has no encryption dependency. Credentials,
+# private keys, API tokens, and authentication state are restored manually.

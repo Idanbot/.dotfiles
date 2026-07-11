@@ -7,11 +7,9 @@ fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-log_step "Package Manifest Changed — Checking for Updates"
+log_step "Reconciling Changed Package Sections"
 
-log_info "packages.yaml has been modified"
-log_info "Re-running install scripts to apply version changes..."
-log_info "For targeted upgrades, run individual install scripts manually."
-log_info "Run: chezmoi apply --verbose to see what changed"
+log_info "packages.yaml changed; routing only affected manifest sections"
+"$DOTFILES_SOURCE_DIR/scripts/reconcile-packages.sh"
 
 print_summary "Package Update Check"

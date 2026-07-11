@@ -1,89 +1,136 @@
 #!/usr/bin/env bash
-# scripts/update-packages.sh — Scans GitHub for updates to pinned package versions in packages.yaml
+# Discover upstream versions and safely update checksum-verifiable pins.
+
 set -euo pipefail
 
-# ANSI color codes
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+DOTFILES_SOURCE_DIR="${DOTFILES_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-PACKAGES_FILE="$(dirname "$0")/../packages.yaml"
+MODE=check
+case "${1:-}" in
+  --apply) MODE=apply ;;
+  --check | '') MODE=check ;;
+  -h | --help)
+    printf 'Usage: scripts/update-packages.sh [--check|--apply]\n'
+    exit 0
+    ;;
+  *)
+    printf 'Unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+esac
 
-log_info() {
-  echo -e "${CYAN}[INFO]${NC} $1"
+PACKAGES_FILE="$DOTFILES_SOURCE_DIR/packages.yaml"
+REPORT="${DOTFILES_UPDATE_REPORT:-$DOTFILES_SOURCE_DIR/.version-update-report}"
+UPDATES=0
+APPLIED=0
+MANUAL=0
+printf 'Version audit %s\n\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$REPORT"
+
+github_release() {
+  github_latest_release "$1" | sed 's/^v//'
 }
 
-log_upgrade() {
-  echo -e "${GREEN}[UPDATE]${NC} $1: $2 -> $3"
+npm_release() {
+  curl --proto '=https' --tlsv1.2 --retry 3 -fsSL \
+    "https://registry.npmjs.org/$1/latest" | jq -r .version
 }
 
-log_uptodate() {
-  echo -e "  $1 is up to date ($2)"
+pypi_release() {
+  curl --proto '=https' --tlsv1.2 --retry 3 -fsSL \
+    "https://pypi.org/pypi/$1/json" | jq -r .info.version
 }
 
-get_latest_github_release() {
-  local repo="$1"
-  # Fetch latest release tag, remove leading 'v'
-  curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null | jq -r '.tag_name' | sed 's/^v//'
+set_manifest_version() {
+  local section="$1" key="$2" version="$3"
+  python3 - "$PACKAGES_FILE" "$section" "$key" "$version" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path, section, key, version = sys.argv[1:]
+lines = Path(path).read_text(encoding="utf-8").splitlines()
+inside = False
+changed = False
+for index, line in enumerate(lines):
+    if re.fullmatch(rf"{re.escape(section)}:\s*", line):
+        inside = True
+        continue
+    if inside and line and not line.startswith((" ", "#")):
+        inside = False
+    if inside and re.match(rf"  {re.escape(key)}:\s*", line):
+        comment = ""
+        if " #" in line:
+            comment = " #" + line.split(" #", 1)[1]
+        lines[index] = f'  {key}: "{version}"{comment}'
+        changed = True
+        break
+if not changed:
+    raise SystemExit(f"manifest key not found: {section}.{key}")
+Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
 }
 
-update_package_version() {
-  local tool_key="$1"
-  local repo="$2"
-  local current_version
-
-  if [[ ! -f "$PACKAGES_FILE" ]]; then
-    echo -e "${YELLOW}[WARN]${NC} Manifest file not found: $PACKAGES_FILE"
-    return
+audit() {
+  local section="$1" key="$2" latest="$3" policy="$4" current
+  current="$(package_version "$section" "$key")"
+  latest="${latest#v}"
+  [[ -n "$latest" && "$latest" != null ]] || {
+    log_warn "Could not resolve $section.$key"
+    return 0
+  }
+  if version_equals "$current" "$latest" || version_ge "$current" "$latest"; then
+    log_skip "$section.$key $current"
+    return 0
   fi
 
-  current_version=$(grep -E "^[[:space:]]*${tool_key}:" "$PACKAGES_FILE" | awk '{print $2}' | tr -d '"' | tr -d "'")
-
-  if [[ -z "$current_version" || "$current_version" == "latest" || "$current_version" == "stable" ]]; then
-    return
+  ((UPDATES++)) || true
+  printf '%s.%s %s -> %s (%s)\n' "$section" "$key" "$current" "$latest" "$policy" | tee -a "$REPORT"
+  if [[ "$policy" == manual-integrity ]]; then
+    ((MANUAL++)) || true
+    return 0
   fi
-
-  local latest_version
-  latest_version=$(get_latest_github_release "$repo")
-
-  if [[ -z "$latest_version" || "$latest_version" == "null" ]]; then
-    echo -e "${YELLOW}[WARN]${NC} Could not fetch latest release for $tool_key ($repo)"
-    return
-  fi
-
-  if [[ "$current_version" != "$latest_version" ]]; then
-    log_upgrade "$tool_key" "$current_version" "$latest_version"
-    # Update the version in the packages.yaml file, replacing old version with quotes
-    sed -i -E "s|^([[:space:]]*${tool_key}:[[:space:]]*)['\"]?${current_version}['\"]?|\1\"${latest_version}\"|g" "$PACKAGES_FILE"
-  else
-    log_uptodate "$tool_key" "$current_version"
+  if [[ "$MODE" == apply ]]; then
+    set_manifest_version "$section" "$key" "$latest"
+    ((APPLIED++)) || true
   fi
 }
 
-log_info "Scanning pinned packages in packages.yaml..."
+audit bootstrap chezmoi "$(github_release twpayne/chezmoi)" auto
+audit core fzf "$(github_release junegunn/fzf)" external
+audit core eza "$(github_release eza-community/eza)" auto
+audit core lazygit "$(github_release jesseduffield/lazygit)" auto
+audit core starship "$(github_release starship/starship)" auto
+audit core sops "$(github_release getsops/sops)" auto
+audit core lazydocker "$(github_release jesseduffield/lazydocker)" auto
+audit core tealdeer "$(github_release dbrgn/tealdeer)" auto
+audit languages go "$(curl -fsSL 'https://go.dev/dl/?mode=json' | jq -r '.[0].version' | sed 's/^go//')" auto
+audit languages node_lts "$(curl -fsSL https://nodejs.org/dist/index.json | jq -r 'map(select(.lts != false))[0].version' | sed 's/^v//')" auto
+audit languages typescript "$(npm_release typescript)" auto
+audit languages uv "$(github_release astral-sh/uv)" auto
+audit history atuin "$(github_release atuinsh/atuin)" auto
+audit editor neovim "$(github_release neovim/neovim)" manual-integrity
+audit cloud kubectl "$(curl -fsSL https://dl.k8s.io/release/stable.txt | sed 's/^v//')" auto
+audit cloud helm "$(github_release helm/helm)" auto
+audit cloud terraform "$(github_release hashicorp/terraform)" auto
+audit cloud k9s "$(github_release derailed/k9s)" auto
+audit system git_credential_manager "$(github_release git-ecosystem/git-credential-manager)" manual-integrity
+audit fonts nerd_font_version "$(github_release ryanoasis/nerd-fonts)" auto
+audit ai_tools claude_cli "$(npm_release @anthropic-ai/claude-code)" auto
+audit ai_tools gemini_cli "$(npm_release @google/gemini-cli)" auto
+audit ai_tools opencode "$(npm_release opencode-ai)" auto
+audit ai_tools omp "$(npm_release @oh-my-pi/pi-coding-agent)" auto
+audit terminal tmuxp "$(pypi_release tmuxp)" auto
+audit media yt_dlp "$(github_release yt-dlp/yt-dlp)" auto
+audit media rmpc "$(github_release mierak/rmpc)" manual-integrity
 
-# Map tool keys in packages.yaml to their GitHub repositories
-update_package_version "fzf" "junegunn/fzf"
-update_package_version "fd" "sharkdp/fd"
-update_package_version "ripgrep" "BurntSushi/ripgrep"
-update_package_version "bat" "sharkdp/bat"
-update_package_version "eza" "eza-community/eza"
-update_package_version "lazygit" "jesseduffield/lazygit"
-update_package_version "zoxide" "ajeetdsouza/zoxide"
-update_package_version "direnv" "direnv/direnv"
-update_package_version "git-delta" "dandavison/delta"
-update_package_version "hyperfine" "sharkdp/hyperfine"
-update_package_version "duf" "muesli/duf"
-update_package_version "sops" "getsops/sops"
-update_package_version "lazydocker" "jesseduffield/lazydocker"
-update_package_version "tealdeer" "dbrgn/tealdeer"
-update_package_version "btop" "aristocratos/btop"
-update_package_version "starship" "starship/starship"
-update_package_version "neovim" "neovim/neovim"
-update_package_version "helm" "helm/helm"
-update_package_version "terraform" "hashicorp/terraform"
-update_package_version "k9s" "derailed/k9s"
-update_package_version "nerd_font_version" "ryanoasis/nerd-fonts"
+if [[ "$MODE" == apply && "$APPLIED" -gt 0 ]]; then
+  "$DOTFILES_SOURCE_DIR/scripts/generate-package-lock.sh"
+  "$DOTFILES_SOURCE_DIR/scripts/generate-tool-inventory.sh"
+fi
 
-log_info "Upgrade scan complete. If versions were updated, apply them using: chezmoi apply"
+log_info "Updates: $UPDATES; applied: $APPLIED; manual integrity refreshes: $MANUAL"
+if [[ "$MODE" == check && "$UPDATES" -gt 0 ]]; then
+  exit 3
+fi

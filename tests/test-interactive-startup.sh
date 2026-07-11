@@ -12,6 +12,7 @@ render_template() {
     function emit(line) {
       gsub(/{{ \.chezmoi\.sourceDir }}/, source_dir, line)
       gsub(/{{ \.chezmoi\.sourceFile }}/, source_dir, line)
+      gsub(/{{ \.sessionizer_dirs \| quote }}/, "\"~/Code ~/Scripts\"", line)
       gsub(/{{ \.sessionizer_dirs }}/, "~/Code ~/Scripts", line)
       gsub(/{{ \.email }}/, "test@example.com", line)
       gsub(/{{ \.name }}/, "Test User", line)

@@ -1,0 +1,22 @@
+# Agent workspace registry. Authentication and agent state are never managed.
+agents:
+  codex:
+    command: codex
+    install: openai-standalone
+    required: true
+  antigravity:
+    command: antigravity
+    install: manual
+    required: false
+  claude:
+    command: claude
+    install: npm
+    required: true
+  opencode:
+    command: opencode
+    install: npm
+    required: true
+  omp:
+    command: omp
+    install: github-standalone
+    required: true

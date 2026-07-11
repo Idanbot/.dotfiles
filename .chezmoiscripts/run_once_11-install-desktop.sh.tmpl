@@ -5,54 +5,20 @@ fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-log_step "Installing Desktop Tools (Native Only)"
-
+log_step "Installing Desktop Tools"
 if is_wsl; then
-  log_skip "Skipping desktop tools on WSL"
+  log_skip "Desktop tools are disabled on WSL"
   print_summary "Desktop Tools"
   exit 0
 fi
 
 require_sudo
-
-# ── Kitty Terminal ────────────────────────────────────────────────────────────
-if ! is_installed kitty; then
-  log_info "Installing Kitty terminal..."
-  curl -fsSL https://sw.kovidgoyal.net/kitty/installer.sh | sh /dev/stdin launch=n
-  # Create symlinks
-  mkdir -p "$HOME/.local/bin"
-  ln -sf "$HOME/.local/kitty.app/bin/kitty" "$HOME/.local/bin/kitty"
-  ln -sf "$HOME/.local/kitty.app/bin/kitten" "$HOME/.local/bin/kitten"
-  # Desktop integration
-  mkdir -p "$HOME/.local/share/applications"
-  cp "$HOME/.local/kitty.app/share/applications/kitty.desktop" "$HOME/.local/share/applications/"
-  cp "$HOME/.local/kitty.app/share/applications/kitty-open.desktop" "$HOME/.local/share/applications/"
-  log_success "Kitty terminal installed"
-else
-  log_skip "Kitty already installed"
-fi
-
-# ── Ghostty (secondary, if available) ─────────────────────────────────────────
-if ! is_installed ghostty; then
-  log_info "Ghostty: Install manually from https://ghostty.org (not yet in apt)"
-fi
-
-# ── GNOME tweaks ──────────────────────────────────────────────────────────────
+apt_install kitty
 if is_installed gnome-shell; then
   apt_install gnome-tweaks gnome-shell-extension-manager
-  log_info "GNOME extensions — install manually:"
-  log_info "  - Bluetooth Battery Meter"
-  log_info "  - System Monitor"
-  log_info "  - Grand Theft Focus"
-  log_info "  - Caffeine"
-  log_info "  - Burn My Windows"
-  log_info "  - Coverflow Alt-Tab"
-  log_info "  - GNOME UI Tune"
-  log_info "  - Impatience"
-  log_info "  - Primary Input on Lock Screen"
-  log_info "  - Places Menu"
 else
-  log_skip "GNOME not detected — skipping desktop customizations"
+  log_skip "GNOME is not present"
 fi
+log_info "Ghostty and GNOME extension authentication/install choices remain manual"
 
 print_summary "Desktop Tools"

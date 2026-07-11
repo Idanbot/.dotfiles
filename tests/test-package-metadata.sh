@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 versions = Path(sys.argv[1])
-metadata = Path(sys.argv[2])
+meta_path = Path(sys.argv[2])
 
 def keys(path):
     result = []
@@ -46,8 +46,8 @@ def keys(path):
             result.append((section, line.split(":", 1)[0].strip()))
     return result
 
-def sources(path):
-    result = set()
+def parse_metadata(path):
+    result = {}
     section = ""
     tool = ""
     for raw in path.read_text().splitlines():
@@ -59,17 +59,31 @@ def sources(path):
             section = line[:-1].strip()
         elif indent == 2 and line.endswith(":"):
             tool = line[:-1].strip()
-        elif indent == 4 and line.strip().startswith("source:"):
-            result.add((section, tool))
+            result[(section, tool)] = {}
+        elif indent == 4 and ":" in line:
+            key, value = line.split(":", 1)
+            result[(section, tool)][key.strip()] = value.strip().strip('"\'')
     return result
 
-missing = sorted(set(keys(versions)) - sources(metadata))
+meta = parse_metadata(meta_path)
+missing = sorted(set(keys(versions)) - set(meta))
 if missing:
     for section, tool in missing:
         print(f"missing source metadata: {section}.{tool}")
     raise SystemExit(1)
+
+invalid = []
+for item in keys(versions):
+    values = meta[item]
+    for field in ("source", "owner", "integrity"):
+        if not values.get(field) or values[field] in {"missing", "null"}:
+            invalid.append((*item, field))
+for section, tool, field in invalid:
+    print(f"missing {field}: {section}.{tool}")
+if invalid:
+    raise SystemExit(1)
 PYTEST
-  pass "all packages have source metadata"
+  pass "all packages have source, owner, and integrity metadata"
 else
   fail "some packages are missing source metadata"
 fi

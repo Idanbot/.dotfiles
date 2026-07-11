@@ -1,171 +1,328 @@
-# packages.meta.yaml — install source metadata for packages.yaml
-# Keep versions in packages.yaml; this describes each install source.
+# Installation ownership and integrity policy for packages.yaml.
+
+bootstrap:
+  chezmoi:
+    source: apt_or_github
+    owner: bootstrap
+    repo: twpayne/chezmoi
+    integrity: upstream-checksum
 
 core:
   fzf:
     source: external
+    owner: chezmoi-external
     repo: junegunn/fzf
+    integrity: pinned-sha256
   fd:
     source: apt
+    owner: apt
     package: fd-find
     binary: fdfind
+    integrity: apt-signature
   ripgrep:
     source: apt
+    owner: apt
     package: ripgrep
     binary: rg
+    integrity: apt-signature
   bat:
     source: apt
+    owner: apt
     package: bat
     binary: batcat
+    integrity: apt-signature
   eza:
-    source: apt_repo
+    source: github
+    owner: dotfiles-binary
     repo: eza-community/eza
+    binary: eza
+    integrity: pinned-sha256
   lazygit:
     source: github
+    owner: dotfiles-binary
     repo: jesseduffield/lazygit
     binary: lazygit
-    asset_template: lazygit_{version}_Linux_{arch}.tar.gz
+    asset_template: lazygit_{version}_linux_{arch}.tar.gz
+    checksum_template: https://github.com/jesseduffield/lazygit/releases/download/{tag}/checksums.txt
+    integrity: upstream-checksum
   btop:
     source: apt
+    owner: apt
     package: btop
+    integrity: apt-signature
   starship:
-    source: install_script
-    url: https://starship.rs/install.sh
+    source: github
+    owner: dotfiles-binary
+    repo: starship/starship
+    binary: starship
+    integrity: upstream-checksum
   jq:
     source: apt
+    owner: apt
     package: jq
+    integrity: apt-signature
   yq:
     source: apt
+    owner: apt
     package: yq
+    integrity: apt-signature
   htop:
     source: apt
+    owner: apt
     package: htop
+    integrity: apt-signature
   zoxide:
     source: apt
+    owner: apt
     package: zoxide
+    integrity: apt-signature
   direnv:
     source: apt
+    owner: apt
     package: direnv
+    integrity: apt-signature
   git-delta:
     source: apt
+    owner: apt
     package: git-delta
     binary: delta
+    integrity: apt-signature
   hyperfine:
     source: apt
+    owner: apt
     package: hyperfine
+    integrity: apt-signature
   duf:
     source: apt
+    owner: apt
     package: duf
+    integrity: apt-signature
   sops:
     source: github
+    owner: dotfiles-binary
     repo: getsops/sops
     binary: sops
-    asset_template: sops-{tag}.linux.{arch}
+    integrity: upstream-checksum
   lazydocker:
     source: github
+    owner: dotfiles-binary
     repo: jesseduffield/lazydocker
     binary: lazydocker
-    asset_template: lazydocker_{version}_Linux_{arch}.tar.gz
+    integrity: upstream-checksum
   tealdeer:
     source: github
+    owner: dotfiles-binary
     repo: dbrgn/tealdeer
     binary: tldr
-    asset_template: tealdeer-linux-{arch}-musl
+    integrity: upstream-checksum
 
 languages:
   go:
     source: direct
-    url_template: https://dl.google.com/go/go{version}.linux-{arch}.tar.gz
+    owner: dotfiles-runtime
+    url_template: https://go.dev/dl/go{version}.linux-{arch}.tar.gz
+    checksum_template: https://go.dev/dl/?mode=json&include=all
+    integrity: upstream-checksum
   rust:
     source: rustup
+    owner: rustup
     channel: stable
+    integrity: upstream-checksum
   cargo:
     source: rustup
+    owner: rustup
     channel: stable
+    integrity: rustup
   node_lts:
-    source: nvm
+    source: node-dist
+    owner: dotfiles-runtime
+    integrity: upstream-checksum
   typescript:
     source: npm
+    owner: npm
     package: typescript
     binary: tsc
+    integrity: npm-registry
   python:
     source: uv
+    owner: uv
+    integrity: uv-managed
   java:
     source: apt
+    owner: apt
     package_template: openjdk-{version}-jdk-headless
+    integrity: apt-signature
   uv:
-    source: install_script
-    url: https://astral.sh/uv/install.sh
+    source: github
+    owner: dotfiles-binary
+    repo: astral-sh/uv
+    binary: uv
+    integrity: upstream-checksum
+
+history:
+  atuin:
+    source: github
+    owner: dotfiles-binary
+    repo: atuinsh/atuin
+    binary: atuin
+    integrity: upstream-checksum
 
 editor:
   neovim:
     source: github
+    owner: dotfiles-runtime
     repo: neovim/neovim
     binary: nvim
-    asset_template: nvim-linux-x86_64.appimage
+    integrity: pinned-sha256
+    sha256_amd64: 012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
+    sha256_arm64: ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
 
 cloud:
   docker:
     source: apt_repo
+    owner: apt
+    integrity: apt-signature
   kubectl:
     source: direct
+    owner: dotfiles-binary
+    binary: kubectl
+    integrity: upstream-checksum
   helm:
-    source: install_script
+    source: github
+    owner: dotfiles-binary
+    repo: helm/helm
+    binary: helm
+    integrity: upstream-checksum
   terraform:
     source: direct
+    owner: dotfiles-binary
+    binary: terraform
+    integrity: upstream-checksum
   ansible:
-    source: pip
+    source: apt
+    owner: apt
+    package: ansible
+    integrity: apt-signature
   k9s:
     source: github
+    owner: dotfiles-binary
     repo: derailed/k9s
     binary: k9s
-    asset_template: k9s_Linux_{arch}.tar.gz
+    integrity: upstream-checksum
   aws_cli:
     source: direct
+    owner: vendor-installer
+    binary: aws
+    integrity: pinned-sha256
+    sha256_amd64: de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a
+    sha256_arm64: f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60
   gcloud:
     source: apt_repo
+    owner: apt
+    integrity: apt-signature
   azure_cli:
     source: apt_repo
+    owner: apt
+    integrity: apt-signature
 
 terminal:
   kitty:
     source: apt
+    owner: apt
     package: kitty
+    integrity: apt-signature
   tmux:
     source: apt
+    owner: apt
     package: tmux
+    integrity: apt-signature
+  tmuxp:
+    source: uvx
+    owner: ephemeral
+    package: tmuxp
+    binary: tmuxp
+    integrity: pypi
+
+system:
+  git_credential_manager:
+    source: github
+    owner: dpkg
+    repo: git-ecosystem/git-credential-manager
+    binary: git-credential-manager
+    integrity: pinned-sha256
+    sha256_amd64: c7bbf9785c3e8166ceedb66a7e0bfb40e6655ef504af5ca7977b516c5497aff6
+    sha256_arm64: e5bbc12c31e97a7409585ef60aa5d53138c7661d9a3abc9227d9b0f68959e836
 
 fonts:
   nerd_font:
     source: github
+    owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
+    integrity: upstream-checksum
   nerd_font_version:
     source: github
+    owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
+    integrity: upstream-checksum
 
 ai_tools:
   claude_cli:
     source: npm
-    package: "@anthropic-ai/claude-cli"
+    owner: npm
+    package: "@anthropic-ai/claude-code"
     binary: claude
+    integrity: npm-registry
   codex_cli:
     source: install_script
+    owner: vendor-installer
     url: https://chatgpt.com/codex/install.sh
     binary: codex
+    integrity: pinned-sha256
+    sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+  gemini_cli:
+    source: npm
+    owner: npm
+    package: "@google/gemini-cli"
+    binary: gemini
+    integrity: npm-registry
   antigravity_cli:
-    source: optional
+    source: manual
+    owner: user
+    binary: antigravity
+    integrity: manual
   opencode:
-    source: go
+    source: npm
+    owner: npm
+    package: opencode-ai
+    binary: opencode
+    integrity: npm-registry
+  omp:
+    source: github
+    owner: dotfiles-binary
+    repo: can1357/oh-my-pi
+    binary: omp
+    asset_template: omp-linux-{release_arch}
+    sha256_amd64: c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
+    sha256_arm64: 6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
+    integrity: pinned-sha256
 
 media:
   yt_dlp:
-    source: github
-    repo: yt-dlp/yt-dlp
+    source: uv
+    owner: uv
+    package: yt-dlp
     binary: yt-dlp
+    integrity: pypi
   rmpc:
     source: github
+    owner: dotfiles-binary
     repo: mierak/rmpc
     binary: rmpc
+    integrity: pinned-sha256
+    sha256_amd64: b03d4b777cf0afe61107abb4ee847b7c6539b8f5c76555fd759cd15a6c1ff604
+    sha256_arm64: 12d9bb3bcabfe90c0573afac9b11e20333262872966a8769967611b578ff7328
   cava:
     source: apt
+    owner: apt
     package: cava
+    integrity: apt-signature

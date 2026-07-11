@@ -15,6 +15,9 @@ RUN apt-get update && \
       ca-certificates \
       locales \
       fontconfig \
+      jq \
+      procps \
+      tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up locale
@@ -31,3 +34,5 @@ WORKDIR /home/testuser
 
 # Ensure ~/.local/bin is on PATH
 ENV PATH="/home/testuser/.local/bin:${PATH}"
+ENV DOTFILES_CI=true
+ENV DOTFILES_COLOR=always

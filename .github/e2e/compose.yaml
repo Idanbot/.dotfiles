@@ -1,0 +1,96 @@
+name: dotfiles-e2e
+
+x-e2e-base: &e2e-base
+  build:
+    context: ../..
+    dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
+  environment: &e2e-env
+    DOTFILES_CI: "true"
+    DOTFILES_COLOR: always
+    DOTFILES_GIT_NAME: E2E User
+    DOTFILES_GIT_EMAIL: e2e@example.invalid
+  volumes:
+    - ../..:/dotfiles:ro
+    - ../../artifacts:/artifacts
+
+services:
+  selectors:
+    <<: *e2e-base
+    profiles: [selectors]
+    command: [bash, -lc, "/dotfiles/tests/test-install-options.sh /dotfiles"]
+
+  base-native:
+    <<: *e2e-base
+    profiles: [base]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "false"
+      E2E_PROFILE: base
+      E2E_PASSES: "2"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  base-wsl-simulated:
+    <<: *e2e-base
+    profiles: [base]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "true"
+      E2E_PROFILE: base
+      E2E_PASSES: "2"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  developer:
+    <<: *e2e-base
+    profiles: [developer]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "false"
+      E2E_PROFILE: developer
+      E2E_PASSES: "1"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  agent:
+    <<: *e2e-base
+    profiles: [agent]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "true"
+      E2E_PROFILE: agent
+      E2E_PASSES: "1"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  cloud:
+    <<: *e2e-base
+    profiles: [cloud]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "true"
+      E2E_PROFILE: cloud
+      E2E_PASSES: "1"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  full:
+    <<: *e2e-base
+    profiles: [full]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "true"
+      E2E_PROFILE: full
+      E2E_PASSES: "2"
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
+  recovery:
+    <<: *e2e-base
+    profiles: [recovery]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "false"
+    command: [bash, -lc, "/dotfiles/tests/test-recovery.sh /dotfiles"]
+
+  failure-resume:
+    <<: *e2e-base
+    profiles: [recovery]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "false"
+    command: [bash, -lc, "/dotfiles/tests/test-failure-resume.sh /dotfiles"]

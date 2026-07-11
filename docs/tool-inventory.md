@@ -6,53 +6,59 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 ./scripts/generate-tool-inventory.sh
 ```
 
-| Section | Tool | Version | Source |
-|---------|------|---------|--------|
-| core | fzf | 0.73.0 | external |
-| core | fd | 10.4.2 | apt |
-| core | ripgrep | 15.1.0 | apt |
-| core | bat | 0.26.1 | apt |
-| core | eza | 0.23.4 | apt_repo |
-| core | lazygit | 0.61.1 | github |
-| core | btop | 1.4.7 | apt |
-| core | starship | 1.25.1 | install_script |
-| core | jq | latest | apt |
-| core | yq | latest | apt |
-| core | htop | latest | apt |
-| core | zoxide | 0.9.9 | apt |
-| core | direnv | 2.37.1 | apt |
-| core | git-delta | 0.19.2 | apt |
-| core | hyperfine | latest | apt |
-| core | duf | latest | apt |
-| core | sops | latest | github |
-| core | lazydocker | 0.25.2 | github |
-| core | tealdeer | 1.8.1 | github |
-| languages | go | 1.24.3 | direct |
-| languages | rust | stable | rustup |
-| languages | cargo | stable | rustup |
-| languages | node_lts | 24.15.0 | nvm |
-| languages | typescript | 5.9.3 | npm |
-| languages | python | 3.14.5 | uv |
-| languages | java | 21 | apt |
-| languages | uv | latest | install_script |
-| editor | neovim | latest | github |
-| cloud | docker | latest | apt_repo |
-| cloud | kubectl | 1.32.0 | direct |
-| cloud | helm | 4.2.0 | install_script |
-| cloud | terraform | 1.15.4 | direct |
-| cloud | ansible | latest | pip |
-| cloud | k9s | 0.50.18 | github |
-| cloud | aws_cli | 2 | direct |
-| cloud | gcloud | latest | apt_repo |
-| cloud | azure_cli | latest | apt_repo |
-| terminal | kitty | latest | apt |
-| terminal | tmux | latest | apt |
-| fonts | nerd_font | FiraMono | github |
-| fonts | nerd_font_version | 3.4.0 | github |
-| ai_tools | claude_cli | latest | npm |
-| ai_tools | codex_cli | latest | install_script |
-| ai_tools | antigravity_cli | latest | optional |
-| ai_tools | opencode | latest | go |
-| media | yt_dlp | latest | github |
-| media | rmpc | latest | github |
-| media | cava | latest | apt |
+| Section | Tool | Version | Source | Owner | Integrity |
+|---------|------|---------|--------|-------|-----------|
+| bootstrap | chezmoi | 2.71.0 | apt_or_github | bootstrap | upstream-checksum |
+| core | fzf | 0.74.0 | external | chezmoi-external | pinned-sha256 |
+| core | fd | 10.4.2 | apt | apt | apt-signature |
+| core | ripgrep | 15.1.0 | apt | apt | apt-signature |
+| core | bat | 0.26.1 | apt | apt | apt-signature |
+| core | eza | 0.23.4 | github | dotfiles-binary | pinned-sha256 |
+| core | lazygit | 0.63.0 | github | dotfiles-binary | upstream-checksum |
+| core | btop | 1.4.7 | apt | apt | apt-signature |
+| core | starship | 1.26.0 | github | dotfiles-binary | upstream-checksum |
+| core | jq | distro | apt | apt | apt-signature |
+| core | yq | distro | apt | apt | apt-signature |
+| core | htop | distro | apt | apt | apt-signature |
+| core | zoxide | distro | apt | apt | apt-signature |
+| core | direnv | distro | apt | apt | apt-signature |
+| core | git-delta | distro | apt | apt | apt-signature |
+| core | hyperfine | distro | apt | apt | apt-signature |
+| core | duf | distro | apt | apt | apt-signature |
+| core | sops | 3.13.2 | github | dotfiles-binary | upstream-checksum |
+| core | lazydocker | 0.25.2 | github | dotfiles-binary | upstream-checksum |
+| core | tealdeer | 1.8.1 | github | dotfiles-binary | upstream-checksum |
+| languages | go | 1.26.5 | direct | dotfiles-runtime | upstream-checksum |
+| languages | rust | stable | rustup | rustup | upstream-checksum |
+| languages | cargo | stable | rustup | rustup | rustup |
+| languages | node_lts | 24.18.0 | node-dist | dotfiles-runtime | upstream-checksum |
+| languages | typescript | 7.0.2 | npm | npm | npm-registry |
+| languages | python | 3.14.6 | uv | uv | uv-managed |
+| languages | java | 21 | apt | apt | apt-signature |
+| languages | uv | 0.11.28 | github | dotfiles-binary | upstream-checksum |
+| history | atuin | 18.17.0 | github | dotfiles-binary | upstream-checksum |
+| editor | neovim | 0.12.4 | github | dotfiles-runtime | pinned-sha256 |
+| cloud | docker | distro | apt_repo | apt | apt-signature |
+| cloud | kubectl | 1.36.2 | direct | dotfiles-binary | upstream-checksum |
+| cloud | helm | 4.2.3 | github | dotfiles-binary | upstream-checksum |
+| cloud | terraform | 1.15.8 | direct | dotfiles-binary | upstream-checksum |
+| cloud | ansible | distro | apt | apt | apt-signature |
+| cloud | k9s | 0.51.0 | github | dotfiles-binary | upstream-checksum |
+| cloud | aws_cli | 2.34.54 | direct | vendor-installer | pinned-sha256 |
+| cloud | gcloud | distro | apt_repo | apt | apt-signature |
+| cloud | azure_cli | distro | apt_repo | apt | apt-signature |
+| terminal | kitty | distro | apt | apt | apt-signature |
+| terminal | tmux | distro | apt | apt | apt-signature |
+| terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |
+| system | git_credential_manager | 2.8.0 | github | dpkg | pinned-sha256 |
+| fonts | nerd_font | FiraMono | github | dotfiles-assets | upstream-checksum |
+| fonts | nerd_font_version | 3.4.0 | github | dotfiles-assets | upstream-checksum |
+| ai_tools | claude_cli | 2.1.206 | npm | npm | npm-registry |
+| ai_tools | codex_cli | standalone | install_script | vendor-installer | pinned-sha256 |
+| ai_tools | gemini_cli | 0.50.0 | npm | npm | npm-registry |
+| ai_tools | antigravity_cli | manual | manual | user | manual |
+| ai_tools | opencode | 1.17.18 | npm | npm | npm-registry |
+| ai_tools | omp | 16.4.0 | github | dotfiles-binary | pinned-sha256 |
+| media | yt_dlp | 2026.07.04 | uv | uv | pypi |
+| media | rmpc | 0.11.0 | github | dotfiles-binary | pinned-sha256 |
+| media | cava | distro | apt | apt | apt-signature |

@@ -2,291 +2,416 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 9ed043e3db381a09dc8f2bd83fe3622e0439cd9e60e8b60019d9a389ec37f8fe
-  metadata: ff5b988da6148a370c44a5314c7ebd47eb431fd5566553de8b69b8c32f01e55a
+  packages: f6270e20d67aad8a83a3446d3a7686d05ffec0dd500a2d6ebc42ac9d3a5e97c2
+  metadata: 223a9ff522e9951de17c02fd7f3061e054fa579c8fe08e6fdd5e0a65c49f9a29
 
 tools:
+  - section: bootstrap
+    name: chezmoi
+    version: 2.71.0
+    source: apt_or_github
+    owner: bootstrap
+    repo: twpayne/chezmoi
+    integrity: upstream-checksum
   - section: core
     name: fzf
-    version: 0.73.0
+    version: 0.74.0
     source: external
+    owner: chezmoi-external
     repo: junegunn/fzf
-    checksum: null
+    integrity: pinned-sha256
   - section: core
     name: fd
     version: 10.4.2
     source: apt
+    owner: apt
     package: fd-find
     binary: fdfind
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: ripgrep
     version: 15.1.0
     source: apt
+    owner: apt
     package: ripgrep
     binary: rg
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: bat
     version: 0.26.1
     source: apt
+    owner: apt
     package: bat
     binary: batcat
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: eza
     version: 0.23.4
-    source: apt_repo
+    source: github
+    owner: dotfiles-binary
     repo: eza-community/eza
-    checksum: null
+    binary: eza
+    integrity: pinned-sha256
   - section: core
     name: lazygit
-    version: 0.61.1
+    version: 0.63.0
     source: github
+    owner: dotfiles-binary
     repo: jesseduffield/lazygit
     binary: lazygit
-    checksum: null
+    asset_template: "lazygit_{version}_linux_{arch}.tar.gz"
+    checksum_template: "https://github.com/jesseduffield/lazygit/releases/download/{tag}/checksums.txt"
+    integrity: upstream-checksum
   - section: core
     name: btop
     version: 1.4.7
     source: apt
+    owner: apt
     package: btop
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: starship
-    version: 1.25.1
-    source: install_script
-    checksum: null
+    version: 1.26.0
+    source: github
+    owner: dotfiles-binary
+    repo: starship/starship
+    binary: starship
+    integrity: upstream-checksum
   - section: core
     name: jq
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: jq
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: yq
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: yq
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: htop
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: htop
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: zoxide
-    version: 0.9.9
+    version: distro
     source: apt
+    owner: apt
     package: zoxide
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: direnv
-    version: 2.37.1
+    version: distro
     source: apt
+    owner: apt
     package: direnv
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: git-delta
-    version: 0.19.2
+    version: distro
     source: apt
+    owner: apt
     package: git-delta
     binary: delta
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: hyperfine
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: hyperfine
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: duf
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: duf
-    checksum: null
+    integrity: apt-signature
   - section: core
     name: sops
-    version: latest
+    version: 3.13.2
     source: github
+    owner: dotfiles-binary
     repo: getsops/sops
     binary: sops
-    checksum: null
+    integrity: upstream-checksum
   - section: core
     name: lazydocker
     version: 0.25.2
     source: github
+    owner: dotfiles-binary
     repo: jesseduffield/lazydocker
     binary: lazydocker
-    checksum: null
+    integrity: upstream-checksum
   - section: core
     name: tealdeer
     version: 1.8.1
     source: github
+    owner: dotfiles-binary
     repo: dbrgn/tealdeer
     binary: tldr
-    checksum: null
+    integrity: upstream-checksum
   - section: languages
     name: go
-    version: 1.24.3
+    version: 1.26.5
     source: direct
-    checksum: null
+    owner: dotfiles-runtime
+    checksum_template: "https://go.dev/dl/?mode=json&include=all"
+    integrity: upstream-checksum
   - section: languages
     name: rust
     version: stable
     source: rustup
-    checksum: null
+    owner: rustup
+    integrity: upstream-checksum
   - section: languages
     name: cargo
     version: stable
     source: rustup
-    checksum: null
+    owner: rustup
+    integrity: rustup
   - section: languages
     name: node_lts
-    version: 24.15.0
-    source: nvm
-    checksum: null
+    version: 24.18.0
+    source: node-dist
+    owner: dotfiles-runtime
+    integrity: upstream-checksum
   - section: languages
     name: typescript
-    version: 5.9.3
+    version: 7.0.2
     source: npm
+    owner: npm
     package: typescript
     binary: tsc
-    checksum: null
+    integrity: npm-registry
   - section: languages
     name: python
-    version: 3.14.5
+    version: 3.14.6
     source: uv
-    checksum: null
+    owner: uv
+    integrity: uv-managed
   - section: languages
     name: java
     version: 21
     source: apt
-    checksum: null
+    owner: apt
+    integrity: apt-signature
   - section: languages
     name: uv
-    version: latest
-    source: install_script
-    checksum: null
+    version: 0.11.28
+    source: github
+    owner: dotfiles-binary
+    repo: astral-sh/uv
+    binary: uv
+    integrity: upstream-checksum
+  - section: history
+    name: atuin
+    version: 18.17.0
+    source: github
+    owner: dotfiles-binary
+    repo: atuinsh/atuin
+    binary: atuin
+    integrity: upstream-checksum
   - section: editor
     name: neovim
-    version: latest
+    version: 0.12.4
     source: github
+    owner: dotfiles-runtime
     repo: neovim/neovim
     binary: nvim
-    checksum: null
+    sha256_amd64: 012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
+    sha256_arm64: ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
+    integrity: pinned-sha256
   - section: cloud
     name: docker
-    version: latest
+    version: distro
     source: apt_repo
-    checksum: null
+    owner: apt
+    integrity: apt-signature
   - section: cloud
     name: kubectl
-    version: 1.32.0
+    version: 1.36.2
     source: direct
-    checksum: null
+    owner: dotfiles-binary
+    binary: kubectl
+    integrity: upstream-checksum
   - section: cloud
     name: helm
-    version: 4.2.0
-    source: install_script
-    checksum: null
+    version: 4.2.3
+    source: github
+    owner: dotfiles-binary
+    repo: helm/helm
+    binary: helm
+    integrity: upstream-checksum
   - section: cloud
     name: terraform
-    version: 1.15.4
+    version: 1.15.8
     source: direct
-    checksum: null
+    owner: dotfiles-binary
+    binary: terraform
+    integrity: upstream-checksum
   - section: cloud
     name: ansible
-    version: latest
-    source: pip
-    checksum: null
+    version: distro
+    source: apt
+    owner: apt
+    package: ansible
+    integrity: apt-signature
   - section: cloud
     name: k9s
-    version: 0.50.18
+    version: 0.51.0
     source: github
+    owner: dotfiles-binary
     repo: derailed/k9s
     binary: k9s
-    checksum: null
+    integrity: upstream-checksum
   - section: cloud
     name: aws_cli
-    version: 2
+    version: 2.34.54
     source: direct
-    checksum: null
+    owner: vendor-installer
+    binary: aws
+    sha256_amd64: de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a
+    sha256_arm64: f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60
+    integrity: pinned-sha256
   - section: cloud
     name: gcloud
-    version: latest
+    version: distro
     source: apt_repo
-    checksum: null
+    owner: apt
+    integrity: apt-signature
   - section: cloud
     name: azure_cli
-    version: latest
+    version: distro
     source: apt_repo
-    checksum: null
+    owner: apt
+    integrity: apt-signature
   - section: terminal
     name: kitty
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: kitty
-    checksum: null
+    integrity: apt-signature
   - section: terminal
     name: tmux
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: tmux
-    checksum: null
+    integrity: apt-signature
+  - section: terminal
+    name: tmuxp
+    version: 1.74.0
+    source: uvx
+    owner: ephemeral
+    package: tmuxp
+    binary: tmuxp
+    integrity: pypi
+  - section: system
+    name: git_credential_manager
+    version: 2.8.0
+    source: github
+    owner: dpkg
+    repo: git-ecosystem/git-credential-manager
+    binary: git-credential-manager
+    sha256_amd64: c7bbf9785c3e8166ceedb66a7e0bfb40e6655ef504af5ca7977b516c5497aff6
+    sha256_arm64: e5bbc12c31e97a7409585ef60aa5d53138c7661d9a3abc9227d9b0f68959e836
+    integrity: pinned-sha256
   - section: fonts
     name: nerd_font
     version: FiraMono
     source: github
+    owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
-    checksum: null
+    integrity: upstream-checksum
   - section: fonts
     name: nerd_font_version
     version: 3.4.0
     source: github
+    owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
-    checksum: null
+    integrity: upstream-checksum
   - section: ai_tools
     name: claude_cli
-    version: latest
+    version: 2.1.206
     source: npm
-    package: "@anthropic-ai/claude-cli"
+    owner: npm
+    package: "@anthropic-ai/claude-code"
     binary: claude
-    checksum: null
+    integrity: npm-registry
   - section: ai_tools
     name: codex_cli
-    version: latest
+    version: standalone
     source: install_script
+    owner: vendor-installer
     binary: codex
-    checksum: null
+    url: "https://chatgpt.com/codex/install.sh"
+    sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+    integrity: pinned-sha256
+  - section: ai_tools
+    name: gemini_cli
+    version: 0.50.0
+    source: npm
+    owner: npm
+    package: "@google/gemini-cli"
+    binary: gemini
+    integrity: npm-registry
   - section: ai_tools
     name: antigravity_cli
-    version: latest
-    source: optional
-    checksum: null
+    version: manual
+    source: manual
+    owner: user
+    binary: antigravity
+    integrity: manual
   - section: ai_tools
     name: opencode
-    version: latest
-    source: go
-    checksum: null
+    version: 1.17.18
+    source: npm
+    owner: npm
+    package: opencode-ai
+    binary: opencode
+    integrity: npm-registry
+  - section: ai_tools
+    name: omp
+    version: 16.4.0
+    source: github
+    owner: dotfiles-binary
+    repo: can1357/oh-my-pi
+    binary: omp
+    asset_template: "omp-linux-{release_arch}"
+    sha256_amd64: c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
+    sha256_arm64: 6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
+    integrity: pinned-sha256
   - section: media
     name: yt_dlp
-    version: latest
-    source: github
-    repo: yt-dlp/yt-dlp
+    version: 2026.07.04
+    source: uv
+    owner: uv
+    package: yt-dlp
     binary: yt-dlp
-    checksum: null
+    integrity: pypi
   - section: media
     name: rmpc
-    version: latest
+    version: 0.11.0
     source: github
+    owner: dotfiles-binary
     repo: mierak/rmpc
     binary: rmpc
-    checksum: null
+    sha256_amd64: b03d4b777cf0afe61107abb4ee847b7c6539b8f5c76555fd759cd15a6c1ff604
+    sha256_arm64: 12d9bb3bcabfe90c0573afac9b11e20333262872966a8769967611b578ff7328
+    integrity: pinned-sha256
   - section: media
     name: cava
-    version: latest
+    version: distro
     source: apt
+    owner: apt
     package: cava
-    checksum: null
+    integrity: apt-signature

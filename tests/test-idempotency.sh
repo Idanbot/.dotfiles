@@ -1,37 +1,25 @@
 #!/usr/bin/env bash
-# test-idempotency.sh — Verifies bootstrap can be run twice without errors
+# Fast helper idempotency checks. CI's base/full E2E runs install.sh twice.
+
 set -euo pipefail
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BOLD='\033[1m'
-NC='\033[0m'
+DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+TMP_HOME="$(mktemp -d)"
+trap 'rm -rf "$TMP_HOME"' EXIT
+export HOME="$TMP_HOME"
+export DOTFILES_STATE_DIR="$HOME/state"
+export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_DIR/scripts/lib.sh"
 
-echo -e "\n${BOLD}══ Idempotency Test ══${NC}\n"
+mkdir -p "$HOME/.local/bin"
+printf 'demo\n' >"$HOME/.local/bin/demo"
+record_install demo 1.0 test "$HOME/.local/bin/demo"
+record_install demo 1.0 test "$HOME/.local/bin/demo"
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -eq 1 ]]
 
-# Copy dotfiles
-cp -r /dotfiles "$HOME/.dotfiles" 2>/dev/null || true
-chmod +x "$HOME/.dotfiles/scripts/lib.sh"
-find "$HOME/.dotfiles" -name '*.sh' -exec chmod +x {} \;
+first="$(section_manifest_hash languages)"
+second="$(section_manifest_hash languages)"
+[[ "$first" == "$second" ]]
 
-source "$HOME/.dotfiles/scripts/lib.sh"
-
-# Run core package install twice
-echo -e "${BOLD}── First run ──${NC}"
-sudo apt-get update -qq
-apt_install git curl wget jq yq fzf fd-find ripgrep bat btop zoxide direnv git-delta hyperfine duf
-echo -e "\n${BOLD}── Second run (should all skip) ──${NC}"
-skipped_before_second_run=$_SKIPPED
-apt_install git curl wget jq yq fzf fd-find ripgrep bat btop zoxide direnv git-delta hyperfine duf
-second_run_skipped=$((_SKIPPED - skipped_before_second_run))
-
-# Verify skip messages
-echo -e "\n${BOLD}── Idempotency Check ──${NC}"
-if [[ $second_run_skipped -eq 15 ]]; then
-  echo -e "  ${GREEN}✓${NC} All packages correctly skipped on second run ($second_run_skipped skipped)"
-else
-  echo -e "  ${RED}✗${NC} Expected 15 second-run skips, got $second_run_skipped"
-  exit 1
-fi
-
-echo -e "\n${GREEN}${BOLD}IDEMPOTENCY TEST PASSED${NC}"
+printf 'Helper idempotency test passed; installer idempotency is Docker E2E\n'

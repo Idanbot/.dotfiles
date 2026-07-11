@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Personal dotfiles lifecycle command.
+
+set -euo pipefail
+
+SOURCE="$(chezmoi source-path 2>/dev/null || true)"
+[[ -n "$SOURCE" ]] || SOURCE="$HOME/.local/share/chezmoi"
+STATE_ROOT="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
+
+usage() {
+  cat <<'USAGE'
+Usage: dot <command> [args]
+
+  status              Git, chezmoi, last-run, and managed-install status
+  diff                Preview destination changes
+  sync [install args] Pull fast-forward updates and run the reliable installer
+  doctor [args]       Run the post-install acceptance checks
+  workspace [args]    Open the current project agent workspace
+  profile [name]      Show or set the local machine profile (mode 0600)
+  logs [run-id]       Show recent runs or tail one run log
+  backup              List configuration backups
+  restore <id>        Restore a configuration backup
+  reconcile           Apply changed package-manifest sections
+  uninstall <tool>    Remove a tool using the ownership ledger
+USAGE
+}
+
+case "${1:-}" in
+  status)
+    printf 'Source: %s\n' "$SOURCE"
+    git -C "$SOURCE" status --short --branch
+    printf '\nChezmoi:\n'
+    chezmoi status || true
+    printf '\nManaged installs: '
+    if [[ -f "$STATE_ROOT/installed.tsv" ]]; then
+      printf '%s entries\n' "$(wc -l <"$STATE_ROOT/installed.tsv")"
+    else
+      printf 'none\n'
+    fi
+    printf 'Recent runs:\n'
+    find "$STATE_ROOT/runs" -mindepth 2 -maxdepth 2 -name summary.json -printf '%h\n' 2>/dev/null |
+      sort -r | head -5 | xargs -r -n1 basename
+    ;;
+  diff) exec chezmoi diff ;;
+  sync)
+    shift
+    if [[ -n "$(git -C "$SOURCE" status --porcelain)" ]]; then
+      printf 'Source has local changes; commit or stash them before sync\n' >&2
+      exit 1
+    fi
+    git -C "$SOURCE" pull --ff-only
+    exec "$SOURCE/scripts/install.sh" --source "$SOURCE" --yes "$@"
+    ;;
+  doctor)
+    shift
+    exec "$SOURCE/scripts/doctor.sh" "$@"
+    ;;
+  workspace)
+    shift
+    exec dot-workspace "$@"
+    ;;
+  profile)
+    config="$HOME/.config/dotfiles/machine.conf"
+    if [[ -z "${2:-}" ]]; then
+      [[ -f "$config" ]] && cat "$config" || printf 'profile=full\n'
+      exit 0
+    fi
+    case "$2" in minimal | base | developer | agent | cloud | full) ;; *)
+      printf 'Unknown profile: %s\n' "$2" >&2
+      exit 2
+      ;;
+    esac
+    umask 077
+    mkdir -p "$(dirname "$config")"
+    printf 'profile=%s\n' "$2" >"$config"
+    chmod 600 "$config"
+    printf 'Machine profile set to %s\n' "$2"
+    ;;
+  logs)
+    if [[ -n "${2:-}" ]]; then
+      exec tail -n 200 -f "$STATE_ROOT/logs/bootstrap-$2.log"
+    fi
+    find "$STATE_ROOT/logs" -maxdepth 1 -type f -name '*.log' -printf '%TY-%Tm-%Td %TH:%TM %f\n' 2>/dev/null |
+      sort -r | head -20
+    ;;
+  backup) exec "$SOURCE/scripts/backup.sh" list ;;
+  restore)
+    [[ -n "${2:-}" ]] || {
+      printf 'restore requires a backup id\n' >&2
+      exit 2
+    }
+    exec "$SOURCE/scripts/backup.sh" restore "$2"
+    ;;
+  reconcile)
+    shift
+    exec "$SOURCE/scripts/reconcile-packages.sh" "$@"
+    ;;
+  uninstall)
+    [[ -n "${2:-}" ]] || {
+      printf 'uninstall requires a tool name\n' >&2
+      exit 2
+    }
+    exec "$SOURCE/scripts/uninstall-tool.sh" "$2"
+    ;;
+  -h | --help | '') usage ;;
+  *)
+    printf 'Unknown command: %s\n' "$1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

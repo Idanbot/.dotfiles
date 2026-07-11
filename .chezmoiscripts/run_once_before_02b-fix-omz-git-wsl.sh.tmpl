@@ -19,17 +19,20 @@
 {{ if not .is_wsl }}exit 0{{ end }}
 
 OMZ="$HOME/.oh-my-zsh"
+backup="$HOME/.local/state/dotfiles/legacy/omz-state-$(date +%Y%m%d%H%M%S)"
 
 if [[ -d "$OMZ/.git" ]]; then
-  echo "[omz-wsl-fix] Removing stale .git dir from $OMZ"
-  rm -rf "$OMZ/.git"
+  mkdir -p "$backup"
+  echo "[omz-wsl-fix] Preserving stale .git dir at $backup/git"
+  mv "$OMZ/.git" "$backup/git"
 fi
 
 # Clean up any leftover merge / lock state files
 for f in MERGE_HEAD MERGE_MSG MERGE_MODE CHERRY_PICK_HEAD index.lock; do
   if [[ -f "$OMZ/$f" ]]; then
-    rm -f "$OMZ/$f"
-    echo "[omz-wsl-fix] Removed $OMZ/$f"
+    mkdir -p "$backup"
+    mv "$OMZ/$f" "$backup/$f"
+    echo "[omz-wsl-fix] Preserved $OMZ/$f"
   fi
 done
 

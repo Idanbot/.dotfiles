@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+if [[ -z "${DOTFILES_SOURCE_DIR:-}" ]]; then
+  DOTFILES_SOURCE_DIR="${CHEZMOI_SOURCE_DIR:-$HOME/.local/share/chezmoi}"
+fi
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
+
+log_step "Installing Optional History Tooling"
+
+ATUIN_VERSION="$(package_version history atuin 18.17.0)"
+case "$(get_arch)" in
+  amd64) ATUIN_TARGET=x86_64-unknown-linux-gnu ;;
+  arm64) ATUIN_TARGET=aarch64-unknown-linux-gnu ;;
+  *) log_error "Unsupported Atuin architecture: $(get_arch)"; exit 1 ;;
+esac
+ASSET="atuin-${ATUIN_TARGET}.tar.gz"
+install_github_archive \
+  atuin atuinsh/atuin "v${ATUIN_VERSION#v}" "$ASSET" \
+  "atuin-${ATUIN_TARGET}/atuin" \
+  "https://github.com/atuinsh/atuin/releases/download/{tag}/${ASSET}.sha256" \
+  'atuin --version'
+
+log_info "Atuin is installed but inactive by default to preserve existing shell history behavior"
+log_info "Enable it locally with: printf '%s\\n' 'export DOTFILES_ENABLE_ATUIN=1' >> ~/.config/dotfiles/local.zsh"
+log_info "Authentication and history import remain manual"
+
+print_summary "Optional History Tooling"

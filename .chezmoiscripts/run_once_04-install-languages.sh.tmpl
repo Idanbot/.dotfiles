@@ -6,116 +6,128 @@ fi
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Languages & Runtimes"
-
 require_sudo
-ARCH=$(get_arch)
+ARCH="$(get_arch)"
 
-# ── Go ────────────────────────────────────────────────────────────────────────
-GO_VERSION="$(package_version languages go 1.24.3)"
-if [[ -d /usr/local/go/bin ]]; then
-  export PATH="/usr/local/go/bin:$PATH"
-fi
+GO_VERSION="$(package_version languages go 1.26.5)"
 if ! is_installed go || ! version_ge "$(go version 2>/dev/null || true)" "$GO_VERSION"; then
-  log_info "Installing Go ${GO_VERSION}..."
-  curl -fsSLo /tmp/go.tar.gz "https://dl.google.com/go/go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  tmpdir="$(mktemp -d)"
+  asset="go${GO_VERSION}.linux-${ARCH}.tar.gz"
+  go_sha256="$(go_release_checksum "$asset")"
+  log_info "Installing Go $GO_VERSION"
+  download_verified \
+    "https://go.dev/dl/$asset" "$tmpdir/$asset" \
+    "sha256:$go_sha256" "$asset"
   sudo rm -rf /usr/local/go
-  sudo tar -C /usr/local -xzf /tmp/go.tar.gz
-  rm -f /tmp/go.tar.gz
-  export PATH="/usr/local/go/bin:$PATH"
-  log_success "Go $(extract_version "$(/usr/local/go/bin/go version)") installed"
+  sudo tar -C /usr/local -xzf "$tmpdir/$asset"
+  rm -rf "$tmpdir"
+  record_install go "$GO_VERSION" go-dist /usr/local/go
+  ((_INSTALLED++)) || true
+  log_success "Go $GO_VERSION installed"
 else
-  log_skip "Go ${GO_VERSION} already installed or newer"
+  log_skip "Go $GO_VERSION already installed or newer"
 fi
+export PATH="/usr/local/go/bin:$PATH"
 
-# ── Rust + Cargo ──────────────────────────────────────────────────────────────
-RUST_VERSION="$(package_version languages rust stable)"
-CARGO_VERSION="$(package_version languages cargo stable)"
-if ! is_installed rustc || ! is_installed cargo; then
-  log_info "Installing Rust/Cargo toolchain ${RUST_VERSION}..."
-  curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
-  source "$HOME/.cargo/env"
-  log_success "Rust $(rustc --version | awk '{print $2}') installed"
+RUST_CHANNEL="$(package_version languages rust stable)"
+if ! is_installed rustup; then
+  case "$ARCH" in
+    amd64) RUST_TARGET=x86_64-unknown-linux-gnu ;;
+    arm64) RUST_TARGET=aarch64-unknown-linux-gnu ;;
+    *) log_error "Unsupported rustup architecture: $ARCH"; exit 1 ;;
+  esac
+  tmpdir="$(mktemp -d)"
+  rustup_url="https://static.rust-lang.org/rustup/dist/${RUST_TARGET}/rustup-init"
+  log_info "Installing Rust toolchain $RUST_CHANNEL"
+  download_verified "$rustup_url" "$tmpdir/rustup-init" "$rustup_url.sha256" rustup-init
+  chmod +x "$tmpdir/rustup-init"
+  "$tmpdir/rustup-init" -y --default-toolchain "$RUST_CHANNEL" --profile minimal
+  rm -rf "$tmpdir"
+  record_install rustup "$RUST_CHANNEL" rustup "$HOME/.cargo"
+  ((_INSTALLED++)) || true
+  log_success "Rust installed"
 else
-  [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
-  if is_installed rustup && [[ "$RUST_VERSION" != "stable" ]]; then
-    rustup toolchain install "$RUST_VERSION"
-    rustup default "$RUST_VERSION"
-  fi
-  log_skip "Rust/Cargo ${CARGO_VERSION} already installed"
+  log_skip "Rustup already installed"
 fi
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+rustup toolchain install "$RUST_CHANNEL" --profile minimal
+rustup default "$RUST_CHANNEL"
 
-
-# ── Node.js via nvm ──────────────────────────────────────────────────────────
-NODE_VERSION="$(package_version languages node_lts 24.15.0)"
-TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"
-export NVM_DIR="$HOME/.nvm"
-if [[ ! -d "$NVM_DIR" ]]; then
-  log_info "Installing nvm..."
-  curl -fsSLo- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-  log_success "nvm installed"
-fi
-if ! load_nvm; then
-  log_error "nvm was installed but $NVM_DIR/nvm.sh is not available"
-  exit 1
-fi
-
-if ! nvm ls "$NODE_VERSION" &>/dev/null; then
-  log_info "Installing Node.js ${NODE_VERSION}..."
-  nvm install "$NODE_VERSION"
-  nvm alias default "$NODE_VERSION"
-  nvm use --silent "$NODE_VERSION" >/dev/null
-  log_success "Node.js $(node --version) installed"
+NODE_VERSION="$(package_version languages node_lts 24.18.0)"
+case "$ARCH" in
+  amd64) NODE_ARCH=x64 ;;
+  arm64) NODE_ARCH=arm64 ;;
+  *) log_error "Unsupported Node.js architecture: $ARCH"; exit 1 ;;
+esac
+NODE_ROOT="$HOME/.local/share/dotfiles/tools/node/$NODE_VERSION"
+NODE_ASSET="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
+if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$($NODE_ROOT/bin/node --version 2>/dev/null || true)" "$NODE_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  log_info "Installing Node.js $NODE_VERSION into a stable user-local runtime"
+  download_verified \
+    "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_ASSET}" "$tmpdir/$NODE_ASSET" \
+    "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" "$NODE_ASSET"
+  rm -rf "$NODE_ROOT"
+  mkdir -p "$NODE_ROOT"
+  tar -xJf "$tmpdir/$NODE_ASSET" -C "$NODE_ROOT" --strip-components=1
+  rm -rf "$tmpdir"
+  record_install node "$NODE_VERSION" node-dist "$NODE_ROOT"
+  ((_INSTALLED++)) || true
+  log_success "Node.js $NODE_VERSION installed"
 else
-  nvm use --silent "$NODE_VERSION" >/dev/null
-  log_skip "Node.js ${NODE_VERSION} already installed"
+  log_skip "Node.js $NODE_VERSION runtime already installed"
 fi
-
+for binary in node npm npx corepack; do
+  [[ -x "$NODE_ROOT/bin/$binary" ]] && managed_link "$NODE_ROOT/bin/$binary" "$HOME/.local/bin/$binary" node "$NODE_VERSION"
+done
+activate_node_paths
 if ! is_installed node || ! is_installed npm; then
-  log_error "Node.js/npm are not available after nvm activation"
+  log_error "Node.js/npm shims are unavailable after installation"
   exit 1
 fi
 
-if ! is_installed tsc || ! version_ge "$(tsc --version 2>/dev/null || true)" "$TYPESCRIPT_VERSION"; then
-  log_info "Installing TypeScript ${TYPESCRIPT_VERSION}..."
-  npm install -g "typescript@${TYPESCRIPT_VERSION}"
-  log_success "TypeScript $(tsc --version | awk '{print $2}') installed"
+TYPESCRIPT_VERSION="$(package_version languages typescript 7.0.2)"
+npm_install_global typescript "$TYPESCRIPT_VERSION" tsc
+
+UV_VERSION="$(package_version languages uv 0.11.28)"
+if ! is_installed uv || ! version_ge "$(uv --version 2>/dev/null || true)" "$UV_VERSION"; then
+  case "$ARCH" in
+    amd64) UV_TARGET=x86_64-unknown-linux-gnu ;;
+    arm64) UV_TARGET=aarch64-unknown-linux-gnu ;;
+  esac
+  tmpdir="$(mktemp -d)"
+  asset="uv-${UV_TARGET}.tar.gz"
+  log_info "Installing uv $UV_VERSION"
+  download_verified \
+    "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/$asset" "$tmpdir/$asset" \
+    "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/$asset.sha256" "$asset"
+  tar -xzf "$tmpdir/$asset" -C "$tmpdir"
+  install_managed_binary "$tmpdir/uv-${UV_TARGET}/uv" uv "$UV_VERSION" github:astral-sh/uv
+  install_managed_binary "$tmpdir/uv-${UV_TARGET}/uvx" uvx "$UV_VERSION" github:astral-sh/uv
+  rm -rf "$tmpdir"
+  ((_INSTALLED++)) || true
+  log_success "uv $UV_VERSION installed"
 else
-  log_skip "TypeScript ${TYPESCRIPT_VERSION} already installed or newer"
+  log_skip "uv $UV_VERSION already installed or newer"
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
+PYTHON_VERSION="$(package_version languages python 3.14.6)"
+if uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
+  log_skip "Python $PYTHON_VERSION already installed"
+else
+  log_info "Installing Python $PYTHON_VERSION with uv"
+  uv python install "$PYTHON_VERSION"
+  record_install python "$PYTHON_VERSION" uv "$(uv python find "$PYTHON_VERSION")"
+  ((_INSTALLED++)) || true
+  log_success "Python $PYTHON_VERSION installed"
 fi
 
-# ── Python (uv) ──────────────────────────────────────────────────────────────
-PYTHON_VERSION="$(package_version languages python 3.14.5)"
-if ! is_installed uv; then
-  log_info "Installing uv (Python package manager)..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
-  log_success "uv installed"
-else
-  log_skip "uv already installed"
-fi
-
-PYTHON_MINOR="${PYTHON_VERSION%.*}"
-if ! uv python find "$PYTHON_VERSION" &>/dev/null; then
-  log_info "Installing Python ${PYTHON_VERSION} with uv..."
-  if uv python install "$PYTHON_VERSION"; then
-    log_success "Python $(uv python find "$PYTHON_VERSION") installed"
-  else
-    log_warn "Python ${PYTHON_VERSION} is not available from uv yet; installing latest ${PYTHON_MINOR}.x"
-    uv python install "$PYTHON_MINOR"
-    log_success "Python $(uv python find "$PYTHON_MINOR") installed"
-  fi
-else
-  log_skip "Python ${PYTHON_VERSION} already installed"
-fi
-
-# ── Java ──────────────────────────────────────────────────────────────────────
 JAVA_VERSION="$(package_version languages java 21)"
 if ! is_installed java || ! version_major_matches "$(java -version 2>&1 | head -1 || true)" "$JAVA_VERSION"; then
-  log_info "Installing OpenJDK ${JAVA_VERSION}..."
-  sudo apt-get install -y "openjdk-${JAVA_VERSION}-jdk-headless"
-  log_success "Java $(java -version 2>&1 | head -1 | awk -F '"' '{print $2}') installed"
+  apt_install "openjdk-${JAVA_VERSION}-jdk-headless"
 else
-  log_skip "OpenJDK ${JAVA_VERSION} already installed"
+  log_skip "OpenJDK $JAVA_VERSION already installed"
 fi
 
 print_summary "Languages & Runtimes"

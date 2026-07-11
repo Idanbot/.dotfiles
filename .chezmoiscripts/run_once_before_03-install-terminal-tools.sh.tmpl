@@ -6,112 +6,85 @@ fi
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Terminal Tools"
-
 require_sudo
-ARCH=$(get_arch)
+ARCH="$(get_arch)"
 
-# ── fzf ───────────────────────────────────────────────────────────────────────
-# fzf is handled by .chezmoiexternal.yaml (cloned to ~/.fzf)
-# Run the install script if not already done
-if [[ -d "$HOME/.fzf" ]] && ! is_installed fzf; then
-  log_info "Installing fzf from ~/.fzf..."
-  "$HOME/.fzf/install" --all --no-update-rc --no-bash --no-fish
-  log_success "fzf installed"
-elif is_installed fzf; then
-  log_skip "fzf already installed"
-else
-  log_warn "fzf source not found at ~/.fzf — will be set up by chezmoi externals"
-fi
-
-# ── fd-find ───────────────────────────────────────────────────────────────────
-apt_install fd-find
-if is_installed fdfind && ! is_installed fd; then
-  mkdir -p "$HOME/.local/bin"
-  ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"
-  log_success "Created fd -> fdfind symlink"
-fi
-
-# ── ripgrep ───────────────────────────────────────────────────────────────────
-apt_install ripgrep
-
-# ── bat ───────────────────────────────────────────────────────────────────────
-if ! is_installed bat && ! is_installed batcat; then
-  apt_install bat
-  # Create bat symlink if only batcat exists
-  if is_installed batcat && ! is_installed bat; then
-    mkdir -p "$HOME/.local/bin"
-    ln -sf "$(command -v batcat)" "$HOME/.local/bin/bat"
-    log_success "Created bat -> batcat symlink"
+# fzf source is a checksum-pinned chezmoi external.
+if [[ -x "$HOME/.fzf/install" ]]; then
+  if ! is_installed fzf; then
+    "$HOME/.fzf/install" --all --no-update-rc --no-bash --no-fish
+    record_install fzf "$(package_version core fzf 0.74.0)" chezmoi-external "$HOME/.fzf"
+    log_success "fzf installed"
+  else
+    log_skip "fzf already installed"
   fi
 else
-  log_skip "bat already installed"
+  log_error "Checksum-pinned fzf external is missing"
 fi
 
-# ── eza ───────────────────────────────────────────────────────────────────────
-if ! is_installed eza; then
-  log_info "Installing eza..."
-  sudo mkdir -p /etc/apt/keyrings
-  wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-  echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list > /dev/null
-  sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
-  sudo apt-get update -qq
-  sudo apt-get install -y eza
-  log_success "eza installed"
-else
-  log_skip "eza already installed"
+apt_install fd-find ripgrep bat btop htop jq
+if is_installed fdfind; then
+  managed_link "$(command -v fdfind)" "$HOME/.local/bin/fd" fd distro
+fi
+if is_installed batcat; then
+  managed_link "$(command -v batcat)" "$HOME/.local/bin/bat" bat distro
 fi
 
-# ── lazygit ───────────────────────────────────────────────────────────────────
-LAZYGIT_VERSION=$(package_version core lazygit latest)
-if [[ "$ARCH" == "amd64" ]]; then
-  LG_ARCH="x86_64"
-else
-  LG_ARCH="$ARCH"
-fi
-install_github_archive lazygit jesseduffield/lazygit "v${LAZYGIT_VERSION#v}" "lazygit_{version}_Linux_${LG_ARCH}.tar.gz" lazygit
+case "$ARCH" in
+  amd64)
+    RELEASE_ARCH=x86_64
+    EZA_SHA=0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
+    ;;
+  arm64)
+    RELEASE_ARCH=aarch64
+    EZA_SHA=366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
+    ;;
+  *)
+    log_error "Unsupported release architecture: $ARCH"
+    exit 1
+    ;;
+esac
 
-# ── btop ──────────────────────────────────────────────────────────────────────
-apt_install btop
+EZA_VERSION="$(package_version core eza 0.23.4)"
+install_github_archive \
+  eza eza-community/eza "v${EZA_VERSION#v}" \
+  "eza_${RELEASE_ARCH}-unknown-linux-gnu.tar.gz" ./eza \
+  "sha256:$EZA_SHA" \
+  'eza --version'
 
-# ── htop ──────────────────────────────────────────────────────────────────────
-apt_install htop
+LAZYGIT_VERSION="$(package_version core lazygit 0.63.0)"
+install_github_archive \
+  lazygit jesseduffield/lazygit "v${LAZYGIT_VERSION#v}" \
+  "lazygit_{version}_linux_${RELEASE_ARCH}.tar.gz" lazygit \
+  "https://github.com/jesseduffield/lazygit/releases/download/{tag}/checksums.txt" \
+  'lazygit --version'
 
-# ── starship ──────────────────────────────────────────────────────────────────
-if ! is_installed starship; then
-  log_info "Installing starship..."
-  curl -fsSL https://starship.rs/install.sh | sh -s -- -y
-  log_success "starship installed"
-else
-  log_skip "starship already installed"
-fi
+STARSHIP_VERSION="$(package_version core starship 1.26.0)"
+install_github_archive \
+  starship starship/starship "v${STARSHIP_VERSION#v}" \
+  "starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz" starship \
+  "https://github.com/starship/starship/releases/download/{tag}/starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz.sha256" \
+  'starship --version'
 
+SOPS_VERSION="$(package_version core sops 3.13.2)"
+install_github_binary \
+  sops getsops/sops "v${SOPS_VERSION#v}" "sops-{tag}.linux.${ARCH}" sops \
+  "https://github.com/getsops/sops/releases/download/{tag}/sops-{tag}.checksums.txt" \
+  'sops --version'
 
-# ── sops ──────────────────────────────────────────────────────────────────────
-SOPS_VERSION=$(package_version core sops latest)
-install_github_binary sops getsops/sops "$SOPS_VERSION" "sops-{tag}.linux.${ARCH}" sops
+LAZYDOCKER_VERSION="$(package_version core lazydocker 0.25.2)"
+install_github_archive \
+  lazydocker jesseduffield/lazydocker "v${LAZYDOCKER_VERSION#v}" \
+  "lazydocker_{version}_Linux_${RELEASE_ARCH}.tar.gz" lazydocker \
+  "https://github.com/jesseduffield/lazydocker/releases/download/{tag}/checksums.txt" \
+  'lazydocker --version'
 
-# ── lazydocker ────────────────────────────────────────────────────────────────
-LAZYDOCKER_VERSION=$(package_version core lazydocker "0.25.2")
-if [[ "$ARCH" == "amd64" ]]; then
-  LD_ARCH="x86_64"
-else
-  LD_ARCH="$ARCH"
-fi
-install_github_archive lazydocker jesseduffield/lazydocker "v${LAZYDOCKER_VERSION#v}" "lazydocker_{version}_Linux_${LD_ARCH}.tar.gz" lazydocker
-
-# ── tealdeer ──────────────────────────────────────────────────────────────────
-TEALDEER_VERSION=$(package_version core tealdeer "1.6.1")
-if [[ "$ARCH" == "amd64" ]]; then
-  TD_ARCH="x86_64"
-elif [[ "$ARCH" == "arm64" ]]; then
-  TD_ARCH="aarch64"
-else
-  TD_ARCH="$ARCH"
-fi
-install_github_binary tldr dbrgn/tealdeer "v${TEALDEER_VERSION#v}" "tealdeer-linux-${TD_ARCH}-musl" tldr
-tldr --update || true
-
-# ── jq (usually from core but just in case) ───────────────────────────────────
-apt_install jq
+TEALDEER_VERSION="$(package_version core tealdeer 1.8.1)"
+install_github_binary \
+  tldr dbrgn/tealdeer "v${TEALDEER_VERSION#v}" \
+  "tealdeer-linux-${RELEASE_ARCH}-musl" tldr \
+  "https://github.com/dbrgn/tealdeer/releases/download/{tag}/tealdeer-linux-${RELEASE_ARCH}-musl.sha256" \
+  'tldr --version'
+tldr --update || log_warn "tealdeer cache update is temporarily unavailable"
 
 print_summary "Terminal Tools"

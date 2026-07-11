@@ -7,40 +7,41 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Neovim"
 
-require_sudo
-ARCH=$(get_arch)
+NVIM_VERSION="$(package_version editor neovim 0.12.4)"
+case "$(get_arch)" in
+  amd64)
+    NVIM_ARCH=x86_64
+    NVIM_SHA=012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
+    ;;
+  arm64)
+    NVIM_ARCH=arm64
+    NVIM_SHA=ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
+    ;;
+  *) log_error "Unsupported Neovim architecture: $(get_arch)"; exit 1 ;;
+esac
 
-NVIM_REQUESTED="$(package_version editor neovim latest)"
-if [[ "$NVIM_REQUESTED" == "latest" ]]; then
-  NVIM_VERSION="$(resolve_tool_version neovim/neovim latest)"
-elif [[ "$NVIM_REQUESTED" == v* ]]; then
-  NVIM_VERSION="$NVIM_REQUESTED"
+NVIM_ROOT="$HOME/.local/share/dotfiles/tools/neovim/$NVIM_VERSION"
+if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --version 2>/dev/null | head -1 || true)" "$NVIM_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  asset="nvim-linux-${NVIM_ARCH}.tar.gz"
+  log_info "Installing verified Neovim $NVIM_VERSION"
+  download_verified \
+    "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/$asset" \
+    "$tmpdir/$asset" "sha256:$NVIM_SHA" "$asset"
+  rm -rf "$NVIM_ROOT"
+  mkdir -p "$NVIM_ROOT"
+  tar -xzf "$tmpdir/$asset" -C "$NVIM_ROOT" --strip-components=1
+  rm -rf "$tmpdir"
+  record_install nvim "$NVIM_VERSION" github:neovim/neovim "$NVIM_ROOT"
+  ((_INSTALLED++)) || true
+  log_success "Neovim $NVIM_VERSION installed"
 else
-  NVIM_VERSION="v$NVIM_REQUESTED"
+  log_skip "Neovim $NVIM_VERSION already installed"
 fi
-NVIM_TARGET="${NVIM_VERSION#v}"
-NVIM_CURRENT=""
-if is_installed nvim; then
-  NVIM_CURRENT="$(nvim --version 2>/dev/null | awk 'NR == 1 {print $2}' | sed 's/^v//')"
-fi
+managed_link "$NVIM_ROOT/bin/nvim" "$HOME/.local/bin/nvim" nvim "$NVIM_VERSION"
 
-if ! is_installed nvim || ! version_ge "$NVIM_CURRENT" "$NVIM_TARGET"; then
-  log_info "Installing Neovim ${NVIM_VERSION}..."
-  if [[ "$ARCH" == "amd64" ]]; then
-    curl -fsSLo /tmp/nvim.appimage "https://github.com/neovim/neovim/releases/download/${NVIM_VERSION}/nvim-linux-x86_64.appimage"
-    chmod +x /tmp/nvim.appimage
-    sudo install /tmp/nvim.appimage /usr/local/bin/nvim
-    rm -f /tmp/nvim.appimage
-  else
-    log_warn "Neovim AppImage is only configured for amd64; installing distro package"
-    sudo apt-get install -y neovim
-  fi
-  log_success "Neovim $(nvim --version | awk 'NR == 1 {print $2}') installed"
-else
-  log_skip "Neovim ${NVIM_TARGET} already installed"
-fi
-
-# LazyVim will bootstrap itself on first launch from ~/.config/nvim/
-log_info "LazyVim will auto-install plugins on first nvim launch"
+"$HOME/.local/bin/nvim" --clean --headless '+lua assert(vim.version().minor >= 12)' +qa
+log_success "Neovim headless runtime validation passed"
+log_info "Run scripts/validate-neovim.sh --sync to install and verify locked plugins"
 
 print_summary "Neovim"

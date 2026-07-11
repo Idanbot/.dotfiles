@@ -90,29 +90,43 @@ assert_output_contains() {
   fi
 }
 
-FULL_SECTIONS="detect,core,zsh,terminal,languages,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services"
+FULL_SECTIONS="detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services"
+MINIMAL_SECTIONS="detect,core"
 BASE_SECTIONS="detect,core,zsh,terminal"
 
 echo -e "\n${BOLD}══ Install Option Plans ══${NC}\n"
 
-assert_plan "default full plan" full "$FULL_SECTIONS" true
-assert_plan "explicit full plan" full "$FULL_SECTIONS" true --full
-assert_plan "base-only plan" base "$BASE_SECTIONS" false --base-only
-assert_plan "base plus languages/tmux" base "detect,core,zsh,terminal,languages,tmux" false --with languages,tmux
-assert_plan "base plus equals syntax" base "detect,core,zsh,terminal,neovim,ai" false --with=ai,neovim
+assert_plan "default full plan" profile "$FULL_SECTIONS" false
+assert_plan "explicit full plan" profile "$FULL_SECTIONS" false --full
+assert_plan "minimal profile" profile "$MINIMAL_SECTIONS" false --profile minimal
+assert_plan "minimal profile equals syntax" profile "$MINIMAL_SECTIONS" false --profile=minimal
+assert_plan "base-only plan" profile "$BASE_SECTIONS" false --base-only
+assert_plan "base plus languages/tmux" profile "detect,core,zsh,terminal,languages,tmux" false --with languages,tmux
+assert_plan "base plus equals syntax and dependency" profile "detect,core,zsh,terminal,languages,neovim,ai" false --with=ai,neovim
 assert_plan "exact sections" custom "core,languages" false --sections core,languages
 assert_plan "exact sections equals syntax sorted" custom "core,languages" false --sections=languages,core
-assert_plan "full without heavy sections" full "detect,core,zsh,terminal,languages,tmux,neovim,ai,media,fonts,desktop,system,theme,services" false --full --without cloud,vscode
-assert_plan "yes defaults to full" full "$FULL_SECTIONS" true --yes
-assert_menu_plan "menu full" '1\n' full "$FULL_SECTIONS" true
-assert_menu_plan "menu base" '2\n' base "$BASE_SECTIONS" false
-assert_menu_plan "menu base plus selected" '3\nlanguages,tmux\n' custom "detect,core,zsh,terminal,languages,tmux" false
-assert_menu_plan "menu exact selected" '4\ncore,languages\n' custom "core,languages" false
+assert_plan "full without heavy sections" profile "detect,core,zsh,terminal,languages,history,tmux,neovim,ai,media,fonts,desktop,system,theme,services" false --full --without cloud,vscode
+assert_plan "yes defaults to full" profile "$FULL_SECTIONS" false --yes
+assert_plan "developer profile" profile "detect,core,zsh,terminal,languages,history,tmux,neovim,system,theme,services" false --profile developer
+assert_plan "agent profile" profile "detect,core,zsh,terminal,languages,history,tmux,neovim,ai,system,theme,services" false --profile agent
+assert_plan "cloud profile" profile "detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,system,theme,services" false --profile cloud
+assert_menu_plan "menu full" '1\n' profile "$FULL_SECTIONS" false
+assert_menu_plan "menu minimal" '2\n' profile "$MINIMAL_SECTIONS" false
+assert_menu_plan "menu base" '3\n' profile "$BASE_SECTIONS" false
+assert_menu_plan "menu developer" '4\n' profile "detect,core,zsh,terminal,languages,history,tmux,neovim,system,theme,services" false
+assert_menu_plan "menu agent" '5\n' profile "detect,core,zsh,terminal,languages,history,tmux,neovim,ai,system,theme,services" false
+assert_menu_plan "menu cloud" '6\n' profile "detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,system,theme,services" false
+assert_menu_plan "menu exact selected" '7\ncore,languages\n' custom "core,languages" false
+assert_output_contains "backup conflict policy" "conflict_policy=backup" --profile base --conflict-policy backup --print-plan
+assert_output_contains "skip conflict policy equals syntax" "conflict_policy=skip" --profile base --conflict-policy=skip --print-plan
+assert_output_contains "abort conflict policy" "conflict_policy=abort" --profile base --conflict-policy abort --print-plan
 assert_output_contains "list options" "All sections: $FULL_SECTIONS" --list-options
 assert_output_contains "help" "Usage: scripts/install.sh [options]" --help
 assert_failure "missing only section rejected" --only
 assert_failure "unknown section rejected" --sections nope
 assert_failure "unknown option rejected" --bogus
+assert_failure "invalid conflict policy rejected" --profile base --conflict-policy overwrite
+assert_failure "required language dependency cannot be excluded" --with ai --without languages
 
 if [[ $FAILED -gt 0 ]]; then
   echo -e "\n${RED}${BOLD}INSTALL OPTION TESTS FAILED${NC}"

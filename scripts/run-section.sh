@@ -15,6 +15,7 @@ Sections:
   zsh          zsh and shell ecosystem
   terminal     terminal CLI tools
   languages    Go, Rust, Node.js, TypeScript, Python, Java
+  history      optional Atuin installation (activation remains local/manual)
   cloud        Docker, kubectl, Helm, Terraform, cloud CLIs
   tmux         tmux and tmuxp
   neovim       Neovim
@@ -45,6 +46,7 @@ declare -A SECTIONS=(
   [zsh]=".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl"
   [terminal]=".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
   [languages]=".chezmoiscripts/run_once_04-install-languages.sh.tmpl"
+  [history]=".chezmoiscripts/run_once_04b-install-history.sh.tmpl"
   [cloud]=".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
   [tmux]=".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl"
   [neovim]=".chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
@@ -71,4 +73,5 @@ if [[ ! -f "$script_path" ]]; then
   exit 1
 fi
 
-DOTFILES_SOURCE_DIR="$DOTFILES_DIR" chezmoi execute-template <"$script_path" | DOTFILES_SOURCE_DIR="$DOTFILES_DIR" bash
+DOTFILES_SOURCE_DIR="$DOTFILES_DIR" chezmoi execute-template <"$script_path" |
+  DOTFILES_SOURCE_DIR="$DOTFILES_DIR" DOTFILES_SECTION="$SECTION" bash

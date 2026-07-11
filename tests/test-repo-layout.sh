@@ -1,215 +1,114 @@
 #!/usr/bin/env bash
-# test-repo-layout.sh — Validates repository script placement conventions
-set -euo pipefail
+# Repository architecture contracts that should never regress silently.
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BOLD='\033[1m'
-NC='\033[0m'
+set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 FAILED=0
-
-echo -e "\n${BOLD}══ Repository Layout Test ══${NC}\n"
-
-if [[ -f "$DOTFILES_DIR/scripts/install.sh" ]]; then
-  echo -e "  ${GREEN}✓${NC} bootstrap script lives in scripts/"
-else
-  echo -e "  ${RED}✗${NC} missing scripts/install.sh"
+pass() { printf '  [PASS] %s\n' "$*"; }
+fail() {
+  printf '  [FAIL] %s\n' "$*"
   FAILED=1
-fi
+}
 
-if [[ -d "$DOTFILES_DIR/.chezmoiscripts" ]]; then
-  echo -e "  ${GREEN}✓${NC} chezmoi scripts live in .chezmoiscripts/"
-else
-  echo -e "  ${RED}✗${NC} missing .chezmoiscripts/"
-  FAILED=1
-fi
+printf '\n== Repository Layout ==\n'
 
-INSTALL_SCRIPT="$DOTFILES_DIR/scripts/install.sh"
-if grep -Fq 'https://github.com/Idanbot/.dotfiles.git' "$INSTALL_SCRIPT" && ! grep -Fq -- '--ssh' "$INSTALL_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} bootstrap uses HTTPS repo source"
-else
-  echo -e "  ${RED}✗${NC} bootstrap should use HTTPS repo source without --ssh"
-  FAILED=1
-fi
-
-if grep -Fq 'APPLY_EXCLUDES+=(encrypted)' "$INSTALL_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} bootstrap skips encrypted files after generating a new age key"
-else
-  echo -e "  ${RED}✗${NC} bootstrap missing encrypted-file skip for new age keys"
-  FAILED=1
-fi
-
-CONFIGURE_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_12-configure-system.sh.tmpl"
-if grep -Fq 'GCM_DEB="gcm-linux-${GCM_ARCH}-${GCM_VERSION}.deb"' "$CONFIGURE_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} system installer uses current GCM release asset names"
-else
-  echo -e "  ${RED}✗${NC} system installer should use current GCM release asset names"
-  FAILED=1
-fi
-
-if grep -R '\$HOME/.dotfiles/scripts/lib.sh' \
-  "$DOTFILES_DIR/.chezmoiscripts" >/dev/null; then
-  echo -e "  ${RED}✗${NC} chezmoi scripts hard-code ~/.dotfiles"
-  FAILED=1
-else
-  echo -e "  ${GREEN}✓${NC} chezmoi scripts use the source directory"
-fi
-
-if grep -R "{{ .chezmoi.sourceDir }}/scripts/lib.sh" \
-  "$DOTFILES_DIR/.chezmoiscripts" >/dev/null; then
-  echo -e "  ${RED}✗${NC} chezmoi scripts rely on templating to load scripts/lib.sh"
-  FAILED=1
-else
-  echo -e "  ${GREEN}✓${NC} chezmoi scripts load scripts/lib.sh from CHEZMOI_SOURCE_DIR"
-fi
-
-if grep -Fq "git -C \"\$CHEZMOI_SOURCE\" pull --ff-only" "$INSTALL_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} bootstrap refreshes existing remote source before apply"
-else
-  echo -e "  ${RED}✗${NC} bootstrap should refresh existing remote source before apply"
-  FAILED=1
-fi
-
-for expected in collect_chezmoi_status print_chezmoi_dry_run_summary handle_chezmoi_conflicts backup_chezmoi_conflicts run_chezmoi_apply; do
-  if grep -Fq "$expected" "$INSTALL_SCRIPT"; then
-    echo -e "  ${GREEN}✓${NC} bootstrap contains $expected"
-  else
-    echo -e "  ${RED}✗${NC} bootstrap missing $expected"
-    FAILED=1
-  fi
-done
-
-while IFS= read -r -d '' script; do
-  echo -e "  ${RED}✗${NC} root script found: ${script#$DOTFILES_DIR/}"
-  FAILED=1
-done < <(
-  find "$DOTFILES_DIR" \
-    -maxdepth 1 \
-    -type f \
-    \( -name '*.sh' -o -name '*.sh.tmpl' \) \
-    -print0
+required=(
+  scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
+  scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
+  profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
+  profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
+  .github/e2e/compose.yaml tests/e2e/test-install.sh
+  tests/test-external-tools.sh
 )
-
-TERMINAL_TOOLS_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
-LANGUAGES_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"
-
-for tool in fzf fd-find ripgrep bat eza lazygit btop sops lazydocker tealdeer; do
-  if grep -q "$tool" "$TERMINAL_TOOLS_SCRIPT"; then
-    echo -e "  ${GREEN}✓${NC} terminal installer covers $tool"
-  else
-    echo -e "  ${RED}✗${NC} terminal installer missing $tool"
-    FAILED=1
-  fi
+for path in "${required[@]}"; do
+  [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
 done
 
-for tool in yq zoxide direnv git-delta hyperfine duf; do
-  if grep -q "$tool" "$DOTFILES_DIR/.chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl"; then
-    echo -e "  ${GREEN}✓${NC} core installer covers $tool"
-  else
-    echo -e "  ${RED}✗${NC} core installer missing $tool"
-    FAILED=1
-  fi
+if find "$DOTFILES_DIR" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.sh.tmpl' \) | grep -q .; then
+  fail "shell entrypoints must live under scripts/, tests/, or .chezmoiscripts/"
+else
+  pass "no root-level shell entrypoints"
+fi
+
+INSTALL="$DOTFILES_DIR/scripts/install.sh"
+for expected in \
+  'run_stage "section-$section"' \
+  'DOTFILES_FAIL_AT' \
+  'scripts/backup.sh create' \
+  'chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
+  'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
+  'orchestrator=explicit'; do
+  grep -Fq "$expected" "$INSTALL" && pass "installer contract: $expected" || fail "installer missing: $expected"
 done
 
-for expected in 'NODE_VERSION="$(package_version languages node_lts 24.15.0)"' 'export PATH="/usr/local/go/bin:$PATH"' '/usr/local/go/bin/go version' 'TYPESCRIPT_VERSION="$(package_version languages typescript 5.9.3)"' 'PYTHON_VERSION="$(package_version languages python 3.14.5)"' 'RUST_VERSION="$(package_version languages rust stable)"' 'CARGO_VERSION="$(package_version languages cargo stable)"' 'load_nvm' 'version_ge' 'version_major_matches' 'nvm use --silent "$NODE_VERSION"' 'npm install -g "typescript@${TYPESCRIPT_VERSION}"' 'uv python install "$PYTHON_VERSION"' 'uv python install "$PYTHON_MINOR"'; do
-  if grep -Fq "$expected" "$LANGUAGES_SCRIPT"; then
-    echo -e "  ${GREEN}✓${NC} language installer contains $expected"
-  else
-    echo -e "  ${RED}✗${NC} language installer missing $expected"
-    FAILED=1
-  fi
+if grep -R -E 'curl[^|]*(\||[[:space:]])[[:space:]]*(ba)?sh|wget[^|]*\|[[:space:]]*(ba)?sh' \
+  "$DOTFILES_DIR/.chezmoiscripts" "$DOTFILES_DIR/scripts" --include='*.sh' --include='*.tmpl' | grep -v 'scripts/install.sh:.*curl -fsSL'; then
+  fail "runtime scripts contain an unverified download-to-shell pipeline"
+else
+  pass "no runtime download-to-shell pipelines"
+fi
+
+if grep -Rq 'checksum: null' "$DOTFILES_DIR/packages.lock" "$DOTFILES_DIR/packages.meta.yaml"; then
+  fail "package integrity contains null checksums"
+else
+  pass "package integrity declarations are non-null"
+fi
+
+if grep -Eq 'sha256: [0-9a-f]{64}$' "$DOTFILES_DIR/.chezmoiexternal.yaml"; then
+  fail "external SHA256 values must be quoted for chezmoi's HexBytes decoder"
+else
+  pass "external SHA256 values use chezmoi-compatible quoted strings"
+fi
+
+if grep -Rq '@anthropic-ai/antigravity-cli' "$DOTFILES_DIR" \
+  --exclude-dir=.git --exclude=test-repo-layout.sh; then
+  fail "Antigravity must not be substituted with an unrelated npm package"
+else
+  pass "Antigravity remains an explicit manual capability"
+fi
+
+if grep -Fq 'load_nvm' "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl" ||
+  grep -Fq 'nvm.sh' "$DOTFILES_DIR/dot_zshrc.tmpl"; then
+  fail "Node still depends on shell-time NVM initialization"
+else
+  pass "Node uses stable user-local shims"
+fi
+
+if grep -Fq 'npm_install_global @oh-my-pi/pi-coding-agent' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
+  fail "OMP npm installation requires an undeclared Bun runtime"
+else
+  pass "OMP uses its checksum-pinned standalone release"
+fi
+
+for preserved in .bash_history .zsh_history .lesshst '.zcompdump*' .zsh_sessions/ .local/share/zsh/; do
+  grep -Fxq "$preserved" "$DOTFILES_DIR/.chezmoiignore" && pass "preserves $preserved" || fail "missing preservation rule: $preserved"
 done
 
-if grep -Fq 'ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"' "$TERMINAL_TOOLS_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} terminal installer creates fd shim"
-else
-  echo -e "  ${RED}✗${NC} terminal installer missing fd shim"
-  FAILED=1
-fi
-
-if grep -Fq /usr/share/zsh/vendor-completions "$DOTFILES_DIR/dot_zshrc.tmpl" &&
-  grep -Fq _clean_fpath "$DOTFILES_DIR/dot_zshrc.tmpl"; then
-  echo -e "  ${GREEN}✓${NC} zsh startup cleans stale completion paths before compinit"
-else
-  echo -e "  ${RED}✗${NC} zsh startup should clean stale completion paths before compinit"
-  FAILED=1
-fi
-
-AI_TOOLS_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
-if grep -Fq "https://chatgpt.com/codex/install.sh | sh" "$AI_TOOLS_SCRIPT" &&
-  ! grep -Fq "@openai/codex" "$AI_TOOLS_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} Codex installer uses standalone CLI"
-else
-  echo -e "  ${RED}✗${NC} Codex installer should use standalone CLI, not npm"
-  FAILED=1
-fi
-
-NEOVIM_SCRIPT="$DOTFILES_DIR/.chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
-if grep -Fq 'NVIM_CURRENT="$(nvim --version' "$NEOVIM_SCRIPT" &&
-  grep -Fq 'sudo install /tmp/nvim.appimage /usr/local/bin/nvim' "$NEOVIM_SCRIPT"; then
-  echo -e "  ${GREEN}✓${NC} Neovim installer upgrades stale nvim versions"
-else
-  echo -e "  ${RED}✗${NC} Neovim installer should upgrade stale nvim versions"
-  FAILED=1
-fi
-
-for preserved in dot_bash_history dot_zsh_history dot_lesshst 'dot_zcompdump*' dot_zsh_sessions/ dot_local/share/zsh/; do
-  if grep -Fxq "$preserved" "$DOTFILES_DIR/.chezmoiignore"; then
-    echo -e "  ${GREEN}✓${NC} preserves $preserved"
-  else
-    echo -e "  ${RED}✗${NC} .chezmoiignore should preserve $preserved"
-    FAILED=1
-  fi
+for metadata in artifacts/ docs/ .gitleaks.toml .yamllint.yml; do
+  grep -Fxq "$metadata" "$DOTFILES_DIR/.chezmoiignore" && pass "ignores repo metadata $metadata" || fail "missing metadata ignore: $metadata"
 done
 
-if [[ -x "$DOTFILES_DIR/tests/test-install-selector-profile.sh" ]]; then
-  echo -e "  ${GREEN}✓${NC} install selector profile test is executable"
+for local_path in \
+  .config/dotfiles/local.zsh .config/dotfiles/local.bash \
+  .config/dotfiles/local.tmux.conf .config/dotfiles/machine.conf \
+  .config/git/config.local .ssh/config.local; do
+  grep -Fxq "$local_path" "$DOTFILES_DIR/.chezmoiignore" && pass "local-only $local_path" || fail "missing local-only rule: $local_path"
+done
+
+if grep -Fq 'set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins/"' \
+  "$DOTFILES_DIR/dot_tmux.conf.tmpl"; then
+  pass "tmux declares the TPM plugin path before background initialization"
 else
-  echo -e "  ${RED}✗${NC} install selector profile test missing or not executable"
-  FAILED=1
+  fail "tmux must declare TMUX_PLUGIN_MANAGER_PATH before TPM initialization"
 fi
 
-if [[ -x "$DOTFILES_DIR/scripts/doctor.sh" ]]; then
-  echo -e "  ${GREEN}✓${NC} doctor script is executable"
+if grep -Fq "set -g @plugin 'tmux-plugins/tpm'" "$DOTFILES_DIR/dot_tmux.conf.tmpl"; then
+  fail "checksum-pinned TPM must not attempt to Git-manage itself"
 else
-  echo -e "  ${RED}✗${NC} doctor script missing or not executable"
-  FAILED=1
+  pass "chezmoi remains the sole owner of the pinned TPM installation"
 fi
 
-if [[ -x "$DOTFILES_DIR/scripts/generate-package-lock.sh" && -f "$DOTFILES_DIR/packages.lock" && -f "$DOTFILES_DIR/packages.meta.yaml" ]]; then
-  echo -e "  ${GREEN}✓${NC} package lock generator and metadata are present"
-else
-  echo -e "  ${RED}✗${NC} package lock generator, metadata, or lockfile missing"
-  FAILED=1
-fi
-
-if [[ -x "$DOTFILES_DIR/scripts/generate-keybinding-docs.sh" && -f "$DOTFILES_DIR/docs/keybindings.md" ]]; then
-  echo -e "  ${GREEN}✓${NC} keybinding docs generator and doc are present"
-else
-  echo -e "  ${RED}✗${NC} keybinding docs generator or doc missing"
-  FAILED=1
-fi
-
-if [[ -x "$DOTFILES_DIR/scripts/generate-tool-inventory.sh" && -f "$DOTFILES_DIR/docs/tool-inventory.md" ]]; then
-  tmp_inventory=$(mktemp)
-  "$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmp_inventory"
-  if cmp -s "$tmp_inventory" "$DOTFILES_DIR/docs/tool-inventory.md"; then
-    echo -e "  ${GREEN}✓${NC} tool inventory is up to date"
-  else
-    echo -e "  ${RED}✗${NC} tool inventory is stale"
-    FAILED=1
-  fi
-  rm -f "$tmp_inventory"
-else
-  echo -e "  ${RED}✗${NC} tool inventory generator or doc missing"
-  FAILED=1
-fi
-
-if [[ $FAILED -gt 0 ]]; then
-  echo -e "\n${RED}${BOLD}REPOSITORY LAYOUT TEST FAILED${NC}"
-  exit 1
-fi
-
-echo -e "\n${GREEN}${BOLD}REPOSITORY LAYOUT TEST PASSED${NC}"
+[[ "$FAILED" -eq 0 ]] || exit 1
+printf 'Repository layout test passed\n'

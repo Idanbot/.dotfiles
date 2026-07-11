@@ -6,134 +6,136 @@ fi
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Container & Cloud Tools"
-
 require_sudo
-ARCH=$(get_arch)
+ARCH="$(get_arch)"
+case "$ARCH" in
+  amd64) RELEASE_ARCH=amd64; HASHI_ARCH=amd64; AWS_ARCH=x86_64 ;;
+  arm64) RELEASE_ARCH=arm64; HASHI_ARCH=arm64; AWS_ARCH=aarch64 ;;
+  *) log_error "Unsupported cloud-tool architecture: $ARCH"; exit 1 ;;
+esac
 
-# ── Docker ────────────────────────────────────────────────────────────────────
-if ! is_installed docker; then
-  if is_wsl; then
-    log_info "WSL detected — installing Docker CLI only (use Docker Desktop on Windows)"
-    sudo apt-get install -y docker.io docker-compose-v2
-    # Don't start dockerd on WSL — Docker Desktop handles it
-    # docker.io on Ubuntu may not ship the zsh vendor completion; install it
-    # explicitly so the OMZ docker plugin's fpath entry resolves correctly.
-    if [[ ! -f /usr/share/zsh/vendor-completions/_docker ]]; then
-      log_info "Installing docker zsh completion for vendor-completions..."
-      sudo mkdir -p /usr/share/zsh/vendor-completions
-      curl -fsSL https://raw.githubusercontent.com/docker/cli/master/contrib/completion/zsh/_docker \
-        | sudo tee /usr/share/zsh/vendor-completions/_docker > /dev/null
-      log_success "Docker zsh completion installed"
-    fi
+# Ubuntu's signed packages are the sole Docker owner. On WSL, Docker Desktop
+# supplies the daemon; on native Ubuntu docker.io supplies both CLI and daemon.
+apt_install docker.io docker-compose-v2
+if is_installed docker && [[ ! -f /usr/share/zsh/vendor-completions/_docker ]]; then
+  sudo mkdir -p /usr/share/zsh/vendor-completions
+  docker completion zsh | sudo tee /usr/share/zsh/vendor-completions/_docker >/dev/null
+  log_success "Generated Docker zsh completion from the installed CLI"
+fi
+if is_native && is_installed docker; then
+  sudo usermod -aG docker "$(whoami)" || true
+  log_warn "Docker group changes take effect after the next login"
+fi
+
+KUBECTL_VERSION="$(package_version cloud kubectl 1.36.2)"
+if ! is_installed kubectl || ! version_ge "$(kubectl version --client 2>/dev/null | head -1 || true)" "$KUBECTL_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  url="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${RELEASE_ARCH}/kubectl"
+  log_info "Installing kubectl $KUBECTL_VERSION"
+  download_verified "$url" "$tmpdir/kubectl" "$url.sha256" kubectl
+  install_managed_binary "$tmpdir/kubectl" kubectl "$KUBECTL_VERSION" dl.k8s.io
+  rm -rf "$tmpdir"
+  ((_INSTALLED++)) || true
+else
+  log_skip "kubectl $KUBECTL_VERSION already installed or newer"
+fi
+
+HELM_VERSION="$(package_version cloud helm 4.2.3)"
+if ! is_installed helm || ! version_ge "$(helm version --short 2>/dev/null || true)" "$HELM_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  asset="helm-v${HELM_VERSION}-linux-${RELEASE_ARCH}.tar.gz"
+  url="https://get.helm.sh/$asset"
+  log_info "Installing Helm $HELM_VERSION"
+  download_verified "$url" "$tmpdir/$asset" "$url.sha256sum" "$asset"
+  tar -xzf "$tmpdir/$asset" -C "$tmpdir"
+  install_managed_binary "$tmpdir/linux-${RELEASE_ARCH}/helm" helm "$HELM_VERSION" get.helm.sh
+  rm -rf "$tmpdir"
+  ((_INSTALLED++)) || true
+else
+  log_skip "Helm $HELM_VERSION already installed or newer"
+fi
+
+TERRAFORM_VERSION="$(package_version cloud terraform 1.15.8)"
+if ! is_installed terraform || ! version_ge "$(terraform version 2>/dev/null | head -1 || true)" "$TERRAFORM_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  asset="terraform_${TERRAFORM_VERSION}_linux_${HASHI_ARCH}.zip"
+  base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+  log_info "Installing Terraform $TERRAFORM_VERSION"
+  download_verified "$base/$asset" "$tmpdir/$asset" \
+    "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS" "$asset"
+  unzip -q "$tmpdir/$asset" -d "$tmpdir"
+  install_managed_binary "$tmpdir/terraform" terraform "$TERRAFORM_VERSION" releases.hashicorp.com
+  rm -rf "$tmpdir"
+  ((_INSTALLED++)) || true
+else
+  log_skip "Terraform $TERRAFORM_VERSION already installed or newer"
+fi
+
+apt_install ansible
+
+K9S_VERSION="$(package_version cloud k9s 0.51.0)"
+install_github_archive \
+  k9s derailed/k9s "v${K9S_VERSION#v}" \
+  "k9s_Linux_${RELEASE_ARCH}.tar.gz" k9s \
+  "https://github.com/derailed/k9s/releases/download/{tag}/checksums.sha256" \
+  'k9s version --short'
+
+AWS_VERSION="$(package_version cloud aws_cli 2.34.54)"
+AWS_CURRENT="$(aws --version 2>/dev/null || true)"
+if ! is_installed aws || ! version_ge "$AWS_CURRENT" "$AWS_VERSION"; then
+  case "$ARCH" in
+    amd64) AWS_SHA=de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a ;;
+    arm64) AWS_SHA=f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60 ;;
+  esac
+  tmpdir="$(mktemp -d)"
+  asset="awscli-exe-linux-${AWS_ARCH}-${AWS_VERSION}.zip"
+  log_info "Installing AWS CLI $AWS_VERSION"
+  download_verified "https://awscli.amazonaws.com/$asset" "$tmpdir/$asset" "sha256:$AWS_SHA" "$asset"
+  unzip -q "$tmpdir/$asset" -d "$tmpdir"
+  if is_installed aws; then
+    sudo "$tmpdir/aws/install" --update
   else
-    log_info "Installing Docker Engine (native)..."
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    sudo chmod a+r /etc/apt/keyrings/docker.gpg
-    echo "deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
-      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-    sudo apt-get update -qq
-    sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-    sudo usermod -aG docker "$(whoami)"
-    log_warn "Log out and back in for Docker group to take effect"
+    sudo "$tmpdir/aws/install"
   fi
-  log_success "Docker installed"
+  rm -rf "$tmpdir"
+  record_install aws "$AWS_VERSION" aws-installer /usr/local/aws-cli
+  ((_INSTALLED++)) || true
+  log_success "AWS CLI $AWS_VERSION installed"
 else
-  log_skip "Docker already installed"
+  log_skip "AWS CLI $AWS_VERSION already installed or newer"
 fi
 
-# ── kubectl ───────────────────────────────────────────────────────────────────
-KUBECTL_VERSION="$(package_version cloud kubectl 1.32.0)"
-if ! is_installed kubectl || ! version_ge "$(kubectl version --client --short 2>/dev/null | awk '{print $3}' | sed 's/^v//' || kubectl version --client 2>/dev/null | grep -oP 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | sed 's/^v//')" "$KUBECTL_VERSION"; then
-  log_info "Installing kubectl ${KUBECTL_VERSION}..."
-  curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl"
-  sudo install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl
-  rm -f /tmp/kubectl
-  log_success "kubectl $(kubectl version --client --short 2>/dev/null || kubectl version --client 2>/dev/null | head -1) installed"
-else
-  log_skip "kubectl ${KUBECTL_VERSION} already installed or newer"
-fi
-
-# ── Helm ──────────────────────────────────────────────────────────────────────
-HELM_VERSION="$(package_version cloud helm 4.2.0)"
-if ! is_installed helm || ! version_ge "$(helm version --short 2>/dev/null | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' || true)" "$HELM_VERSION"; then
-  log_info "Installing Helm v${HELM_VERSION}..."
-  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | DESIRED_VERSION="v${HELM_VERSION}" bash
-  log_success "Helm $(helm version --short) installed"
-else
-  log_skip "Helm ${HELM_VERSION} already installed or newer"
-fi
-
-# ── Terraform ─────────────────────────────────────────────────────────────────
-TERRAFORM_VERSION="$(package_version cloud terraform 1.15.4)"
-if ! is_installed terraform || ! version_ge "$(terraform version 2>/dev/null | head -1 | grep -oP 'v\K[0-9]+\.[0-9]+\.[0-9]+' || true)" "$TERRAFORM_VERSION"; then
-  log_info "Installing Terraform..."
-  wget -qO- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg || true
-  echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
-    sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
-  sudo apt-get update -qq
-  sudo apt-get install -y terraform
-  log_success "Terraform $(terraform version | head -1) installed"
-else
-  log_skip "Terraform ${TERRAFORM_VERSION} already installed or newer"
-fi
-
-# ── Ansible ───────────────────────────────────────────────────────────────────
-if ! is_installed ansible; then
-  log_info "Installing Ansible..."
-  sudo apt-get install -y ansible
-  log_success "Ansible installed"
-else
-  log_skip "Ansible already installed"
-fi
-
-# ── k9s ───────────────────────────────────────────────────────────────────────
-K9S_VERSION="$(package_version cloud k9s 0.50.18)"
-if ! is_installed k9s || ! version_ge "$(k9s version -s 2>/dev/null | grep -i Version | awk '{print $2}' | sed 's/^v//' || true)" "$K9S_VERSION"; then
-  log_info "Installing k9s v${K9S_VERSION}..."
-  K9S_ARCH="$ARCH"
-  [[ "$K9S_ARCH" == "amd64" ]] && K9S_ARCH="amd64"
-  curl -fsSLo /tmp/k9s.tar.gz "https://github.com/derailed/k9s/releases/download/v${K9S_VERSION}/k9s_Linux_${K9S_ARCH}.tar.gz"
-  tar -xf /tmp/k9s.tar.gz -C /tmp k9s
-  sudo install /tmp/k9s /usr/local/bin/k9s
-  rm -f /tmp/k9s /tmp/k9s.tar.gz
-  log_success "k9s v${K9S_VERSION} installed"
-else
-  log_skip "k9s ${K9S_VERSION} already installed or newer"
-fi
-
-# ── AWS CLI v2 ────────────────────────────────────────────────────────────────
-if ! is_installed aws; then
-  log_info "Installing AWS CLI v2..."
-  curl -fsSLo /tmp/awscli.zip "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip"
-  unzip -qo /tmp/awscli.zip -d /tmp
-  sudo /tmp/aws/install
-  rm -rf /tmp/aws /tmp/awscli.zip
-  log_success "AWS CLI $(aws --version) installed"
-else
-  log_skip "AWS CLI already installed"
-fi
-
-# ── Google Cloud CLI ──────────────────────────────────────────────────────────
 if ! is_installed gcloud; then
-  log_info "Installing Google Cloud CLI..."
-  curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-  echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | \
-    sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list > /dev/null
-  sudo apt-get update -qq
-  sudo apt-get install -y google-cloud-cli
-  log_success "gcloud installed"
+  log_info "Configuring Google Cloud's signed apt repository"
+  sudo mkdir -p /usr/share/keyrings
+  install_apt_key \
+    https://packages.cloud.google.com/apt/doc/apt-key.gpg \
+    /usr/share/keyrings/cloud.google.gpg \
+    35BAA0B33E9EB396F59CA838C0BA5CE6DC6315A3
+  printf '%s\n' \
+    'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' |
+    sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null
+  apt_update
+  apt_install google-cloud-cli
 else
-  log_skip "gcloud already installed"
+  log_skip "Google Cloud CLI already installed"
 fi
 
-# ── Azure CLI ─────────────────────────────────────────────────────────────────
 if ! is_installed az; then
-  log_info "Installing Azure CLI..."
-  curl -fsSL https://aka.ms/InstallAzureCLIDeb | sudo bash
-  log_success "Azure CLI installed"
+  log_info "Configuring Microsoft's signed Azure CLI apt repository"
+  sudo mkdir -p /etc/apt/keyrings
+  install_apt_key \
+    https://packages.microsoft.com/keys/microsoft.asc \
+    /etc/apt/keyrings/microsoft.gpg \
+    BC528686B50D79E339D3721CEB3E94ADBE1229CF
+  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
+    "$(dpkg --print-architecture)" "$(. /etc/os-release; printf '%s' "$VERSION_CODENAME")" |
+    sudo tee /etc/apt/sources.list.d/azure-cli.list >/dev/null
+  apt_update
+  apt_install azure-cli
 else
   log_skip "Azure CLI already installed"
 fi
 
+log_info "Cloud authentication is intentionally not automated"
 print_summary "Container & Cloud Tools"

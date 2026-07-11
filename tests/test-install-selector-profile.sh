@@ -26,7 +26,8 @@ fi
 
 if grep -Fxq "mode=$EXPECTED_MODE" <<<"$OUTPUT" &&
   grep -Fxq "sections=$EXPECTED_SECTIONS" <<<"$OUTPUT" &&
-  grep -Fxq "apply_scripts=$EXPECTED_APPLY" <<<"$OUTPUT"; then
+  grep -Fxq "apply_scripts=$EXPECTED_APPLY" <<<"$OUTPUT" &&
+  grep -Fxq "orchestrator=explicit" <<<"$OUTPUT"; then
   echo "install selector profile passed: $EXPECTED_MODE $EXPECTED_SECTIONS"
 else
   echo "install selector profile failed" >&2

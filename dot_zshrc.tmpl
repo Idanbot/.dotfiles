@@ -9,7 +9,7 @@ export GOPATH=$HOME/go
 export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
 
 # If you come from bash you might have to change your $PATH.
-export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/.local/share/npm/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
 export PATH="$PATH:/usr/local/go/bin:$GOPATH/bin"
 
 {{- if .is_wsl }}
@@ -23,13 +23,6 @@ for vscode_path in "/mnt/c/Users/{{ .chezmoi.username }}/AppData/Local/Programs/
   fi
 done
 {{- end }}
-
-export NVM_DIR="$HOME/.nvm"
-if [[ -s "$NVM_DIR/nvm.sh" ]]; then
-  source "$NVM_DIR/nvm.sh"
-  nvm use --silent default >/dev/null 2>&1 || true
-  export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
-fi
 
 # Path to your Oh My Zsh installation.
 export ZSH="$HOME/.oh-my-zsh"
@@ -45,6 +38,10 @@ DISABLE_UPDATE_PROMPT=true
 
 # History
 HIST_STAMPS="mm-dd-yyyy-%T"
+HISTFILE="$HOME/.zsh_history"
+HISTSIZE=100000
+SAVEHIST=100000
+setopt APPEND_HISTORY INC_APPEND_HISTORY SHARE_HISTORY HIST_IGNORE_DUPS HIST_REDUCE_BLANKS
 
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=249'
 
@@ -56,7 +53,6 @@ plugins=(
 {{ if not .is_wsl }}
   kitty
 {{ end }}
-  tmux
 
   # Core tools
   gitfast
@@ -95,10 +91,14 @@ plugins=(
 
   my-functions
 )
+if (( $+commands[tmux] )); then
+  plugins+=(tmux)
+fi
 
 # Drop stale completion dumps that reference broken system completion paths.
-for _zcompdump in "$HOME"/.zcompdump*(N); do
-  if [[ -f "$_zcompdump" ]] && command grep -q /usr/share/zsh/vendor-completions "$_zcompdump" 2>/dev/null; then
+for _zcompdump in "$HOME"/.zcompdump*(N) "${XDG_CACHE_HOME:-$HOME/.cache}"/zsh/zcompdump*(N); do
+  if [[ -f "$_zcompdump" ]] && command grep -Eq '/user/share/zsh/vendor-completions|/usr/share/zsh/vendor-completions/_docker' "$_zcompdump" 2>/dev/null &&
+    [[ ! -e /usr/share/zsh/vendor-completions/_docker ]]; then
     command rm -f "$_zcompdump" "$_zcompdump.zwc"
   fi
 done
@@ -107,11 +107,7 @@ unset _zcompdump
 # Keep compinit from scanning directories that no longer exist.
 typeset -ga _clean_fpath
 for _fpath_dir in "${fpath[@]}"; do
-  if [[ "$_fpath_dir" == "/usr/share/zsh/vendor-completions" ]]; then
-    mkdir -p "$HOME/.zsh/vendor-completions"
-    cp -L /usr/share/zsh/vendor-completions/* "$HOME/.zsh/vendor-completions/" 2>/dev/null || true
-    _clean_fpath+=("$HOME/.zsh/vendor-completions")
-  elif [[ -d "$_fpath_dir" ]]; then
+  if [[ -d "$_fpath_dir" ]]; then
     _clean_fpath+=("$_fpath_dir")
   fi
 done
@@ -239,10 +235,10 @@ alias gc9='gcc -std=c99 -pedantic-errors -Wall -Wextra -DNDEBUG -O3'
 alias ssh='TERM=xterm-256color ssh'
 alias ls='eza --icons=always -hg'
 alias cat='bat --paging=never --style=full'
-alias tm='tmuxp load -y -s "$(basename $PWD | tr . _)" $(tmuxp ls | fzf)'
+alias tm='dot-workspace'
 alias ytmp4='yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"'
 alias cheat="curl -s https://cht.sh/"
-alias dotfiles-doctor="echo '=== SSH Agent ===' && systemctl --user status ssh-agent.service | head -n 3 && echo '\n=== Chezmoi State ===' && chezmoi status && echo '\n=== Template Check ===' && bash ~/.dotfiles/tests/test-templates.sh"
+alias dotfiles-doctor='dot doctor'
 
 # Interactive Git & SSH Helpers
 gcb() {
@@ -283,8 +279,16 @@ bindkey -s '\et' 'tmux-sessionizer -s 1\n'
 bindkey -s '\en' 'tmux-sessionizer -s 2\n'
 bindkey -s '\es' 'tmux-sessionizer -s 3\n'
 
+# Local-only customizations are never managed or logged. Source them before
+# optional integrations so a machine can opt in without changing this template.
+if [[ -r "$HOME/.config/dotfiles/local.zsh" ]]; then
+  source "$HOME/.config/dotfiles/local.zsh"
+fi
+
 # Starship (ultra-fast cross-shell prompt)
-eval "$(starship init zsh)"
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
+fi
 
 # Tool initializations
 if command -v zoxide >/dev/null 2>&1; then
@@ -297,6 +301,10 @@ fi
 
 if command -v mise >/dev/null 2>&1; then
   eval "$(mise activate zsh)"
+fi
+
+if [[ "${DOTFILES_ENABLE_ATUIN:-0}" == "1" ]] && command -v atuin >/dev/null 2>&1; then
+  eval "$(atuin init zsh)"
 fi
 
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"

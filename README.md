@@ -1,147 +1,239 @@
-# 🏠 Dotfiles — Idan Botbol
+# Idan's Dotfiles
 
-[![CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
-[![Ubuntu 24.04](https://img.shields.io/badge/Ubuntu-24.04-E95420?logo=ubuntu&logoColor=white)](https://ubuntu.com/download)
-[![WSL Tested](https://img.shields.io/badge/WSL-tested-0078D4?logo=windows&logoColor=white)](https://learn.microsoft.com/windows/wsl/)
-[![chezmoi](https://img.shields.io/badge/managed%20by-chezmoi-6D57FF)](https://chezmoi.io)
-[![License](https://img.shields.io/badge/license-personal-lightgrey)](#-license)
+[![CI](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
 
-> One-command bootstrap for Ubuntu 24.04 LTS (native & WSL). Managed by [chezmoi](https://chezmoi.io) with [age](https://age-encryption.org) encryption for secrets.
+A repeatable, observable development-environment bootstrap for Ubuntu 24.04,
+both native and WSL2. Chezmoi owns configuration deployment; one explicit
+orchestrator owns package installation, recovery, logging, and acceptance.
 
-## ⚡ Quick Start
+The repository is public and intentionally contains no credentials, private
+keys, tokens, or encrypted secret payloads.
 
-### Fresh Machine (one-liner)
+## Quick Start
+
+Interactive profile selector:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
 ```
 
-The default one-liner performs the full install. For unattended or smaller installs, pass flags through `bash -s --`:
+Unattended profile:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --base-only -y
-curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --with languages,tmux,neovim -y
-curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash -s -- --sections core,languages -y
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | \
+  bash -s -- --profile developer --yes
 ```
 
-### Or clone and run:
+Preview without changing the machine:
 
 ```bash
-git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles
-cd ~/.dotfiles && ./scripts/install.sh
+./scripts/install.sh --profile agent --print-plan
+./scripts/install.sh --list-options
 ```
 
-Run `./scripts/install.sh --menu` for the interactive selector, `./scripts/install.sh --list-options` to see valid sections, or `./scripts/install.sh --print-plan` to preview a selected install profile.
+Supported targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
+Unsupported platforms fail before configuration is applied.
 
-### Existing Machine (already have chezmoi)
+## Install Profiles
+
+| Profile | Intended use | Sections beyond the common shell baseline |
+| --- | --- | --- |
+| `minimal` | Repair or small server | Core packages only |
+| `base` | Shell workstation | Zsh and terminal utilities |
+| `developer` | Main development machine | Languages, Atuin, tmux, Neovim, system/theme |
+| `agent` | LLM/agent workstation | Developer plus AI CLI harnesses |
+| `cloud` | Infrastructure workstation | Developer plus container/cloud CLIs |
+| `full` | Complete native or WSL setup | All applicable sections |
+
+Selectors can extend or reduce a profile:
 
 ```bash
-chezmoi init --apply https://github.com/Idanbot/.dotfiles.git
+./scripts/install.sh --with ai,neovim --yes
+./scripts/install.sh --full --without cloud,vscode --yes
+./scripts/install.sh --sections core,languages --yes
 ```
 
-By default the bootstrap uses HTTPS, so a fresh machine does not need a GitHub SSH key. If you generated a new age key instead of importing the existing one, the installer applies public dotfiles with encrypted files excluded; re-encrypt secrets for the new public recipient before applying encrypted files.
+`--with` starts from `base`. Profile selections automatically include the
+`languages` dependency for `ai`, `tmux`, and `media`. `--sections` is exact
+expert mode and does not add dependencies.
 
-To override the Git identity prompts during bootstrap, set `DOTFILES_GIT_NAME` and `DOTFILES_GIT_EMAIL`; otherwise the installer uses your existing `git config --global user.name` and `git config --global user.email` when present.
+## Reliability Model
 
-### Bootstrap Flow
+The installer follows one path for local, one-line, CI, native, and WSL runs:
 
-```mermaid
-graph TD
-    A[curl install.sh] --> B[detect environment: Native vs WSL]
-    B --> C[optimize APT mirrors: mirrors.ubuntu.com]
-    C --> D[install core dependencies: git, curl, age, chezmoi, zoxide, direnv, git-delta]
-    D --> E[import age decryption key]
-    E --> F[run chezmoi init & apply]
-    F --> G[install packages.yaml versions]
-    G --> H[enable systemd user services: ssh-agent]
-    H --> I[compile Zsh caches & launch shell]
-```
+1. Validate the platform and selection.
+2. Create a run ID, private logs, and stage checkpoints.
+3. Install bootstrap prerequisites and a checksum-verified chezmoi release.
+4. Resolve the source checkout and calculate pending config changes.
+5. Back up every changed or newly-created destination.
+6. Apply configuration and checksum-pinned externals without running hidden
+   chezmoi install scripts.
+7. Run selected install sections explicitly with timing and event records.
+8. Run acceptance checks and write a machine-readable summary.
 
-### Resume or Run a Focused Section
+Default conflict policy is `backup`. Other policies are explicit:
 
 ```bash
-./scripts/install.sh --only terminal
-./scripts/run-section.sh languages
-./scripts/run-section.sh tmux
+./scripts/install.sh --conflict-policy backup --profile base --yes
+./scripts/install.sh --conflict-policy skip --profile base --yes
+./scripts/install.sh --conflict-policy abort --profile base --yes
 ```
 
-### Post-Install Doctor
+- `backup`: preserve pending destinations, then apply with rollback on failure.
+- `skip`: preserve current config, apply only required directories/externals,
+  and continue the selected tool sections.
+- `abort`: stop when any managed config change is pending.
+
+The bootstrap uses `chezmoi apply --force` only after policy handling, so it
+does not enter chezmoi's per-file prompt. When running raw `chezmoi apply`, the
+prompt choices mean:
+
+- `diff`: display the proposed change; nothing is written yet.
+- `overwrite`: replace this destination with the managed version.
+- `all-overwrite`: replace this and all later conflicts in the same run.
+- `skip`: preserve this destination and continue.
+- `quit`: stop the apply immediately.
+
+Recovery commands:
 
 ```bash
-~/.dotfiles/scripts/doctor.sh
+./scripts/install.sh --resume
+./scripts/install.sh --resume=<run-id>
+dot backup
+dot restore <backup-id>
 ```
 
----
+Backups record files, directories, symlinks, modes, checksums, and paths that
+were previously absent. Restoring therefore also removes files created by a
+failed apply.
 
-## 📦 What Gets Installed
+## Logs and Diagnostics
 
-| Category | Tools |
-|----------|-------|
-| **Shell** | Zsh, Oh-My-Zsh, Starship prompt, fzf-tab, zsh-autosuggestions, zsh-syntax-highlighting |
-| **Terminal** | Kitty (native), Ghostty (secondary), tmux + TPM, tmuxp |
-| **Editor** | Neovim (LazyVim), Vim |
-| **CLI Tools** | fzf, fd, ripgrep, bat, eza, lazygit, btop, htop, jq, yq, delta, zoxide, direnv, hyperfine, duf, sops |
-| **Languages** | Go 1.24, Rust/Cargo (stable), Node.js 24.15.0 (nvm), TypeScript 5.9.3 (npm), Python 3.14.5 (uv), Java 21 |
-| **Containers** | Docker, kubectl, Helm, k9s |
-| **Cloud** | AWS CLI v2, Google Cloud CLI, Azure CLI, Terraform, Ansible |
-| **AI Tools** | Claude CLI, Codex CLI, Gemini CLI, OpenCode |
-| **Media** | yt-dlp, rmpc, cava (native only) |
-| **Fonts** | FiraMono Nerd Font |
-| **Theme** | Catppuccin Mocha (everywhere) |
+Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
 
----
-
-## 📁 Repo Structure
-
-```
-~/.dotfiles/
-├── scripts/install.sh            # Bootstrap entrypoint
-├── .chezmoi.yaml.tmpl            # chezmoi init prompts
-├── .chezmoiexternal.yaml         # External deps (oh-my-zsh, TPM, etc.)
-├── .chezmoiignore                # Platform-specific ignores
-├── packages.yaml                 # Version-pinned tool manifest
-│
-├── dot_zshrc.tmpl                # Zsh config (WSL/native templated)
-├── dot_tmux.conf.tmpl            # tmux config (WSL/native templated)
-├── dot_gitconfig.tmpl            # Git config (templated email)
-├── dot_bashrc / dot_vimrc / ...  # Other configs
-│
-├── dot_config/                   # ~/.config/ files
-│   ├── starship.toml             # Starship prompt
-│   ├── nvim/                     # LazyVim config
-│   ├── private_kitty/            # Kitty terminal
-│   └── ...                       # lazygit, btop, bat, etc.
-│
-├── dot_local/bin/                # Custom scripts
-│   ├── tmux-sessionizer.tmpl     # Project switcher
-│   └── fzf-preview.sh            # FZF preview
-│
-├── encrypted_*                   # age-encrypted secrets
-│
-├── .chezmoiscripts/              # chezmoi run scripts
-│   ├── run_once_before_*.sh.tmpl # Pre-apply install scripts
-│   ├── run_once_*.sh.tmpl        # Install scripts
-│   └── run_onchange_*.sh.tmpl    # Re-run on manifest change
-│
-├── scripts/lib.sh                # Shared bash utilities
-├── tests/                        # CI test scripts
-└── .github/workflows/            # GitHub Actions CI
+```text
+~/.local/state/dotfiles/
+|-- logs/
+|   |-- bootstrap-<run-id>.log
+|   `-- bootstrap-<run-id>.jsonl
+|-- runs/<run-id>/
+|   |-- checkpoints/
+|   `-- summary.json
+|-- backups/
+`-- installed.tsv
 ```
 
----
+On-machine logs and state use mode `0600`. Persisted text logs have ANSI
+sequences removed and common secret assignments redacted. JSONL events include
+UTC time, run ID, section/stage, level, and message. The newest 20 log pairs are
+retained by default.
 
+Console color is enabled for a capable TTY and Windows Terminal on WSL. Control
+it with `DOTFILES_COLOR=always|never|auto` or the standard `NO_COLOR` variable.
 
-## 🧰 Tool Inventory
+Useful commands:
 
-The tool manifests are split by responsibility:
+```bash
+dot status
+dot logs
+dot logs <run-id>
+dot doctor
+./scripts/doctor.sh --acceptance --sections core,zsh,terminal --json
+```
 
-- [packages.yaml](packages.yaml): requested versions.
-- [packages.meta.yaml](packages.meta.yaml): install source metadata such as apt, cargo, npm, GitHub release, or install script.
-- [packages.lock](packages.lock): generated audit view with manifest hashes and resolved metadata.
-- [docs/tool-inventory.md](docs/tool-inventory.md): generated human-readable inventory.
-- [docs/keybindings.md](docs/keybindings.md): generated tmux/zsh keybinding reference.
+## Daily Workflow
 
-Regenerate derived files after editing manifests or keybindings:
+The managed `dot` command is the lifecycle entrypoint:
+
+```text
+dot status                 repository, chezmoi, run, and ledger status
+dot diff                   preview managed changes
+dot sync [install flags]   fast-forward pull and reliable install
+dot doctor [flags]         health and acceptance checks
+dot profile [name]         read or set the machine profile
+dot logs [run-id]          list or follow bootstrap logs
+dot backup                 list config backups
+dot restore <id>           restore a config backup
+dot reconcile              run only changed package sections
+dot uninstall <tool>       remove a ledger-owned tool
+dot workspace [directory]  open the agent tmux workspace
+```
+
+Machine-specific choices live in
+`~/.config/dotfiles/machine.conf` with mode `0600`.
+
+## Agent Workspace
+
+The `agent` profile installs or validates Claude Code, Codex, Gemini, OpenCode,
+and OMP. Codex uses OpenAI's standalone installer, OMP uses a checksum-pinned
+standalone GitHub release, and npm packages use a stable user-local Node/npm
+prefix. Antigravity remains a manual optional command. Authentication and
+session state are never automated.
+
+Launch the parameterized tmuxp workspace in any project:
+
+```bash
+dot workspace
+dot workspace ~/Code/project
+dot-workspace . --name project-agents --print
+```
+
+The workspace creates a main terminal plus Codex, Antigravity, Claude,
+OpenCode, and OMP windows in the same working directory. It runs the pinned
+tmuxp version through `uvx`; a missing optional agent leaves a usable login
+shell instead of failing the workspace.
+
+## Preserved Local State
+
+The source intentionally does not own shell histories, completion caches,
+credentials, or local overlays. Existing files remain in place across applies.
+
+Local extension points:
+
+```text
+~/.config/dotfiles/local.zsh
+~/.config/dotfiles/local.bash
+~/.config/dotfiles/local.tmux.conf
+~/.config/git/config.local
+~/.ssh/config.local
+```
+
+History paths such as `~/.zsh_history`, `~/.bash_history`, `.zcompdump*`, and
+local Zsh state directories are explicitly ignored. WSL also ignores native
+Kitty configuration.
+
+## Secrets Boundary
+
+SOPS is installed as a tool, but this repository does not configure SOPS/age
+encryption and does not generate an age identity. These remain manual after
+bootstrap:
+
+- SSH and GPG private keys.
+- Git/GitHub credentials and Git Credential Manager authentication.
+- Cloud credentials and profiles for AWS, Google Cloud, Azure, Kubernetes,
+  Terraform backends, and Cloudflare.
+- API tokens, environment files, password-store/keyring content.
+- Claude, Codex, Gemini, OpenCode, OMP, and Antigravity authentication/session
+  directories.
+- Any future age private key or SOPS recovery material.
+
+The recommended future model is still a secret-free public bootstrap plus a
+separate, opt-in encrypted recovery source. See [Security Model](docs/security-model.md).
+
+## Versions and Supply Chain
+
+- `packages.yaml`: requested versions.
+- `packages.meta.yaml`: source, owner, and integrity policy.
+- `packages.lock`: generated audit view and manifest hashes.
+- `.chezmoiexternal.yaml`: immutable archive refs and SHA256 values.
+- `docs/tool-inventory.md`: generated readable inventory.
+
+Downloads use upstream checksum manifests or repository-pinned SHA256 values.
+APT signing keys are verified by fingerprint. GitHub Actions are pinned by
+commit SHA. The weekly version audit updates verifiable pins in a pull request;
+literal hashes remain manual-review changes.
+
+Regenerate derived files after manifest edits:
 
 ```bash
 ./scripts/generate-package-lock.sh
@@ -149,219 +241,60 @@ Regenerate derived files after editing manifests or keybindings:
 ./scripts/generate-keybinding-docs.sh
 ```
 
----
+## CI and Docker E2E
 
-## 🔧 chezmoi Workflow Cheat Sheet
+The first CI stage runs these jobs in parallel:
 
-| Action | Command |
-|--------|--------|
-| **Apply configs** | `chezmoi apply` |
-| **Pull & apply latest** | `chezmoi update` |
-| **Add a config file** | `chezmoi add ~/.config/tool/config` |
-| **Add a secret (encrypted)** | `chezmoi add --encrypt ~/.ssh/id_ed25519` |
-| **Edit a managed file** | `chezmoi edit ~/.zshrc` |
-| **Preview changes** | `chezmoi diff` |
-| **View managed files** | `chezmoi managed` |
-| **Re-init (re-run prompts)** | `chezmoi init` |
-| **Run health check** | `~/.dotfiles/scripts/doctor.sh` |
-| **Push changes** | `cd ~/.dotfiles && git add -A && git commit -m "..." && git push` |
+- Gitleaks full-history scan.
+- ShellCheck, shfmt, YAML, templates, and generated-file contracts.
+- Hadolint.
+- Actionlint and Zizmor `--pedantic`.
+- Trivy filesystem/secret/misconfiguration scan.
+- Pull-request dependency review.
 
----
+All six must pass before the verified GitHub release/external smoke job. A
+pre-matrix gate then unlocks selector and native/WSL-simulated unit matrices,
+two-pass base installations, and failure/restore/resume tests. Developer,
+agent, cloud, and full live profiles run on schedule or manual dispatch with a
+maximum parallelism of two. A separate workflow targets a private Windows
+self-hosted runner for a real WSL2 kernel.
 
-## ⌨️ Key Bindings
-
-### tmux
-
-| Binding | Action |
-|---------|--------|
-| `Ctrl-s` | Prefix |
-| `Prefix r` | Reload tmux config |
-| `Prefix \|` / `Prefix -` | Split pane horizontally / vertically in current directory |
-| `Alt-g` | Open lazygit popup |
-| `Alt-d` | Docker containers/images popup |
-| `Alt-k` | Kubernetes contexts/namespaces popup |
-| `Alt-p` | Project picker popup (`tmux-sessionizer`) |
-| `Alt-i` | cht.sh query popup |
-| `Alt-h` | btop popup |
-| `Alt-o` | Open current directory in Windows Explorer (WSL only) |
-| `Alt-e` | WSL interop diagnostics popup (WSL only) |
-| `Alt-u` | Native utility diagnostics popup (native only) |
-
-### Shell
-
-| Binding/Alias | Action |
-|---------------|--------|
-| `Ctrl-f` | Run `tmux-sessionizer` |
-| `Alt-h` / `Alt-t` / `Alt-n` / `Alt-s` | Open configured sessionizer directory groups |
-| `reload` | Reload current shell config |
-| `fd` | Compatibility shim to Ubuntu `fdfind` |
-
----
-
-## 🔐 Secret Management
-
-Secrets are encrypted with [age](https://age-encryption.org) and stored in the repo as `encrypted_*` files.
-
-### Encrypted Files
-
-| File | Target |
-|------|--------|
-| `encrypted_dot_ssh/` | `~/.ssh/` (keys + config) |
-| `encrypted_dot_gnupg/` | `~/.gnupg/` (GPG keys) |
-| `encrypted_dot_git-credentials` | `~/.git-credentials` |
-| `encrypted_dot_cloudflared/` | `~/.cloudflared/` |
-| `encrypted_private_dot_aws/credentials` | `~/.aws/credentials` |
-
-### Key Management
-
-- **Identity key location**: `~/.config/chezmoi/key.txt`
-- **BACK THIS UP**: Bitwarden, encrypted USB, or another secure location
-- **Existing key**: import it before applying if you want encrypted secrets restored.
-- **New key**: `age-keygen -o ~/.config/chezmoi/key.txt`; encrypted secrets are skipped until they are re-encrypted for the new recipient.
-- **Encrypt a new file**: `chezmoi add --encrypt <file>`
-
----
-
-## 🖥️ WSL vs Native
-
-The bootstrap auto-detects WSL by checking `/proc/version` for "microsoft".
-
-| Feature | Native | WSL |
-|---------|--------|-----|
-| Kitty terminal | ✅ | ❌ |
-| GNOME desktop | ✅ | ❌ |
-| Docker Engine | ✅ (full) | CLI only (Docker Desktop) |
-| tmux terminal | `xterm-kitty` | `tmux-256color` |
-| Battery in tmux | ✅ | ❌ |
-| Media tools (rmpc, cava) | ✅ | ❌ |
-| Image preview in fzf | ✅ (kitty icat) | ❌ |
-| All other tools | ✅ | ✅ |
-
-### 🔧 WSL Troubleshooting & Prerequisites
-
-Before running the bootstrap on a fresh WSL installation, ensure:
-
-1. **Systemd is Enabled:**
-   Edit `/etc/wsl.conf` (requires root privileges inside WSL) and add:
-   ```ini
-   [boot]
-   systemd=true
-   ```
-   After editing, restart WSL from a Windows Host PowerShell terminal:
-   ```powershell
-   wsl.exe --shutdown
-   ```
-
-2. **Windows Git Credential Manager Setup:**
-   Ensure Git for Windows is installed on your Windows Host. Chezmoi will automatically bridge credentials from the host to your WSL terminal using the GCM helper routing at `/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe`.
-
----
-
-## ➕ Adding a New Tool
-
-1. **Update `packages.yaml`** with the version.
-2. **Update `packages.meta.yaml`** with source metadata.
-3. **Create/update install script** in `.chezmoiscripts/run_once_*.sh.tmpl`.
-4. **Regenerate derived files** with `./scripts/generate-package-lock.sh`, `./scripts/generate-tool-inventory.sh`, and `./scripts/generate-keybinding-docs.sh`.
-5. **Add config** with `chezmoi add ~/.config/newtool/config`.
-6. **Test** with `tests/test-package-metadata.sh`, `tests/test-templates.sh`, and `chezmoi apply --verbose`.
-7. **Commit**: `cd ~/.dotfiles && git add -A && git commit -m "Add newtool" && git push`.
-
-Rollback helper for locally managed tools:
+Local test commands also execute inside Docker:
 
 ```bash
-./scripts/uninstall-tool.sh lazygit
+docker compose -f .github/e2e/compose.yaml --profile selectors run --rm selectors
+docker compose -f .github/e2e/compose.yaml --profile base up --build --abort-on-container-exit
+docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
+docker compose -f .github/e2e/compose.yaml --profile agent run --rm agent
 ```
 
----
+E2E artifacts include redacted text logs, JSONL events, run summaries,
+checkpoints, the install ledger, environment context, process/memory/disk data,
+and shell-startup timing.
 
-## 🎨 Theme: Catppuccin Mocha
+## Repository Map
 
-All tools are themed with [Catppuccin Mocha](https://github.com/catppuccin/catppuccin):
+```text
+.chezmoiscripts/       explicit section implementations
+.github/e2e/           Docker profile harness
+.github/workflows/     CI, version audit, and real WSL workflows
+dot_* / private_dot_*  chezmoi-managed configuration
+profiles/              machine profile definitions
+scripts/               orchestrator, recovery, doctor, update helpers
+tests/                 contracts, units, fixtures, and E2E drivers
+agents.yaml            agent command registry
+packages*.yaml         version and ownership manifests
+```
 
-- ✅ Starship prompt
-- ✅ FZF colors
-- ✅ tmux status bar
-- ✅ Kitty terminal
-- ✅ btop
-- ✅ lazygit
-- ✅ bat (via BAT_THEME)
-- ✅ Neovim (set in LazyVim config)
+Design details and decisions:
 
----
+- [Architecture](docs/architecture.md)
+- [Reliability](docs/reliability.md)
+- [Security Model](docs/security-model.md)
+- [Implemented Improvements](docs/improvements-2026.md)
+- [ADRs](docs/adr/README.md)
 
-## 📝 Manual Steps
+## License
 
-Some things cannot be automated:
-
-1. **Age identity key**: Import `~/.config/chezmoi/key.txt` from backup
-2. **Firefox extensions**: Use Firefox Sync (sign in with your Firefox account)
-3. **VS Code**: Sign in to Settings Sync (GitHub account)
-4. **GNOME extensions** (native only): Install via Extension Manager:
-   - Bluetooth Battery Meter
-   - System Monitor
-   - Grand Theft Focus
-   - Caffeine
-   - Burn My Windows
-   - Coverflow Alt-Tab
-   - GNOME UI Tune
-   - Impatience
-   - Primary Input on Lock Screen
-   - Places Menu
-
----
-
-## 🧪 CI/CD
-
-GitHub Actions runs [CI — Dotfiles Bootstrap](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml) on every push/PR to `main`:
-
-- **Lint**: shellcheck, shfmt, hadolint, yamllint, template validation, package metadata validation, generated doc freshness.
-- **Chezmoi fixture**: applies templates into a temporary home without running install scripts.
-- **Interactive startup**: smoke-tests rendered zsh and tmux startup.
-- **Network install smoke**: verifies GitHub-release tools can still be installed.
-- **Install option e2e**: Exercises full, base-only, selected-section, menu, and invalid flag paths in Docker.
-- **Test Matrix**: Bootstrap test in Docker for:
-  - `ubuntu-24.04-native`
-  - `ubuntu-24.04-wsl` (simulated)
-  - (Extensible for Arch, Fedora, etc.)
-- **Idempotency**: Verifies bootstrap can run twice without errors
-
-### Status Tracking
-
-| Check | Coverage | Current Signal |
-|-------|----------|----------------|
-| **Lint** | shellcheck, shfmt, yamllint, template rendering, repo layout, package metadata, generated docs | Tracks syntax, formatting, YAML, expected layout, manifest coverage, and stale generated files |
-| **Dockerfile Lint** | hadolint against `.github/workflows/Dockerfile.ubuntu-24.04` | Tracks container build hygiene |
-| **Chezmoi Apply Fixture** | Applies rendered dotfiles into a temporary home with scripts and externals excluded | Tracks template destination behavior without installing packages |
-| **Interactive Startup** | zsh interactive startup and tmux config source smoke tests | Tracks shell/tmux parse regressions |
-| **GitHub Release Tool Smoke** | Downloads and runs `lazygit`, `lazydocker`, `sops`, and `tealdeer` | Tracks upstream release asset drift |
-| **Bootstrap Test** | Ubuntu 24.04 native + simulated WSL containers | Tracks core package availability, sourced libraries, directory creation, and config source files |
-| **Install Option E2E** | Full, base-only, `--with`, `--sections`, `--without`, menu, and invalid flag plans | Tracks selector behavior without repeatedly installing packages |
-| **Idempotency Test** | Re-runs package install logic in the same container | Tracks repeatability and skip behavior after first install |
-
-### Latest Successful Run Review
-
-The supplied run is healthy:
-
-- **Bootstrap**: 20 passed, 0 failed, 0 skipped.
-- **Environment coverage**: exercised CI with `WSL=true`, so WSL detection and WSL-safe paths are covered.
-- **Core dependencies**: `git`, `curl`, `wget`, `jq`, `make`, and `unzip` were present after setup.
-- **Filesystem layout**: expected user directories under `~/Code`, `~/Scripts`, `~/.local/bin`, and `~/.config` were created.
-- **Config source coverage**: key chezmoi templates and manifests are present, including `.zshrc`, `.tmux.conf`, `.gitconfig`, `.vimrc`, `starship.toml`, `packages.yaml`, and `.chezmoi.yaml.tmpl`.
-- **Idempotency**: the first run installed missing `wget` and `jq`; the second run skipped already-installed packages, confirming repeatable package handling.
-
-One thing to watch: the idempotency output says "All packages correctly skipped on second run (6 skipped)" while the displayed second run shows four package skip lines. That may be expected if the script counts setup or helper operations too, but the log would be clearer if the skipped count matched visible package checks or printed the hidden skipped items.
-
-### Remaining CI Improvement Ideas
-
-1. **Scheduled drift check**: run weekly against `ubuntu:24.04` to catch upstream apt, curl, GitHub release, and install URL changes before the next code change.
-2. **Prebuild the Docker test image**: publish the Ubuntu CI image through GitHub Container Registry or use build cache to reduce repeated Docker build time.
-3. **Upload logs as artifacts on failure**: preserve bootstrap, idempotency, cargo, and GitHub-release logs for inspection.
-4. **Add checksum enforcement**: replace `checksum: null` in `packages.lock` for direct binary downloads and fail CI when checksums are absent.
-5. **Add a destructive rollback fixture**: install managed binaries into a temp prefix, then verify `scripts/uninstall-tool.sh` removes them cleanly.
-
----
-
-## 📄 License
-
-Personal dotfiles. Use at your own risk.
+Personal configuration repository. Reuse selectively and review every setting
+before applying it to another account or machine.

@@ -14,3 +14,9 @@ Thumbs.db
 # Tool runtime dirs (not dotfiles)
 .antigravitycli/
 .codex/
+
+# Local test and bootstrap artifacts
+artifacts/
+.e2e/
+*.orig
+.version-update-report

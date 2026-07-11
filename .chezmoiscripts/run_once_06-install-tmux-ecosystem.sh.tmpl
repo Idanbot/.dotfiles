@@ -6,35 +6,24 @@ fi
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Tmux Ecosystem"
-
 require_sudo
-
-# Install tmux
 apt_install tmux
 
-# Install tmuxp
-if ! is_installed tmuxp; then
-  log_info "Installing tmuxp..."
-  pip3 install --user tmuxp 2>/dev/null || pipx install tmuxp 2>/dev/null || {
-    if is_installed uv; then
-      uv tool install tmuxp
-    else
-      log_warn "Could not install tmuxp — install manually"
-    fi
-  }
-  log_success "tmuxp installed"
-else
-  log_skip "tmuxp already installed"
+TMUXP_VERSION="$(package_version terminal tmuxp 1.74.0)"
+if ! is_installed uvx; then
+  log_error "uvx is required for reproducible tmuxp workspaces; include the languages section"
+  exit 1
 fi
+log_info "Prewarming tmuxp $TMUXP_VERSION through uvx"
+uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp --version
+record_install tmuxp "$TMUXP_VERSION" uvx "$(uv cache dir)/archive-v0"
+log_success "tmuxp $TMUXP_VERSION is available through uvx"
 
-# TPM is handled by .chezmoiexternal.yaml
-if [[ -d "$HOME/.tmux/plugins/tpm" ]]; then
-  log_success "TPM installed (via chezmoi externals)"
-  # Install tmux plugins
-  log_info "Installing tmux plugins via TPM..."
-  "$HOME/.tmux/plugins/tpm/bin/install_plugins" 2>/dev/null || log_warn "TPM plugin install skipped (tmux may not be running)"
+if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
+  log_info "Installing missing TPM plugins"
+  "$HOME/.tmux/plugins/tpm/bin/install_plugins" || log_warn "TPM deferred plugin installation"
 else
-  log_warn "TPM not yet installed — will be set up by chezmoi externals"
+  log_error "Checksum-pinned TPM external is missing"
 fi
 
 print_summary "Tmux Ecosystem"

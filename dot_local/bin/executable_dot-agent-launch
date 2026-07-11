@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Launch one configured agent, leaving a useful shell when it is unavailable.
+
+set -u
+
+agent="${1:-}"
+case "$agent" in
+  codex | antigravity | claude | opencode | omp) ;;
+  *)
+    printf 'Unknown agent: %s\n' "$agent" >&2
+    exit 2
+    ;;
+esac
+
+if command -v "$agent" >/dev/null 2>&1; then
+  exec "$agent"
+fi
+
+printf '%s is not installed. This window remains in %s.\n' "$agent" "$PWD"
+printf 'Run "dot doctor" for installation and authentication status.\n'
+exec "${SHELL:-/bin/bash}" -l

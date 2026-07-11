@@ -2,30 +2,47 @@
 README.md
 LICENSE
 packages.yaml
+packages.meta.yaml
+packages.lock
+agents.yaml
+profiles/
 scripts/
 tests/
 .github/
 .gitignore
+.gitleaks.toml
+.yamllint.yml
+artifacts/
+docs/
 
 # Platform-specific ignores
 {{ if .is_wsl }}
 # Skip desktop/GUI configs on WSL
-dot_config/private_kitty
+.config/kitty/
 {{ end }}
 
 # Preserve local shell history, completion caches, and interactive session state.
 # These are useful machine-local files and should not be overwritten by chezmoi.
-dot_bash_history
-dot_zsh_history
-dot_lesshst
-dot_python_history
-dot_mysql_history
-dot_psql_history
-dot_sqlite_history
-dot_node_repl_history
-dot_rediscli_history
-dot_wget-hsts
-dot_zcompdump*
-dot_zsh_sessions/
-dot_local/share/zsh/
-dot_local/state/zsh/
+.bash_history
+.zsh_history
+.lesshst
+.python_history
+.mysql_history
+.psql_history
+.sqlite_history
+.node_repl_history
+.rediscli_history
+.wget-hsts
+.zcompdump*
+.zsh_sessions/
+.local/share/zsh/
+.local/state/zsh/
+
+# Explicitly local-only overlays and credentials. These paths are never
+# materialized from this public source state.
+.config/dotfiles/local.zsh
+.config/dotfiles/local.bash
+.config/dotfiles/local.tmux.conf
+.config/dotfiles/machine.conf
+.config/git/config.local
+.ssh/config.local

@@ -10,8 +10,6 @@
 {{- end }}
 [credential "https://dev.azure.com"]
 	useHttpPath = true
-[credential "https://git.idanbot.uk"]
-	provider = generic
 [push]
 	autoSetupRemote = true
 [init]
@@ -30,3 +28,5 @@
 	tool = nvimdiff
 [merge]
 	tool = nvimdiff
+[include]
+	path = ~/.config/git/config.local

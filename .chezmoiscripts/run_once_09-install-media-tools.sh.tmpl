@@ -6,51 +6,48 @@ fi
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Media Tools"
-
 if is_wsl; then
-  log_skip "Skipping media tools on WSL"
+  log_skip "Media tools are disabled on WSL"
   print_summary "Media Tools"
   exit 0
 fi
 
-# ── yt-dlp ────────────────────────────────────────────────────────────────────
-if ! is_installed yt-dlp; then
-  log_info "Installing yt-dlp..."
-  pip3 install --user yt-dlp 2>/dev/null || {
-    if is_installed uv; then
-      uv tool install yt-dlp
-    else
-      sudo curl -fsSLo /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
-      sudo chmod a+rx /usr/local/bin/yt-dlp
-    fi
-  }
-  log_success "yt-dlp installed"
+YTDLP_VERSION="$(package_version media yt_dlp 2026.07.04)"
+if ! is_installed uv; then
+  log_error "uv is required for yt-dlp; include the languages section"
 else
-  log_skip "yt-dlp already installed"
+  uv tool install --force "yt-dlp==${YTDLP_VERSION}"
+  record_install yt-dlp "$YTDLP_VERSION" uv "$(uv tool dir)/yt-dlp"
+  log_success "yt-dlp $YTDLP_VERSION installed"
 fi
 
-# ── cava (audio visualizer) ───────────────────────────────────────────────────
-apt_install cava 2>/dev/null || log_warn "cava not available in apt — install from source if needed"
+require_sudo
+apt_install cava mpd
 
-# ── rmpc + mpd ────────────────────────────────────────────────────────────────
-apt_install mpd 2>/dev/null || log_warn "mpd not available"
-if ! is_installed rmpc; then
-  log_info "Installing rmpc..."
-  RMPC_VERSION=$(github_latest_release "mierak/rmpc" 2>/dev/null || echo "")
-  if [[ -n "$RMPC_VERSION" ]]; then
-    curl -fsSLo /tmp/rmpc.tar.gz "https://github.com/mierak/rmpc/releases/download/${RMPC_VERSION}/rmpc-$(uname -m)-unknown-linux-gnu.tar.gz" 2>/dev/null
-    if [[ -f /tmp/rmpc.tar.gz ]]; then
-      tar -xf /tmp/rmpc.tar.gz -C /tmp 2>/dev/null
-      sudo install /tmp/rmpc /usr/local/bin/rmpc 2>/dev/null && log_success "rmpc installed" || log_warn "rmpc install failed"
-      rm -f /tmp/rmpc /tmp/rmpc.tar.gz
-    else
-      log_warn "rmpc download failed"
-    fi
-  else
-    log_warn "Could not determine rmpc version — skipping"
-  fi
+RMPC_VERSION="$(package_version media rmpc 0.11.0)"
+case "$(get_arch)" in
+  amd64)
+    RMPC_TARGET=x86_64-unknown-linux-gnu
+    RMPC_SHA=b03d4b777cf0afe61107abb4ee847b7c6539b8f5c76555fd759cd15a6c1ff604
+    ;;
+  arm64)
+    RMPC_TARGET=aarch64-unknown-linux-gnu
+    RMPC_SHA=12d9bb3bcabfe90c0573afac9b11e20333262872966a8769967611b578ff7328
+    ;;
+esac
+if ! is_installed rmpc || ! version_ge "$(rmpc --version 2>/dev/null || true)" "$RMPC_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  asset="rmpc-v${RMPC_VERSION}-${RMPC_TARGET}.tar.gz"
+  download_verified \
+    "https://github.com/mierak/rmpc/releases/download/v${RMPC_VERSION}/$asset" \
+    "$tmpdir/$asset" "sha256:$RMPC_SHA" "$asset"
+  tar -xzf "$tmpdir/$asset" -C "$tmpdir"
+  install_managed_binary "$tmpdir/rmpc" rmpc "$RMPC_VERSION" github:mierak/rmpc
+  rm -rf "$tmpdir"
+  ((_INSTALLED++)) || true
+  log_success "rmpc $RMPC_VERSION installed"
 else
-  log_skip "rmpc already installed"
+  log_skip "rmpc $RMPC_VERSION already installed or newer"
 fi
 
 print_summary "Media Tools"

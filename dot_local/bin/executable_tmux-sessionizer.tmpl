@@ -1,29 +1,73 @@
 #!/usr/bin/env bash
-# tmux-sessionizer — Quick project session switcher (ThePrimeagen-inspired)
-# Search dirs configured via chezmoi: {{ .sessionizer_dirs }}
+# Project session switcher. Search roots: {{ .sessionizer_dirs }}
 
-if [[ $# -eq 1 ]]; then
-  selected=$1
-else
-  # Search directories from chezmoi config
-  # shellcheck disable=SC2086
-  selected=$(find {{ .sessionizer_dirs }} -mindepth 1 -maxdepth 1 -type d 2>/dev/null | fzf)
+set -euo pipefail
+
+SESSIONIZER_DIRS={{ .sessionizer_dirs | quote }}
+read -r -a SEARCH_ROOTS <<< "$SESSIONIZER_DIRS"
+ROOT_INDEX=""
+SELECTED=""
+PRINT_ONLY=false
+AGENT_WORKSPACE=false
+
+usage() {
+  cat <<'USAGE'
+Usage: tmux-sessionizer [-s index] [--workspace] [--print] [directory]
+
+  -s, --search-root N  Limit the picker to the Nth configured search root
+  --workspace          Launch the selected project with dot-workspace
+  --print              Print the selected path without changing tmux
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s | --search-root) ROOT_INDEX="${2:-}"; shift 2 ;;
+    --search-root=*) ROOT_INDEX="${1#*=}"; shift ;;
+    --workspace) AGENT_WORKSPACE=true; shift ;;
+    --print) PRINT_ONLY=true; shift ;;
+    -h | --help) usage; exit 0 ;;
+    -*) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+    *)
+      [[ -z "$SELECTED" ]] || { printf 'Only one directory may be supplied\n' >&2; exit 2; }
+      SELECTED="$1"
+      shift
+      ;;
+  esac
+done
+
+roots=()
+for root in "${SEARCH_ROOTS[@]}"; do
+  root="${root/#\~/$HOME}"
+  [[ -d "$root" ]] && roots+=("$root")
+done
+
+if [[ -n "$ROOT_INDEX" ]]; then
+  [[ "$ROOT_INDEX" =~ ^[0-9]+$ ]] || { printf 'Search root index must be numeric\n' >&2; exit 2; }
+  [[ "$ROOT_INDEX" -lt "${#roots[@]}" ]] || { printf 'Search root %s is not configured\n' "$ROOT_INDEX" >&2; exit 2; }
+  roots=("${roots[$ROOT_INDEX]}")
 fi
 
-if [[ -z $selected ]]; then
+if [[ -z "$SELECTED" ]]; then
+  [[ ${#roots[@]} -gt 0 ]] || exit 0
+  SELECTED="$(find "${roots[@]}" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort -u | fzf || true)"
+fi
+[[ -n "$SELECTED" ]] || exit 0
+SELECTED="$(cd "$SELECTED" && pwd -P)"
+
+if [[ "$PRINT_ONLY" == true ]]; then
+  printf '%s\n' "$SELECTED"
   exit 0
 fi
-
-selected_name=$(basename "$selected" | tr ":,. " "____")
-tmux_running=$(pgrep tmux)
-
-if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
-  tmux new-session -s "$selected_name" -c "$selected"
-  exit 0
+if [[ "$AGENT_WORKSPACE" == true ]]; then
+  exec dot-workspace "$SELECTED"
 fi
 
-if ! tmux has-session -t="$selected_name" 2>/dev/null; then
-  tmux new-session -ds "$selected_name" -c "$selected"
+session_name="$(basename "$SELECTED" | tr -cs '[:alnum:]_-' '_')"
+if ! tmux has-session -t "=$session_name" 2>/dev/null; then
+  tmux new-session -d -s "$session_name" -c "$SELECTED"
 fi
-
-tmux switch-client -t "$selected_name"
+if [[ -n "${TMUX:-}" ]]; then
+  exec tmux switch-client -t "=$session_name"
+fi
+exec tmux attach-session -t "=$session_name"

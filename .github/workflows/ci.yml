@@ -1,361 +1,382 @@
-name: CI — Dotfiles Bootstrap
+name: CI - Reliable Bootstrap
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "31 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      run_heavy_e2e:
+        description: Run developer, agent, cloud, and full live installs
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   gitleaks:
-    name: Gitleaks Scan
-    runs-on: ubuntu-latest
+    name: Secret Scan
+    runs-on: ubuntu-24.04
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
-      - name: Gitleaks Scan
-        # v2.3.9 is latest; no Node 24 build yet — FORCE env var is workaround
-        uses: gitleaks/gitleaks-action@v2.3.9
+          persist-credentials: false
+      - name: Scan full history and documentation
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
   lint:
-    name: Lint
-    runs-on: ubuntu-latest
+    name: Shell, YAML, Template, and Generated Files
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Add local bin to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Cache binaries
-        id: cache-binaries
-        uses: actions/cache@v5
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          path: |
-            ~/.local/bin/shfmt
-            ~/.local/bin/chezmoi
-          key: bin-cache-${{ runner.os }}-${{ hashFiles('packages.yaml') }}
-          restore-keys: |
-            bin-cache-${{ runner.os }}-
-
-      - name: Install linters
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install lint tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y shellcheck yamllint tmux zsh
-          # shfmt
-          if ! command -v shfmt &>/dev/null; then
-            mkdir -p ~/.local/bin
-            shfmt_url=https://github.com/mvdan/sh/releases/download/v3.10.0
-            curl -fsSLo ~/.local/bin/shfmt \
-              "$shfmt_url/shfmt_v3.10.0_linux_amd64"
-            chmod +x ~/.local/bin/shfmt
-          fi
-
-      - name: shellcheck
+          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+          ./scripts/install-chezmoi.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Shellcheck
         run: |
-          echo "══ Running shellcheck ══"
-          find . -name '*.sh' -print0 | \
+          find scripts tests -type f -name '*.sh' -print0 | \
             xargs -0 shellcheck -x -S warning -e SC1090,SC1091
-
+          find dot_local/bin -type f \( -name 'executable_*' ! -name '*.tmpl' \) -print0 | \
+            xargs -0 shellcheck -x -S warning -e SC1090,SC1091
       - name: shfmt
         run: |
-          echo "══ Running shfmt ══"
-          find . -name '*.sh' -print0 | xargs -0 shfmt -d -i 2 -ci
-
-      - name: yamllint
+          find scripts tests -type f -name '*.sh' -print0 | \
+            xargs -0 shfmt -d -i 2 -ci
+          find dot_local/bin -type f \( -name 'executable_*' ! -name '*.tmpl' \) -print0 | \
+            xargs -0 shfmt -d -i 2 -ci
+      - name: YAML
+        run: yamllint .
+      - name: Templates and repository contracts
         run: |
-          echo "══ Running yamllint ══"
-          yamllint .
-
-      - name: Validate templates
-        run: tests/test-templates.sh "$PWD"
-
-      - name: Repository layout
-        run: tests/test-repo-layout.sh
-
-      - name: Bootstrap safety
-        run: tests/test-bootstrap-safety.sh "$PWD"
-
-      - name: Package metadata and generated docs
-        run: tests/test-package-metadata.sh
-
-      - name: Install chezmoi
-        run: |
-          if ! command -v chezmoi &>/dev/null; then
-            mkdir -p ~/.local/bin
-            sh -c "$(curl -fsLS get.chezmoi.io)" -- -b ~/.local/bin
-          fi
-
-      - name: Chezmoi apply fixture
-        run: tests/test-chezmoi-apply.sh "$PWD"
-
-      - name: Interactive startup smoke
-        run: tests/test-interactive-startup.sh "$PWD"
+          tests/test-templates.sh "$PWD"
+          tests/test-repo-layout.sh "$PWD"
+          tests/test-bootstrap-safety.sh "$PWD"
+          tests/test-package-metadata.sh "$PWD"
+          tests/test-static-policy.sh "$PWD"
+          tests/test-chezmoi-apply.sh "$PWD"
+          tests/test-interactive-startup.sh "$PWD"
 
   hadolint:
     name: Dockerfile Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
       - name: hadolint
-        uses: hadolint/hadolint-action@v3.3.0
+        uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
           dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
           failure-threshold: warning
 
-  workflow-static:
-    name: Workflow & Static Policy
-    runs-on: ubuntu-latest
+  workflow-security:
+    name: Actionlint and Zizmor
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          fetch-depth: 2
-
-      - name: Add local bin to PATH
-        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Install static policy tools
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install workflow analyzers
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y jq python3
-          mkdir -p ~/.local/bin
-          actionlint_version=1.7.7
-          actionlint_url="https://github.com/rhysd/actionlint/releases/download/v${actionlint_version}"
-          curl -fsSLo /tmp/actionlint.tar.gz \
-            "$actionlint_url/actionlint_${actionlint_version}_linux_amd64.tar.gz"
-          tar -xzf /tmp/actionlint.tar.gz -C ~/.local/bin actionlint
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          pipx install zizmor==1.26.1
+      - name: Analyze workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          actionlint
+          zizmor --pedantic .
 
-      - name: actionlint
-        run: actionlint
+  trivy:
+    name: Filesystem and Misconfiguration Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Trivy repository scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
 
-      - name: Static policy checks
-        run: tests/test-static-policy.sh "$PWD"
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+      - name: Non-PR event
+        if: github.event_name != 'pull_request'
+        run: echo "Dependency review applies to pull requests"
 
   github-release-tools:
-    name: GitHub Release Tool Smoke
-    needs: [gitleaks, lint, hadolint, workflow-static]
-    runs-on: ubuntu-latest
+    name: Verified Release Asset Smoke
+    needs: [gitleaks, lint, hadolint, workflow-security, trivy, dependency-review]
+    runs-on: ubuntu-24.04
     steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - name: Checkout
-        uses: actions/checkout@v6
-      - name: Download and smoke GitHub release tools
-        run: tests/test-github-release-tools.sh "$PWD"
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install archive prerequisites
+        run: sudo apt-get update -qq && sudo apt-get install -y curl jq
+      - name: Verify upstream checksum paths
+        run: |
+          tests/test-github-release-tools.sh "$PWD"
+          tests/test-external-tools.sh "$PWD"
 
-  install-selectors:
-    name: Selector E2E (${{ matrix.profile.name }}/${{ matrix.selector.name }})
+  pre-matrix:
+    name: Pre-Matrix Gate
     needs: [github-release-tools]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "All static, security, workflow, and release-smoke gates passed"
+
+  selectors:
+    name: Selector (${{ matrix.name }})
+    needs: [pre-matrix]
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        profile:
-          - name: native
-            wsl: "false"
-          - name: wsl
-            wsl: "true"
-        selector:
-          - name: default-full
-            args: ""
-            input: ""
-            mode: full
-            sections: detect,core,zsh,terminal,languages,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services
-            apply_scripts: "true"
-          - name: base-only
-            args: "--base-only"
-            input: ""
-            mode: base
+        include:
+          - name: minimal
+            args: --profile minimal
+            mode: profile
+            sections: detect,core
+          - name: full
+            args: --profile full
+            mode: profile
+            sections: detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services
+          - name: base
+            args: --profile base
+            mode: profile
             sections: detect,core,zsh,terminal
-            apply_scripts: "false"
-          - name: base-with-languages-tmux
-            args: "--with languages,tmux"
-            input: ""
-            mode: base
-            sections: detect,core,zsh,terminal,languages,tmux
-            apply_scripts: "false"
-          - name: base-with-ai-neovim
-            args: "--with=ai,neovim"
-            input: ""
-            mode: base
-            sections: detect,core,zsh,terminal,neovim,ai
-            apply_scripts: "false"
-          - name: exact-core-languages
-            args: "--sections core,languages"
-            input: ""
+          - name: developer
+            args: --profile developer
+            mode: profile
+            sections: detect,core,zsh,terminal,languages,history,tmux,neovim,system,theme,services
+          - name: agent
+            args: --profile agent
+            mode: profile
+            sections: detect,core,zsh,terminal,languages,history,tmux,neovim,ai,system,theme,services
+          - name: cloud
+            args: --profile cloud
+            mode: profile
+            sections: detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,system,theme,services
+          - name: custom
+            args: --sections core,languages
             mode: custom
             sections: core,languages
-            apply_scripts: "false"
-          - name: full-without-cloud-vscode
-            args: "--full --without cloud,vscode"
-            input: ""
-            mode: full
-            sections: detect,core,zsh,terminal,languages,tmux,neovim,ai,media,fonts,desktop,system,theme,services
-            apply_scripts: "false"
-          - name: menu-base
-            args: "--menu"
-            input: "2\\n"
-            mode: base
-            sections: detect,core,zsh,terminal
-            apply_scripts: "false"
-
+          - name: exclusions
+            args: --full --without cloud,vscode
+            mode: profile
+            sections: detect,core,zsh,terminal,languages,history,tmux,neovim,ai,media,fonts,desktop,system,theme,services
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Run selector profile in Docker
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Validate selector in clean Ubuntu
         env:
-          INSTALL_SELECTOR_INPUT: ${{ matrix.selector.input }}
+          SELECTOR_ARGS: ${{ matrix.args }}
+          SELECTOR_MODE: ${{ matrix.mode }}
+          SELECTOR_SECTIONS: ${{ matrix.sections }}
         run: |
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e INSTALL_SELECTOR_INPUT \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            ubuntu:24.04 \
-            bash -lc '
-              set -euo pipefail
-              selector_args=()
-              if [[ -n "${{ matrix.selector.args }}" ]]; then
-                read -ra selector_args <<< "${{ matrix.selector.args }}"
-              fi
-              /dotfiles/tests/test-install-selector-profile.sh \
-                "${{ matrix.selector.mode }}" \
-                "${{ matrix.selector.sections }}" \
-                "${{ matrix.selector.apply_scripts }}" \
-                -- "${selector_args[@]}"
-            '
+          read -r -a selector_argv <<< "${SELECTOR_ARGS:-}"
+          docker run --rm -v "$PWD:/dotfiles:ro" ubuntu:24.04 \
+            /dotfiles/tests/test-install-selector-profile.sh \
+            "${SELECTOR_MODE:?}" "${SELECTOR_SECTIONS:?}" false -- "${selector_argv[@]}"
 
-  test:
-    name: Bootstrap Test (${{ matrix.profile.name }})
-    needs: [github-release-tools, install-selectors]
-    runs-on: ubuntu-latest
+  unit:
+    name: Docker Unit (${{ matrix.platform }})
+    needs: [pre-matrix]
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        profile:
-          - name: ubuntu-24.04-native
+        include:
+          - platform: native
             wsl: "false"
-            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
-          - name: ubuntu-24.04-wsl
+          - platform: wsl-simulated
             wsl: "true"
-            dockerfile: .github/workflows/Dockerfile.ubuntu-24.04
-          # Future distros:
-          # - name: arch-latest
-          #   wsl: "false"
-          #   dockerfile: .github/workflows/Dockerfile.arch
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build test container
-        uses: docker/build-push-action@v7
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          context: .
-          file: ${{ matrix.profile.dockerfile }}
-          tags: dotfiles-test
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Install option e2e
+          persist-credentials: false
+      - name: Run behavioral suite in Docker
+        env:
+          MATRIX_WSL: ${{ matrix.wsl }}
         run: |
-          ARTIFACTS="artifacts/test-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
+          docker build -f .github/workflows/Dockerfile.ubuntu-24.04 -t dotfiles-unit .
           docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            dotfiles-test \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/install-options-env.txt
-              /dotfiles/tests/test-install-options.sh \
-                2>&1 | tee /artifacts/install-options.log
+            -e DOTFILES_WSL="$MATRIX_WSL" \
+            -v "$PWD:/dotfiles:ro" \
+            dotfiles-unit bash -lc '
+              set -e
+              sudo apt-get update -qq
+              sudo apt-get install -y yq zsh tmux
+              /dotfiles/scripts/install-chezmoi.sh
+              export PATH="$HOME/.local/bin:$PATH"
+              for test in \
+                test-environment.sh test-version-helpers.sh test-profiles.sh \
+                test-secret-boundary.sh test-agent-workspace.sh test-sessionizer.sh \
+                test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
+                /dotfiles/tests/$test /dotfiles
+              done
             '
 
-      - name: Chezmoi apply fixture
-        run: |
-          ARTIFACTS="artifacts/test-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            dotfiles-test \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/chezmoi-env.txt
-              {
-                mkdir -p ~/.local/bin &&
-                sh -c "$(curl -fsLS get.chezmoi.io)" \
-                  -- -b ~/.local/bin &&
-                /dotfiles/tests/test-chezmoi-apply.sh /dotfiles
-              } 2>&1 | tee /artifacts/chezmoi-apply.log
-              find "$HOME" -maxdepth 3 -type f \
-                | sort > /artifacts/home-files.txt
-            '
-
-      - name: Run bootstrap test
-        run: |
-          ARTIFACTS="artifacts/bootstrap-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            dotfiles-test \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/bootstrap-env.txt
-              /dotfiles/tests/test-bootstrap.sh \
-                2>&1 | tee /artifacts/bootstrap.log
-              find "$HOME" -maxdepth 3 -type f \
-                | sort > /artifacts/home-files-after-bootstrap.txt
-            '
-
-      - name: Run idempotency test
-        run: |
-          ARTIFACTS="artifacts/idempotency-${{ matrix.profile.name }}"
-          mkdir -p "$ARTIFACTS"
-          docker run --rm \
-            -e DOTFILES_WSL=${{ matrix.profile.wsl }} \
-            -e DOTFILES_CI=true \
-            -e DOTFILES_LOG_DIR=/artifacts \
-            -v ${{ github.workspace }}/$ARTIFACTS:/artifacts \
-            -v ${{ github.workspace }}:/dotfiles:ro \
-            dotfiles-test \
-            bash -lc '
-              set -o pipefail
-              env | sort > /artifacts/idempotency-env.txt
-              /dotfiles/tests/test-idempotency.sh \
-                2>&1 | tee /artifacts/idempotency.log
-              find "$HOME" -maxdepth 3 -type f \
-                | sort > /artifacts/home-files-after-idempotency.txt
-            '
-
-      - name: Upload bootstrap logs
-        if: failure()
-        uses: actions/upload-artifact@v7
+  base-e2e:
+    name: Two-Pass Base E2E (${{ matrix.service }})
+    needs: [pre-matrix, selectors, unit]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [base-native, base-wsl-simulated]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          name: bootstrap-logs-${{ matrix.profile.name }}
+          persist-credentials: false
+      - name: Prepare artifact volume
+        run: mkdir -p artifacts && chmod 0777 artifacts
+      - name: Run real installer twice
+        env:
+          E2E_SERVICE: ${{ matrix.service }}
+        run: |
+          docker compose -f .github/e2e/compose.yaml --profile base \
+            up --build --abort-on-container-exit \
+            --exit-code-from "$E2E_SERVICE" "$E2E_SERVICE"
+      - name: Upload E2E observability bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: base-e2e-${{ matrix.service }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  recovery-e2e:
+    name: Recovery and Resume E2E
+    needs: [pre-matrix, unit]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Prepare artifact volume
+        run: mkdir -p artifacts && chmod 0777 artifacts
+      - name: Backup and restore
+        run: docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
+      - name: Inject failure and resume
+        run: docker compose -f .github/e2e/compose.yaml --profile recovery run --rm failure-resume
+      - name: Upload recovery logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: recovery-e2e
           path: artifacts/
           if-no-files-found: ignore
+          retention-days: 14
+
+  heavy-e2e:
+    name: Live ${{ matrix.service }} E2E
+    if: github.event_name == 'schedule' || inputs.run_heavy_e2e == true
+    needs: [base-e2e, recovery-e2e]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        service: [developer, agent, cloud, full]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Prepare artifact volume
+        run: mkdir -p artifacts && chmod 0777 artifacts
+      - name: Run live profile
+        env:
+          E2E_SERVICE: ${{ matrix.service }}
+        run: |
+          docker compose -f .github/e2e/compose.yaml --profile "$E2E_SERVICE" \
+            up --build --abort-on-container-exit \
+            --exit-code-from "$E2E_SERVICE" "$E2E_SERVICE"
+      - name: Upload profile logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: heavy-e2e-${{ matrix.service }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
