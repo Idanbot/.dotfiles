@@ -24,8 +24,8 @@ check_git_whitespace() {
   fi
 
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
-    git -C "$DOTFILES_DIR" fetch --depth=1 origin "$GITHUB_BASE_REF"
-    git -C "$DOTFILES_DIR" diff --check "origin/$GITHUB_BASE_REF...HEAD"
+    git -C "$DOTFILES_DIR" fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+    git -C "$DOTFILES_DIR" diff --check FETCH_HEAD HEAD
   elif [[ "${GITHUB_ACTIONS:-}" == "true" ]] && git -C "$DOTFILES_DIR" rev-parse HEAD^ >/dev/null 2>&1; then
     git -C "$DOTFILES_DIR" diff --check HEAD^ HEAD
   else
