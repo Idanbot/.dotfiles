@@ -5,6 +5,7 @@ set -euo pipefail
 
 BUDGET_MS="${DOTFILES_ZSH_STARTUP_BUDGET_MS:-3000}"
 ARTIFACT="${1:-/tmp/zsh-startup.json}"
+DEBUG_DIR="${ARTIFACT%.json}-debug"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -19,7 +20,16 @@ command -v script >/dev/null 2>&1 || {
 
 run_zsh() {
   local transcript="$1"
-  TERM=xterm-256color timeout 10 script -qefc 'zsh -lic exit' "$transcript" >/dev/null
+  local status=0
+  TERM=xterm-256color timeout 10 script -qefc 'zsh -lic exit' "$transcript" </dev/null >/dev/null || status=$?
+  if [[ "$status" -ne 0 ]]; then
+    rm -rf "$DEBUG_DIR"
+    mkdir -p "$DEBUG_DIR"
+    cp -a "$tmp"/. "$DEBUG_DIR/"
+    ps -ef >"$DEBUG_DIR/processes.txt"
+    printf 'zsh startup command failed with exit %s; diagnostics: %s\n' "$status" "$DEBUG_DIR" >&2
+    return "$status"
+  fi
 }
 
 run_zsh "$tmp/warmup.out"

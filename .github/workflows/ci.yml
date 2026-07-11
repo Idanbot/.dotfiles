@@ -83,6 +83,7 @@ jobs:
           tests/test-templates.sh "$PWD"
           tests/test-repo-layout.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
+          tests/test-e2e-shell.sh "$PWD"
           tests/test-package-metadata.sh "$PWD"
           tests/test-static-policy.sh "$PWD"
           tests/test-chezmoi-apply.sh "$PWD"

@@ -16,9 +16,10 @@ printf '\n== Repository Layout ==\n'
 required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
+  scripts/e2e-shell.sh
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
-  .github/e2e/compose.yaml tests/e2e/test-install.sh
+  .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh
 )
 for path in "${required[@]}"; do
@@ -80,6 +81,13 @@ if grep -Fq 'npm_install_global @oh-my-pi/pi-coding-agent' \
   fail "OMP npm installation requires an undeclared Bun runtime"
 else
   pass "OMP uses its checksum-pinned standalone release"
+fi
+
+if grep -Fq 'CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
+  pass "Codex standalone installation cannot launch an interactive session"
+else
+  fail "Codex standalone installation must suppress vendor prompts"
 fi
 
 for preserved in .bash_history .zsh_history .lesshst '.zcompdump*' .zsh_sessions/ .local/share/zsh/; do

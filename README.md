@@ -268,6 +268,36 @@ docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
 docker compose -f .github/e2e/compose.yaml --profile agent run --rm agent
 ```
 
+For manual validation, the wrapper runs a complete native-Ubuntu installation,
+executes the acceptance suite, and then leaves the disposable container open at
+a login shell:
+
+```bash
+./scripts/e2e-shell.sh
+```
+
+The default is `--profile full --platform native --passes 1`. The validation
+result is available inside the shell as `DOTFILES_E2E_STATUS`; `0` means the
+automated checks passed. Exit the shell to delete the container. Redacted logs,
+run summaries, diagnostics, and timing data remain under
+`artifacts/full-false/`. A first full run can take several minutes and consume
+several gigabytes because it installs the complete native workstation profile.
+
+Useful variants:
+
+```bash
+./scripts/e2e-shell.sh --passes 2             # verify installer idempotency
+./scripts/e2e-shell.sh --profile agent        # smaller agent workstation
+./scripts/e2e-shell.sh --platform wsl         # simulated WSL behavior
+./scripts/e2e-shell.sh --no-build             # reuse the current E2E image
+./scripts/e2e-shell.sh --help
+```
+
+The container validates Ubuntu package and configuration behavior, but it
+cannot prove native GUI integration, physical-device behavior, or Windows/WSL
+interop. Those remain acceptance checks for the target machine or the real-WSL
+workflow.
+
 E2E artifacts include redacted text logs, JSONL events, run summaries,
 checkpoints, the install ledger, environment context, process/memory/disk data,
 and shell-startup timing.

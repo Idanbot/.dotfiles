@@ -23,7 +23,7 @@ if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   download_verified \
     https://chatgpt.com/codex/install.sh "$tmpdir/codex-install.sh" \
     "sha256:$CODEX_INSTALLER_SHA" codex-install.sh
-  sh "$tmpdir/codex-install.sh"
+  CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
   rm -rf "$tmpdir"
   export PATH="$HOME/.local/bin:$PATH"
   is_installed codex || { log_error "Codex standalone installer did not expose codex in PATH"; exit 1; }
