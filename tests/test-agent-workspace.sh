@@ -64,6 +64,9 @@ allowed="$(env -u HERDR_ENV TMUX=/tmp/tmux "$WORKSPACE" "$HOME/project with spac
 printf '#!/bin/sh\nprintf "codex-launched\\n"\n' >"$HOME/bin/codex"
 chmod +x "$HOME/bin/codex"
 [[ "$($AGENT_LAUNCH codex)" == codex-launched ]]
+mkdir -p "$HOME/pane-home"
+[[ "$(HOME="$HOME/pane-home" DOTFILES_AGENT_REGISTRY="$DOTFILES_AGENT_REGISTRY" \
+  "$AGENT_LAUNCH" codex)" == codex-launched ]]
 set +e
 "$AGENT_LAUNCH" unknown-agent >/dev/null 2>&1
 status=$?

@@ -294,7 +294,8 @@ run_herdr_workspace() {
       tab_id="$(jq -er '.result.tab.tab_id' <<<"$response")"
       placeholder_pane="$(jq -er '.result.root_pane.pane_id' <<<"$response")"
       if ! herdr agent start "$agent" --workspace "$workspace_id" --tab "$tab_id" \
-        --cwd "$WORKDIR" --no-focus -- dot-agent-launch "$agent" >/dev/null; then
+        --cwd "$WORKDIR" --no-focus -- env "DOTFILES_AGENT_REGISTRY=$REGISTRY" \
+        dot-agent-launch "$agent" >/dev/null; then
         herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
         return 1
       fi

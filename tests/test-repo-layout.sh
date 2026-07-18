@@ -105,6 +105,13 @@ else
   fail "workspace nesting policy is incomplete"
 fi
 
+if grep -Fq 'env "DOTFILES_AGENT_REGISTRY=$REGISTRY"' \
+  "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
+  pass "Herdr agent panes receive the resolved registry path"
+else
+  fail "Herdr agent panes can lose the registry when HOME is reset"
+fi
+
 if grep -Fq 'for integration in claude codex opencode omp; do' \
   "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
   grep -Fq 'herdr integration install "$integration"' \
