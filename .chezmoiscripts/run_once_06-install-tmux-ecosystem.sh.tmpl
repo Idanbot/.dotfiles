@@ -13,13 +13,12 @@ HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
 case "$(get_arch)" in
   amd64)
     HERDR_ASSET=herdr-linux-x86_64
-    HERDR_SHA256=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
     ;;
   arm64)
     HERDR_ASSET=herdr-linux-aarch64
-    HERDR_SHA256=544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
     ;;
 esac
+HERDR_SHA256="$(package_metadata terminal herdr "sha256_$(get_arch)")"
 install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" "$HERDR_ASSET" herdr \
   "sha256:$HERDR_SHA256" 'herdr --version'
 

@@ -3,7 +3,7 @@
 
 generated_from:
   packages: 11df34c4a43a395e0c55835be6da91bea9cf25eeb71395388117248dee33137a
-  metadata: a9194063a7c5f854d63469eb7696861bc80e10125dc6264a08b0acf5d0ab55d3
+  metadata: bf172e46dd933171f37f56bb14fb7e5ce35ddffef9062478bce7b756477353bd
 
 tools:
   - section: bootstrap
@@ -51,6 +51,8 @@ tools:
     owner: dotfiles-binary
     repo: eza-community/eza
     binary: eza
+    sha256_amd64: 0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
+    sha256_arm64: 366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
     integrity: pinned-sha256
   - section: core
     name: lazygit

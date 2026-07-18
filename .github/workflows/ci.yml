@@ -86,6 +86,7 @@ jobs:
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"
           tests/test-package-metadata.sh "$PWD"
+          tests/test-update-packages.sh "$PWD"
           tests/test-static-policy.sh "$PWD"
           tests/test-chezmoi-apply.sh "$PWD"
           tests/test-interactive-startup.sh "$PWD"
@@ -175,9 +176,36 @@ jobs:
         if: github.event_name != 'pull_request'
         run: echo "Dependency review applies to pull requests"
 
+  version-report:
+    name: Version and Checksum Report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Check latest versions and checksums
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
+        run: |
+          ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
+          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload upgrade report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: version-checksum-report
+          path: ${{ runner.temp }}/dotfiles-upgrade-report.md
+          retention-days: 14
+
   github-release-tools:
     name: Verified Release Asset Smoke
-    needs: [gitleaks, lint, hadolint, workflow-security, trivy, dependency-review]
+    needs: [gitleaks, lint, hadolint, workflow-security, trivy, dependency-review, version-report]
     runs-on: ubuntu-24.04
     steps:
       - name: Harden runner

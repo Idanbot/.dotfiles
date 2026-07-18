@@ -83,10 +83,7 @@ install_github_archive \
 AWS_VERSION="$(package_version cloud aws_cli 2.34.54)"
 AWS_CURRENT="$(aws --version 2>/dev/null || true)"
 if ! is_installed aws || ! version_ge "$AWS_CURRENT" "$AWS_VERSION"; then
-  case "$ARCH" in
-    amd64) AWS_SHA=de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a ;;
-    arm64) AWS_SHA=f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60 ;;
-  esac
+  AWS_SHA="$(package_metadata cloud aws_cli "sha256_$ARCH")"
   tmpdir="$(mktemp -d)"
   asset="awscli-exe-linux-${AWS_ARCH}-${AWS_VERSION}.zip"
   log_info "Installing AWS CLI $AWS_VERSION"

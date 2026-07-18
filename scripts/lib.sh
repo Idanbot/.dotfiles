@@ -445,6 +445,32 @@ package_version() {
   ' "$manifest"
 }
 
+package_metadata() {
+  local section="$1" key="$2" field="$3" default="${4:-}" metadata
+  metadata="${DOTFILES_PACKAGES_META_FILE:-$DOTFILES_SOURCE_DIR/packages.meta.yaml}"
+  [[ -f "$metadata" ]] || {
+    printf '%s\n' "$default"
+    return 0
+  }
+
+  awk -v section="$section" -v key="$key" -v field="$field" -v fallback="$default" '
+    $0 == section ":" { in_section = 1; next }
+    in_section && $0 ~ /^[^[:space:]#].*:[[:space:]]*$/ { in_section = 0 }
+    in_section && $0 == "  " key ":" { in_tool = 1; next }
+    in_tool && $0 ~ /^  [^[:space:]#].*:[[:space:]]*$/ { in_tool = 0 }
+    in_tool && $0 ~ "^    " field ":[[:space:]]*" {
+      value = $0
+      sub("^    " field ":[[:space:]]*", "", value)
+      sub(/[[:space:]]+#.*$/, "", value)
+      gsub(/^[\047\"]|[\047\"]$/, "", value)
+      print value
+      found = 1
+      exit
+    }
+    END { if (!found) print fallback }
+  ' "$metadata"
+}
+
 managed_state_root() {
   printf '%s\n' "${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
 }

@@ -33,17 +33,16 @@ fi
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
-    EZA_SHA=0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
     ;;
   arm64)
     RELEASE_ARCH=aarch64
-    EZA_SHA=366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
     ;;
   *)
     log_error "Unsupported release architecture: $ARCH"
     exit 1
     ;;
 esac
+EZA_SHA="$(package_metadata core eza "sha256_$ARCH")"
 
 EZA_VERSION="$(package_version core eza 0.23.4)"
 install_github_archive \

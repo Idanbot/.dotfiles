@@ -37,6 +37,8 @@ core:
     repo: eza-community/eza
     binary: eza
     integrity: pinned-sha256
+    sha256_amd64: 0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
+    sha256_arm64: 366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
   lazygit:
     source: github
     owner: dotfiles-binary

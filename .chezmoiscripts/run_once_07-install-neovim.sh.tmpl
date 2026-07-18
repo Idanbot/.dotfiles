@@ -11,14 +11,13 @@ NVIM_VERSION="$(package_version editor neovim 0.12.4)"
 case "$(get_arch)" in
   amd64)
     NVIM_ARCH=x86_64
-    NVIM_SHA=012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
     ;;
   arm64)
     NVIM_ARCH=arm64
-    NVIM_SHA=ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
     ;;
   *) log_error "Unsupported Neovim architecture: $(get_arch)"; exit 1 ;;
 esac
+NVIM_SHA="$(package_metadata editor neovim "sha256_$(get_arch)")"
 
 NVIM_ROOT="$HOME/.local/share/dotfiles/tools/neovim/$NVIM_VERSION"
 if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --version 2>/dev/null | head -1 || true)" "$NVIM_VERSION"; then

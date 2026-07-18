@@ -16,16 +16,25 @@ printf '\n== Repository Layout ==\n'
 required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
-  scripts/e2e-shell.sh
+  scripts/e2e-shell.sh scripts/update-packages.sh
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
-  tests/test-external-tools.sh tests/test-herdr-config.sh
+  tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
 for path in "${required[@]}"; do
   [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
 done
+
+CI_WORKFLOW="$DOTFILES_DIR/.github/workflows/ci.yml"
+if grep -Fq 'name: Version and Checksum Report' "$CI_WORKFLOW" &&
+  grep -Fq './scripts/update-packages.sh --check --report "$UPGRADE_REPORT"' "$CI_WORKFLOW" &&
+  grep -Fq 'cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"' "$CI_WORKFLOW"; then
+  pass "push/PR CI publishes the non-mutating upgrade report"
+else
+  fail "push/PR CI is missing the version/checksum report"
+fi
 
 if find "$DOTFILES_DIR" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.sh.tmpl' \) | grep -q .; then
   fail "shell entrypoints must live under scripts/, tests/, or .chezmoiscripts/"

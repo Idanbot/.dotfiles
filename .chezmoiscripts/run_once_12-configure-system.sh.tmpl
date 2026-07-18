@@ -26,13 +26,12 @@ if ! is_installed git-credential-manager || ! version_ge "$(git-credential-manag
   case "$(get_arch)" in
     amd64)
       GCM_ARCH=x64
-      GCM_SHA=c7bbf9785c3e8166ceedb66a7e0bfb40e6655ef504af5ca7977b516c5497aff6
       ;;
     arm64)
       GCM_ARCH=arm64
-      GCM_SHA=e5bbc12c31e97a7409585ef60aa5d53138c7661d9a3abc9227d9b0f68959e836
       ;;
   esac
+  GCM_SHA="$(package_metadata system git_credential_manager "sha256_$(get_arch)")"
   tmpdir="$(mktemp -d)"
   asset="gcm-linux-${GCM_ARCH}-${GCM_VERSION}.deb"
   log_info "Installing Git Credential Manager $GCM_VERSION"

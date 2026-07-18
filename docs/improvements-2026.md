@@ -20,7 +20,7 @@ implementation and validation points.
 | 13 | Managed-install ownership ledger | Recovery | High | Mode-0600 ledger and safe uninstall command |
 | 14 | Targeted package reconciliation | Efficiency | Medium | Section hashes route only changed manifest slices |
 | 15 | Central version helpers | Maintainability | Medium | Shared extraction/comparison/asset expansion with tests |
-| 16 | Automated version audit | Maintenance | Medium | Weekly verified-pin update PR workflow |
+| 16 | Automated version audit | Maintenance | Medium | Push/PR and weekly version/checksum reports with explicit local acceptance |
 | 17 | Stable Node/npm installation | Runtime | High | User-local versioned runtime and stable shims; no shell-time NVM |
 | 18 | Current verified Neovim | Editor | High | Pinned upstream release, checksum, headless validation |
 | 19 | Official standalone Codex install | Agents | High | Verified OpenAI installer; npm substitution removed |

@@ -21,25 +21,22 @@ ARCH="$(get_arch)"
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
-    EZA_SHA=0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
     OMP_ARCH=x64
-    OMP_SHA=c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
     HERDR_ARCH=x86_64
-    HERDR_SHA=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
     ;;
   arm64)
     RELEASE_ARCH=aarch64
-    EZA_SHA=366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
     OMP_ARCH=arm64
-    OMP_SHA=6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
     HERDR_ARCH=aarch64
-    HERDR_SHA=544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
     ;;
   *)
     printf 'Unsupported smoke architecture: %s\n' "$ARCH" >&2
     exit 1
     ;;
 esac
+EZA_SHA="$(package_metadata core eza "sha256_$ARCH")"
+OMP_SHA="$(package_metadata ai_tools omp "sha256_$ARCH")"
+HERDR_SHA="$(package_metadata terminal herdr "sha256_$ARCH")"
 
 EZA_VERSION="$(package_version core eza 0.23.4)"
 install_github_archive eza eza-community/eza "v$EZA_VERSION" \

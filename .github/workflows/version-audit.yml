@@ -13,12 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  update:
-    name: Refresh verified version pins
+  report:
+    name: Report available version and checksum updates
     runs-on: ubuntu-24.04
-    permissions:
-      contents: write # Push the generated version-audit branch.
-      pull-requests: write # Open the generated update pull request.
+    timeout-minutes: 10
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -27,39 +25,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 0
           persist-credentials: false
-
-      - name: Install manifest tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y jq python3
-
-      - name: Update verifiable pins
+      - name: Check latest versions and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
         run: |
-          ./scripts/update-packages.sh --apply
-          ./scripts/update-externals.sh --apply
-
-      - name: Open update pull request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if git diff --quiet; then
-            echo "No updates available"
-            exit 0
-          fi
-          branch="automation/version-audit-$(date -u +%Y%m%d)"
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git switch -c "$branch"
-          git add packages.yaml packages.lock docs/tool-inventory.md .chezmoiexternal.yaml
-          git commit -m "chore: refresh verified tool versions"
-          gh auth setup-git
-          git push --force-with-lease origin "$branch"
-          gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "chore: refresh verified tool versions" \
-            --body-file .version-update-report || true
+          ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
+          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload upgrade report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: weekly-version-checksum-report
+          path: ${{ runner.temp }}/dotfiles-upgrade-report.md
+          retention-days: 30

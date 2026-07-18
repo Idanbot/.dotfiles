@@ -78,6 +78,11 @@ for item in keys(versions):
     for field in ("source", "owner", "integrity"):
         if not values.get(field) or values[field] in {"missing", "null"}:
             invalid.append((*item, field))
+    if values.get("integrity") == "pinned-sha256" and values.get("source") != "external":
+        has_single = bool(values.get("sha256"))
+        has_arches = bool(values.get("sha256_amd64") and values.get("sha256_arm64"))
+        if not (has_single or has_arches):
+            invalid.append((*item, "sha256 or sha256_amd64+sha256_arm64"))
 for section, tool, field in invalid:
     print(f"missing {field}: {section}.{tool}")
 if invalid:

@@ -28,13 +28,12 @@ RMPC_VERSION="$(package_version media rmpc 0.11.0)"
 case "$(get_arch)" in
   amd64)
     RMPC_TARGET=x86_64-unknown-linux-gnu
-    RMPC_SHA=b03d4b777cf0afe61107abb4ee847b7c6539b8f5c76555fd759cd15a6c1ff604
     ;;
   arm64)
     RMPC_TARGET=aarch64-unknown-linux-gnu
-    RMPC_SHA=12d9bb3bcabfe90c0573afac9b11e20333262872966a8769967611b578ff7328
     ;;
 esac
+RMPC_SHA="$(package_metadata media rmpc "sha256_$(get_arch)")"
 if ! is_installed rmpc || ! version_ge "$(rmpc --version 2>/dev/null || true)" "$RMPC_VERSION"; then
   tmpdir="$(mktemp -d)"
   asset="rmpc-v${RMPC_VERSION}-${RMPC_TARGET}.tar.gz"

@@ -15,7 +15,7 @@ fi
 CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
 npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude
 
-CODEX_INSTALLER_SHA=1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+CODEX_INSTALLER_SHA="$(package_metadata ai_tools codex_cli sha256)"
 CODEX_PATH="$(command -v codex 2>/dev/null || true)"
 if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   tmpdir="$(mktemp -d)"
@@ -44,13 +44,12 @@ OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
 case "$(get_arch)" in
   amd64)
     OMP_ASSET=omp-linux-x64
-    OMP_SHA256=c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
     ;;
   arm64)
     OMP_ASSET=omp-linux-arm64
-    OMP_SHA256=6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
     ;;
 esac
+OMP_SHA256="$(package_metadata ai_tools omp "sha256_$(get_arch)")"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
   "sha256:$OMP_SHA256" 'omp --version'
 

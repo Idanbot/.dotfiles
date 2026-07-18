@@ -286,8 +286,29 @@ separate, opt-in encrypted recovery source. See [Security Model](docs/security-m
 
 Downloads use upstream checksum manifests or repository-pinned SHA256 values.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
-commit SHA. The weekly version audit updates verifiable pins in a pull request;
-literal hashes remain manual-review changes.
+commit SHA. Every push and pull request publishes a non-mutating version and
+checksum report. The weekly audit publishes the same report without changing
+the repository; all upgrades remain explicit local review decisions.
+
+Check current versions and integrity values:
+
+```bash
+./scripts/update-packages.sh --check
+```
+
+Accept every fully resolved update, or only selected tools:
+
+```bash
+./scripts/update-packages.sh --apply-all
+./scripts/update-packages.sh --apply core.eza@0.23.5 terminal.herdr@0.7.5
+```
+
+The report shows old and candidate versions plus SHA256 or package-registry
+integrity deltas. Apply mode updates requested versions, both architecture
+pins where required, `packages.lock`, and the generated tool inventory. Review
+the diff and run Docker verification before committing and pushing it. Prefer
+the report's version-qualified commands so a later upstream release cannot
+expand the approval implicitly.
 
 Regenerate derived files after manifest edits:
 
@@ -315,8 +336,9 @@ The first push/PR stage runs these jobs in parallel:
 - Actionlint and Zizmor `--pedantic`.
 - Trivy filesystem/secret/misconfiguration scan.
 - Pull-request dependency review.
+- Non-mutating latest-version and checksum report with a downloadable artifact.
 
-All six must pass before the verified GitHub release/external smoke job. A
+All seven must pass before the verified GitHub release/external smoke job. A
 pre-matrix gate then unlocks the normal matrices. A green push/PR run does not
 mean the scheduled heavy profiles or real-WSL workflow ran; check those tiers
 when changing platform integration or complete install behavior.

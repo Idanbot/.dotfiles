@@ -86,8 +86,9 @@ tool inventory provide reviewable snapshots.
 Version comparison and GitHub asset expansion are centralized in `scripts/lib.sh`.
 Install sections use distro signatures, upstream checksum manifests, pinned
 hashes, or verified signing-key fingerprints. Literal hash changes require
-review; safely discoverable versions can be proposed by the version-audit
-workflow.
+review. Push/PR CI and the weekly version audit publish a non-mutating upgrade
+report; `scripts/update-packages.sh --apply-all` or `--apply section.tool@version`
+materializes only locally accepted version and integrity changes.
 
 ## Agent Workspaces
 
