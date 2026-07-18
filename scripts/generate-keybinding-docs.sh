@@ -5,6 +5,7 @@ set -euo pipefail
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OUTPUT_FILE="${1:-$DOTFILES_DIR/docs/keybindings.md}"
 TMUX_FILE="$DOTFILES_DIR/dot_tmux.conf.tmpl"
+HERDR_FILE="$DOTFILES_DIR/dot_config/herdr/config.toml"
 ZSH_FILE="$DOTFILES_DIR/dot_zshrc.tmpl"
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -12,7 +13,7 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
 {
   echo "# Keybindings"
   echo
-  echo "Generated from tmux and zsh config. Regenerate with:"
+  echo "Generated from tmux, Herdr, and zsh config. Regenerate with:"
   echo
   echo '```bash'
   echo './scripts/generate-keybinding-docs.sh'
@@ -32,10 +33,49 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
       action = key
       sub(/[[:space:]].*$/, "", key)
       sub(/^[^[:space:]]+[[:space:]]+/, "", action)
+      gsub(/\|/, "\\|", key)
       gsub(/\|/, "\\|", action)
       printf "| %s | `%s` |\n", key, action
     }
   ' "$TMUX_FILE"
+  echo
+  echo "## Herdr"
+  echo
+  echo "| Key | Action |"
+  echo "|-----|--------|"
+  awk '
+    /^\[keys\]$/ { in_keys = 1; next }
+    in_keys && /^\[/ { in_keys = 0 }
+    in_keys && /^[a-z_]+[[:space:]]*=/ {
+      line = $0
+      action = line
+      sub(/[[:space:]]*=.*/, "", action)
+      key = line
+      sub(/^[^=]+=[[:space:]]*/, "", key)
+      gsub(/^"|"$/, "", key)
+      if (key != "") printf "| %s | `%s` |\n", key, action
+    }
+  ' "$HERDR_FILE"
+  awk '
+    function clean(value) {
+      sub(/^[^=]+=[[:space:]]*/, "", value)
+      gsub(/^\047|\047$|^"|"$/, "", value)
+      gsub(/\|/, "\\|", value)
+      return value
+    }
+    function emit() {
+      if (active && key != "") {
+        action = description != "" ? description : command
+        printf "| %s | `%s` |\n", key, action
+      }
+    }
+    /^\[\[keys.command\]\]$/ { emit(); active = 1; key = command = description = ""; next }
+    active && /^\[/ { emit(); active = 0 }
+    active && /^key[[:space:]]*=/ { key = clean($0) }
+    active && /^command[[:space:]]*=/ { command = clean($0) }
+    active && /^description[[:space:]]*=/ { description = clean($0) }
+    END { emit() }
+  ' "$HERDR_FILE"
   echo
   echo "## zsh aliases"
   echo

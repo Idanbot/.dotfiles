@@ -5,9 +5,34 @@ fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-log_step "Installing Tmux Ecosystem"
+log_step "Installing Terminal Multiplexers"
 require_sudo
 apt_install tmux
+
+HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
+case "$(get_arch)" in
+  amd64)
+    HERDR_ASSET=herdr-linux-x86_64
+    HERDR_SHA256=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
+    ;;
+  arm64)
+    HERDR_ASSET=herdr-linux-aarch64
+    HERDR_SHA256=544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
+    ;;
+esac
+install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" "$HERDR_ASSET" herdr \
+  "sha256:$HERDR_SHA256" 'herdr --version'
+
+mkdir -p "$HOME/.zfunc"
+completion_tmp="$HOME/.zfunc/_herdr.tmp"
+if herdr completion zsh >"$completion_tmp"; then
+  mv "$completion_tmp" "$HOME/.zfunc/_herdr"
+  chmod 0644 "$HOME/.zfunc/_herdr"
+  log_success "Herdr zsh completion generated"
+else
+  rm -f "$completion_tmp"
+  log_warn "Herdr zsh completion generation failed"
+fi
 
 TMUXP_VERSION="$(package_version terminal tmuxp 1.74.0)"
 if ! is_installed uvx; then
@@ -26,4 +51,4 @@ else
   log_error "Checksum-pinned TPM external is missing"
 fi
 
-print_summary "Tmux Ecosystem"
+print_summary "Terminal Multiplexers"

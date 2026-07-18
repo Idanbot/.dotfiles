@@ -1,21 +1,39 @@
 #!/usr/bin/env bash
-# Launch one configured agent, leaving a useful shell when it is unavailable.
+# Launch one registered agent, leaving a useful shell when it is unavailable.
 
 set -u
 
 agent="${1:-}"
-case "$agent" in
-  codex | antigravity | claude | opencode | omp) ;;
-  *)
-    printf 'Unknown agent: %s\n' "$agent" >&2
-    exit 2
-    ;;
-esac
+[[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
+  printf 'Invalid agent id: %s\n' "$agent" >&2
+  exit 2
+}
 
-if command -v "$agent" >/dev/null 2>&1; then
-  exec "$agent"
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+registry="${DOTFILES_AGENT_REGISTRY:-$config_root/dotfiles/agents.yaml}"
+if [[ ! -f "$registry" ]] && command -v chezmoi >/dev/null 2>&1; then
+  source_dir="$(chezmoi source-path 2>/dev/null || true)"
+  [[ -f "$source_dir/agents.yaml" ]] && registry="$source_dir/agents.yaml"
+fi
+[[ -f "$registry" ]] || {
+  printf 'Missing agent registry: %s\n' "$registry" >&2
+  exit 1
+}
+command -v yq >/dev/null 2>&1 || {
+  printf 'yq is required to read the agent registry\n' >&2
+  exit 1
+}
+
+command_name="$(yq -r ".agents[\"$agent\"].command // \"\"" "$registry")"
+[[ "$command_name" =~ ^[[:alnum:]_.+-]+$ ]] || {
+  printf 'Unknown agent: %s\n' "$agent" >&2
+  exit 2
+}
+
+if command -v "$command_name" >/dev/null 2>&1; then
+  exec "$command_name"
 fi
 
-printf '%s is not installed. This window remains in %s.\n' "$agent" "$PWD"
+printf '%s is not installed. This window remains in %s.\n' "$command_name" "$PWD"
 printf 'Run "dot doctor" for installation and authentication status.\n'
 exec "${SHELL:-/bin/bash}" -l

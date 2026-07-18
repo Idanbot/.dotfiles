@@ -122,6 +122,7 @@ audit ai_tools gemini_cli "$(npm_release @google/gemini-cli)" auto
 audit ai_tools opencode "$(npm_release opencode-ai)" auto
 audit ai_tools omp "$(npm_release @oh-my-pi/pi-coding-agent)" auto
 audit terminal tmuxp "$(pypi_release tmuxp)" auto
+audit terminal herdr "$(github_release ogulcancelik/herdr)" manual-integrity
 audit media yt_dlp "$(github_release yt-dlp/yt-dlp)" auto
 audit media rmpc "$(github_release mierak/rmpc)" manual-integrity
 

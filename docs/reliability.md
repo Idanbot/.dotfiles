@@ -66,7 +66,7 @@ not automatic.
 1. Static: syntax, formatting, schemas, policies, generated files.
 2. Unit/fixture: versions, environment, profiles, routing, ledger, workspaces,
    backup/restore, failure/resume.
-3. Release smoke: real checksummed assets and all external archives.
+3. Release smoke: real checksummed assets, Herdr server/workspace reuse, and all external archives.
 4. Base E2E: clean native and simulated-WSL install, two passes.
 5. Heavy E2E: developer, agent, cloud, and full profiles.
 6. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.

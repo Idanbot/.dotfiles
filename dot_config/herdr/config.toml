@@ -1,0 +1,178 @@
+# Managed Herdr defaults. Credentials, authentication, and session data remain local.
+onboarding = false
+
+[theme]
+name = "catppuccin"
+auto_switch = false
+
+[terminal]
+default_shell = ""
+shell_mode = "auto"
+new_cwd = "follow"
+
+[update]
+channel = "stable"
+version_check = true
+manifest_check = true
+
+[keys]
+prefix = "ctrl+s"
+help = "prefix+?"
+settings = "prefix+s"
+detach = "prefix+q"
+reload_config = "prefix+shift+r"
+open_notification_target = "prefix+o"
+
+workspace_picker = "prefix+w"
+goto = "prefix+g"
+new_workspace = "prefix+shift+n"
+new_worktree = ""
+open_worktree = ""
+remove_worktree = ""
+rename_workspace = "prefix+shift+w"
+close_workspace = "prefix+shift+d"
+previous_workspace = "prefix+shift+left"
+next_workspace = "prefix+shift+right"
+focus_agent = "prefix+alt+1..9"
+
+new_tab = "prefix+c"
+rename_tab = "prefix+shift+t"
+previous_tab = "prefix+p"
+next_tab = "prefix+n"
+switch_tab = "prefix+1..9"
+switch_workspace = "prefix+shift+1..9"
+close_tab = "prefix+shift+x"
+
+rename_pane = "prefix+shift+p"
+edit_scrollback = "prefix+e"
+copy_mode = "prefix+["
+focus_pane_left = "prefix+h"
+focus_pane_down = "prefix+j"
+focus_pane_up = "prefix+k"
+focus_pane_right = "prefix+l"
+swap_pane_left = "prefix+shift+h"
+swap_pane_down = "prefix+shift+j"
+swap_pane_up = "prefix+shift+k"
+swap_pane_right = "prefix+shift+l"
+cycle_pane_next = "prefix+tab"
+cycle_pane_previous = "prefix+shift+tab"
+last_pane = "prefix+backtick"
+split_vertical = "prefix+v"
+split_horizontal = "prefix+minus"
+close_pane = "prefix+x"
+zoom = "prefix+z"
+resize_mode = "prefix+r"
+toggle_sidebar = "prefix+b"
+
+navigate_workspace_up = "shift+k"
+navigate_workspace_down = "shift+j"
+navigate_pane_left = "h"
+navigate_pane_down = "j"
+navigate_pane_up = "k"
+navigate_pane_right = "l"
+
+[[keys.command]]
+key = "prefix+alt+g"
+type = "popup"
+command = 'command -v lazygit >/dev/null 2>&1 && exec lazygit || { printf "lazygit is not installed\n"; sleep 2; }'
+description = "open lazygit"
+width = "92%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+alt+d"
+type = "popup"
+command = 'command -v lazydocker >/dev/null 2>&1 && exec lazydocker || { printf "lazydocker is not installed\n"; sleep 2; }'
+description = "open lazydocker"
+width = "92%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+alt+k"
+type = "popup"
+command = 'command -v k9s >/dev/null 2>&1 && exec k9s || { printf "k9s is not installed\n"; sleep 2; }'
+description = "open k9s"
+width = "92%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+alt+h"
+type = "popup"
+command = 'command -v btop >/dev/null 2>&1 && exec btop || { printf "btop is not installed\n"; sleep 2; }'
+description = "open btop"
+width = "88%"
+height = "86%"
+
+[[keys.command]]
+key = "prefix+alt+o"
+type = "popup"
+command = 'command -v dot >/dev/null 2>&1 && dot doctor --quick; printf "\nPress enter to close..."; read -r _'
+description = "run dotfiles doctor"
+width = "88%"
+height = "86%"
+
+[ui]
+sidebar_width = 30
+sidebar_min_width = 22
+sidebar_max_width = 42
+sidebar_collapsed_mode = "compact"
+mobile_width_threshold = 72
+mouse_capture = true
+copy_on_select = true
+host_cursor = "auto"
+right_click_passthrough_modifier = "ctrl"
+redraw_on_focus_gained = true
+mouse_scroll_lines = 3
+confirm_close = true
+prompt_new_tab_name = true
+pane_borders = true
+pane_gaps = false
+show_agent_labels_on_pane_borders = true
+hide_tab_bar_when_single_tab = false
+agent_panel_sort = "priority"
+accent = "#89b4fa"
+
+[ui.sidebar.agents]
+row_gap = 0
+rows = [
+  ["state_icon", "agent", "state_text"],
+  ["workspace", "tab"],
+  ["terminal_title_stripped"],
+]
+
+[ui.sidebar.spaces]
+row_gap = 0
+rows = [
+  ["state_icon", "workspace"],
+  ["branch", "git_status"],
+]
+
+[ui.toast]
+delivery = "herdr"
+delay_seconds = 2
+
+[ui.toast.herdr]
+position = "bottom-right"
+
+[ui.toast.clipboard]
+enabled = true
+position = "bottom-center"
+
+[ui.sound]
+enabled = false
+
+[session]
+resume_agents_on_restore = true
+
+[remote]
+manage_ssh_config = true
+
+[experimental]
+allow_nested = false
+kitty_graphics = false
+pane_history = false
+reveal_hidden_cursor_for_cjk_ime = false
+switch_ascii_input_source_in_prefix = false
+
+[advanced]
+scrollback_limit_bytes = 20000000

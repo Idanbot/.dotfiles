@@ -23,12 +23,16 @@ case "$ARCH" in
     EZA_SHA=0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
     OMP_ARCH=x64
     OMP_SHA=c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
+    HERDR_ARCH=x86_64
+    HERDR_SHA=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
     ;;
   arm64)
     RELEASE_ARCH=aarch64
     EZA_SHA=366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
     OMP_ARCH=arm64
     OMP_SHA=6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
+    HERDR_ARCH=aarch64
+    HERDR_SHA=544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
     ;;
   *)
     printf 'Unsupported smoke architecture: %s\n' "$ARCH" >&2
@@ -75,9 +79,46 @@ OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "omp-linux-$OMP_ARCH" omp \
   "sha256:$OMP_SHA" 'omp --version'
 
-for binary in eza lazygit lazydocker sops tldr starship omp; do
+HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
+install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
+  "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
+
+for binary in eza lazygit lazydocker sops tldr starship omp herdr; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 7 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 8 ]]
+
+export HERDR_CONFIG_PATH="$DOTFILES_DIR/dot_config/herdr/config.toml"
+export SHELL=/bin/bash
+herdr server >"$TMP_HOME/herdr-server.out" 2>&1 &
+server_pid=$!
+for _ in {1..100}; do
+  herdr workspace list >/dev/null 2>&1 && break
+  sleep 0.1
+done
+herdr workspace list >/dev/null
+
+mkdir -p "$HOME/.config/dotfiles" "$HOME/.config/tmuxp" "$HOME/workspace-smoke"
+cp "$DOTFILES_DIR/agents.yaml" "$HOME/.config/dotfiles/agents.yaml"
+cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/agent-workspace.yaml"
+for agent in codex antigravity claude opencode omp; do
+  sed -i "s/command: $agent/command: missing-$agent/" "$HOME/.config/dotfiles/agents.yaml"
+done
+ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" "$DOTFILES_BIN_DIR/dot-agent-launch"
+
+HERDR_ENV=1 "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \
+  "$HOME/workspace-smoke" --name release-smoke
+HERDR_ENV=1 "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \
+  "$HOME/workspace-smoke" --name release-smoke
+
+workspaces="$(herdr workspace list)"
+[[ "$(jq '[.result.workspaces[] | select(.label == "release-smoke")] | length' <<<"$workspaces")" -eq 1 ]]
+workspace_id="$(jq -r '.result.workspaces[] | select(.label == "release-smoke") | .workspace_id' <<<"$workspaces")"
+workspace="$(herdr workspace get "$workspace_id")"
+[[ "$(jq -r '.result.workspace.tab_count' <<<"$workspace")" -eq 6 ]]
+[[ "$(jq -r '.result.workspace.pane_count' <<<"$workspace")" -eq 6 ]]
+
+herdr server stop >/dev/null
+wait "$server_pid" 2>/dev/null || true
 printf 'GitHub release tool smoke passed\n'

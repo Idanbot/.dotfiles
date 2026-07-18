@@ -20,7 +20,8 @@ required=(
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
-  tests/test-external-tools.sh
+  tests/test-external-tools.sh tests/test-herdr-config.sh
+  dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
 for path in "${required[@]}"; do
   [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
@@ -88,6 +89,29 @@ if grep -Fq 'CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \
   pass "Codex standalone installation cannot launch an interactive session"
 else
   fail "Codex standalone installation must suppress vendor prompts"
+fi
+
+if grep -Fq 'prefix = "ctrl+s"' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
+  grep -Fq 'set -g prefix C-s' "$DOTFILES_DIR/dot_tmux.conf.tmpl"; then
+  pass "Herdr and tmux share the Ctrl+S prefix"
+else
+  fail "Herdr and tmux must both use Ctrl+S"
+fi
+
+if grep -Fq 'allow_nested = false' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
+  grep -Fq -- '--allow-nested' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
+  pass "workspace nesting is guarded and explicitly opt-in"
+else
+  fail "workspace nesting policy is incomplete"
+fi
+
+if grep -Fq 'for integration in claude codex opencode omp; do' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
+  grep -Fq 'herdr integration install "$integration"' \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
+  pass "Herdr installs the supported agent integrations"
+else
+  fail "Herdr integration installation is incomplete"
 fi
 
 for preserved in .bash_history .zsh_history .lesshst '.zcompdump*' .zsh_sessions/ .local/share/zsh/; do

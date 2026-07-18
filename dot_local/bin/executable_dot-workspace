@@ -1,30 +1,53 @@
 #!/usr/bin/env bash
-# Render and launch the pinned tmuxp agent workspace for a project directory.
+# Launch an agent workspace through Herdr or tmux without implicit nesting.
 
 set -euo pipefail
+umask 077
 
 TMUXP_VERSION="${DOTFILES_TMUXP_VERSION:-1.74.0}"
 WORKDIR="$PWD"
 SESSION_NAME=""
+BACKEND="${DOTFILES_WORKSPACE_BACKEND:-auto}"
 PRINT_ONLY=false
+ALLOW_NESTED=false
+TMUX_RENDERED=""
 
 usage() {
   cat <<'USAGE'
-Usage: dot-workspace [directory] [--name <session>] [--print]
+Usage: dot-workspace [directory] [options]
 
-Creates one tmux window each for the main shell, Codex, Antigravity, Claude,
-OpenCode, and OMP. Missing optional commands leave an interactive shell.
+Options:
+  --backend <auto|herdr|tmux>  Select the workspace backend (default: auto)
+  --name <session>             Override the project workspace/session name
+  --allow-nested               Permit an explicit cross-multiplexer launch
+  --print                      Print the resolved plan without launching it
+  -h, --help                   Show this help
+
+Auto routing stays in Herdr or tmux when already inside one. On a bare terminal
+it prefers Herdr when available and otherwise falls back to tmuxp.
 USAGE
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --backend)
+      BACKEND="${2:-}"
+      shift 2
+      ;;
+    --backend=*)
+      BACKEND="${1#--backend=}"
+      shift
+      ;;
     --name)
       SESSION_NAME="${2:-}"
       shift 2
       ;;
     --name=*)
       SESSION_NAME="${1#--name=}"
+      shift
+      ;;
+    --allow-nested)
+      ALLOW_NESTED=true
       shift
       ;;
     --print)
@@ -46,47 +69,252 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+case "$BACKEND" in auto | herdr | tmux) ;;
+*)
+  printf 'Unknown workspace backend: %s\n' "$BACKEND" >&2
+  exit 2
+  ;;
+esac
+
 WORKDIR="$(cd "$WORKDIR" && pwd -P)"
 if [[ -z "$SESSION_NAME" ]]; then
-  SESSION_NAME="$(basename "$WORKDIR" | tr -cs '[:alnum:]_-' '_')-agents"
+  SESSION_NAME="$(printf '%s' "$(basename "$WORKDIR")" | tr -cs '[:alnum:]_-' '_')-agents"
 fi
 [[ "$SESSION_NAME" =~ ^[[:alnum:]_-]+$ ]] || {
   printf 'Session name may contain only letters, numbers, underscore, and dash\n' >&2
   exit 2
 }
 
-TEMPLATE="${XDG_CONFIG_HOME:-$HOME/.config}/tmuxp/agent-workspace.yaml"
-[[ -f "$TEMPLATE" ]] || {
-  printf 'Missing workspace template: %s\n' "$TEMPLATE" >&2
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+REGISTRY="${DOTFILES_AGENT_REGISTRY:-$config_root/dotfiles/agents.yaml}"
+if [[ ! -f "$REGISTRY" ]] && command -v chezmoi >/dev/null 2>&1; then
+  source_dir="$(chezmoi source-path 2>/dev/null || true)"
+  [[ -f "$source_dir/agents.yaml" ]] && REGISTRY="$source_dir/agents.yaml"
+fi
+[[ -f "$REGISTRY" ]] || {
+  printf 'Missing agent registry: %s\n' "$REGISTRY" >&2
   exit 1
 }
-command -v uvx >/dev/null 2>&1 || {
-  printf 'uvx is required; install the languages profile\n' >&2
-  exit 1
-}
-command -v tmux >/dev/null 2>&1 || {
-  printf 'tmux is required; install the tmux profile\n' >&2
+command -v yq >/dev/null 2>&1 || {
+  printf 'yq is required to read the agent registry\n' >&2
   exit 1
 }
 
-rendered="$(mktemp "${TMPDIR:-/tmp}/dot-workspace.XXXXXX.yaml")"
-trap 'rm -f "$rendered"' EXIT
-python3 - "$TEMPLATE" "$rendered" "$SESSION_NAME" "$WORKDIR" <<'PY'
+mapfile -t AGENTS < <(yq -r '.workspace.agents[]' "$REGISTRY")
+[[ ${#AGENTS[@]} -gt 0 ]] || {
+  printf 'Agent registry contains no workspace agents\n' >&2
+  exit 1
+}
+for agent in "${AGENTS[@]}"; do
+  [[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
+    printf 'Invalid agent id in registry: %s\n' "$agent" >&2
+    exit 1
+  }
+done
+
+if [[ "$BACKEND" == auto ]]; then
+  if [[ "${HERDR_ENV:-}" == 1 ]]; then
+    BACKEND=herdr
+  elif [[ -n "${TMUX:-}" ]]; then
+    BACKEND=tmux
+  elif command -v herdr >/dev/null 2>&1; then
+    BACKEND=herdr
+  else
+    BACKEND=tmux
+  fi
+fi
+
+if [[ "$BACKEND" == tmux && "${HERDR_ENV:-}" == 1 && "$ALLOW_NESTED" == false ]]; then
+  printf 'Refusing to launch tmux inside Herdr; use the Herdr backend or pass --allow-nested\n' >&2
+  exit 2
+fi
+if [[ "$BACKEND" == herdr && -n "${TMUX:-}" && "${HERDR_ENV:-}" != 1 && "$ALLOW_NESTED" == false ]]; then
+  printf 'Refusing to launch Herdr inside tmux; use the tmux backend or pass --allow-nested\n' >&2
+  exit 2
+fi
+
+print_herdr_plan() {
+  python3 - "$SESSION_NAME" "$WORKDIR" "${AGENTS[@]}" <<'PY'
 import json
+import sys
+
+session, workdir, *agents = sys.argv[1:]
+print(json.dumps({
+    "backend": "herdr",
+    "workspace": session,
+    "directory": workdir,
+    "agents": agents,
+}, indent=2))
+PY
+}
+
+render_tmux_workspace() {
+  local destination="$1" prefix=C-s template
+  template="${XDG_CONFIG_HOME:-$HOME/.config}/tmuxp/agent-workspace.yaml"
+  [[ -f "$template" ]] || {
+    printf 'Missing workspace template: %s\n' "$template" >&2
+    return 1
+  }
+  [[ "${HERDR_ENV:-}" == 1 ]] && prefix=C-b
+
+  python3 - "$template" "$destination" "$SESSION_NAME" "$WORKDIR" "$prefix" "${AGENTS[@]}" <<'PY'
+import json
+import re
 import sys
 from pathlib import Path
 
-source, destination, session, workdir = sys.argv[1:]
+source, destination, session, workdir, prefix, *agents = sys.argv[1:]
+for agent in agents:
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", agent):
+        raise SystemExit(f"invalid agent id: {agent}")
+
+windows = []
+for agent in agents:
+    windows.extend([
+        f"  - window_name: {json.dumps(agent)}",
+        "    panes:",
+        f"      - shell_command: {json.dumps(f'dot-agent-launch {agent}')}"
+    ])
+
 text = Path(source).read_text(encoding="utf-8")
 text = text.replace("__SESSION_NAME__", json.dumps(session))
 text = text.replace("__WORKDIR__", json.dumps(workdir))
+text = text.replace("__TMUX_PREFIX__", json.dumps(prefix))
+text = text.replace("# __AGENT_WINDOWS__", "\n".join(windows))
 Path(destination).write_text(text, encoding="utf-8")
 PY
+}
 
-if [[ "$PRINT_ONLY" == true ]]; then
-  cat "$rendered"
-  exit 0
-fi
+run_tmux_workspace() {
+  local status
+  TMUX_RENDERED="$(mktemp "${TMPDIR:-/tmp}/dot-workspace.XXXXXX.yaml")"
+  trap 'rm -f "$TMUX_RENDERED"' EXIT INT TERM
+  render_tmux_workspace "$TMUX_RENDERED"
+  if [[ "$PRINT_ONLY" == true ]]; then
+    cat "$TMUX_RENDERED"
+    return 0
+  fi
+  command -v uvx >/dev/null 2>&1 || {
+    printf 'uvx is required; install the languages profile\n' >&2
+    return 1
+  }
+  command -v tmux >/dev/null 2>&1 || {
+    printf 'tmux is required; install the tmux profile\n' >&2
+    return 1
+  }
+  export TMUXP_PROGRESS=0
+  set +e
+  uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp load -y "$TMUX_RENDERED"
+  status=$?
+  set -e
+  return "$status"
+}
 
-export TMUXP_PROGRESS=0
-exec uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp load -y "$rendered"
+run_herdr_json() {
+  local output_name="$1" payload
+  shift
+  if ! payload="$(herdr "$@")"; then
+    printf 'Herdr command failed: herdr %s\n' "$*" >&2
+    return 1
+  fi
+  if jq -e '.error? != null' >/dev/null 2>&1 <<<"$payload"; then
+    jq -r '.error.message // "unknown Herdr error"' <<<"$payload" >&2
+    return 1
+  fi
+  printf -v "$output_name" '%s' "$payload"
+}
+
+ensure_herdr_server() {
+  local state_root log_file server_pid
+  if herdr workspace list >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ "${HERDR_ENV:-}" == 1 ]]; then
+    printf 'HERDR_ENV is set but the Herdr server is unreachable\n' >&2
+    return 1
+  fi
+
+  state_root="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
+  log_file="$state_root/herdr-server-bootstrap.log"
+  mkdir -p "$state_root"
+  printf 'Starting Herdr server; log: %s\n' "$log_file"
+  nohup herdr server </dev/null >>"$log_file" 2>&1 &
+  server_pid=$!
+  for _ in {1..100}; do
+    if herdr workspace list >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.1
+  done
+  kill "$server_pid" 2>/dev/null || true
+  printf 'Herdr server did not become ready; inspect %s\n' "$log_file" >&2
+  return 1
+}
+
+run_herdr_workspace() {
+  local list workspace_id created root_tab response tab_id placeholder_pane agent
+  if [[ "$PRINT_ONLY" == true ]]; then
+    print_herdr_plan
+    return 0
+  fi
+  command -v herdr >/dev/null 2>&1 || {
+    printf 'herdr is required; install the tmux profile or choose --backend tmux\n' >&2
+    return 1
+  }
+  command -v jq >/dev/null 2>&1 || {
+    printf 'jq is required for Herdr workspace orchestration\n' >&2
+    return 1
+  }
+  command -v dot-agent-launch >/dev/null 2>&1 || {
+    printf 'dot-agent-launch is missing; apply the managed workspace commands\n' >&2
+    return 1
+  }
+  ensure_herdr_server
+  run_herdr_json list workspace list
+  workspace_id="$(jq -r --arg label "$SESSION_NAME" \
+    'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty' <<<"$list")"
+  if [[ -n "$workspace_id" ]]; then
+    herdr workspace focus "$workspace_id" >/dev/null
+    printf 'Focused existing Herdr workspace: %s\n' "$SESSION_NAME"
+  else
+    run_herdr_json created workspace create --cwd "$WORKDIR" --label "$SESSION_NAME" --focus
+    workspace_id="$(jq -er '.result.workspace.workspace_id' <<<"$created")"
+    root_tab="$(jq -er '.result.tab.tab_id' <<<"$created")"
+    if ! herdr tab rename "$root_tab" terminal >/dev/null; then
+      herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
+      return 1
+    fi
+
+    for agent in "${AGENTS[@]}"; do
+      if ! run_herdr_json response tab create --workspace "$workspace_id" \
+        --cwd "$WORKDIR" --label "$agent" --no-focus; then
+        herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
+        return 1
+      fi
+      tab_id="$(jq -er '.result.tab.tab_id' <<<"$response")"
+      placeholder_pane="$(jq -er '.result.root_pane.pane_id' <<<"$response")"
+      if ! herdr agent start "$agent" --workspace "$workspace_id" --tab "$tab_id" \
+        --cwd "$WORKDIR" --no-focus -- dot-agent-launch "$agent" >/dev/null; then
+        herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
+        return 1
+      fi
+      if ! herdr pane close "$placeholder_pane" >/dev/null; then
+        herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
+        return 1
+      fi
+    done
+
+    herdr tab focus "$root_tab" >/dev/null
+    herdr workspace focus "$workspace_id" >/dev/null
+    printf 'Created Herdr workspace %s with %d agents\n' "$SESSION_NAME" "${#AGENTS[@]}"
+  fi
+
+  if [[ "${HERDR_ENV:-}" != 1 ]]; then
+    exec herdr
+  fi
+}
+
+case "$BACKEND" in
+  tmux) run_tmux_workspace ;;
+  herdr) run_herdr_workspace ;;
+esac

@@ -67,6 +67,19 @@ for agent in claude codex gemini opencode omp; do
     log_error "$agent failed its noninteractive version check"
   fi
 done
+
+if is_installed herdr; then
+  log_info "Installing bundled Herdr agent integrations"
+  for integration in claude codex opencode omp; do
+    if herdr integration install "$integration" >/dev/null 2>&1; then
+      log_success "Herdr $integration integration installed"
+    else
+      log_warn "Herdr $integration integration could not be installed; run 'herdr integration install $integration' manually"
+    fi
+  done
+else
+  log_warn "Herdr is unavailable; agent integrations were not installed"
+fi
 log_info "Agent authentication and session state are intentionally left to the user"
 
 print_summary "AI Coding Tools"

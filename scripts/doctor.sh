@@ -158,16 +158,30 @@ if selected cloud; then
 fi
 
 if selected tmux; then
-  log_step "Tmux"
+  log_step "Terminal Multiplexers"
   check_command tmux true
+  check_command herdr true
   check_file "$HOME/.tmux.conf" tmux-config
   check_file "$HOME/.config/tmuxp/agent-workspace.yaml" agent-workspace
+  check_file "$HOME/.config/herdr/config.toml" herdr-config
+  check_file "$HOME/.config/dotfiles/agents.yaml" agent-registry
   check_command dot-workspace true
+  check_command dot-agent-launch true
   if [[ "$QUICK" == false ]] && tmux -L dotfiles-doctor -f "$HOME/.tmux.conf" start-server 2>/dev/null; then
     tmux -L dotfiles-doctor kill-server 2>/dev/null || true
     result pass tmux-config "server accepted configuration"
   elif [[ "$QUICK" == false ]]; then
     result fail tmux-config "tmux rejected configuration"
+  fi
+  if command -v herdr >/dev/null 2>&1 && [[ "$(herdr --version 2>/dev/null)" == herdr* ]]; then
+    result pass herdr-runtime "binary and managed configuration available"
+    if herdr integration status >/dev/null 2>&1; then
+      result pass herdr-integrations "integration status is readable"
+    else
+      result warn herdr-integrations "run herdr integration status"
+    fi
+  else
+    result fail herdr-runtime "Herdr version check failed"
   fi
 fi
 

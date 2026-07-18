@@ -49,6 +49,10 @@ EOF
   test -f "$HOME/.zshrc"
   test -f "$HOME/.tmux.conf"
   test -f "$HOME/.gitconfig"
+  test -f "$HOME/.config/herdr/config.toml"
+  test -f "$HOME/.config/dotfiles/agents.yaml"
+  grep -Fq 'prefix = "ctrl+s"' "$HOME/.config/herdr/config.toml"
+  grep -Fq 'workspace:' "$HOME/.config/dotfiles/agents.yaml"
   test "$(cat "$HOME/.zsh_history")" = "$expected_history"
   test "$(cat "$HOME/.config/dotfiles/local.zsh")" = "$expected_overlay"
   test "$(stat -c '%a' "$HOME/.zsh_history")" = 600

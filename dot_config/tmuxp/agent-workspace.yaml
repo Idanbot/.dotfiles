@@ -1,22 +1,10 @@
 session_name: __SESSION_NAME__
 start_directory: __WORKDIR__
+options:
+  prefix: __TMUX_PREFIX__
 windows:
   - window_name: terminal
     focus: true
     panes:
       - null
-  - window_name: codex
-    panes:
-      - shell_command: dot-agent-launch codex
-  - window_name: antigravity
-    panes:
-      - shell_command: dot-agent-launch antigravity
-  - window_name: claude
-    panes:
-      - shell_command: dot-agent-launch claude
-  - window_name: opencode
-    panes:
-      - shell_command: dot-agent-launch opencode
-  - window_name: omp
-    panes:
-      - shell_command: dot-agent-launch omp
+# __AGENT_WINDOWS__

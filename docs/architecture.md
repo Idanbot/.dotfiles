@@ -91,16 +91,27 @@ workflow.
 
 ## Agent Workspaces
 
-`agents.yaml` is the command registry. `dot-workspace` renders one pinned tmuxp
-YAML template with a validated session name and canonical working directory,
-then runs tmuxp through `uvx`. Each agent starts in its own window. Missing
-optional commands degrade to a login shell.
+`agents.yaml` is the single command and workspace-order registry. Chezmoi
+materializes it at `~/.config/dotfiles/agents.yaml` for runtime use.
+
+`dot-workspace` resolves `auto`, `herdr`, or `tmux` before launching anything.
+Auto stays in the active multiplexer, prefers Herdr from a bare terminal, and
+falls back to tmuxp when Herdr is unavailable. Cross-multiplexer nesting is
+rejected unless `--allow-nested` is explicit.
+
+The Herdr backend creates or focuses one named project workspace, keeps its
+root terminal tab, and creates one agent tab per registry entry through Herdr's
+JSON CLI. The tmux backend renders the same registry into a tmuxp YAML session
+and runs the pinned tmuxp version through `uvx`. Missing agent commands degrade
+to a login shell in either backend. See ADR 0006.
 
 ## Test Architecture
 
-Fast contracts validate parsing, templates, policies, routing, ownership,
+Fast contracts validate parsing, templates, policies, workspace routing,
+Herdr configuration, ownership,
 recovery, selectors, and generated files. Network release smoke tests execute
-real downloaded binaries and apply all chezmoi externals. Docker E2E executes
+real downloaded binaries, create a real Herdr workspace twice, and apply all
+chezmoi externals. Docker E2E executes
 the same installer path as users, twice, on native and WSL-simulated modes.
 
 Simulation verifies platform branches; it does not claim to emulate the WSL

@@ -82,6 +82,7 @@ jobs:
         run: |
           tests/test-templates.sh "$PWD"
           tests/test-repo-layout.sh "$PWD"
+          tests/test-herdr-config.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"
           tests/test-package-metadata.sh "$PWD"
@@ -188,7 +189,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install archive prerequisites
-        run: sudo apt-get update -qq && sudo apt-get install -y curl jq
+        run: sudo apt-get update -qq && sudo apt-get install -y curl jq yq
       - name: Verify upstream checksum paths
         run: |
           tests/test-github-release-tools.sh "$PWD"
@@ -290,7 +291,7 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
-                test-secret-boundary.sh test-agent-workspace.sh test-sessionizer.sh \
+                test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
                 /dotfiles/tests/$test /dotfiles
               done

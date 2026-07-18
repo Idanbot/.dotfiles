@@ -25,7 +25,7 @@ implementation and validation points.
 | 18 | Current verified Neovim | Editor | High | Pinned upstream release, checksum, headless validation |
 | 19 | Official standalone Codex install | Agents | High | Verified OpenAI installer; npm substitution removed |
 | 20 | Agent CLI registry and validation | Agents | High | Claude, Codex, Gemini, OpenCode, OMP; Antigravity manual |
-| 21 | Parameterized tmuxp agent workspace | Workflow | High | Current-directory windows, pinned `uvx`, graceful missing agents |
+| 21 | Backend-aware agent workspace | Workflow | High | Native Herdr tabs or pinned tmuxp windows, context routing, no implicit nesting |
 | 22 | Shell completion and startup hygiene | Shell | High | Stale fpath cleanup, conditional plugins, startup budget |
 | 23 | Docker selector/profile E2E | Testing | High | Native and WSL-simulated profiles with retained diagnostics |
 | 24 | Failure/recovery and real WSL contracts | Testing | High | Injected failure/resume, backup restore, self-hosted WSL workflow |

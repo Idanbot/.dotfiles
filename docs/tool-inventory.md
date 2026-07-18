@@ -50,6 +50,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | terminal | kitty | distro | apt | apt | apt-signature |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |
+| terminal | herdr | 0.7.4 | github | dotfiles-binary | pinned-sha256 |
 | system | git_credential_manager | 2.8.0 | github | dpkg | pinned-sha256 |
 | fonts | nerd_font | FiraMono | github | dotfiles-assets | upstream-checksum |
 | fonts | nerd_font_version | 3.4.0 | github | dotfiles-assets | upstream-checksum |

@@ -95,6 +95,9 @@ if (( $+commands[tmux] )); then
   plugins+=(tmux)
 fi
 
+# User-local generated completions must be visible before Oh My Zsh runs compinit.
+[[ -d "$HOME/.zfunc" ]] && fpath=("$HOME/.zfunc" $fpath)
+
 # Drop stale completion dumps that reference broken system completion paths.
 for _zcompdump in "$HOME"/.zcompdump*(N) "${XDG_CACHE_HOME:-$HOME/.cache}"/zsh/zcompdump*(N); do
   if [[ -f "$_zcompdump" ]] && command grep -Eq '/user/share/zsh/vendor-completions|/usr/share/zsh/vendor-completions/_docker' "$_zcompdump" 2>/dev/null &&

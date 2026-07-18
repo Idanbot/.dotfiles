@@ -9,6 +9,23 @@ orchestrator owns package installation, recovery, logging, and acceptance.
 The repository is public and intentionally contains no credentials, private
 keys, tokens, or encrypted secret payloads.
 
+## Scope and Guarantees
+
+Current targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
+Unsupported platforms fail before configuration is applied.
+
+For supported targets, the project is designed to provide:
+
+- One observable install path for interactive, unattended, CI, native, and WSL runs.
+- A backup before managed configuration overwrites an existing destination.
+- Preservation of shell history, completion caches, credentials, and local overlays.
+- Integrity verification and explicit ownership metadata for downloaded tools.
+- Profile-specific acceptance checks and machine-readable run records.
+- Idempotent convergence: a successful second run should require no corrective work.
+
+Explicit non-goals are Arch/macOS support, unattended authentication, credential
+distribution, GUI validation in Docker, and autonomous agent commits or merges.
+
 ## Quick Start
 
 Interactive profile selector:
@@ -31,8 +48,13 @@ Preview without changing the machine:
 ./scripts/install.sh --list-options
 ```
 
-Supported targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
-Unsupported platforms fail before configuration is applied.
+After installation:
+
+```bash
+exec zsh
+dot doctor
+dot status
+```
 
 ## Install Profiles
 
@@ -40,7 +62,7 @@ Unsupported platforms fail before configuration is applied.
 | --- | --- | --- |
 | `minimal` | Repair or small server | Core packages only |
 | `base` | Shell workstation | Zsh and terminal utilities |
-| `developer` | Main development machine | Languages, Atuin, tmux, Neovim, system/theme |
+| `developer` | Main development machine | Languages, Atuin, tmux/Herdr, Neovim, system/theme |
 | `agent` | LLM/agent workstation | Developer plus AI CLI harnesses |
 | `cloud` | Infrastructure workstation | Developer plus container/cloud CLIs |
 | `full` | Complete native or WSL setup | All applicable sections |
@@ -156,7 +178,7 @@ dot backup                 list config backups
 dot restore <id>           restore a config backup
 dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
-dot workspace [directory]  open the agent tmux workspace
+dot workspace [directory]  open a backend-aware agent workspace
 ```
 
 Machine-specific choices live in
@@ -170,18 +192,52 @@ standalone GitHub release, and npm packages use a stable user-local Node/npm
 prefix. Antigravity remains a manual optional command. Authentication and
 session state are never automated.
 
-Launch the parameterized tmuxp workspace in any project:
+Launch the workspace in any project:
 
 ```bash
 dot workspace
 dot workspace ~/Code/project
+dot workspace . --backend herdr
+dot workspace . --backend tmux
 dot-workspace . --name project-agents --print
 ```
 
-The workspace creates a main terminal plus Codex, Antigravity, Claude,
-OpenCode, and OMP windows in the same working directory. It runs the pinned
-tmuxp version through `uvx`; a missing optional agent leaves a usable login
-shell instead of failing the workspace.
+`--backend auto` is the default. It remains in Herdr or tmux when invoked from
+inside one, prefers Herdr on a bare terminal when available, and otherwise
+falls back to tmuxp. It never launches one multiplexer inside the other unless
+`--allow-nested` is also passed. Set `DOTFILES_WORKSPACE_BACKEND=herdr` or
+`tmux` for a shell-local default.
+
+Both backends create a main terminal plus Codex, Antigravity, Claude, OpenCode,
+and OMP in the same working directory. Herdr uses one project workspace with a
+tab per agent and reuses an existing workspace with the same name. The tmux
+backend renders a session from the registry and runs pinned tmuxp through
+`uvx`. A missing optional agent leaves a usable login shell instead of failing
+the workspace.
+
+Herdr and tmux both use `Ctrl+S` as their normal prefix. Existing tmux
+`send-prefix` support handles an explicitly nested Herdr. An explicitly nested
+tmux session under Herdr receives `Ctrl+B` for that generated session only.
+Implicit nesting remains blocked because Herdr cannot observe agents hidden
+behind an inner tmux process.
+
+Herdr configuration is managed at `~/.config/herdr/config.toml`. It provides
+tmux-style pane navigation, indexed tabs/workspaces/agents, Catppuccin, compact
+priority-sorted agent status, in-app notifications, and popups for lazygit,
+lazydocker, k9s, btop, and `dot doctor`. Worktree shortcuts, nested Herdr, sound,
+and persisted pane history are disabled. Reload a running session after config
+changes with `herdr server reload-config`.
+
+The agent install section also installs Herdr's bundled Claude, Codex,
+OpenCode, and OMP integrations. These add lifecycle/session hooks but do not
+authenticate an agent or copy its credentials. Inspect them with
+`herdr integration status`.
+
+This is a supervised launcher, not a branch-isolation system. It does not
+create worktrees, coordinate concurrent edits, commit, merge, or push. Use one
+editing agent at a time in a working directory; use the other windows for
+review, diagnosis, research, and test observation. Separate source copies are
+required when concurrent writers are intentional.
 
 ## Preserved Local State
 
@@ -241,9 +297,17 @@ Regenerate derived files after manifest edits:
 ./scripts/generate-keybinding-docs.sh
 ```
 
-## CI and Docker E2E
+## Verification
 
-The first CI stage runs these jobs in parallel:
+Verification is tiered so a green result has a precise meaning:
+
+| Tier | Trigger | Coverage |
+| --- | --- | --- |
+| Push/PR CI | Every change | Security and policy checks, selector matrices, native/WSL-simulated units, two-pass base install, recovery/restore/resume |
+| Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, and `full` profile installations |
+| Real WSL2 | Manual, private self-hosted Windows runner | Actual WSL kernel, Windows interop, and target-machine acceptance |
+
+The first push/PR stage runs these jobs in parallel:
 
 - Gitleaks full-history scan.
 - ShellCheck, shfmt, YAML, templates, and generated-file contracts.
@@ -253,11 +317,9 @@ The first CI stage runs these jobs in parallel:
 - Pull-request dependency review.
 
 All six must pass before the verified GitHub release/external smoke job. A
-pre-matrix gate then unlocks selector and native/WSL-simulated unit matrices,
-two-pass base installations, and failure/restore/resume tests. Developer,
-agent, cloud, and full live profiles run on schedule or manual dispatch with a
-maximum parallelism of two. A separate workflow targets a private Windows
-self-hosted runner for a real WSL2 kernel.
+pre-matrix gate then unlocks the normal matrices. A green push/PR run does not
+mean the scheduled heavy profiles or real-WSL workflow ran; check those tiers
+when changing platform integration or complete install behavior.
 
 Local test commands also execute inside Docker:
 
@@ -268,7 +330,7 @@ docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
 docker compose -f .github/e2e/compose.yaml --profile agent run --rm agent
 ```
 
-For manual validation, the wrapper runs a complete native-Ubuntu installation,
+For manual validation, the wrapper runs a complete native Ubuntu installation,
 executes the acceptance suite, and then leaves the disposable container open at
 a login shell:
 
@@ -282,6 +344,16 @@ automated checks passed. Exit the shell to delete the container. Redacted logs,
 run summaries, diagnostics, and timing data remain under
 `artifacts/full-false/`. A first full run can take several minutes and consume
 several gigabytes because it installs the complete native workstation profile.
+
+Useful checks inside the validation shell:
+
+```bash
+echo "$DOTFILES_E2E_STATUS"
+dot doctor
+nvim
+tmux
+dot workspace /dotfiles
+```
 
 Useful variants:
 
@@ -316,13 +388,22 @@ agents.yaml            agent command registry
 packages*.yaml         version and ownership manifests
 ```
 
-Design details and decisions:
+## Authoritative Documentation
+
+Accepted ADRs and the current implementation are authoritative. Superseded
+phase plans, candidate-path notes, and the old universal-deployment proposal
+have been removed so unimplemented ideas are not mistaken for supported
+behavior. New architectural decisions should extend or supersede an ADR.
+
+Design details and generated references:
 
 - [Architecture](docs/architecture.md)
 - [Reliability](docs/reliability.md)
 - [Security Model](docs/security-model.md)
 - [Implemented Improvements](docs/improvements-2026.md)
 - [ADRs](docs/adr/README.md)
+- [Tool Inventory](docs/tool-inventory.md)
+- [Keybindings](docs/keybindings.md)
 
 ## License
 

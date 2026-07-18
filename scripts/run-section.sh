@@ -17,7 +17,7 @@ Sections:
   languages    Go, Rust, Node.js, TypeScript, Python, Java
   history      optional Atuin installation (activation remains local/manual)
   cloud        Docker, kubectl, Helm, Terraform, cloud CLIs
-  tmux         tmux and tmuxp
+  tmux         tmux, tmuxp, and Herdr
   neovim       Neovim
   ai           AI CLIs
   media        media tools
