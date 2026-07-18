@@ -10,6 +10,7 @@ export HOME="$TMP_HOME"
 export DOTFILES_BIN_DIR="$TMP_HOME/bin"
 export DOTFILES_STATE_DIR="$TMP_HOME/state"
 export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
+export DOTFILES_AGENT_REGISTRY="$TMP_HOME/.config/dotfiles/agents.yaml"
 mkdir -p "$DOTFILES_BIN_DIR"
 export PATH="$DOTFILES_BIN_DIR:$PATH"
 
@@ -99,11 +100,11 @@ for _ in {1..100}; do
 done
 herdr workspace list >/dev/null
 
-mkdir -p "$HOME/.config/dotfiles" "$HOME/.config/tmuxp" "$HOME/workspace-smoke"
-cp "$DOTFILES_DIR/agents.yaml" "$HOME/.config/dotfiles/agents.yaml"
+mkdir -p "$(dirname "$DOTFILES_AGENT_REGISTRY")" "$HOME/.config/tmuxp" "$HOME/workspace-smoke"
+cp "$DOTFILES_DIR/agents.yaml" "$DOTFILES_AGENT_REGISTRY"
 cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/agent-workspace.yaml"
 for agent in codex antigravity claude opencode omp; do
-  sed -i "s/command: $agent/command: missing-$agent/" "$HOME/.config/dotfiles/agents.yaml"
+  sed -i "s/command: $agent/command: missing-$agent/" "$DOTFILES_AGENT_REGISTRY"
 done
 ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" "$DOTFILES_BIN_DIR/dot-agent-launch"
 

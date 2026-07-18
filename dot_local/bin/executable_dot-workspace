@@ -157,23 +157,25 @@ render_tmux_workspace() {
   }
   [[ "${HERDR_ENV:-}" == 1 ]] && prefix=C-b
 
-  python3 - "$template" "$destination" "$SESSION_NAME" "$WORKDIR" "$prefix" "${AGENTS[@]}" <<'PY'
+  python3 - "$template" "$destination" "$SESSION_NAME" "$WORKDIR" "$prefix" "$REGISTRY" "${AGENTS[@]}" <<'PY'
 import json
 import re
+import shlex
 import sys
 from pathlib import Path
 
-source, destination, session, workdir, prefix, *agents = sys.argv[1:]
+source, destination, session, workdir, prefix, registry, *agents = sys.argv[1:]
 for agent in agents:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", agent):
         raise SystemExit(f"invalid agent id: {agent}")
 
 windows = []
 for agent in agents:
+    command = shlex.join(["dot-agent-launch", "--registry", registry, agent])
     windows.extend([
         f"  - window_name: {json.dumps(agent)}",
         "    panes:",
-        f"      - shell_command: {json.dumps(f'dot-agent-launch {agent}')}"
+        f"      - shell_command: {json.dumps(command)}"
     ])
 
 text = Path(source).read_text(encoding="utf-8")
@@ -295,7 +297,7 @@ run_herdr_workspace() {
       placeholder_pane="$(jq -er '.result.root_pane.pane_id' <<<"$response")"
       if ! herdr agent start "$agent" --workspace "$workspace_id" --tab "$tab_id" \
         --cwd "$WORKDIR" --no-focus --env "DOTFILES_AGENT_REGISTRY=$REGISTRY" -- \
-        dot-agent-launch "$agent" >/dev/null; then
+        dot-agent-launch --registry "$REGISTRY" "$agent" >/dev/null; then
         herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
         return 1
       fi

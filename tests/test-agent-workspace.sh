@@ -23,7 +23,7 @@ grep -Fq 'session_name: "test-agents"' <<<"$rendered"
 grep -Fq "start_directory: \"$HOME/project with spaces\"" <<<"$rendered"
 [[ "$(yq -r '.options.prefix' <<<"$rendered")" == C-s ]]
 for agent in codex antigravity claude opencode omp; do
-  grep -Fq "dot-agent-launch $agent" <<<"$rendered"
+  grep -Fq "dot-agent-launch --registry $DOTFILES_AGENT_REGISTRY $agent" <<<"$rendered"
 done
 printf '%s\n' "$rendered" | yq . >/dev/null
 
@@ -65,8 +65,8 @@ printf '#!/bin/sh\nprintf "codex-launched\\n"\n' >"$HOME/bin/codex"
 chmod +x "$HOME/bin/codex"
 [[ "$($AGENT_LAUNCH codex)" == codex-launched ]]
 mkdir -p "$HOME/pane-home"
-[[ "$(HOME="$HOME/pane-home" DOTFILES_AGENT_REGISTRY="$DOTFILES_AGENT_REGISTRY" \
-  "$AGENT_LAUNCH" codex)" == codex-launched ]]
+[[ "$(HOME="$HOME/pane-home" "$AGENT_LAUNCH" --registry "$DOTFILES_AGENT_REGISTRY" \
+  codex)" == codex-launched ]]
 set +e
 "$AGENT_LAUNCH" unknown-agent >/dev/null 2>&1
 status=$?

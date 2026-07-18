@@ -105,7 +105,7 @@ else
   fail "workspace nesting policy is incomplete"
 fi
 
-if grep -Fq -- '--env "DOTFILES_AGENT_REGISTRY=$REGISTRY"' \
+if grep -Fq 'dot-agent-launch --registry "$REGISTRY" "$agent"' \
   "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
   pass "Herdr agent panes receive the resolved registry path"
 else

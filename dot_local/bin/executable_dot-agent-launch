@@ -3,6 +3,16 @@
 
 set -u
 
+registry_override=""
+if [[ "${1:-}" == --registry ]]; then
+  registry_override="${2:-}"
+  [[ -n "$registry_override" ]] || {
+    printf '%s\n' '--registry requires a path' >&2
+    exit 2
+  }
+  shift 2
+fi
+
 agent="${1:-}"
 [[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
   printf 'Invalid agent id: %s\n' "$agent" >&2
@@ -10,8 +20,9 @@ agent="${1:-}"
 }
 
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
-registry="${DOTFILES_AGENT_REGISTRY:-$config_root/dotfiles/agents.yaml}"
-if [[ ! -f "$registry" ]] && command -v chezmoi >/dev/null 2>&1; then
+registry="${registry_override:-${DOTFILES_AGENT_REGISTRY:-$config_root/dotfiles/agents.yaml}}"
+if [[ ! -f "$registry" && -z "$registry_override" && -z "${DOTFILES_AGENT_REGISTRY:-}" ]] &&
+  command -v chezmoi >/dev/null 2>&1; then
   source_dir="$(chezmoi source-path 2>/dev/null || true)"
   [[ -f "$source_dir/agents.yaml" ]] && registry="$source_dir/agents.yaml"
 fi
