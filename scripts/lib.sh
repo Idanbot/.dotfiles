@@ -382,6 +382,7 @@ install_github_archive() {
 
   arch="$(get_arch)"
   asset="$(github_asset_name "$asset_template" "$tag" "$arch")"
+  member_path="$(github_asset_name "$member" "$tag" "$arch")"
   checksum_url="$(github_asset_name "$checksum_template" "$tag" "$arch")"
   tmpdir="$(mktemp -d)"
   archive="$tmpdir/$asset"
@@ -389,8 +390,8 @@ install_github_archive() {
   download_verified \
     "https://github.com/${repo}/releases/download/${tag}/${asset}" \
     "$archive" "$checksum_url" "$asset"
-  tar -xf "$archive" -C "$tmpdir" "$member"
-  install_managed_binary "$tmpdir/$member" "$binary" "${tag#v}" "github:$repo"
+  tar -xf "$archive" -C "$tmpdir" "$member_path"
+  install_managed_binary "$tmpdir/$member_path" "$binary" "${tag#v}" "github:$repo"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"
   ((_INSTALLED++)) || true
