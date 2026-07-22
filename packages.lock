@@ -3,7 +3,7 @@
 
 generated_from:
   packages: bc68fdad09ca19518e0499d4f8392893d673bd97b9d98906efc29b2d92f29c11
-  metadata: 90cd7361f1f756d0e3ad47def841d13a59e6081cf041b4a1c51b003405b53561
+  metadata: d5318c38bee04772bce3baf8471c06d840292a5796a3eba417e98663fddd8b08
 
 tools:
   - section: bootstrap
@@ -175,7 +175,9 @@ tools:
     owner: dotfiles-binary
     repo: fujiapple852/trippy
     binary: trip
-    integrity: upstream-checksum
+    sha256_amd64: aa2b7b2a0773f3cc04da691100419049950b690fe3736d25e24ac955b63d6056
+    sha256_arm64: 73af939aa94e9e0f07cac2b3c8177e02a6b1c3be88299d85988e02be81ae7004
+    integrity: pinned-sha256
   - section: languages
     name: go
     version: 1.26.5
@@ -254,7 +256,9 @@ tools:
     owner: dotfiles-binary
     repo: xo/usql
     binary: usql
-    integrity: upstream-checksum
+    sha256_amd64: 78bd9b221e223d7a954d41f51e9eca98bdd94b401618367ba0f3887abebd44fc
+    sha256_arm64: ccad89d6f4c67a9bf595df0aa8a550e0a9e3d6a6f9356356ba1e164e311335e4
+    integrity: pinned-sha256
   - section: database
     name: iredis
     version: 1.15.0

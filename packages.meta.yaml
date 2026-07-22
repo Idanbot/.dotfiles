@@ -128,7 +128,10 @@ core:
     owner: dotfiles-binary
     repo: fujiapple852/trippy
     binary: trip
-    integrity: upstream-checksum
+    integrity: pinned-sha256
+    sha256_amd64: aa2b7b2a0773f3cc04da691100419049950b690fe3736d25e24ac955b63d6056
+    sha256_arm64: 73af939aa94e9e0f07cac2b3c8177e02a6b1c3be88299d85988e02be81ae7004
+
 
 languages:
   go:
@@ -257,7 +260,10 @@ database:
     owner: dotfiles-binary
     repo: xo/usql
     binary: usql
-    integrity: upstream-checksum
+    integrity: pinned-sha256
+    sha256_amd64: 78bd9b221e223d7a954d41f51e9eca98bdd94b401618367ba0f3887abebd44fc
+    sha256_arm64: ccad89d6f4c67a9bf595df0aa8a550e0a9e3d6a6f9356356ba1e164e311335e4
+
   iredis:
     source: pypi
     owner: uv

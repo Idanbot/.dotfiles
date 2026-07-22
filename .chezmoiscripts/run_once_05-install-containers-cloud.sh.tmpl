@@ -152,11 +152,12 @@ install_github_archive \
   "https://github.com/stern/stern/releases/download/{tag}/checksums.txt" \
   'stern --version'
 
+USQL_SHA="$(package_metadata database usql "sha256_$ARCH")"
 USQL_VERSION="$(package_version database usql 0.21.4)"
 install_github_archive \
   usql xo/usql "v${USQL_VERSION#v}" \
   "usql-${USQL_VERSION}-linux-${ARCH}.tar.bz2" usql \
-  "" \
+  "sha256:$USQL_SHA" \
   'usql --version'
 
 if ! is_installed iredis; then

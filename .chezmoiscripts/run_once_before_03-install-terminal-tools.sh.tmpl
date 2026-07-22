@@ -93,11 +93,12 @@ install_github_archive \
   "https://github.com/rs/curlie/releases/download/{tag}/curlie_${CURLIE_VERSION}_checksums.txt" \
   'curlie --version'
 
+TRIPPY_SHA="$(package_metadata core trippy "sha256_$ARCH")"
 TRIPPY_VERSION="$(package_version core trippy 0.13.0)"
 install_github_archive \
   trip fujiapple852/trippy "${TRIPPY_VERSION}" \
   "trippy-${TRIPPY_VERSION}-${RELEASE_ARCH}-unknown-linux-musl.tar.gz" trip \
-  "" \
+  "sha256:$TRIPPY_SHA" \
   'trip --version'
 
 print_summary "Terminal Tools"
