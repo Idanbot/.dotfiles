@@ -28,6 +28,19 @@ Host gitlab.com
     User git
     IdentityFile ~/.ssh/id_ed25519
 
+# Raspberry Pi 4 (Cloudflare Access SSH)
+Host rpi4
+    HostName rpi4-ssh.idanbot.uk
+    User idan
+    ProxyCommand /usr/bin/cloudflared access ssh --hostname %h
+
+# ThinkPad T420 (Cloudflare Access SSH)
+Host t420
+    HostName t420.idanbot.uk
+    User idan
+    ProxyCommand /usr/bin/cloudflared access ssh --hostname %h
+
+
 # Add any custom hosts below or use chezmoi templates to customize per machine:
 # {{ "{{" }}- if eq .chezmoi.hostname "your-work-host" {{ "}}" }}
 # Host work-host

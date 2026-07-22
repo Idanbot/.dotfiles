@@ -134,5 +134,52 @@ else
   log_skip "Azure CLI already installed"
 fi
 
+if ! is_installed cloudflared; then
+  log_info "Installing cloudflared..."
+  CF_ARCH=$(get_arch)
+  download "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.deb" /tmp/cloudflared.deb
+  sudo dpkg -i /tmp/cloudflared.deb
+  rm -f /tmp/cloudflared.deb
+  log_success "cloudflared installed"
+else
+  log_skip "cloudflared already installed"
+fi
+
+STERN_VERSION="$(package_version cloud stern 1.32.0)"
+install_github_archive \
+  stern stern/stern "v${STERN_VERSION#v}" \
+  "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
+  "https://github.com/stern/stern/releases/download/{tag}/checksums.txt" \
+  'stern --version'
+
+USQL_VERSION="$(package_version database usql 0.19.16)"
+install_github_archive \
+  usql xo/usql "v${USQL_VERSION#v}" \
+  "usql-${USQL_VERSION}-linux-${ARCH}.tar.bz2" usql \
+  "" \
+  'usql --version'
+
+if ! is_installed iredis; then
+  if is_installed uv; then
+    log_info "Installing iredis via uv..."
+    uv tool install iredis --quiet 2>/dev/null || pip install --user iredis 2>/dev/null || true
+    log_success "iredis installed"
+  fi
+else
+  log_skip "iredis already installed"
+fi
+
+# Pre-generate offline Zsh completion definitions for kubectl, helm, docker
+mkdir -p "$HOME/.zsh/completions"
+if is_installed kubectl; then
+  kubectl completion zsh > "$HOME/.zsh/completions/_kubectl" 2>/dev/null || true
+fi
+if is_installed helm; then
+  helm completion zsh > "$HOME/.zsh/completions/_helm" 2>/dev/null || true
+fi
+if is_installed docker; then
+  docker completion zsh > "$HOME/.zsh/completions/_docker" 2>/dev/null || true
+fi
+
 log_info "Cloud authentication is intentionally not automated"
 print_summary "Container & Cloud Tools"

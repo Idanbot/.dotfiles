@@ -86,4 +86,18 @@ install_github_binary \
   'tldr --version'
 tldr --update || log_warn "tealdeer cache update is temporarily unavailable"
 
+CURLIE_VERSION="$(package_version core curlie 1.8.2)"
+install_github_archive \
+  curlie rs/curlie "v${CURLIE_VERSION#v}" \
+  "curlie_${CURLIE_VERSION}_linux_${ARCH}.tar.gz" curlie \
+  "https://github.com/rs/curlie/releases/download/{tag}/checksums.txt" \
+  'curlie --version'
+
+TRIPPY_VERSION="$(package_version core trippy 0.12.2)"
+install_github_archive \
+  trip fujiapple852/trippy "v${TRIPPY_VERSION#v}" \
+  "trippy-${TRIPPY_VERSION}-${RELEASE_ARCH}-unknown-linux-musl.tar.gz" trip \
+  "" \
+  'trip --version'
+
 print_summary "Terminal Tools"

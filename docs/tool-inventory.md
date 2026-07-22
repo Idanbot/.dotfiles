@@ -28,6 +28,8 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | sops | 3.13.2 | github | dotfiles-binary | upstream-checksum |
 | core | lazydocker | 0.25.2 | github | dotfiles-binary | upstream-checksum |
 | core | tealdeer | 1.8.1 | github | dotfiles-binary | upstream-checksum |
+| core | curlie | 1.8.2 | github | dotfiles-binary | upstream-checksum |
+| core | trippy | 0.12.2 | github | dotfiles-binary | upstream-checksum |
 | languages | go | 1.26.5 | direct | dotfiles-runtime | upstream-checksum |
 | languages | rust | stable | rustup | rustup | upstream-checksum |
 | languages | cargo | stable | rustup | rustup | rustup |
@@ -38,6 +40,8 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | languages | uv | 0.11.28 | github | dotfiles-binary | upstream-checksum |
 | history | atuin | 18.17.0 | github | dotfiles-binary | upstream-checksum |
 | editor | neovim | 0.12.4 | github | dotfiles-runtime | pinned-sha256 |
+| database | usql | 0.19.16 | github | dotfiles-binary | upstream-checksum |
+| database | iredis | 1.15.0 | pypi | uv | pypi |
 | cloud | docker | distro | apt_repo | apt | apt-signature |
 | cloud | kubectl | 1.36.2 | direct | dotfiles-binary | upstream-checksum |
 | cloud | helm | 4.2.3 | github | dotfiles-binary | upstream-checksum |
@@ -47,6 +51,8 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | cloud | aws_cli | 2.34.54 | direct | vendor-installer | pinned-sha256 |
 | cloud | gcloud | distro | apt_repo | apt | apt-signature |
 | cloud | azure_cli | distro | apt_repo | apt | apt-signature |
+| cloud | cloudflared | distro | github | vendor-installer | upstream-checksum |
+| cloud | stern | 1.32.0 | github | dotfiles-binary | upstream-checksum |
 | terminal | kitty | distro | apt | apt | apt-signature |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |

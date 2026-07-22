@@ -97,6 +97,8 @@ fi
 
 # User-local generated completions must be visible before Oh My Zsh runs compinit.
 [[ -d "$HOME/.zfunc" ]] && fpath=("$HOME/.zfunc" $fpath)
+[[ -d "$HOME/.zsh/completions" ]] && fpath=("$HOME/.zsh/completions" $fpath)
+
 
 # Drop stale completion dumps that reference broken system completion paths.
 for _zcompdump in "$HOME"/.zcompdump*(N) "${XDG_CACHE_HOME:-$HOME/.cache}"/zsh/zcompdump*(N); do
@@ -166,9 +168,13 @@ _ignored_dev_artifacts=(
 
 zstyle ':completion:*:(rm|chmod|chown|chgrp|diff):*' ignored-patterns "${_ignored_dev_artifacts[@]}"
 
-# --- AWS CLI completion via aws_completer ---
+# --- AWS CLI completion (lazy-loaded on first invocation) ---
 if command -v aws_completer >/dev/null 2>&1; then
-  complete -C "$(command -v aws_completer)" aws
+  aws() {
+    unfunction aws
+    complete -C "$(command -v aws_completer)" aws
+    aws "$@"
+  }
 fi
 
 # Git zstyle

@@ -117,6 +117,18 @@ core:
     repo: dbrgn/tealdeer
     binary: tldr
     integrity: upstream-checksum
+  curlie:
+    source: github
+    owner: dotfiles-binary
+    repo: rs/curlie
+    binary: curlie
+    integrity: upstream-checksum
+  trippy:
+    source: github
+    owner: dotfiles-binary
+    repo: fujiapple852/trippy
+    binary: trip
+    integrity: upstream-checksum
 
 languages:
   go:
@@ -226,6 +238,32 @@ cloud:
     source: apt_repo
     owner: apt
     integrity: apt-signature
+  cloudflared:
+    source: github
+    owner: vendor-installer
+    repo: cloudflare/cloudflared
+    binary: cloudflared
+    integrity: upstream-checksum
+  stern:
+    source: github
+    owner: dotfiles-binary
+    repo: stern/stern
+    binary: stern
+    integrity: upstream-checksum
+
+database:
+  usql:
+    source: github
+    owner: dotfiles-binary
+    repo: xo/usql
+    binary: usql
+    integrity: upstream-checksum
+  iredis:
+    source: pypi
+    owner: uv
+    package: iredis
+    binary: iredis
+    integrity: pypi
 
 terminal:
   kitty:

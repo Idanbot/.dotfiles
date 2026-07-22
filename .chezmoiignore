@@ -46,3 +46,5 @@ docs/
 .config/dotfiles/machine.conf
 .config/git/config.local
 .ssh/config.local
+.cloudflared/
+

@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 11df34c4a43a395e0c55835be6da91bea9cf25eeb71395388117248dee33137a
-  metadata: bf172e46dd933171f37f56bb14fb7e5ce35ddffef9062478bce7b756477353bd
+  packages: 9f90b01f59126284d6d82992507e212cabeb2468ea708782a586781c8590554c
+  metadata: 90cd7361f1f756d0e3ad47def841d13a59e6081cf041b4a1c51b003405b53561
 
 tools:
   - section: bootstrap
@@ -160,6 +160,22 @@ tools:
     repo: dbrgn/tealdeer
     binary: tldr
     integrity: upstream-checksum
+  - section: core
+    name: curlie
+    version: 1.8.2
+    source: github
+    owner: dotfiles-binary
+    repo: rs/curlie
+    binary: curlie
+    integrity: upstream-checksum
+  - section: core
+    name: trippy
+    version: 0.12.2
+    source: github
+    owner: dotfiles-binary
+    repo: fujiapple852/trippy
+    binary: trip
+    integrity: upstream-checksum
   - section: languages
     name: go
     version: 1.26.5
@@ -231,6 +247,22 @@ tools:
     sha256_amd64: 012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
     sha256_arm64: ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
     integrity: pinned-sha256
+  - section: database
+    name: usql
+    version: 0.19.16
+    source: github
+    owner: dotfiles-binary
+    repo: xo/usql
+    binary: usql
+    integrity: upstream-checksum
+  - section: database
+    name: iredis
+    version: 1.15.0
+    source: pypi
+    owner: uv
+    package: iredis
+    binary: iredis
+    integrity: pypi
   - section: cloud
     name: docker
     version: distro
@@ -295,6 +327,22 @@ tools:
     source: apt_repo
     owner: apt
     integrity: apt-signature
+  - section: cloud
+    name: cloudflared
+    version: distro
+    source: github
+    owner: vendor-installer
+    repo: cloudflare/cloudflared
+    binary: cloudflared
+    integrity: upstream-checksum
+  - section: cloud
+    name: stern
+    version: 1.32.0
+    source: github
+    owner: dotfiles-binary
+    repo: stern/stern
+    binary: stern
+    integrity: upstream-checksum
   - section: terminal
     name: kitty
     version: distro

@@ -24,6 +24,8 @@ core:
   sops: "3.13.2"
   lazydocker: "0.25.2"
   tealdeer: "1.8.1"
+  curlie: "1.8.2"
+  trippy: "0.12.2"
 
 languages:
   go: "1.26.5"
@@ -41,6 +43,10 @@ history:
 editor:
   neovim: "0.12.4"
 
+database:
+  usql: "0.19.16"
+  iredis: "1.15.0"
+
 cloud:
   docker: distro
   kubectl: "1.36.2"
@@ -51,6 +57,10 @@ cloud:
   aws_cli: "2.34.54"
   gcloud: distro
   azure_cli: distro
+  cloudflared: distro
+  stern: "1.32.0"
+
+
 
 terminal:
   kitty: distro
