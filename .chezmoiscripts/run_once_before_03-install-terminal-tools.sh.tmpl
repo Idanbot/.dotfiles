@@ -90,12 +90,12 @@ CURLIE_VERSION="$(package_version core curlie 1.8.2)"
 install_github_archive \
   curlie rs/curlie "v${CURLIE_VERSION#v}" \
   "curlie_${CURLIE_VERSION}_linux_${ARCH}.tar.gz" curlie \
-  "https://github.com/rs/curlie/releases/download/{tag}/checksums.txt" \
+  "https://github.com/rs/curlie/releases/download/{tag}/curlie_${CURLIE_VERSION}_checksums.txt" \
   'curlie --version'
 
-TRIPPY_VERSION="$(package_version core trippy 0.12.2)"
+TRIPPY_VERSION="$(package_version core trippy 0.13.0)"
 install_github_archive \
-  trip fujiapple852/trippy "v${TRIPPY_VERSION#v}" \
+  trip fujiapple852/trippy "${TRIPPY_VERSION}" \
   "trippy-${TRIPPY_VERSION}-${RELEASE_ARCH}-unknown-linux-musl.tar.gz" trip \
   "" \
   'trip --version'

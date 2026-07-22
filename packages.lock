@@ -2,7 +2,7 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 9f90b01f59126284d6d82992507e212cabeb2468ea708782a586781c8590554c
+  packages: bc68fdad09ca19518e0499d4f8392893d673bd97b9d98906efc29b2d92f29c11
   metadata: 90cd7361f1f756d0e3ad47def841d13a59e6081cf041b4a1c51b003405b53561
 
 tools:
@@ -170,7 +170,7 @@ tools:
     integrity: upstream-checksum
   - section: core
     name: trippy
-    version: 0.12.2
+    version: 0.13.0
     source: github
     owner: dotfiles-binary
     repo: fujiapple852/trippy
@@ -249,7 +249,7 @@ tools:
     integrity: pinned-sha256
   - section: database
     name: usql
-    version: 0.19.16
+    version: 0.21.4
     source: github
     owner: dotfiles-binary
     repo: xo/usql
@@ -337,7 +337,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: stern
-    version: 1.32.0
+    version: 1.34.0
     source: github
     owner: dotfiles-binary
     repo: stern/stern
