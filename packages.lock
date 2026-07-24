@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 2a4ac355be8ee6be04af63457f74cb6c8f200e4dc944425df4c4cd4a92cb465f
-  metadata: 3e459eecc4decc0ca0cdc904c9b78b795c73a9ae164a2e45b140ac679b9fb263
+  packages: 1b2cb74acfb0424df5fedcedd3c62b3e316c599ed4a17df46cb5a0325a69d42e
+  metadata: 9105f3ddc03b009a3bb1d643afba0620a41a151da3f98442dd3ac413a602d857
 
 tools:
   - section: bootstrap
@@ -187,22 +187,30 @@ tools:
     integrity: upstream-checksum
   - section: languages
     name: rust
-    version: stable
+    version: 1.97.1
     source: rustup
     owner: rustup
     integrity: upstream-checksum
   - section: languages
     name: cargo
-    version: stable
+    version: 1.97.1
     source: rustup
     owner: rustup
     integrity: rustup
   - section: languages
-    name: node_lts
-    version: 24.18.0
+    name: node
+    version: 26.5.0
     source: node-dist
     owner: dotfiles-runtime
     integrity: upstream-checksum
+  - section: languages
+    name: npm
+    version: 12.0.1
+    source: npm
+    owner: node-runtime
+    package: npm
+    binary: npm
+    integrity: npm-registry
   - section: languages
     name: typescript
     version: 7.0.2
@@ -219,10 +227,14 @@ tools:
     integrity: uv-managed
   - section: languages
     name: java
-    version: 21
-    source: apt
-    owner: apt
-    integrity: apt-signature
+    version: "25.0.3+9"
+    source: github
+    owner: dotfiles-runtime
+    repo: adoptium/temurin25-binaries
+    binary: java
+    sha256_amd64: 69264a7a211bf5029830d07bc3370f879769d62ebc5b5488e90c9343a2da0e1f
+    sha256_arm64: 3e4287cb98870ba824ed698854bdc27cff984254caf66dd12cc291e7bfdde26b
+    integrity: pinned-sha256
   - section: languages
     name: uv
     version: 0.11.28
@@ -275,7 +287,7 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: kubectl
-    version: 1.36.2
+    version: 1.36.3
     source: direct
     owner: dotfiles-binary
     binary: kubectl
@@ -312,12 +324,12 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: aws_cli
-    version: 2.34.54
+    version: 2.36.7
     source: direct
     owner: vendor-installer
     binary: aws
-    sha256_amd64: de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a
-    sha256_arm64: f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60
+    sha256_amd64: d641283d37f1a2168457a9f26a20d4e29167652e9ab1719b37114ef1ebe859f4
+    sha256_arm64: 85826b67912b44bb45d1e46c6e66f383c14405ee0b2f4686f73bdf949c93bd61
     integrity: pinned-sha256
   - section: cloud
     name: gcloud
@@ -333,12 +345,14 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: cloudflared
-    version: distro
+    version: 2026.7.3
     source: github
     owner: vendor-installer
     repo: cloudflare/cloudflared
     binary: cloudflared
-    integrity: upstream-checksum
+    sha256_amd64: 049777d30f9bf93da6df8bbe31383460eb2aa51a832c6551824d56f9fcc55974
+    sha256_arm64: d3ea7d22dd337b465da33d6bc1c4b3cfd381407447a2a7d29542c19783430db3
+    integrity: pinned-sha256
   - section: cloud
     name: stern
     version: 1.34.0

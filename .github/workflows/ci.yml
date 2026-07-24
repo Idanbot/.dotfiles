@@ -84,6 +84,8 @@ jobs:
           tests/test-repo-layout.sh "$PWD"
           tests/test-herdr-config.sh "$PWD"
           tests/test-kitty.sh "$PWD"
+          tests/test-cloud-context.sh "$PWD"
+          tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"
           tests/test-package-metadata.sh "$PWD"

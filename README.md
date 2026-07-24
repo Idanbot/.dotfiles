@@ -179,6 +179,7 @@ dot restore <id>           restore a config backup
 dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
 dot workspace [directory]  open a backend-aware agent workspace
+cloud-context [command]    save, load, inspect, or clear cloud CLI contexts
 ```
 
 Machine-specific choices live in
@@ -288,12 +289,28 @@ Downloads use upstream checksum manifests or repository-pinned SHA256 values.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
-the repository; all upgrades remain explicit local review decisions.
+the repository; all upgrades remain explicit local review decisions. The report
+covers pinned GitHub/direct downloads, npm packages, Rust, Python, Java, Node,
+and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
+vendor-signed APT repositories and are upgraded whenever the `cloud` section
+runs.
 
 Check current versions and integrity values:
 
 ```bash
 ./scripts/update-packages.sh --check
+```
+
+The report is visible under **Actions > Version Audit** and in the `Version and
+Checksum Report` job on every CI run. Trigger and inspect the standalone audit:
+
+```bash
+gh workflow run version-audit.yml
+gh run list --workflow=version-audit.yml --limit 5
+run_id="$(gh run list --workflow=version-audit.yml --limit 1 \
+  --json databaseId --jq '.[0].databaseId')"
+gh run view "$run_id"
+gh run download "$run_id" --name weekly-version-checksum-report
 ```
 
 Accept every fully resolved update, or only selected tools:
@@ -316,6 +333,30 @@ that approved build, and leaves the generated manifest diff for review and
 commit. Install an already-approved version with `./scripts/install-kitty.sh`.
 Kitty checks daily and displays an update notification; updates are not applied
 unattended.
+
+## Cloud Contexts
+
+Starship displays the active Kubernetes context/namespace, AWS profile and
+account ID, Google Cloud project, and Azure subscription. A provider segment is
+hidden when no corresponding context is active.
+
+`cloud-context` stores context identifiers only. It never copies credentials or
+tokens, and activates saved values through each provider's native CLI:
+
+```bash
+cloud-context                       # show current contexts
+cloud-context --save work           # save identifiers as profile "work"
+cloud-context --load work           # kubectl/gcloud/aws/az native activation
+cloud-context --clear               # clear all four contexts
+cloud-context --clear kubectl       # also: gcloud, aws, azure
+cloud-context --list
+```
+
+AWS profile selection is shell-local, so the managed Zsh wrapper sources only
+`AWS_PROFILE` and region values after load/clear. Kubernetes uses
+`kubectl config`, GCloud uses named configurations and project selection, and
+Azure uses `az account`. Saved profiles are mode `0600` under
+`~/.config/dotfiles/cloud-contexts/`.
 
 Kitty tabs are displayed vertically on the left. The configured controls are:
 

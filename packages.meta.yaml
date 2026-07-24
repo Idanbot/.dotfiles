@@ -143,17 +143,23 @@ languages:
   rust:
     source: rustup
     owner: rustup
-    channel: stable
+    channel: pinned
     integrity: upstream-checksum
   cargo:
     source: rustup
     owner: rustup
-    channel: stable
+    channel: pinned
     integrity: rustup
-  node_lts:
+  node:
     source: node-dist
     owner: dotfiles-runtime
     integrity: upstream-checksum
+  npm:
+    source: npm
+    owner: node-runtime
+    package: npm
+    binary: npm
+    integrity: npm-registry
   typescript:
     source: npm
     owner: npm
@@ -165,10 +171,13 @@ languages:
     owner: uv
     integrity: uv-managed
   java:
-    source: apt
-    owner: apt
-    package_template: openjdk-{version}-jdk-headless
-    integrity: apt-signature
+    source: github
+    owner: dotfiles-runtime
+    repo: adoptium/temurin25-binaries
+    binary: java
+    integrity: pinned-sha256
+    sha256_amd64: 69264a7a211bf5029830d07bc3370f879769d62ebc5b5488e90c9343a2da0e1f
+    sha256_arm64: 3e4287cb98870ba824ed698854bdc27cff984254caf66dd12cc291e7bfdde26b
   uv:
     source: github
     owner: dotfiles-binary
@@ -231,8 +240,8 @@ cloud:
     owner: vendor-installer
     binary: aws
     integrity: pinned-sha256
-    sha256_amd64: de278754dec97e0f6e9b4e8167d4bd1a27004c3e56e9c2da10002597f76ca35a
-    sha256_arm64: f381be152a868ccfdd0cb7cb235916b1dd8024e388bdeef0c385fb33af131a60
+    sha256_amd64: d641283d37f1a2168457a9f26a20d4e29167652e9ab1719b37114ef1ebe859f4
+    sha256_arm64: 85826b67912b44bb45d1e46c6e66f383c14405ee0b2f4686f73bdf949c93bd61
   gcloud:
     source: apt_repo
     owner: apt
@@ -246,7 +255,9 @@ cloud:
     owner: vendor-installer
     repo: cloudflare/cloudflared
     binary: cloudflared
-    integrity: upstream-checksum
+    integrity: pinned-sha256
+    sha256_amd64: 049777d30f9bf93da6df8bbe31383460eb2aa51a832c6551824d56f9fcc55974
+    sha256_arm64: d3ea7d22dd337b465da33d6bc1c4b3cfd381407447a2a7d29542c19783430db3
   stern:
     source: github
     owner: dotfiles-binary

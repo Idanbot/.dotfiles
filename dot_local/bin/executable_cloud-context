@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+# Save and restore cloud CLI context identifiers without copying credentials.
+
+set -euo pipefail
+
+CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/cloud-contexts"
+STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+AWS_ENV="$STATE_ROOT/cloud-context.env"
+AWS_CACHE="$STATE_ROOT/cloud-context-aws.cache"
+
+usage() {
+  cat <<'USAGE'
+Usage: cloud-context [command]
+
+  --status                  Show active provider contexts
+  -s, --save NAME           Save current kubectl, gcloud, AWS, and Azure contexts
+  -l, --load NAME           Activate a saved context profile through native CLIs
+  -c, --clear [PROVIDER]    Clear one provider, or all providers when omitted
+  --list                    List saved profiles
+
+Providers: kubectl, gcloud, aws, azure
+USAGE
+}
+
+warn() { printf '[WARN] %s\n' "$*" >&2; }
+info() { printf '[INFO] %s\n' "$*"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+clean() { tr '\t\r\n' '   ' <<<"${1:-}" | sed 's/[[:space:]]*$//'; }
+
+validate_name() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || {
+    printf 'Invalid profile name: %s\n' "$1" >&2
+    exit 2
+  }
+}
+
+profile_path() {
+  validate_name "$1"
+  printf '%s/%s.tsv\n' "$CONFIG_ROOT" "$1"
+}
+
+read_value() {
+  local file="$1" key="$2"
+  awk -F '\t' -v key="$key" '$1 == key { print substr($0, index($0, "\t") + 1); exit }' "$file"
+}
+
+kubectl_context() {
+  have kubectl && kubectl config current-context 2>/dev/null || true
+}
+
+gcloud_configuration() {
+  have gcloud &&
+    gcloud config configurations list --filter=is_active:true --format='value(name)' 2>/dev/null || true
+}
+
+gcloud_project() {
+  local value
+  value="$(have gcloud && gcloud config get-value project 2>/dev/null || true)"
+  [[ "$value" != '(unset)' ]] && printf '%s\n' "$value"
+}
+
+aws_profile() {
+  printf '%s\n' "${AWS_PROFILE:-${AWS_DEFAULT_PROFILE:-default}}"
+}
+
+aws_region() {
+  local profile
+  profile="$(aws_profile)"
+  have aws && aws configure get region --profile "$profile" 2>/dev/null || true
+}
+
+aws_account() {
+  have aws || return 0
+  timeout 1 aws sts get-caller-identity --query Account --output text 2>/dev/null || true
+}
+
+azure_value() {
+  local query="$1"
+  have az && az account show --query "$query" -o tsv 2>/dev/null || true
+}
+
+write_aws_env() {
+  local profile="${1:-}" region="${2:-}"
+  umask 077
+  mkdir -p "$STATE_ROOT"
+  {
+    if [[ -n "$profile" && "$profile" != default ]]; then
+      printf 'export AWS_PROFILE=%q\n' "$profile"
+    else
+      printf 'unset AWS_PROFILE\n'
+    fi
+    printf 'unset AWS_DEFAULT_PROFILE\n'
+    if [[ -n "$region" ]]; then
+      printf 'export AWS_DEFAULT_REGION=%q\n' "$region"
+    else
+      printf 'unset AWS_DEFAULT_REGION AWS_REGION\n'
+    fi
+  } >"$AWS_ENV"
+  chmod 600 "$AWS_ENV"
+  rm -f "$AWS_CACHE"
+}
+
+show_status() {
+  local kube gconfig gproject aprofile aregion aaccount azname azid
+  kube="$(clean "$(kubectl_context)")"
+  gconfig="$(clean "$(gcloud_configuration)")"
+  gproject="$(clean "$(gcloud_project)")"
+  aprofile="$(clean "$(aws_profile)")"
+  aregion="$(clean "$(aws_region)")"
+  aaccount="$(clean "$(aws_account)")"
+  azname="$(clean "$(azure_value name)")"
+  azid="$(clean "$(azure_value id)")"
+  printf 'kubectl  %s\n' "${kube:-<none>}"
+  printf 'gcloud   %s%s\n' "${gproject:-<none>}" "${gconfig:+ (config: $gconfig)}"
+  if [[ -n "$aaccount" ]]; then
+    printf 'aws      %s (profile: %s%s)\n' "$aaccount" "$aprofile" "${aregion:+, region: $aregion}"
+  else
+    printf 'aws      <none>\n'
+  fi
+  printf 'azure    %s%s\n' "${azname:-<none>}" "${azid:+ ($azid)}"
+}
+
+save_profile() {
+  local name="$1" file
+  file="$(profile_path "$name")"
+  umask 077
+  mkdir -p "$CONFIG_ROOT"
+  {
+    printf 'kubectl_context\t%s\n' "$(clean "$(kubectl_context)")"
+    printf 'gcloud_configuration\t%s\n' "$(clean "$(gcloud_configuration)")"
+    printf 'gcloud_project\t%s\n' "$(clean "$(gcloud_project)")"
+    printf 'aws_profile\t%s\n' "$(clean "$(aws_profile)")"
+    printf 'aws_region\t%s\n' "$(clean "$(aws_region)")"
+    printf 'azure_subscription\t%s\n' "$(clean "$(azure_value id)")"
+  } >"$file"
+  chmod 600 "$file"
+  info "Saved cloud context profile '$name' (identifiers only)"
+}
+
+load_profile() {
+  local name="$1" file kube gconfig gproject aprofile aregion azure
+  file="$(profile_path "$name")"
+  [[ -r "$file" ]] || {
+    printf 'Cloud context profile not found: %s\n' "$name" >&2
+    exit 1
+  }
+  kube="$(read_value "$file" kubectl_context)"
+  gconfig="$(read_value "$file" gcloud_configuration)"
+  gproject="$(read_value "$file" gcloud_project)"
+  aprofile="$(read_value "$file" aws_profile)"
+  aregion="$(read_value "$file" aws_region)"
+  azure="$(read_value "$file" azure_subscription)"
+
+  if [[ -n "$kube" ]]; then
+    have kubectl && kubectl config use-context "$kube" >/dev/null ||
+      warn "kubectl context '$kube' could not be activated"
+  fi
+  if [[ -n "$gconfig" ]]; then
+    have gcloud && gcloud config configurations activate "$gconfig" --quiet >/dev/null ||
+      warn "gcloud configuration '$gconfig' could not be activated"
+  fi
+  if [[ -n "$gproject" ]]; then
+    have gcloud && gcloud config set project "$gproject" --quiet >/dev/null ||
+      warn "gcloud project '$gproject' could not be activated"
+  fi
+  write_aws_env "$aprofile" "$aregion"
+  if [[ -n "$azure" ]]; then
+    have az && az account set --subscription "$azure" ||
+      warn "Azure subscription '$azure' could not be activated"
+  fi
+  info "Loaded cloud context profile '$name'"
+  info "AWS selection is active in this shell through the Zsh cloud-context wrapper"
+}
+
+clear_provider() {
+  case "$1" in
+    kubectl | kube)
+      have kubectl && kubectl config unset current-context >/dev/null ||
+        warn "kubectl is unavailable or has no current context"
+      ;;
+    gcloud | google)
+      have gcloud && gcloud config unset project --quiet >/dev/null ||
+        warn "gcloud is unavailable or has no active project"
+      ;;
+    aws)
+      write_aws_env "" ""
+      ;;
+    azure | az)
+      have az && az account clear ||
+        warn "Azure CLI is unavailable or has no cached account context"
+      ;;
+    *)
+      printf 'Unknown provider: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+}
+
+clear_contexts() {
+  local provider="${1:-all}"
+  if [[ "$provider" == all ]]; then
+    clear_provider kubectl
+    clear_provider gcloud
+    clear_provider aws
+    clear_provider azure
+    info "Cleared kubectl, gcloud, AWS, and Azure contexts through native interfaces"
+  else
+    clear_provider "$provider"
+    info "Cleared $provider context through its native interface"
+  fi
+}
+
+prompt_aws() {
+  local now profile cached_at cached_profile cached_account account
+  have aws || return 0
+  profile="$(aws_profile)"
+  now="$(date +%s)"
+  if [[ -r "$AWS_CACHE" ]]; then
+    IFS=$'\t' read -r cached_at cached_profile cached_account <"$AWS_CACHE" || true
+    if [[ "$cached_profile" == "$profile" && "$cached_at" =~ ^[0-9]+$ &&
+      $((now - cached_at)) -lt 300 ]]; then
+      [[ "$cached_account" != - ]] && printf '%s\n' "$cached_account"
+      return 0
+    fi
+  fi
+  account="$(aws_account)"
+  [[ "$account" =~ ^[0-9]{12}$ ]] || account=-
+  umask 077
+  mkdir -p "$STATE_ROOT"
+  printf '%s\t%s\t%s\n' "$now" "$profile" "$account" >"$AWS_CACHE"
+  chmod 600 "$AWS_CACHE"
+  [[ "$account" != - ]] && printf '%s\n' "$account"
+}
+
+case "${1:---status}" in
+  --status | status) show_status ;;
+  -s | --save)
+    [[ -n "${2:-}" ]] || {
+      usage >&2
+      exit 2
+    }
+    save_profile "$2"
+    ;;
+  -l | --load)
+    [[ -n "${2:-}" ]] || {
+      usage >&2
+      exit 2
+    }
+    load_profile "$2"
+    ;;
+  -c | --clear) clear_contexts "${2:-all}" ;;
+  --list | list)
+    [[ -d "$CONFIG_ROOT" ]] &&
+      find "$CONFIG_ROOT" -maxdepth 1 -type f -name '*.tsv' -printf '%f\n' |
+      sed 's/\.tsv$//' | sort
+    ;;
+  prompt)
+    [[ "${2:-}" == aws ]] || exit 2
+    prompt_aws
+    ;;
+  -h | --help | help) usage ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

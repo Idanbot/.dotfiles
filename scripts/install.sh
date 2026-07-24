@@ -665,7 +665,9 @@ run_stage() {
 
 bootstrap_download() {
   local url="$1" dest="$2"
-  curl --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors -fsSLo "$dest" "$url"
+  curl --proto '=https' --tlsv1.2 \
+    --retry 6 --retry-all-errors --retry-delay 2 --retry-max-time 120 \
+    -fsSLo "$dest" "$url"
 }
 
 install_chezmoi_fallback() {
@@ -756,6 +758,8 @@ stage_source() {
   export DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE"
   printf '%s\n' "$CHEZMOI_SOURCE" >"$RUN_DIR/source"
   chmod 600 "$RUN_DIR/source"
+  printf '%s\n' "$CHEZMOI_SOURCE" >"$STATE_ROOT/source"
+  chmod 600 "$STATE_ROOT/source"
   local declared builtin
   declared="$(profile_sections "${PROFILE_NAME:-full}" "$CHEZMOI_SOURCE" 2>/dev/null || true)"
   builtin="${BUILTIN_PROFILES[${PROFILE_NAME:-full}]:-}"

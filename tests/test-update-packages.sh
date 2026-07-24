@@ -113,7 +113,7 @@ grep -Fq '  claude_cli: "2.1.207"' "$all_repo/packages.yaml" || fail "apply-all 
 grep -Fq "    sha256: $new_codex_sha" "$all_repo/packages.meta.yaml" ||
   fail "apply-all omitted mutable installer checksum"
 grep -Fq '  fzf: "0.75.0"' "$all_repo/packages.yaml" || fail "apply-all omitted external version"
-grep -Fq 'url: "https://github.com/junegunn/fzf/archive/v0.75.0.tar.gz"' \
+grep -Fq 'url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.75.0"' \
   "$all_repo/.chezmoiexternal.yaml" || fail "apply-all omitted external URL"
 grep -Fq "sha256: \"$new_fzf_sha\"" "$all_repo/.chezmoiexternal.yaml" ||
   fail "apply-all omitted external checksum"

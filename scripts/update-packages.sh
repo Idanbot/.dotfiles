@@ -196,6 +196,7 @@ github_asset_spec() {
     history.atuin) printf '%s\n' 'atuinsh/atuin|v{version}|atuin-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     editor.neovim) printf '%s\n' 'neovim/neovim|v{version}|nvim-linux-{arch}.tar.gz|x86_64|arm64' ;;
     cloud.k9s) printf '%s\n' 'derailed/k9s|v{version}|k9s_Linux_{arch}.tar.gz|amd64|arm64' ;;
+    cloud.cloudflared) printf '%s\n' 'cloudflare/cloudflared|{version}|cloudflared-linux-{arch}.deb|amd64|arm64' ;;
     fonts.nerd_font_version)
       printf 'ryanoasis/nerd-fonts|v{version}|%s.zip|shared|shared\n' \
         "$(package_version fonts nerd_font FiraMono)"
@@ -261,7 +262,7 @@ external_archive_checksum() {
   local repo="$1" tag="$2" tmp
   tmp="$WORK_DIR/archive-$(sha256sum <<<"$repo/$tag" | awk '{print $1}')"
   [[ -s "$tmp" ]] || curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
-    -o "$tmp" "https://github.com/$repo/archive/$tag.tar.gz"
+    -o "$tmp" "https://codeload.github.com/$repo/tar.gz/refs/tags/$tag"
   sha256sum "$tmp" | awk '{print $1}'
 }
 
@@ -273,10 +274,20 @@ direct_checksums() {
       amd="$(jq -r --arg asset "go${version}.linux-amd64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")"
       arm="$(jq -r --arg asset "go${version}.linux-arm64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")"
       ;;
-    languages.node_lts)
+    languages.node)
       sums="$(curl "${CURL_ARGS[@]}" "https://nodejs.org/dist/v${version}/SHASUMS256.txt")"
       amd="$(checksum_for_asset /dev/stdin "node-v${version}-linux-x64.tar.xz" <<<"$sums")"
       arm="$(checksum_for_asset /dev/stdin "node-v${version}-linux-arm64.tar.xz" <<<"$sums")"
+      ;;
+    languages.java)
+      amd="$(curl "${CURL_ARGS[@]}" \
+        "https://api.adoptium.net/v3/assets/feature_releases/25/ga?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
+        jq -r --arg release "jdk-$version" \
+          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
+      arm="$(curl "${CURL_ARGS[@]}" \
+        "https://api.adoptium.net/v3/assets/feature_releases/25/ga?architecture=aarch64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
+        jq -r --arg release "jdk-$version" \
+          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
       ;;
     cloud.kubectl)
       amd="$(curl "${CURL_ARGS[@]}" "https://dl.k8s.io/release/v${version}/bin/linux/amd64/kubectl.sha256")"
@@ -291,6 +302,12 @@ direct_checksums() {
       sums="$(curl "${CURL_ARGS[@]}" "$base/terraform_${version}_SHA256SUMS")"
       amd="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_amd64.zip" <<<"$sums")"
       arm="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_arm64.zip" <<<"$sums")"
+      ;;
+    cloud.aws_cli)
+      amd="$(curl "${CURL_ARGS[@]}" "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${version}.zip" |
+        sha256sum | awk '{print $1}')"
+      arm="$(curl "${CURL_ARGS[@]}" "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-${version}.zip" |
+        sha256sum | awk '{print $1}')"
       ;;
     *) return 1 ;;
   esac
@@ -320,6 +337,8 @@ integrity_pair() {
       old="$(pinned_metadata_checksums "$section" "$key")" || old=unresolved
       if github_asset_spec "$id" >/dev/null; then
         new="$(github_checksums "$id" "$latest")" || new=unresolved
+      elif [[ "$id" == languages.java || "$id" == cloud.aws_cli ]]; then
+        new="$(direct_checksums "$id" "$latest")" || new=unresolved
       else
         new=manual-refresh-required
       fi
@@ -431,7 +450,7 @@ load_fixture() {
 }
 
 run_live_audit() {
-  local latest
+  local current latest python_series
   audit_github bootstrap chezmoi twpayne/chezmoi
   audit_github core fzf junegunn/fzf
   audit_github core eza eza-community/eza
@@ -445,12 +464,37 @@ run_live_audit() {
     latest="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json' 2>/dev/null | jq -r '.[0].version' | sed 's/^go//' || true)"
     add_candidate languages go "$latest"
   fi
-  if wanted languages.node_lts; then
-    latest="$(curl "${CURL_ARGS[@]}" https://nodejs.org/dist/index.json 2>/dev/null |
-      jq -r 'map(select(.lts != false))[0].version' | sed 's/^v//' || true)"
-    add_candidate languages node_lts "$latest"
+  if wanted languages.rust; then
+    latest="$(curl "${CURL_ARGS[@]}" https://static.rust-lang.org/dist/channel-rust-stable.toml 2>/dev/null |
+      awk -F '\"' '/^version = / { print $2; exit }' | awk '{print $1}' || true)"
+    add_candidate languages rust "$latest"
   fi
+  if wanted languages.cargo; then
+    latest="$(curl "${CURL_ARGS[@]}" https://static.rust-lang.org/dist/channel-rust-stable.toml 2>/dev/null |
+      awk -F '\"' '/^version = / { print $2; exit }' | awk '{print $1}' || true)"
+    add_candidate languages cargo "$latest"
+  fi
+  if wanted languages.node; then
+    latest="$(curl "${CURL_ARGS[@]}" https://nodejs.org/dist/index.json 2>/dev/null |
+      jq -r '.[0].version' | sed 's/^v//' || true)"
+    add_candidate languages node "$latest"
+  fi
+  audit_npm languages npm npm
   audit_npm languages typescript typescript
+  if wanted languages.python; then
+    current="$(package_version languages python)"
+    python_series="${current%.*}"
+    latest="$(curl "${CURL_ARGS[@]}" https://www.python.org/ftp/python/ 2>/dev/null |
+      grep -Eo "href=\"${python_series//./\\.}\\.[0-9]+/" | cut -d'"' -f2 | tr -d / |
+      sort -V | tail -1 || true)"
+    add_candidate languages python "$latest"
+  fi
+  if wanted languages.java; then
+    latest="$(curl "${CURL_ARGS[@]}" \
+      'https://api.adoptium.net/v3/assets/latest/25/hotspot?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse' 2>/dev/null |
+      jq -r '.[0].release_name // empty' | sed 's/^jdk-//' || true)"
+    add_candidate languages java "$latest"
+  fi
   audit_github languages uv astral-sh/uv
   audit_github history atuin atuinsh/atuin
   audit_github editor neovim neovim/neovim
@@ -461,6 +505,16 @@ run_live_audit() {
   audit_github cloud helm helm/helm
   audit_github cloud terraform hashicorp/terraform
   audit_github cloud k9s derailed/k9s
+  if wanted cloud.aws_cli; then
+    latest="$(curl "${CURL_ARGS[@]}" \
+      https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst 2>/dev/null |
+      awk '/^[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }' || true)"
+    add_candidate cloud aws_cli "$latest"
+  fi
+  audit_github cloud cloudflared cloudflare/cloudflared
+  audit_github cloud stern stern/stern
+  audit_github database usql xo/usql
+  audit_pypi database iredis iredis
   audit_github system git_credential_manager git-ecosystem/git-credential-manager
   audit_github fonts nerd_font_version ryanoasis/nerd-fonts
   audit_npm ai_tools claude_cli @anthropic-ai/claude-code
@@ -637,7 +691,7 @@ def set_external_fzf(lines: list[str], version: str, sha256: str) -> None:
     sha_found = False
     for index in range(start + 1, end):
         if re.match(r"^  url:\s*", lines[index]):
-            lines[index] = f'  url: "https://github.com/junegunn/fzf/archive/v{version}.tar.gz"'
+            lines[index] = f'  url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v{version}"'
             url_found = True
         if re.match(r"^    sha256:\s*", lines[index]):
             lines[index] = f'    sha256: "{sha256}"'

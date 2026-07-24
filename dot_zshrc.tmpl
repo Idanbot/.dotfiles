@@ -294,6 +294,17 @@ if [[ -r "$HOME/.config/dotfiles/local.zsh" ]]; then
   source "$HOME/.config/dotfiles/local.zsh"
 fi
 
+# Cloud context profiles use provider-native commands. Only AWS's shell-local
+# profile selection needs a small sourced environment file.
+[[ -r "$HOME/.local/state/dotfiles/cloud-context.env" ]] &&
+  source "$HOME/.local/state/dotfiles/cloud-context.env"
+cloud-context() {
+  command cloud-context "$@" || return
+  [[ -r "$HOME/.local/state/dotfiles/cloud-context.env" ]] &&
+    source "$HOME/.local/state/dotfiles/cloud-context.env"
+}
+alias cctx=cloud-context
+
 # Starship (ultra-fast cross-shell prompt)
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
@@ -320,7 +331,8 @@ fi
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 export GOPATH=$HOME/go
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
+[[ -d "$JAVA_HOME/bin" ]] && path=("$JAVA_HOME/bin" $path)
 export CARGO_HOME=$HOME/.cargo
 
 export BAT_THEME=ansi

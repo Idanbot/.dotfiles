@@ -3,7 +3,7 @@
 
 ".oh-my-zsh":
   type: archive
-  url: "https://github.com/ohmyzsh/ohmyzsh/archive/b26b5002633e865b70e17933536fe4dc99127898.tar.gz"
+  url: "https://codeload.github.com/ohmyzsh/ohmyzsh/tar.gz/b26b5002633e865b70e17933536fe4dc99127898"
   exact: false
   stripComponents: 1
   checksum:
@@ -12,7 +12,7 @@
 
 ".oh-my-zsh/custom/plugins/zsh-autosuggestions":
   type: archive
-  url: "https://github.com/zsh-users/zsh-autosuggestions/archive/v0.7.1.tar.gz"
+  url: "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/refs/tags/v0.7.1"
   exact: false
   stripComponents: 1
   checksum:
@@ -21,7 +21,7 @@
 
 ".oh-my-zsh/custom/plugins/zsh-syntax-highlighting":
   type: archive
-  url: "https://github.com/zsh-users/zsh-syntax-highlighting/archive/0.8.0.tar.gz"
+  url: "https://codeload.github.com/zsh-users/zsh-syntax-highlighting/tar.gz/refs/tags/0.8.0"
   exact: false
   stripComponents: 1
   checksum:
@@ -30,7 +30,7 @@
 
 ".oh-my-zsh/custom/plugins/fzf-tab":
   type: archive
-  url: "https://github.com/Aloxaf/fzf-tab/archive/v1.3.0.tar.gz"
+  url: "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/refs/tags/v1.3.0"
   exact: false
   stripComponents: 1
   checksum:
@@ -39,7 +39,7 @@
 
 ".oh-my-zsh/custom/plugins/you-should-use":
   type: archive
-  url: "https://github.com/MichaelAquilina/zsh-you-should-use/archive/1.11.1.tar.gz"
+  url: "https://codeload.github.com/MichaelAquilina/zsh-you-should-use/tar.gz/refs/tags/1.11.1"
   exact: false
   stripComponents: 1
   checksum:
@@ -48,7 +48,7 @@
 
 ".tmux/plugins/tpm":
   type: archive
-  url: "https://github.com/tmux-plugins/tpm/archive/v3.1.0.tar.gz"
+  url: "https://codeload.github.com/tmux-plugins/tpm/tar.gz/refs/tags/v3.1.0"
   exact: false
   stripComponents: 1
   checksum:
@@ -57,7 +57,7 @@
 
 ".fzf":
   type: archive
-  url: "https://github.com/junegunn/fzf/archive/v0.74.0.tar.gz"
+  url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.74.0"
   exact: false
   stripComponents: 1
   checksum:

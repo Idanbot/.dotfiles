@@ -29,12 +29,15 @@ else
 fi
 export PATH="/usr/local/go/bin:$PATH"
 
-RUST_CHANNEL="$(package_version languages rust stable)"
+RUST_CHANNEL="$(package_version languages rust 1.97.1)"
 if ! is_installed rustup; then
   case "$ARCH" in
     amd64) RUST_TARGET=x86_64-unknown-linux-gnu ;;
     arm64) RUST_TARGET=aarch64-unknown-linux-gnu ;;
-    *) log_error "Unsupported rustup architecture: $ARCH"; exit 1 ;;
+    *)
+      log_error "Unsupported rustup architecture: $ARCH"
+      exit 1
+      ;;
   esac
   tmpdir="$(mktemp -d)"
   rustup_url="https://static.rust-lang.org/rustup/dist/${RUST_TARGET}/rustup-init"
@@ -53,11 +56,14 @@ fi
 rustup toolchain install "$RUST_CHANNEL" --profile minimal
 rustup default "$RUST_CHANNEL"
 
-NODE_VERSION="$(package_version languages node_lts 24.18.0)"
+NODE_VERSION="$(package_version languages node 26.5.0)"
 case "$ARCH" in
   amd64) NODE_ARCH=x64 ;;
   arm64) NODE_ARCH=arm64 ;;
-  *) log_error "Unsupported Node.js architecture: $ARCH"; exit 1 ;;
+  *)
+    log_error "Unsupported Node.js architecture: $ARCH"
+    exit 1
+    ;;
 esac
 NODE_ROOT="$HOME/.local/share/dotfiles/tools/node/$NODE_VERSION"
 NODE_ASSET="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
@@ -77,11 +83,23 @@ if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$($NODE_ROOT/bin/node --ver
 else
   log_skip "Node.js $NODE_VERSION runtime already installed"
 fi
+export PATH="$NODE_ROOT/bin:$PATH"
+activate_node_paths
+NPM_VERSION="$(package_version languages npm 12.0.1)"
+if [[ "$("$NODE_ROOT/bin/npm" --version 2>/dev/null || true)" != "$NPM_VERSION" ]]; then
+  log_info "Installing npm $NPM_VERSION into the managed Node.js runtime"
+  "$NODE_ROOT/bin/npm" install --global --prefix "$NODE_ROOT" --no-audit --no-fund "npm@$NPM_VERSION"
+  record_install npm "$NPM_VERSION" npm "$NODE_ROOT/lib/node_modules/npm"
+  ((_INSTALLED++)) || true
+  log_success "npm $NPM_VERSION installed"
+else
+  log_skip "npm $NPM_VERSION already installed"
+fi
 for binary in node npm npx corepack; do
   [[ -x "$NODE_ROOT/bin/$binary" ]] && managed_link "$NODE_ROOT/bin/$binary" "$HOME/.local/bin/$binary" node "$NODE_VERSION"
 done
-activate_node_paths
-if ! is_installed node || ! is_installed npm; then
+if ! is_installed node || ! is_installed npm ||
+  [[ "$(npm --version 2>/dev/null || true)" != "$NPM_VERSION" ]]; then
   log_error "Node.js/npm shims are unavailable after installation"
   exit 1
 fi
@@ -123,11 +141,41 @@ else
   log_success "Python $PYTHON_VERSION installed"
 fi
 
-JAVA_VERSION="$(package_version languages java 21)"
-if ! is_installed java || ! version_major_matches "$(java -version 2>&1 | head -1 || true)" "$JAVA_VERSION"; then
-  apt_install "openjdk-${JAVA_VERSION}-jdk-headless"
+JAVA_VERSION="$(package_version languages java 25.0.3+9)"
+JAVA_MAJOR="${JAVA_VERSION%%.*}"
+JAVA_BUILD="${JAVA_VERSION#*+}"
+JAVA_FILE_VERSION="${JAVA_VERSION%%+*}_${JAVA_BUILD}"
+case "$ARCH" in
+  amd64) JAVA_ARCH=x64 ;;
+  arm64) JAVA_ARCH=aarch64 ;;
+esac
+JAVA_ROOT="$HOME/.local/share/dotfiles/tools/java/$JAVA_VERSION"
+JAVA_CURRENT="$HOME/.local/share/dotfiles/tools/java/current"
+if [[ ! -x "$JAVA_ROOT/bin/java" ]] ||
+  ! version_major_matches "$("$JAVA_ROOT/bin/java" -version 2>&1 | head -1 || true)" "$JAVA_MAJOR"; then
+  tmpdir="$(mktemp -d)"
+  asset="OpenJDK${JAVA_MAJOR}U-jdk_${JAVA_ARCH}_linux_hotspot_${JAVA_FILE_VERSION}.tar.gz"
+  JAVA_SHA="$(package_metadata languages java "sha256_$ARCH")"
+  log_info "Installing Eclipse Temurin JDK $JAVA_VERSION"
+  download_verified \
+    "https://github.com/adoptium/temurin${JAVA_MAJOR}-binaries/releases/download/jdk-${JAVA_VERSION/+/%2B}/$asset" \
+    "$tmpdir/$asset" "sha256:$JAVA_SHA" "$asset"
+  rm -rf "$JAVA_ROOT"
+  mkdir -p "$JAVA_ROOT"
+  tar -xzf "$tmpdir/$asset" -C "$JAVA_ROOT" --strip-components=1
+  rm -rf "$tmpdir"
+  record_install java "$JAVA_VERSION" adoptium "$JAVA_ROOT"
+  ((_INSTALLED++)) || true
+  log_success "Eclipse Temurin JDK $JAVA_VERSION installed"
 else
-  log_skip "OpenJDK $JAVA_VERSION already installed"
+  log_skip "Eclipse Temurin JDK $JAVA_VERSION already installed"
 fi
+ln -sfn "$JAVA_ROOT" "$JAVA_CURRENT"
+for binary in java javac jar jshell javadoc; do
+  [[ -x "$JAVA_CURRENT/bin/$binary" ]] &&
+    managed_link "$JAVA_CURRENT/bin/$binary" "$HOME/.local/bin/$binary" java "$JAVA_VERSION"
+done
+export JAVA_HOME="$JAVA_CURRENT"
+export PATH="$JAVA_HOME/bin:$PATH"
 
 print_summary "Languages & Runtimes"

@@ -3,9 +3,12 @@
 
 set -euo pipefail
 
-SOURCE="$(chezmoi source-path 2>/dev/null || true)"
-[[ -n "$SOURCE" ]] || SOURCE="$HOME/.local/share/chezmoi"
 STATE_ROOT="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
+SOURCE="${DOTFILES_SOURCE_DIR:-$(chezmoi source-path 2>/dev/null || true)}"
+if [[ ! -f "$SOURCE/scripts/doctor.sh" && -r "$STATE_ROOT/source" ]]; then
+  SOURCE="$(<"$STATE_ROOT/source")"
+fi
+[[ -n "$SOURCE" ]] || SOURCE="$HOME/.local/share/chezmoi"
 
 usage() {
   cat <<'USAGE'
@@ -53,6 +56,11 @@ case "${1:-}" in
     ;;
   doctor)
     shift
+    if [[ ! -x "$SOURCE/scripts/doctor.sh" ]]; then
+      printf 'Doctor script not found under %s\n' "$SOURCE" >&2
+      printf 'Repair with: dot sync --profile base\n' >&2
+      exit 1
+    fi
     exec "$SOURCE/scripts/doctor.sh" "$@"
     ;;
   workspace)

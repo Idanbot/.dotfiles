@@ -144,3 +144,4 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 | explorer | `"explorer.exe"` |
 | cbcopy | `"clip.exe"` |
 | cbpaste | `"powershell.exe -NoProfile -Command Get-Clipboard"` |
+| cctx | `cloud-context` |

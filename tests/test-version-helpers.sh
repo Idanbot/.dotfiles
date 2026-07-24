@@ -18,7 +18,10 @@ version_major_matches 'openjdk 21.0.8' 21
 [[ "$(version_compare 1.2.3 1.2.4)" == -1 ]]
 [[ "$(version_compare 1.2.4 1.2.3)" == 1 ]]
 [[ "$(version_compare 1.2.3 1.2.3)" == 0 ]]
-[[ "$(package_version languages node_lts)" == 24.18.0 ]]
+[[ "$(package_version languages node)" == 26.5.0 ]]
+[[ "$(package_version languages npm)" == 12.0.1 ]]
+[[ "$(package_version languages rust)" == 1.97.1 ]]
+[[ "$(package_version languages java)" == 25.0.3+9 ]]
 
 GO_INDEX_FIXTURE="$(mktemp)"
 trap 'rm -f "$GO_INDEX_FIXTURE"' EXIT

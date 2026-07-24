@@ -29,4 +29,7 @@ export PATH
 export PATH="$PATH:/usr/local/go/bin"
 
 # Java
-export JAVA_HOME="/usr/lib/jvm/java-21-openjdk-amd64"
+export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
+if [ -d "$JAVA_HOME/bin" ]; then
+  PATH="$JAVA_HOME/bin:$PATH"
+fi

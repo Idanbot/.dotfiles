@@ -152,7 +152,7 @@ fi
 
 if selected cloud; then
   log_step "Cloud"
-  for command in docker kubectl helm terraform ansible k9s aws gcloud az; do
+  for command in docker kubectl helm terraform ansible k9s aws gcloud az cloud-context; do
     check_command "$command" true
   done
 fi

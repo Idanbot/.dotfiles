@@ -9,9 +9,20 @@ log_step "Installing Container & Cloud Tools"
 require_sudo
 ARCH="$(get_arch)"
 case "$ARCH" in
-  amd64) RELEASE_ARCH=amd64; HASHI_ARCH=amd64; AWS_ARCH=x86_64 ;;
-  arm64) RELEASE_ARCH=arm64; HASHI_ARCH=arm64; AWS_ARCH=aarch64 ;;
-  *) log_error "Unsupported cloud-tool architecture: $ARCH"; exit 1 ;;
+  amd64)
+    RELEASE_ARCH=amd64
+    HASHI_ARCH=amd64
+    AWS_ARCH=x86_64
+    ;;
+  arm64)
+    RELEASE_ARCH=arm64
+    HASHI_ARCH=arm64
+    AWS_ARCH=aarch64
+    ;;
+  *)
+    log_error "Unsupported cloud-tool architecture: $ARCH"
+    exit 1
+    ;;
 esac
 
 # Ubuntu's signed packages are the sole Docker owner. On WSL, Docker Desktop
@@ -27,7 +38,7 @@ if is_native && is_installed docker; then
   log_warn "Docker group changes take effect after the next login"
 fi
 
-KUBECTL_VERSION="$(package_version cloud kubectl 1.36.2)"
+KUBECTL_VERSION="$(package_version cloud kubectl 1.36.3)"
 if ! is_installed kubectl || ! version_ge "$(kubectl version --client 2>/dev/null | head -1 || true)" "$KUBECTL_VERSION"; then
   tmpdir="$(mktemp -d)"
   url="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${RELEASE_ARCH}/kubectl"
@@ -80,7 +91,7 @@ install_github_archive \
   "https://github.com/derailed/k9s/releases/download/{tag}/checksums.sha256" \
   'k9s version --short'
 
-AWS_VERSION="$(package_version cloud aws_cli 2.34.54)"
+AWS_VERSION="$(package_version cloud aws_cli 2.36.7)"
 AWS_CURRENT="$(aws --version 2>/dev/null || true)"
 if ! is_installed aws || ! version_ge "$AWS_CURRENT" "$AWS_VERSION"; then
   AWS_SHA="$(package_metadata cloud aws_cli "sha256_$ARCH")"
@@ -102,7 +113,8 @@ else
   log_skip "AWS CLI $AWS_VERSION already installed or newer"
 fi
 
-if ! is_installed gcloud; then
+if [[ ! -f /etc/apt/sources.list.d/google-cloud-sdk.list ||
+  ! -f /usr/share/keyrings/cloud.google.gpg ]]; then
   log_info "Configuring Google Cloud's signed apt repository"
   sudo mkdir -p /usr/share/keyrings
   install_apt_key \
@@ -112,13 +124,10 @@ if ! is_installed gcloud; then
   printf '%s\n' \
     'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' |
     sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null
-  apt_update
-  apt_install google-cloud-cli
-else
-  log_skip "Google Cloud CLI already installed"
 fi
 
-if ! is_installed az; then
+if [[ ! -f /etc/apt/sources.list.d/azure-cli.list ||
+  ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
   log_info "Configuring Microsoft's signed Azure CLI apt repository"
   sudo mkdir -p /etc/apt/keyrings
   install_apt_key \
@@ -126,23 +135,36 @@ if ! is_installed az; then
     /etc/apt/keyrings/microsoft.gpg \
     BC528686B50D79E339D3721CEB3E94ADBE1229CF
   printf 'deb [arch=%s signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
-    "$(dpkg --print-architecture)" "$(. /etc/os-release; printf '%s' "$VERSION_CODENAME")" |
+    "$(dpkg --print-architecture)" "$(
+      . /etc/os-release
+      printf '%s' "$VERSION_CODENAME"
+    )" |
     sudo tee /etc/apt/sources.list.d/azure-cli.list >/dev/null
-  apt_update
-  apt_install azure-cli
-else
-  log_skip "Azure CLI already installed"
 fi
 
-if ! is_installed cloudflared; then
-  log_info "Installing cloudflared..."
-  CF_ARCH=$(get_arch)
-  download "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.deb" /tmp/cloudflared.deb
-  sudo dpkg -i /tmp/cloudflared.deb
-  rm -f /tmp/cloudflared.deb
-  log_success "cloudflared installed"
+apt_update
+log_info "Ensuring Google Cloud CLI and Azure CLI are current from their signed repositories"
+sudo apt-get install -y google-cloud-cli azure-cli
+log_success "Google Cloud CLI $(gcloud version --format=json 2>/dev/null | jq -r '."Google Cloud SDK" // "unknown"') is current"
+log_success "Azure CLI $(az version --query '"azure-cli"' -o tsv 2>/dev/null || printf unknown) is current"
+
+CLOUDFLARED_VERSION="$(package_version cloud cloudflared 2026.7.3)"
+if ! is_installed cloudflared ||
+  ! version_ge "$(cloudflared --version 2>/dev/null || true)" "$CLOUDFLARED_VERSION"; then
+  tmpdir="$(mktemp -d)"
+  asset="cloudflared-linux-${ARCH}.deb"
+  CLOUDFLARED_SHA="$(package_metadata cloud cloudflared "sha256_$ARCH")"
+  log_info "Installing cloudflared $CLOUDFLARED_VERSION"
+  download_verified \
+    "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/$asset" \
+    "$tmpdir/$asset" "sha256:$CLOUDFLARED_SHA" "$asset"
+  sudo dpkg -i "$tmpdir/$asset"
+  rm -rf "$tmpdir"
+  record_install cloudflared "$CLOUDFLARED_VERSION" github:cloudflare/cloudflared /usr/bin/cloudflared
+  ((_INSTALLED++)) || true
+  log_success "cloudflared $CLOUDFLARED_VERSION installed"
 else
-  log_skip "cloudflared already installed"
+  log_skip "cloudflared $CLOUDFLARED_VERSION already installed or newer"
 fi
 
 STERN_VERSION="$(package_version cloud stern 1.34.0)"
@@ -173,13 +195,13 @@ fi
 # Pre-generate offline Zsh completion definitions for kubectl, helm, docker
 mkdir -p "$HOME/.zsh/completions"
 if is_installed kubectl; then
-  kubectl completion zsh > "$HOME/.zsh/completions/_kubectl" 2>/dev/null || true
+  kubectl completion zsh >"$HOME/.zsh/completions/_kubectl" 2>/dev/null || true
 fi
 if is_installed helm; then
-  helm completion zsh > "$HOME/.zsh/completions/_helm" 2>/dev/null || true
+  helm completion zsh >"$HOME/.zsh/completions/_helm" 2>/dev/null || true
 fi
 if is_installed docker; then
-  docker completion zsh > "$HOME/.zsh/completions/_docker" 2>/dev/null || true
+  docker completion zsh >"$HOME/.zsh/completions/_docker" 2>/dev/null || true
 fi
 
 log_info "Cloud authentication is intentionally not automated"

@@ -22,7 +22,8 @@ required=(
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
-  tests/test-kitty.sh
+  tests/test-kitty.sh tests/test-cloud-context.sh tests/test-dot-doctor.sh
+  dot_local/bin/executable_cloud-context
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
 for path in "${required[@]}"; do
@@ -93,6 +94,20 @@ if grep -Fq 'npm_install_global @oh-my-pi/pi-coding-agent' \
   fail "OMP npm installation requires an undeclared Bun runtime"
 else
   pass "OMP uses its checksum-pinned standalone release"
+fi
+
+if grep -Fq 'export PATH="$NODE_ROOT/bin:$PATH"' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"; then
+  pass "managed Node is on PATH before npm executes"
+else
+  fail "managed Node must be on PATH before npm executes its env-based node shebang"
+fi
+
+if grep -Fq 'managed_link "$JAVA_CURRENT/bin/$binary"' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"; then
+  pass "managed Java exposes stable user-local shims"
+else
+  fail "managed Java requires stable shims for same-run and future command discovery"
 fi
 
 if grep -Fq 'CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \

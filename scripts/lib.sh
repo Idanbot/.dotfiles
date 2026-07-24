@@ -194,7 +194,9 @@ download() {
   local url="$1" dest="$2"
   mkdir -p "$(dirname "$dest")"
   if command_exists curl; then
-    curl --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors -fsSLo "$dest" "$url"
+    curl --proto '=https' --tlsv1.2 \
+      --retry 6 --retry-all-errors --retry-delay 2 --retry-max-time 120 \
+      -fsSLo "$dest" "$url"
   elif command_exists wget; then
     wget --https-only --tries=3 -qO "$dest" "$url"
   else

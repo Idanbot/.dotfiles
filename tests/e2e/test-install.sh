@@ -82,12 +82,53 @@ grep -Fxq 'history-sentinel' "$HOME/.zsh_history"
 grep -Fxq '# e2e-local-sentinel' "$HOME/.config/dotfiles/local.zsh"
 [[ "$(stat -c '%a' "$HOME/.config/dotfiles/local.zsh")" == 600 ]]
 
+selected_sections="$(jq -r .sections "$latest_summary")"
+
+manifest_version() {
+  yq -r ".$1.$2" /dotfiles/packages.yaml
+}
+
+assert_version_contains() {
+  local label="$1" expected="$2"
+  shift 2
+  local actual
+  actual="$("$@" 2>&1)"
+  [[ "$actual" == *"$expected"* ]] || {
+    printf '%s version mismatch: expected %s, got %s\n' "$label" "$expected" "$actual" >&2
+    exit 1
+  }
+}
+
+if [[ ",$selected_sections," == *,languages,* ]]; then
+  assert_version_contains Go "$(manifest_version languages go)" go version
+  assert_version_contains Rust "$(manifest_version languages rust)" rustc --version
+  assert_version_contains Cargo "$(manifest_version languages cargo)" cargo --version
+  assert_version_contains Node "$(manifest_version languages node)" node --version
+  assert_version_contains npm "$(manifest_version languages npm)" npm --version
+  assert_version_contains TypeScript "$(manifest_version languages typescript)" tsc --version
+  python_path="$(uv python find "$(manifest_version languages python)")"
+  assert_version_contains Python "$(manifest_version languages python)" "$python_path" --version
+  assert_version_contains Java "$(manifest_version languages java | cut -d+ -f1)" java -version
+fi
+
+if [[ ",$selected_sections," == *,cloud,* ]]; then
+  assert_version_contains kubectl "$(manifest_version cloud kubectl)" kubectl version --client
+  assert_version_contains Helm "$(manifest_version cloud helm)" helm version --short
+  assert_version_contains Terraform "$(manifest_version cloud terraform)" terraform version
+  assert_version_contains k9s "$(manifest_version cloud k9s)" k9s version
+  assert_version_contains AWS "$(manifest_version cloud aws_cli)" aws --version
+  assert_version_contains cloudflared "$(manifest_version cloud cloudflared)" cloudflared --version
+  assert_version_contains stern "$(manifest_version cloud stern)" stern --version
+  command -v gcloud >/dev/null
+  command -v az >/dev/null
+fi
+
 if [[ "${DOTFILES_WSL:-false}" == true ]]; then
   [[ ! -e "$HOME/.config/kitty" ]] || {
     printf 'Native-only Kitty config was applied in WSL mode\n' >&2
     exit 1
   }
-else
+elif [[ ",$selected_sections," == *,desktop,* ]]; then
   [[ -f "$HOME/.config/kitty/kitty.conf" ]]
   kitty_version="$(
     awk '
@@ -101,7 +142,12 @@ else
   )"
   kitty --version | grep -Fq "kitty $kitty_version "
   grep -Fq 'tab_bar_edge left' "$HOME/.config/kitty/kitty.conf"
+else
+  [[ -f "$HOME/.config/kitty/kitty.conf" ]]
+  ! command -v kitty >/dev/null 2>&1
 fi
+
+dot doctor --quick --sections "$selected_sections" >/dev/null
 
 for log in "$ARTIFACT_DIR"/bootstrap-pass-*.log; do
   [[ "$(stat -c '%a' "$log")" == 600 ]] || {
