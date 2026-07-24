@@ -13,9 +13,9 @@ agents:
     install: openai-standalone
     required: true
   antigravity:
-    command: antigravity
-    install: manual
-    required: false
+    command: agy
+    install: google-standalone
+    required: true
   claude:
     command: claude
     install: npm

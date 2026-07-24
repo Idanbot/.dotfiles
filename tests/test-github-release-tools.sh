@@ -103,6 +103,7 @@ cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/ag
 for agent in codex antigravity claude opencode omp; do
   sed -i "s/command: $agent/command: missing-$agent/" "$DOTFILES_AGENT_REGISTRY"
 done
+sed -i 's/command: agy/command: missing-antigravity/' "$DOTFILES_AGENT_REGISTRY"
 ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" "$DOTFILES_BIN_DIR/dot-agent-launch"
 
 HERDR_ENV=1 "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \

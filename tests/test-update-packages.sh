@@ -31,6 +31,8 @@ new_kitty_amd64=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 new_kitty_arm64=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 old_codex_sha=1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
 new_codex_sha=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+old_antigravity_sha=ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9c640
+new_antigravity_sha=9999999999999999999999999999999999999999999999999999999999999999
 old_fzf_sha=55ab5f2256edd8890f81d407b63d3a3e81cffe10e318cd196031dc85efdeb079
 new_fzf_sha=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 
@@ -40,6 +42,7 @@ terminal.herdr	0.7.5	amd64:$old_herdr_amd64;arm64:$old_herdr_arm64	amd64:$new_he
 terminal.kitty	0.48.2	amd64:$old_kitty_amd64;arm64:$old_kitty_arm64	amd64:$new_kitty_amd64;arm64:$new_kitty_arm64
 ai_tools.claude_cli	2.1.207	npm:sha512-old	npm:sha512-new
 ai_tools.codex_cli	standalone	sha256:$old_codex_sha	sha256:$new_codex_sha	true
+ai_tools.antigravity_cli	standalone	sha256:$old_antigravity_sha	sha256:$new_antigravity_sha	true
 core.fzf	0.75.0	sha256:$old_fzf_sha	sha256:$new_fzf_sha
 EOF
 
@@ -112,6 +115,8 @@ grep -Fq "    sha256_arm64: $new_kitty_arm64" "$all_repo/packages.meta.yaml" || 
 grep -Fq '  claude_cli: "2.1.207"' "$all_repo/packages.yaml" || fail "apply-all omitted Claude CLI"
 grep -Fq "    sha256: $new_codex_sha" "$all_repo/packages.meta.yaml" ||
   fail "apply-all omitted mutable installer checksum"
+grep -Fq "    sha256: $new_antigravity_sha" "$all_repo/packages.meta.yaml" ||
+  fail "apply-all omitted Antigravity installer checksum"
 grep -Fq '  fzf: "0.75.0"' "$all_repo/packages.yaml" || fail "apply-all omitted external version"
 grep -Fq 'url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.75.0"' \
   "$all_repo/.chezmoiexternal.yaml" || fail "apply-all omitted external URL"

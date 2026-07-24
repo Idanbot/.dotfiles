@@ -187,10 +187,10 @@ Machine-specific choices live in
 
 ## Agent Workspace
 
-The `agent` profile installs or validates Claude Code, Codex, Gemini, OpenCode,
-and OMP. Codex uses OpenAI's standalone installer, OMP uses a checksum-pinned
-standalone GitHub release, and npm packages use a stable user-local Node/npm
-prefix. Antigravity remains a manual optional command. Authentication and
+The `agent` profile installs or validates Claude Code, Codex, Antigravity CLI
+(`agy`), OpenCode, and OMP. Codex and Antigravity use their vendors' verified
+standalone installers, OMP uses a checksum-pinned standalone GitHub release,
+and npm packages use a stable user-local Node/npm prefix. Authentication and
 session state are never automated.
 
 Launch the workspace in any project:
@@ -270,7 +270,7 @@ bootstrap:
 - Cloud credentials and profiles for AWS, Google Cloud, Azure, Kubernetes,
   Terraform backends, and Cloudflare.
 - API tokens, environment files, password-store/keyring content.
-- Claude, Codex, Gemini, OpenCode, OMP, and Antigravity authentication/session
+- Claude, Codex, Antigravity, OpenCode, and OMP authentication/session
   directories.
 - Any future age private key or SOPS recovery material.
 

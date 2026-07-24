@@ -78,8 +78,7 @@ fonts:
 ai_tools:
   claude_cli: "2.1.206"
   codex_cli: standalone
-  gemini_cli: "0.50.0"
-  antigravity_cli: manual
+  antigravity_cli: standalone
   opencode: "1.17.18"
   omp: "16.4.0"
 

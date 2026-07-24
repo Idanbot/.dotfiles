@@ -123,6 +123,14 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   command -v az >/dev/null
 fi
 
+if [[ ",$selected_sections," == *,ai,* ]]; then
+  for agent in claude codex agy opencode omp; do
+    command -v "$agent" >/dev/null
+    "$agent" --version >/dev/null
+  done
+  ! command -v gemini >/dev/null 2>&1
+fi
+
 if [[ "${DOTFILES_WSL:-false}" == true ]]; then
   [[ ! -e "$HOME/.config/kitty" ]] || {
     printf 'Native-only Kitty config was applied in WSL mode\n' >&2

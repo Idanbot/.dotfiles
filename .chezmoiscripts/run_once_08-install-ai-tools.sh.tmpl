@@ -12,6 +12,16 @@ if ! is_installed npm; then
   exit 1
 fi
 
+LEGACY_GEMINI_PATH="$(npm_global_prefix)/lib/node_modules/@google/gemini-cli"
+if [[ -d "$LEGACY_GEMINI_PATH" ]]; then
+  log_info "Removing the deprecated managed Gemini CLI"
+  npm uninstall --global --prefix "$(npm_global_prefix)" @google/gemini-cli
+  forget_install gemini
+  log_success "Deprecated Gemini CLI removed"
+else
+  forget_install gemini
+fi
+
 CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
 npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude
 
@@ -26,7 +36,10 @@ if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
   rm -rf "$tmpdir"
   export PATH="$HOME/.local/bin:$PATH"
-  is_installed codex || { log_error "Codex standalone installer did not expose codex in PATH"; exit 1; }
+  is_installed codex || {
+    log_error "Codex standalone installer did not expose codex in PATH"
+    exit 1
+  }
   record_install codex "$(codex --version 2>/dev/null | head -1 || printf standalone)" openai-installer "$(command -v codex)"
   ((_INSTALLED++)) || true
   log_success "Codex standalone CLI installed"
@@ -34,8 +47,31 @@ else
   log_skip "Codex standalone CLI already installed"
 fi
 
-GEMINI_VERSION="$(package_version ai_tools gemini_cli 0.50.0)"
-npm_install_global @google/gemini-cli "$GEMINI_VERSION" gemini
+ANTIGRAVITY_INSTALLER_SHA="$(package_metadata ai_tools antigravity_cli sha256)"
+if is_installed agy; then
+  log_skip "Antigravity CLI already installed"
+else
+  tmpdir="$(mktemp -d)"
+  install_home="$HOME"
+  mkdir -p "$tmpdir/home"
+  log_info "Installing Antigravity CLI with Google's standalone installer"
+  download_verified \
+    https://antigravity.google/cli/install.sh "$tmpdir/antigravity-install.sh" \
+    "sha256:$ANTIGRAVITY_INSTALLER_SHA" antigravity-install.sh
+  # Contain the vendor's shell-profile edits; chezmoi already manages PATH.
+  HOME="$tmpdir/home" bash "$tmpdir/antigravity-install.sh" \
+    --dir "$install_home/.local/bin"
+  rm -rf "$tmpdir"
+  export PATH="$HOME/.local/bin:$PATH"
+  is_installed agy || {
+    log_error "Antigravity standalone installer did not expose agy in PATH"
+    exit 1
+  }
+  record_install antigravity "$(agy --version 2>/dev/null | head -1 || printf standalone)" \
+    google-installer "$(command -v agy)"
+  ((_INSTALLED++)) || true
+  log_success "Antigravity standalone CLI installed"
+fi
 
 OPENCODE_VERSION="$(package_version ai_tools opencode 1.17.18)"
 npm_install_global opencode-ai "$OPENCODE_VERSION" opencode
@@ -53,13 +89,7 @@ OMP_SHA256="$(package_metadata ai_tools omp "sha256_$(get_arch)")"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
   "sha256:$OMP_SHA256" 'omp --version'
 
-if is_installed antigravity; then
-  log_skip "Antigravity CLI is already available"
-else
-  log_warn "Antigravity has no approved automated installer in this repository; install it manually"
-fi
-
-for agent in claude codex gemini opencode omp; do
+for agent in claude codex agy opencode omp; do
   if "$agent" --version >/dev/null 2>&1; then
     log_success "$agent executable validation passed"
   else

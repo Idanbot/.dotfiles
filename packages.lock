@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 1b2cb74acfb0424df5fedcedd3c62b3e316c599ed4a17df46cb5a0325a69d42e
-  metadata: 9105f3ddc03b009a3bb1d643afba0620a41a151da3f98442dd3ac413a602d857
+  packages: d1af59050bc8f1b6e927f88523a7b4c27ea0214adc165ba0eda3e89d0d7c270c
+  metadata: 456d0ae938aaf3c934573164ef8c8cc30c2fcd7e37d89faf40e894ddb87ed735
 
 tools:
   - section: bootstrap
@@ -439,20 +439,14 @@ tools:
     sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
     integrity: pinned-sha256
   - section: ai_tools
-    name: gemini_cli
-    version: 0.50.0
-    source: npm
-    owner: npm
-    package: "@google/gemini-cli"
-    binary: gemini
-    integrity: npm-registry
-  - section: ai_tools
     name: antigravity_cli
-    version: manual
-    source: manual
-    owner: user
-    binary: antigravity
-    integrity: manual
+    version: standalone
+    source: install_script
+    owner: vendor-installer
+    binary: agy
+    url: "https://antigravity.google/cli/install.sh"
+    sha256: ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9c640
+    integrity: pinned-sha256
   - section: ai_tools
     name: opencode
     version: 1.17.18

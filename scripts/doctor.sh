@@ -198,10 +198,9 @@ fi
 
 if selected ai; then
   log_step "Agent CLIs"
-  for command in claude codex gemini opencode omp; do
+  for command in claude codex agy opencode omp; do
     check_command "$command" true
   done
-  check_command antigravity false
   result warn agent-auth "authentication is intentionally manual"
 fi
 

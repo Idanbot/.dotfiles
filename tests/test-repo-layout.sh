@@ -75,11 +75,24 @@ else
   pass "external SHA256 values use chezmoi-compatible quoted strings"
 fi
 
-if grep -Rq '@anthropic-ai/antigravity-cli' "$DOTFILES_DIR" \
-  --exclude-dir=.git --exclude=test-repo-layout.sh; then
-  fail "Antigravity must not be substituted with an unrelated npm package"
+if grep -RiqE 'gemini_cli|binary:[[:space:]]*gemini|command:[[:space:]]*gemini' \
+  "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" \
+  "$DOTFILES_DIR/packages.lock" "$DOTFILES_DIR/scripts/update-packages.sh" ||
+  grep -Fq 'npm_install_global @google/gemini-cli' \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
+  fail "deprecated Gemini CLI references remain"
 else
-  pass "Antigravity remains an explicit manual capability"
+  pass "Gemini CLI has been removed"
+fi
+
+if grep -Fq 'ANTIGRAVITY_INSTALLER_SHA="$(package_metadata ai_tools antigravity_cli sha256)"' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
+  grep -Fq 'https://antigravity.google/cli/install.sh' \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
+  grep -Fq 'command: agy' "$DOTFILES_DIR/agents.yaml"; then
+  pass "Antigravity uses the verified official agy installer"
+else
+  fail "Antigravity must use the verified official agy installer"
 fi
 
 if grep -Fq 'load_nvm' "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl" ||

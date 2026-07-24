@@ -18,6 +18,10 @@ record_install demo 1.1 test "$HOME/.local/bin/demo"
 grep -Fq $'demo\t1.1\ttest' "$DOTFILES_STATE_DIR/installed.tsv"
 [[ "$(stat -c '%a' "$DOTFILES_STATE_DIR/installed.tsv")" == 600 ]]
 
+record_install gemini 0.50.0 npm:@google/gemini-cli "$HOME/.local/share/npm/gemini"
+forget_install gemini
+! grep -q '^gemini' "$DOTFILES_STATE_DIR/installed.tsv"
+
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run demo | grep -Fq 'would remove'
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" demo >/dev/null
 [[ ! -e "$HOME/.local/bin/demo" ]]

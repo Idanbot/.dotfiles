@@ -348,17 +348,13 @@ ai_tools:
     binary: codex
     integrity: pinned-sha256
     sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
-  gemini_cli:
-    source: npm
-    owner: npm
-    package: "@google/gemini-cli"
-    binary: gemini
-    integrity: npm-registry
   antigravity_cli:
-    source: manual
-    owner: user
-    binary: antigravity
-    integrity: manual
+    source: install_script
+    owner: vendor-installer
+    url: https://antigravity.google/cli/install.sh
+    binary: agy
+    integrity: pinned-sha256
+    sha256: ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9c640
   opencode:
     source: npm
     owner: npm

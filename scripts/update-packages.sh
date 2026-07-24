@@ -519,7 +519,7 @@ run_live_audit() {
   audit_github fonts nerd_font_version ryanoasis/nerd-fonts
   audit_npm ai_tools claude_cli @anthropic-ai/claude-code
   audit_mutable_url ai_tools codex_cli https://chatgpt.com/codex/install.sh
-  audit_npm ai_tools gemini_cli @google/gemini-cli
+  audit_mutable_url ai_tools antigravity_cli https://antigravity.google/cli/install.sh
   audit_npm ai_tools opencode opencode-ai
   audit_github ai_tools omp can1357/oh-my-pi
   audit_pypi terminal tmuxp tmuxp

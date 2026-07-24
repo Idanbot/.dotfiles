@@ -24,7 +24,7 @@ implementation and validation points.
 | 17 | Stable Node/npm installation | Runtime | High | User-local versioned runtime and stable shims; no shell-time NVM |
 | 18 | Current verified Neovim | Editor | High | Pinned upstream release, checksum, headless validation |
 | 19 | Official standalone Codex install | Agents | High | Verified OpenAI installer; npm substitution removed |
-| 20 | Agent CLI registry and validation | Agents | High | Claude, Codex, Gemini, OpenCode, OMP; Antigravity manual |
+| 20 | Agent CLI registry and validation | Agents | High | Claude, Codex, Antigravity (`agy`), OpenCode, and OMP |
 | 21 | Backend-aware agent workspace | Workflow | High | Native Herdr tabs or pinned tmuxp windows, context routing, no implicit nesting |
 | 22 | Shell completion and startup hygiene | Shell | High | Stale fpath cleanup, conditional plugins, startup budget |
 | 23 | Docker selector/profile E2E | Testing | High | Native and WSL-simulated profiles with retained diagnostics |

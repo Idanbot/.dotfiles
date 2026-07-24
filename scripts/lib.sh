@@ -495,6 +495,15 @@ record_install() {
   chmod 600 "$ledger"
 }
 
+forget_install() {
+  local tool="$1" ledger
+  ledger="$(managed_state_root)/installed.tsv"
+  [[ -f "$ledger" ]] || return 0
+  awk -F '\t' -v tool="$tool" '$1 != tool' "$ledger" >"$ledger.tmp"
+  mv "$ledger.tmp" "$ledger"
+  chmod 600 "$ledger"
+}
+
 managed_link() {
   local target="$1" link="$2" tool="$3" version="$4"
   mkdir -p "$(dirname "$link")"

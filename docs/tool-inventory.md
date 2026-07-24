@@ -63,8 +63,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | fonts | nerd_font_version | 3.4.0 | github | dotfiles-assets | upstream-checksum |
 | ai_tools | claude_cli | 2.1.206 | npm | npm | npm-registry |
 | ai_tools | codex_cli | standalone | install_script | vendor-installer | pinned-sha256 |
-| ai_tools | gemini_cli | 0.50.0 | npm | npm | npm-registry |
-| ai_tools | antigravity_cli | manual | manual | user | manual |
+| ai_tools | antigravity_cli | standalone | install_script | vendor-installer | pinned-sha256 |
 | ai_tools | opencode | 1.17.18 | npm | npm | npm-registry |
 | ai_tools | omp | 16.4.0 | github | dotfiles-binary | pinned-sha256 |
 | media | yt_dlp | 2026.07.04 | uv | uv | pypi |
