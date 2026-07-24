@@ -98,6 +98,27 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 | prefix+alt+h | `open btop` |
 | prefix+alt+o | `run dotfiles doctor` |
 
+## Kitty
+
+| Key | Action |
+|-----|--------|
+| ctrl+shift+t | `new_tab_with_cwd` |
+| ctrl+shift+q | `close_tab` |
+| ctrl+shift+right | `next_tab` |
+| ctrl+shift+left | `previous_tab` |
+| ctrl+shift+. | `move_tab_forward` |
+| ctrl+shift+, | `move_tab_backward` |
+| ctrl+shift+space | `select_tab` |
+| ctrl+alt+1 | `goto_tab 1` |
+| ctrl+alt+2 | `goto_tab 2` |
+| ctrl+alt+3 | `goto_tab 3` |
+| ctrl+alt+4 | `goto_tab 4` |
+| ctrl+alt+5 | `goto_tab 5` |
+| ctrl+alt+6 | `goto_tab 6` |
+| ctrl+alt+7 | `goto_tab 7` |
+| ctrl+alt+8 | `goto_tab 8` |
+| ctrl+alt+9 | `goto_tab 9` |
+
 ## zsh aliases
 
 | Alias | Command |

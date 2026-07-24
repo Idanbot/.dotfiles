@@ -27,8 +27,29 @@ scrollback_lines 10000
 enable_audio_bell no
 
 # ── Tab Bar ──────────────────────────────────────────────────────────────────
-tab_bar_style powerline
-tab_powerline_style slanted
+tab_bar_edge left
+tab_bar_style separator
+tab_bar_min_tabs 1
+tab_title_max_length 24
+active_tab_font_style bold
+
+# Tab navigation
+map ctrl+shift+t new_tab_with_cwd
+map ctrl+shift+q close_tab
+map ctrl+shift+right next_tab
+map ctrl+shift+left previous_tab
+map ctrl+shift+. move_tab_forward
+map ctrl+shift+, move_tab_backward
+map ctrl+shift+space select_tab
+map ctrl+alt+1 goto_tab 1
+map ctrl+alt+2 goto_tab 2
+map ctrl+alt+3 goto_tab 3
+map ctrl+alt+4 goto_tab 4
+map ctrl+alt+5 goto_tab 5
+map ctrl+alt+6 goto_tab 6
+map ctrl+alt+7 goto_tab 7
+map ctrl+alt+8 goto_tab 8
+map ctrl+alt+9 goto_tab 9
 
 # ── Shell Integration ────────────────────────────────────────────────────────
 shell_integration enabled
@@ -40,3 +61,6 @@ copy_on_select clipboard
 repaint_delay    10
 input_delay      3
 sync_to_monitor  yes
+
+# Official builds notify when an update is available; acceptance stays explicit.
+update_check_interval 24

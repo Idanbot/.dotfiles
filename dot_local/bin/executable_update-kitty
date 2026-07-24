@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_dir="${DOTFILES_SOURCE_DIR:-${CHEZMOI_SOURCE_DIR:-$HOME/.local/share/chezmoi}}"
+exec "$source_dir/scripts/update-kitty.sh" "$@"

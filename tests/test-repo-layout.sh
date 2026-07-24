@@ -16,11 +16,13 @@ printf '\n== Repository Layout ==\n'
 required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
-  scripts/e2e-shell.sh scripts/update-packages.sh
+  scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
+  scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
+  tests/test-kitty.sh
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
 for path in "${required[@]}"; do

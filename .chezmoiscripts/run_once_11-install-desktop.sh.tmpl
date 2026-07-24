@@ -12,9 +12,9 @@ if is_wsl; then
   exit 0
 fi
 
-require_sudo
-apt_install kitty
+"$DOTFILES_SOURCE_DIR/scripts/install-kitty.sh"
 if is_installed gnome-shell; then
+  require_sudo
   apt_install gnome-tweaks gnome-shell-extension-manager
 else
   log_skip "GNOME is not present"

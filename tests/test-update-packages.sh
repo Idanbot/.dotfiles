@@ -25,6 +25,10 @@ old_herdr_amd64=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
 old_herdr_arm64=544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
 new_herdr_amd64=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 new_herdr_arm64=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+old_kitty_amd64=ab7d4978b146a3f4799d74fdd6fddf322e5cf93601494e3fcbed925141611963
+old_kitty_arm64=6b0d8fe0af20ba03348e97e303f3c6084b5338bb4abd52737d8e2ffd2dba3d33
+new_kitty_amd64=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+new_kitty_arm64=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 old_codex_sha=1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
 new_codex_sha=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 old_fzf_sha=55ab5f2256edd8890f81d407b63d3a3e81cffe10e318cd196031dc85efdeb079
@@ -33,6 +37,7 @@ new_fzf_sha=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
 fixture="$TMP_ROOT/upgrades.tsv"
 cat >"$fixture" <<EOF
 terminal.herdr	0.7.5	amd64:$old_herdr_amd64;arm64:$old_herdr_arm64	amd64:$new_herdr_amd64;arm64:$new_herdr_arm64
+terminal.kitty	0.48.2	amd64:$old_kitty_amd64;arm64:$old_kitty_arm64	amd64:$new_kitty_amd64;arm64:$new_kitty_arm64
 ai_tools.claude_cli	2.1.207	npm:sha512-old	npm:sha512-new
 ai_tools.codex_cli	standalone	sha256:$old_codex_sha	sha256:$new_codex_sha	true
 core.fzf	0.75.0	sha256:$old_fzf_sha	sha256:$new_fzf_sha
@@ -101,6 +106,9 @@ DOTFILES_SOURCE_DIR="$all_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
   "$all_repo/scripts/update-packages.sh" --apply-all \
   --report "$all_repo/upgrade-report.md" >/dev/null
 grep -Fq '  herdr: "0.7.5"' "$all_repo/packages.yaml" || fail "apply-all omitted Herdr"
+grep -Fq '  kitty: "0.48.2"' "$all_repo/packages.yaml" || fail "apply-all omitted Kitty"
+grep -Fq "    sha256_amd64: $new_kitty_amd64" "$all_repo/packages.meta.yaml" || fail "apply-all omitted Kitty amd64 checksum"
+grep -Fq "    sha256_arm64: $new_kitty_arm64" "$all_repo/packages.meta.yaml" || fail "apply-all omitted Kitty arm64 checksum"
 grep -Fq '  claude_cli: "2.1.207"' "$all_repo/packages.yaml" || fail "apply-all omitted Claude CLI"
 grep -Fq "    sha256: $new_codex_sha" "$all_repo/packages.meta.yaml" ||
   fail "apply-all omitted mutable installer checksum"

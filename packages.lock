@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: bc68fdad09ca19518e0499d4f8392893d673bd97b9d98906efc29b2d92f29c11
-  metadata: d5318c38bee04772bce3baf8471c06d840292a5796a3eba417e98663fddd8b08
+  packages: 2a4ac355be8ee6be04af63457f74cb6c8f200e4dc944425df4c4cd4a92cb465f
+  metadata: 3e459eecc4decc0ca0cdc904c9b78b795c73a9ae164a2e45b140ac679b9fb263
 
 tools:
   - section: bootstrap
@@ -349,11 +349,14 @@ tools:
     integrity: upstream-checksum
   - section: terminal
     name: kitty
-    version: distro
-    source: apt
-    owner: apt
-    package: kitty
-    integrity: apt-signature
+    version: 0.48.1
+    source: github
+    owner: dotfiles-binary
+    repo: kovidgoyal/kitty
+    binary: kitty
+    sha256_amd64: ab7d4978b146a3f4799d74fdd6fddf322e5cf93601494e3fcbed925141611963
+    sha256_arm64: 6b0d8fe0af20ba03348e97e303f3c6084b5338bb4abd52737d8e2ffd2dba3d33
+    integrity: pinned-sha256
   - section: terminal
     name: tmux
     version: distro

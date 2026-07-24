@@ -200,6 +200,7 @@ github_asset_spec() {
       printf 'ryanoasis/nerd-fonts|v{version}|%s.zip|shared|shared\n' \
         "$(package_version fonts nerd_font FiraMono)"
       ;;
+    terminal.kitty) printf '%s\n' 'kovidgoyal/kitty|v{version}|kitty-{version}-{arch}.txz|x86_64|arm64' ;;
     terminal.herdr) printf '%s\n' 'ogulcancelik/herdr|v{version}|herdr-linux-{arch}|x86_64|aarch64' ;;
     system.git_credential_manager) printf '%s\n' 'git-ecosystem/git-credential-manager|v{version}|gcm-linux-{arch}-{version}.deb|x64|arm64' ;;
     ai_tools.omp) printf '%s\n' 'can1357/oh-my-pi|v{version}|omp-linux-{arch}|x64|arm64' ;;
@@ -468,6 +469,7 @@ run_live_audit() {
   audit_npm ai_tools opencode opencode-ai
   audit_github ai_tools omp can1357/oh-my-pi
   audit_pypi terminal tmuxp tmuxp
+  audit_github terminal kitty kovidgoyal/kitty
   audit_github terminal herdr ogulcancelik/herdr
   audit_github media yt_dlp yt-dlp/yt-dlp
   audit_github media rmpc mierak/rmpc

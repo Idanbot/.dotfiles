@@ -273,10 +273,13 @@ database:
 
 terminal:
   kitty:
-    source: apt
-    owner: apt
-    package: kitty
-    integrity: apt-signature
+    source: github
+    owner: dotfiles-binary
+    repo: kovidgoyal/kitty
+    binary: kitty
+    integrity: pinned-sha256
+    sha256_amd64: ab7d4978b146a3f4799d74fdd6fddf322e5cf93601494e3fcbed925141611963
+    sha256_arm64: 6b0d8fe0af20ba03348e97e303f3c6084b5338bb4abd52737d8e2ffd2dba3d33
   tmux:
     source: apt
     owner: apt

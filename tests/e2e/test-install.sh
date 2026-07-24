@@ -89,6 +89,18 @@ if [[ "${DOTFILES_WSL:-false}" == true ]]; then
   }
 else
   [[ -f "$HOME/.config/kitty/kitty.conf" ]]
+  kitty_version="$(
+    awk '
+      /^terminal:$/ { inside = 1; next }
+      inside && $1 == "kitty:" {
+        gsub(/["'\''"]/, "", $2)
+        print $2
+        exit
+      }
+    ' /dotfiles/packages.yaml
+  )"
+  kitty --version | grep -Fq "kitty $kitty_version "
+  grep -Fq 'tab_bar_edge left' "$HOME/.config/kitty/kitty.conf"
 fi
 
 for log in "$ARTIFACT_DIR"/bootstrap-pass-*.log; do

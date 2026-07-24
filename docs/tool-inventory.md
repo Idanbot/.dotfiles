@@ -53,7 +53,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | cloud | azure_cli | distro | apt_repo | apt | apt-signature |
 | cloud | cloudflared | distro | github | vendor-installer | upstream-checksum |
 | cloud | stern | 1.34.0 | github | dotfiles-binary | upstream-checksum |
-| terminal | kitty | distro | apt | apt | apt-signature |
+| terminal | kitty | 0.48.1 | github | dotfiles-binary | pinned-sha256 |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |
 | terminal | herdr | 0.7.4 | github | dotfiles-binary | pinned-sha256 |

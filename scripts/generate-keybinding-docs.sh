@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# generate-keybinding-docs.sh — Build docs/keybindings.md from tmux/zsh configs
+# generate-keybinding-docs.sh — Build docs/keybindings.md from terminal and shell configs
 set -euo pipefail
 
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 OUTPUT_FILE="${1:-$DOTFILES_DIR/docs/keybindings.md}"
 TMUX_FILE="$DOTFILES_DIR/dot_tmux.conf.tmpl"
 HERDR_FILE="$DOTFILES_DIR/dot_config/herdr/config.toml"
+KITTY_FILE="$DOTFILES_DIR/dot_config/private_kitty/kitty.conf.tmpl"
 ZSH_FILE="$DOTFILES_DIR/dot_zshrc.tmpl"
 
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -76,6 +77,21 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
     active && /^description[[:space:]]*=/ { description = clean($0) }
     END { emit() }
   ' "$HERDR_FILE"
+  echo
+  echo "## Kitty"
+  echo
+  echo "| Key | Action |"
+  echo "|-----|--------|"
+  awk '
+    /^[[:space:]]*map[[:space:]]+/ {
+      key = $2
+      action = $0
+      sub(/^[[:space:]]*map[[:space:]]+[^[:space:]]+[[:space:]]+/, "", action)
+      gsub(/\|/, "\\|", key)
+      gsub(/\|/, "\\|", action)
+      printf "| %s | `%s` |\n", key, action
+    }
+  ' "$KITTY_FILE"
   echo
   echo "## zsh aliases"
   echo

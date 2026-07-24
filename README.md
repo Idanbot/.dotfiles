@@ -303,6 +303,31 @@ Accept every fully resolved update, or only selected tools:
 ./scripts/update-packages.sh --apply core.eza@0.23.5 terminal.herdr@0.7.5
 ```
 
+Kitty is installed from its official checksum-pinned Linux archive instead of
+the older Ubuntu package. Check or accept the latest release with:
+
+```bash
+update-kitty --check
+update-kitty --apply
+```
+
+`--apply` updates the repository version and architecture checksums, installs
+that approved build, and leaves the generated manifest diff for review and
+commit. Install an already-approved version with `./scripts/install-kitty.sh`.
+Kitty checks daily and displays an update notification; updates are not applied
+unattended.
+
+Kitty tabs are displayed vertically on the left. The configured controls are:
+
+| Action | Key |
+|--------|-----|
+| New tab in the current directory | `Ctrl+Shift+T` |
+| Close current tab | `Ctrl+Shift+Q` |
+| Next / previous tab | `Ctrl+Shift+Right` / `Ctrl+Shift+Left` |
+| Move tab forward / backward | `Ctrl+Shift+.` / `Ctrl+Shift+,` |
+| Select from all tabs | `Ctrl+Shift+Space` |
+| Jump to tab 1-9 | `Ctrl+Alt+1` through `Ctrl+Alt+9` |
+
 The report shows old and candidate versions plus SHA256 or package-registry
 integrity deltas. Apply mode updates requested versions, both architecture
 pins where required, `packages.lock`, and the generated tool inventory. Review
