@@ -4,7 +4,6 @@
 set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
-SYSTEM_PATH="$PATH"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 MOCK_BIN="$TMP_ROOT/bin"
@@ -43,7 +42,10 @@ case "$*" in
 esac'
 
 export HOME="$TMP_ROOT/home"
-export PATH="$MOCK_BIN:$SYSTEM_PATH"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_STATE_HOME="$HOME/.local/state"
+export PATH="$MOCK_BIN:/usr/bin:/bin"
+unset AWS_DEFAULT_PROFILE AWS_DEFAULT_REGION AWS_REGION
 export AWS_PROFILE=work
 SCRIPT="$DOTFILES_DIR/dot_local/bin/executable_cloud-context"
 

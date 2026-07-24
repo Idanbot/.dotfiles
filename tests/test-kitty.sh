@@ -8,7 +8,7 @@ CONFIG="$DOTFILES_DIR/dot_config/private_kitty/kitty.conf.tmpl"
 INSTALLER="$DOTFILES_DIR/scripts/install-kitty.sh"
 DESKTOP="$DOTFILES_DIR/.chezmoiscripts/run_once_11-install-desktop.sh.tmpl"
 
-version="$(awk '/^terminal:$/ { inside=1; next } inside && $1 == "kitty:" { gsub(/[\"'\'']/, "", $2); print $2; exit }' "$DOTFILES_DIR/packages.yaml")"
+version="$(awk '/^terminal:$/ { inside=1; next } inside && $1 == "kitty:" { gsub(/"/, "", $2); print $2; exit }' "$DOTFILES_DIR/packages.yaml")"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
 grep -Fq 'repo: kovidgoyal/kitty' "$DOTFILES_DIR/packages.meta.yaml"
 grep -Fq 'integrity: pinned-sha256' "$DOTFILES_DIR/packages.meta.yaml"
