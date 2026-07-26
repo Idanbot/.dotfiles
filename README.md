@@ -163,6 +163,12 @@ dot doctor
 ./scripts/doctor.sh --acceptance --sections core,zsh,terminal --json
 ```
 
+`dot doctor` validates commands, managed configuration, runtime shims, source
+integrity, private state permissions, and the install ownership ledger. Use
+`--quick` to skip interactive shell and tmux runtime probes, `--json` for a
+JSON-only report, and `--strict` to treat warnings as failures. Failed checks
+include a focused repair command where one is available.
+
 ## Daily Workflow
 
 The managed `dot` command is the lifecycle entrypoint:
