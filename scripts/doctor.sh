@@ -49,7 +49,12 @@ CHECKS=0
 FAILURES=0
 WARNINGS=0
 RESULTS="$(mktemp)"
-trap 'rm -f "$RESULTS"' EXIT
+TMUX_CHECK_CONFIG=""
+cleanup() {
+  rm -f "$RESULTS"
+  [[ -z "$TMUX_CHECK_CONFIG" ]] || rm -f "$TMUX_CHECK_CONFIG"
+}
+trap cleanup EXIT
 
 selected() { [[ ",$SECTIONS," == *",$1,"* ]]; }
 
@@ -167,7 +172,15 @@ if selected tmux; then
   check_file "$HOME/.config/dotfiles/agents.yaml" agent-registry
   check_command dot-workspace true
   check_command dot-agent-launch true
-  if [[ "$QUICK" == false ]] && tmux -L dotfiles-doctor -f "$HOME/.tmux.conf" start-server 2>/dev/null; then
+  if [[ "$QUICK" == false ]]; then
+    TMUX_CHECK_CONFIG="$(mktemp)"
+    # Killing a probe server while TPM runs asynchronously can orphan plugin
+    # processes that recursively restart tmux. The probe only needs syntax.
+    sed '\|^[[:space:]]*run[[:space:]]\+-b.*tpm/tpm|d' \
+      "$HOME/.tmux.conf" >"$TMUX_CHECK_CONFIG"
+  fi
+  if [[ "$QUICK" == false ]] &&
+    tmux -L dotfiles-doctor -f "$TMUX_CHECK_CONFIG" start-server 2>/dev/null; then
     tmux -L dotfiles-doctor kill-server 2>/dev/null || true
     result pass tmux-config "server accepted configuration"
   elif [[ "$QUICK" == false ]]; then

@@ -21,4 +21,7 @@ HOME="$TMP_ROOT/home" \
   "$DOTFILES_DIR/dot_local/bin/executable_dot" doctor --help |
   grep -Fq 'Usage: scripts/doctor.sh'
 
+grep -Fq "sed '\\|^[[:space:]]*run[[:space:]]\\+-b.*tpm/tpm|d'" \
+  "$DOTFILES_DIR/scripts/doctor.sh"
+
 printf 'Dot doctor source recovery test passed\n'
