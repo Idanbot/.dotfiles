@@ -23,7 +23,7 @@ else
 fi
 
 CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
-npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude
+npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude @anthropic-ai/claude-code
 
 CODEX_INSTALLER_SHA="$(package_metadata ai_tools codex_cli sha256)"
 CODEX_PATH="$(command -v codex 2>/dev/null || true)"
@@ -74,7 +74,7 @@ else
 fi
 
 OPENCODE_VERSION="$(package_version ai_tools opencode 1.17.18)"
-npm_install_global opencode-ai "$OPENCODE_VERSION" opencode
+npm_install_global opencode-ai "$OPENCODE_VERSION" opencode opencode-ai
 
 OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
 case "$(get_arch)" in
@@ -90,10 +90,10 @@ install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
   "sha256:$OMP_SHA256" 'omp --version'
 
 for agent in claude codex agy opencode omp; do
-  if "$agent" --version >/dev/null 2>&1; then
+  if version_output="$("$agent" --version 2>&1)"; then
     log_success "$agent executable validation passed"
   else
-    log_error "$agent failed its noninteractive version check"
+    log_error "$agent failed its noninteractive version check: ${version_output:-no output}"
   fi
 done
 

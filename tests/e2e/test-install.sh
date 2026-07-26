@@ -92,6 +92,11 @@ assert_version_contains() {
   local label="$1" expected="$2"
   shift 2
   local actual
+  command -v "$1" >/dev/null 2>&1 || {
+    printf '%s command is unavailable after installation: %s (PATH=%s)\n' \
+      "$label" "$1" "$PATH" >&2
+    exit 1
+  }
   actual="$("$@" 2>&1)"
   [[ "$actual" == *"$expected"* ]] || {
     printf '%s version mismatch: expected %s, got %s\n' "$label" "$expected" "$actual" >&2

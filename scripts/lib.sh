@@ -522,20 +522,30 @@ activate_node_paths() {
 }
 
 npm_install_global() {
-  local package="$1" version="$2" binary="$3"
+  local package="$1" version="$2" binary="$3" allow_scripts="${4:-}"
   local prefix
+  local -a npm_args=(
+    install --global --prefix
+    "$(npm_global_prefix)"
+    --no-audit
+    --no-fund
+  )
   prefix="$(npm_global_prefix)"
   activate_node_paths
   if command_exists "$binary" && version_ge "$($binary --version 2>/dev/null || true)" "$version"; then
+    [[ -x "$prefix/bin/$binary" ]] &&
+      managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary" "$binary" "$version"
     log_skip "$binary $version already installed or newer"
     return 0
   fi
   mkdir -p "$prefix"
-  npm install --global --prefix "$prefix" --no-audit --no-fund "${package}@${version}"
-  if ! command_exists "$binary"; then
+  [[ -n "$allow_scripts" ]] && npm_args+=("--allow-scripts=$allow_scripts")
+  npm "${npm_args[@]}" "${package}@${version}"
+  if [[ ! -x "$prefix/bin/$binary" ]]; then
     log_error "$binary was not found after installing ${package}@${version}"
     return 1
   fi
+  managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary" "$binary" "$version"
   record_install "$binary" "$version" "npm:$package" "$prefix/lib/node_modules/$package"
   log_success "$binary $version installed"
   ((_INSTALLED++)) || true

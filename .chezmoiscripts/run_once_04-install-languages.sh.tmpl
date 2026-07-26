@@ -28,6 +28,11 @@ else
   log_skip "Go $GO_VERSION already installed or newer"
 fi
 export PATH="/usr/local/go/bin:$PATH"
+GO_BIN_DIR="$(dirname "$(command -v go)")"
+for binary in go gofmt; do
+  [[ -x "$GO_BIN_DIR/$binary" ]] &&
+    managed_link "$GO_BIN_DIR/$binary" "$HOME/.local/bin/$binary" go "$GO_VERSION"
+done
 
 RUST_CHANNEL="$(package_version languages rust 1.97.1)"
 if ! is_installed rustup; then
@@ -55,6 +60,10 @@ fi
 [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
 rustup toolchain install "$RUST_CHANNEL" --profile minimal
 rustup default "$RUST_CHANNEL"
+for binary in rustup cargo rustc rustdoc rustfmt clippy; do
+  [[ -x "$HOME/.cargo/bin/$binary" ]] &&
+    managed_link "$HOME/.cargo/bin/$binary" "$HOME/.local/bin/$binary" rust "$RUST_CHANNEL"
+done
 
 NODE_VERSION="$(package_version languages node 26.5.0)"
 case "$ARCH" in

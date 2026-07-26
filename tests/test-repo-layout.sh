@@ -23,6 +23,7 @@ required=(
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-dot-doctor.sh
+  tests/test-npm-global-cli.sh
   dot_local/bin/executable_cloud-context
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
@@ -116,11 +117,28 @@ else
   fail "managed Node must be on PATH before npm executes its env-based node shebang"
 fi
 
+if grep -Fq 'managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary"' \
+  "$DOTFILES_DIR/scripts/lib.sh" &&
+  grep -Fq -- '--allow-scripts=$allow_scripts' "$DOTFILES_DIR/scripts/lib.sh"; then
+  pass "npm global CLIs expose stable shims with explicit install-script allowlists"
+else
+  fail "npm global CLIs need stable shims and explicit install-script allowlists"
+fi
+
 if grep -Fq 'managed_link "$JAVA_CURRENT/bin/$binary"' \
   "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"; then
   pass "managed Java exposes stable user-local shims"
 else
   fail "managed Java requires stable shims for same-run and future command discovery"
+fi
+
+if grep -Fq 'managed_link "$GO_BIN_DIR/$binary"' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl" &&
+  grep -Fq 'managed_link "$HOME/.cargo/bin/$binary"' \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl"; then
+  pass "managed Go and Rust expose stable user-local shims"
+else
+  fail "managed Go and Rust require stable shims for same-run command discovery"
 fi
 
 if grep -Fq 'CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \
