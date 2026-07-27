@@ -165,8 +165,10 @@ load_context --clear
 [[ -z "$(render_module azure)" ]]
 
 mv "$MOCK_BIN/kubectl" "$MOCK_BIN/kubectl.disabled"
+printf '#!/usr/bin/env bash\nexit 127\n' >"$MOCK_BIN/kubectl"
+chmod +x "$MOCK_BIN/kubectl"
 if load_context --load work 2>/dev/null; then
-  echo "Profile load succeeded without kubectl" >&2
+  echo "Profile load succeeded with an unusable kubectl" >&2
   exit 1
 fi
 [[ -z "$(render_module gcloud)" ]]
