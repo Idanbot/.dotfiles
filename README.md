@@ -355,6 +355,10 @@ cloud-context --save work           # save identifiers as profile "work"
 cloud-context --load work           # kubectl/gcloud/aws/az native activation
 cloud-context --clear               # clear all four contexts
 cloud-context --clear kubectl       # also: gcloud, aws, azure
+cloud-context --test aws            # fake one prompt context without credentials
+cloud-context --test all            # fake every prompt context in isolated configs
+cloud-context --test-clear aws       # remove one fake context
+cloud-context --test-clear           # remove all fake contexts
 cloud-context --list
 ```
 
@@ -363,6 +367,11 @@ AWS profile selection is shell-local, so the managed Zsh wrapper sources only
 `kubectl config`, GCloud uses named configurations and project selection, and
 Azure uses `az account`. Saved profiles are mode `0600` under
 `~/.config/dotfiles/cloud-contexts/`.
+
+Test contexts live under `~/.local/state/dotfiles/cloud-context-test/` and use
+temporary `KUBECONFIG`, `CLOUDSDK_CONFIG`, AWS config, and `AZURE_CONFIG_DIR`
+overrides. The Zsh wrapper applies and removes those overrides in the current
+shell; real provider configuration and credentials are not changed.
 
 Loading preflights the saved Kubernetes context, GCloud configuration, AWS
 profile, and cached Azure subscription before changing any provider. Missing

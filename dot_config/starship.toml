@@ -27,7 +27,7 @@ $terraform\
 $docker_context\
 $kubernetes\
 $aws\
-$custom.aws_account\
+${custom.aws_account}\
 $gcloud\
 $azure\
 [](fg:mantle)\

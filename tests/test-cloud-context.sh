@@ -81,6 +81,30 @@ grep -Fq 'unset AWS_PROFILE' "$HOME/.local/state/dotfiles/cloud-context.env"
 [[ "$("$SCRIPT" prompt aws)" == 123456789012 ]]
 [[ "$("$SCRIPT" --list)" == workstation ]]
 
+for provider in kubectl gcloud aws azure; do
+  "$SCRIPT" --test-clear >/dev/null
+  "$SCRIPT" --test "$provider" >/dev/null
+  [[ -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-$provider" ]]
+  [[ "$(find "$XDG_STATE_HOME/dotfiles/cloud-context-test" \
+    -maxdepth 1 -name 'enabled-*' | wc -l)" == 1 ]]
+done
+"$SCRIPT" --test all >/dev/null
+for provider in kubectl gcloud aws azure; do
+  [[ -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-$provider" ]]
+done
+grep -Fq 'current-context: cloud-context-test' \
+  "$XDG_STATE_HOME/dotfiles/cloud-context-test/kube/config"
+grep -Fq 'export KUBECONFIG=' \
+  "$XDG_STATE_HOME/dotfiles/cloud-context-test.env"
+rm -f "$XDG_STATE_HOME/dotfiles/cloud-context-aws.cache"
+[[ "$(CLOUD_CONTEXT_TEST_AWS_ACCOUNT=000000000042 "$SCRIPT" prompt aws)" == 000000000042 ]]
+"$SCRIPT" --test-clear aws >/dev/null
+[[ ! -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-aws" ]]
+"$SCRIPT" --test-clear >/dev/null
+[[ ! -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/active" ]]
+! find "$XDG_STATE_HOME/dotfiles/cloud-context-test" \
+  -maxdepth 1 -name 'enabled-*' -print -quit | grep -q .
+
 cp "$PROFILE" "${PROFILE%/*}/missing.tsv"
 sed -i \
   -e 's/dev-cluster/missing-cluster/' \
@@ -100,7 +124,7 @@ if PATH="$MOCK_BIN" "$SYSTEM_BASH" "$SCRIPT" --clear kubectl >/dev/null 2>&1; th
   exit 1
 fi
 
-grep -Fq '$custom.aws_account' "$DOTFILES_DIR/dot_config/starship.toml"
+grep -Fq '${custom.aws_account}' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq '$azure' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq 'command cloud-context "$@"' "$DOTFILES_DIR/dot_zshrc.tmpl"
 

@@ -140,8 +140,13 @@ load_context() {
     # shellcheck disable=SC1090
     source "$XDG_STATE_HOME/dotfiles/cloud-context.env"
   fi
+  if [[ -r "$XDG_STATE_HOME/dotfiles/cloud-context-test.env" ]]; then
+    # shellcheck disable=SC1090
+    source "$XDG_STATE_HOME/dotfiles/cloud-context-test.env"
+  fi
 }
 
+[[ "$(starship prompt --path "$TMP_ROOT" --status 0 --cmd-duration 0)" != *".aws_account"* ]]
 [[ -z "$(render_module kubernetes)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
@@ -158,6 +163,22 @@ load_context --load work
 [[ "$(render_module azure)" == *Engineering* ]]
 
 load_context --clear
+[[ -z "$(render_module kubernetes)" ]]
+[[ -z "$(render_module gcloud)" ]]
+[[ -z "$(render_module aws)" ]]
+[[ -z "$(render_module custom.aws_account)" ]]
+[[ -z "$(render_module azure)" ]]
+
+load_context --test all
+[[ "$(render_module kubernetes)" == *cloud-context-test* ]]
+[[ "$(render_module kubernetes)" == *test* ]]
+[[ "$(render_module gcloud)" == *cloud-context-test* ]]
+[[ "$(render_module aws)" == *cloud-context-test* ]]
+[[ "$(render_module aws)" == *us-east-1* ]]
+[[ "$(render_module custom.aws_account)" == *000000000042* ]]
+[[ "$(render_module azure)" == *"Cloud Context Test"* ]]
+
+load_context --test-clear
 [[ -z "$(render_module kubernetes)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]

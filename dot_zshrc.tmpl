@@ -294,14 +294,24 @@ if [[ -r "$HOME/.config/dotfiles/local.zsh" ]]; then
   source "$HOME/.config/dotfiles/local.zsh"
 fi
 
-# Cloud context profiles use provider-native commands. Only AWS's shell-local
-# profile selection needs a small sourced environment file.
-[[ -r "$HOME/.local/state/dotfiles/cloud-context.env" ]] &&
-  source "$HOME/.local/state/dotfiles/cloud-context.env"
+# Cloud context profiles use provider-native commands. Shell-local AWS
+# selection and isolated test config roots are applied from generated env files.
+_cloud_context_source_env() {
+  local state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+  [[ -r "$state_root/cloud-context.env" ]] &&
+    source "$state_root/cloud-context.env"
+  [[ -r "$state_root/cloud-context-test.env" ]] &&
+    source "$state_root/cloud-context-test.env"
+  if [[ -r "$state_root/cloud-context-test.env" &&
+    ! -e "$state_root/cloud-context-test/active" ]]; then
+    rm -f "$state_root/cloud-context-test.env"
+    rm -rf "$state_root/cloud-context-test"
+  fi
+}
+_cloud_context_source_env
 cloud-context() {
   command cloud-context "$@" || return
-  [[ -r "$HOME/.local/state/dotfiles/cloud-context.env" ]] &&
-    source "$HOME/.local/state/dotfiles/cloud-context.env"
+  _cloud_context_source_env
 }
 alias cctx=cloud-context
 
