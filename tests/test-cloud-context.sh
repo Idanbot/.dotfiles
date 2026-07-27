@@ -4,6 +4,7 @@
 set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+SYSTEM_BASH="$(command -v bash)"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 MOCK_BIN="$TMP_ROOT/bin"
@@ -94,7 +95,7 @@ fi
 ! grep -Eq 'use-context|configurations activate|account set' "$CALLS"
 
 mv "$MOCK_BIN/kubectl" "$MOCK_BIN/kubectl.disabled"
-if "$SCRIPT" --clear kubectl >/dev/null 2>&1; then
+if PATH="$MOCK_BIN" "$SYSTEM_BASH" "$SCRIPT" --clear kubectl >/dev/null 2>&1; then
   echo "Clearing an unavailable provider reported success" >&2
   exit 1
 fi
