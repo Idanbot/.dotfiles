@@ -157,7 +157,7 @@ format = '[ $symbol $profile( $region) ]($style)'
 
 [custom.aws_account]
 command = "cloud-context prompt aws"
-when = "command -v aws >/dev/null 2>&1"
+when = "cloud-context prompt aws >/dev/null 2>&1"
 symbol = ""
 style = "fg:yellow bg:mantle"
 format = '[ $symbol$output ]($style)'
@@ -168,7 +168,7 @@ us-east-1 = "us-east-1"
 [gcloud]
 symbol = " "
 style = "fg:sky bg:mantle"
-format = '[ $symbol $project( $region) ]($style)'
+format = '([ $symbol $project( $region) ]($style))'
 
 [gcloud.project_aliases]
 "idan-gcp-pca" = "idan-pca"

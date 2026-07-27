@@ -62,6 +62,15 @@ jobs:
           sudo apt-get install -y shellcheck yamllint tmux zsh jq yq
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
           ./scripts/install-chezmoi.sh
+          starship_version="$(yq -r '.core.starship' packages.yaml)"
+          starship_asset="starship-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLo "/tmp/$starship_asset" \
+            "https://github.com/starship/starship/releases/download/v${starship_version}/${starship_asset}"
+          starship_sha256="$(curl -fsSL \
+            "https://github.com/starship/starship/releases/download/v${starship_version}/${starship_asset}.sha256" |
+            awk '{print $1}')"
+          printf '%s  %s\n' "$starship_sha256" "/tmp/$starship_asset" | sha256sum -c -
+          tar -xzf "/tmp/$starship_asset" -C "$HOME/.local/bin" starship
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Shellcheck
@@ -85,6 +94,7 @@ jobs:
           tests/test-herdr-config.sh "$PWD"
           tests/test-kitty.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"
+          tests/test-cloud-context-starship.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"

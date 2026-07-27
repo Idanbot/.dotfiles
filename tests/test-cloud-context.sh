@@ -24,21 +24,25 @@ make_mock() {
 make_mock kubectl '
 case "$*" in
   "config current-context") printf "dev-cluster\n" ;;
+  "config get-contexts dev-cluster -o name") printf "dev-cluster\n" ;;
 esac'
 make_mock gcloud '
 case "$*" in
   *"config configurations list"*) printf "work\n" ;;
   "config get-value project") printf "project-123\n" ;;
+  "config configurations describe work --format=value(name)") printf "work\n" ;;
 esac'
 make_mock aws '
 case "$*" in
   "configure get region --profile work") printf "eu-west-1\n" ;;
+  "configure list-profiles") printf "work\n" ;;
   "sts get-caller-identity --query Account --output text") printf "123456789012\n" ;;
 esac'
 make_mock az '
 case "$*" in
   "account show --query name -o tsv") printf "Engineering\n" ;;
   "account show --query id -o tsv") printf "00000000-0000-0000-0000-000000000001\n" ;;
+  "account list --query [?id=='\''00000000-0000-0000-0000-000000000001'\''].id -o tsv") printf "00000000-0000-0000-0000-000000000001\n" ;;
 esac'
 
 export HOME="$TMP_ROOT/home"
@@ -75,6 +79,25 @@ grep -Fq 'unset AWS_PROFILE' "$HOME/.local/state/dotfiles/cloud-context.env"
 
 [[ "$("$SCRIPT" prompt aws)" == 123456789012 ]]
 [[ "$("$SCRIPT" --list)" == workstation ]]
+
+cp "$PROFILE" "${PROFILE%/*}/missing.tsv"
+sed -i \
+  -e 's/dev-cluster/missing-cluster/' \
+  -e 's/\twork$/\tmissing/' \
+  -e 's/00000000-0000-0000-0000-000000000001/ffffffff-ffff-ffff-ffff-ffffffffffff/' \
+  "${PROFILE%/*}/missing.tsv"
+: >"$CALLS"
+if "$SCRIPT" --load missing >/dev/null 2>&1; then
+  echo "Nonexistent contexts were accepted" >&2
+  exit 1
+fi
+! grep -Eq 'use-context|configurations activate|account set' "$CALLS"
+
+mv "$MOCK_BIN/kubectl" "$MOCK_BIN/kubectl.disabled"
+if "$SCRIPT" --clear kubectl >/dev/null 2>&1; then
+  echo "Clearing an unavailable provider reported success" >&2
+  exit 1
+fi
 
 grep -Fq '$custom.aws_account' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq '$azure' "$DOTFILES_DIR/dot_config/starship.toml"

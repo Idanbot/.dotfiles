@@ -22,7 +22,7 @@ required=(
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
-  tests/test-kitty.sh tests/test-cloud-context.sh tests/test-dot-doctor.sh
+  tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-npm-global-cli.sh
   dot_local/bin/executable_cloud-context
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl

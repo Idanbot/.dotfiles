@@ -137,8 +137,54 @@ save_profile() {
   info "Saved cloud context profile '$name' (identifiers only)"
 }
 
+validate_profile_contexts() {
+  local kube="$1" gconfig="$2" aprofile="$3" azure="$4"
+  local failed=false
+
+  if [[ -n "$kube" ]]; then
+    if ! have kubectl; then
+      warn "kubectl is required to load context '$kube'"
+      failed=true
+    elif ! kubectl config get-contexts "$kube" -o name 2>/dev/null | grep -Fxq "$kube"; then
+      warn "kubectl context '$kube' does not exist locally"
+      failed=true
+    fi
+  fi
+  if [[ -n "$gconfig" ]]; then
+    if ! have gcloud; then
+      warn "gcloud is required to load configuration '$gconfig'"
+      failed=true
+    elif ! gcloud config configurations describe "$gconfig" \
+      --format='value(name)' 2>/dev/null | grep -Fxq "$gconfig"; then
+      warn "gcloud configuration '$gconfig' does not exist locally"
+      failed=true
+    fi
+  fi
+  if [[ -n "$aprofile" && "$aprofile" != default ]]; then
+    if ! have aws; then
+      warn "AWS CLI is required to load profile '$aprofile'"
+      failed=true
+    elif ! aws configure list-profiles 2>/dev/null | grep -Fxq "$aprofile"; then
+      warn "AWS profile '$aprofile' does not exist locally"
+      failed=true
+    fi
+  fi
+  if [[ -n "$azure" ]]; then
+    if ! have az; then
+      warn "Azure CLI is required to load subscription '$azure'"
+      failed=true
+    elif ! az account list --query "[?id=='$azure'].id" -o tsv 2>/dev/null |
+      grep -Fxq "$azure"; then
+      warn "Azure subscription '$azure' is not available in the local account cache"
+      failed=true
+    fi
+  fi
+
+  [[ "$failed" == false ]]
+}
+
 load_profile() {
-  local name="$1" file kube gconfig gproject aprofile aregion azure
+  local name="$1" file kube gconfig gproject aprofile aregion azure failed=false
   file="$(profile_path "$name")"
   [[ -r "$file" ]] || {
     printf 'Cloud context profile not found: %s\n' "$name" >&2
@@ -151,23 +197,44 @@ load_profile() {
   aregion="$(read_value "$file" aws_region)"
   azure="$(read_value "$file" azure_subscription)"
 
+  validate_profile_contexts "$kube" "$gconfig" "$aprofile" "$azure" || {
+    warn "Profile '$name' was not loaded; no contexts were changed"
+    return 1
+  }
+
   if [[ -n "$kube" ]]; then
-    have kubectl && kubectl config use-context "$kube" >/dev/null ||
-      warn "kubectl context '$kube' could not be activated"
+    kubectl config use-context "$kube" >/dev/null ||
+      {
+        warn "kubectl context '$kube' could not be activated"
+        failed=true
+      }
   fi
   if [[ -n "$gconfig" ]]; then
-    have gcloud && gcloud config configurations activate "$gconfig" --quiet >/dev/null ||
-      warn "gcloud configuration '$gconfig' could not be activated"
+    gcloud config configurations activate "$gconfig" --quiet >/dev/null ||
+      {
+        warn "gcloud configuration '$gconfig' could not be activated"
+        failed=true
+      }
   fi
   if [[ -n "$gproject" ]]; then
-    have gcloud && gcloud config set project "$gproject" --quiet >/dev/null ||
-      warn "gcloud project '$gproject' could not be activated"
+    gcloud config set project "$gproject" --quiet >/dev/null ||
+      {
+        warn "gcloud project '$gproject' could not be activated"
+        failed=true
+      }
+  fi
+  if [[ -n "$azure" ]]; then
+    az account set --subscription "$azure" ||
+      {
+        warn "Azure subscription '$azure' could not be activated"
+        failed=true
+      }
+  fi
+  if [[ "$failed" == true ]]; then
+    warn "Profile '$name' was only partially loaded; inspect cloud-context --status"
+    return 1
   fi
   write_aws_env "$aprofile" "$aregion"
-  if [[ -n "$azure" ]]; then
-    have az && az account set --subscription "$azure" ||
-      warn "Azure subscription '$azure' could not be activated"
-  fi
   info "Loaded cloud context profile '$name'"
   info "AWS selection is active in this shell through the Zsh cloud-context wrapper"
 }
@@ -175,19 +242,40 @@ load_profile() {
 clear_provider() {
   case "$1" in
     kubectl | kube)
-      have kubectl && kubectl config unset current-context >/dev/null ||
-        warn "kubectl is unavailable or has no current context"
+      have kubectl || {
+        warn "kubectl is unavailable"
+        return 1
+      }
+      kubectl config unset current-context >/dev/null ||
+        {
+          warn "kubectl is unavailable or has no current context"
+          return 1
+        }
       ;;
     gcloud | google)
-      have gcloud && gcloud config unset project --quiet >/dev/null ||
-        warn "gcloud is unavailable or has no active project"
+      have gcloud || {
+        warn "gcloud is unavailable"
+        return 1
+      }
+      gcloud config unset project --quiet >/dev/null ||
+        {
+          warn "gcloud is unavailable or has no active project"
+          return 1
+        }
       ;;
     aws)
       write_aws_env "" ""
       ;;
     azure | az)
-      have az && az account clear ||
-        warn "Azure CLI is unavailable or has no cached account context"
+      have az || {
+        warn "Azure CLI is unavailable"
+        return 1
+      }
+      az account clear ||
+        {
+          warn "Azure CLI is unavailable or has no cached account context"
+          return 1
+        }
       ;;
     *)
       printf 'Unknown provider: %s\n' "$1" >&2
@@ -197,22 +285,26 @@ clear_provider() {
 }
 
 clear_contexts() {
-  local provider="${1:-all}"
+  local provider="${1:-all}" failed=false
   if [[ "$provider" == all ]]; then
-    clear_provider kubectl
-    clear_provider gcloud
-    clear_provider aws
-    clear_provider azure
+    clear_provider kubectl || failed=true
+    clear_provider gcloud || failed=true
+    clear_provider aws || failed=true
+    clear_provider azure || failed=true
+    if [[ "$failed" == true ]]; then
+      warn "Clear completed with unavailable or failed providers"
+      return 1
+    fi
     info "Cleared kubectl, gcloud, AWS, and Azure contexts through native interfaces"
   else
-    clear_provider "$provider"
+    clear_provider "$provider" || return
     info "Cleared $provider context through its native interface"
   fi
 }
 
 prompt_aws() {
   local now profile cached_at cached_profile cached_account account
-  have aws || return 0
+  have aws || return 1
   profile="$(aws_profile)"
   now="$(date +%s)"
   if [[ -r "$AWS_CACHE" ]]; then
@@ -220,7 +312,8 @@ prompt_aws() {
     if [[ "$cached_profile" == "$profile" && "$cached_at" =~ ^[0-9]+$ &&
       $((now - cached_at)) -lt 300 ]]; then
       [[ "$cached_account" != - ]] && printf '%s\n' "$cached_account"
-      return 0
+      [[ "$cached_account" != - ]]
+      return
     fi
   fi
   account="$(aws_account)"
@@ -229,7 +322,11 @@ prompt_aws() {
   mkdir -p "$STATE_ROOT"
   printf '%s\t%s\t%s\n' "$now" "$profile" "$account" >"$AWS_CACHE"
   chmod 600 "$AWS_CACHE"
-  [[ "$account" != - ]] && printf '%s\n' "$account"
+  if [[ "$account" != - ]]; then
+    printf '%s\n' "$account"
+  else
+    return 1
+  fi
 }
 
 case "${1:---status}" in

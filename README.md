@@ -364,6 +364,14 @@ AWS profile selection is shell-local, so the managed Zsh wrapper sources only
 Azure uses `az account`. Saved profiles are mode `0600` under
 `~/.config/dotfiles/cloud-contexts/`.
 
+Loading preflights the saved Kubernetes context, GCloud configuration, AWS
+profile, and cached Azure subscription before changing any provider. Missing
+CLIs or unknown local identifiers fail without applying the profile. A GCloud
+project ID is still accepted by GCloud itself because validating whether the
+remote project exists would require an authenticated network request. Starship
+reads the resulting native provider state on every prompt; cleared or
+unauthenticated contexts render no segment.
+
 Kitty tabs are displayed vertically on the left. The configured controls are:
 
 | Action | Key |

@@ -126,6 +126,7 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   assert_version_contains stern "$(manifest_version cloud stern)" stern --version
   command -v gcloud >/dev/null
   command -v az >/dev/null
+  /dotfiles/tests/test-cloud-context-starship.sh /dotfiles
 fi
 
 if [[ ",$selected_sections," == *,ai,* ]]; then
