@@ -104,6 +104,13 @@ assert_version_contains() {
   }
 }
 
+if [[ ",$selected_sections," == *,terminal,* ]]; then
+  assert_version_contains curlie "$(manifest_version core curlie)" curlie version
+  printf '{"ready":true}\n' | gojq -e '.ready == true' >/dev/null
+  [[ "$(printf 'pigz-smoke\n' | pigz | pigz -d)" == pigz-smoke ]]
+  [[ "$(printf 'zstd-smoke\n' | zstd -q | zstd -dq)" == zstd-smoke ]]
+fi
+
 if [[ ",$selected_sections," == *,languages,* ]]; then
   assert_version_contains Go "$(manifest_version languages go)" go version
   assert_version_contains Rust "$(manifest_version languages rust)" rustc --version
@@ -123,7 +130,12 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   assert_version_contains k9s "$(manifest_version cloud k9s)" k9s version
   assert_version_contains AWS "$(manifest_version cloud aws_cli)" aws --version
   assert_version_contains cloudflared "$(manifest_version cloud cloudflared)" cloudflared --version
+  assert_version_contains s5cmd "$(manifest_version cloud s5cmd)" s5cmd version
+  kcat -V >/dev/null
   assert_version_contains stern "$(manifest_version cloud stern)" stern --version
+  assert_version_contains helmfile "$(manifest_version cloud helmfile)" helmfile --version
+  assert_version_contains kubectx "$(manifest_version cloud kubectx)" kubectx --version
+  pgloader --version >/dev/null
   command -v gcloud >/dev/null
   command -v az >/dev/null
   /dotfiles/tests/test-cloud-context-starship.sh /dotfiles

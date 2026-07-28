@@ -23,7 +23,7 @@ required=(
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
-  tests/test-npm-global-cli.sh
+  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh
   dot_local/bin/executable_cloud-context
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
 )
@@ -74,6 +74,13 @@ if grep -Eq 'sha256: [0-9a-f]{64}$' "$DOTFILES_DIR/.chezmoiexternal.yaml"; then
   fail "external SHA256 values must be quoted for chezmoi's HexBytes decoder"
 else
   pass "external SHA256 values use chezmoi-compatible quoted strings"
+fi
+
+if grep -Eq "alias[[:space:]]+(ls|cat)=['\"](eza|bat)" \
+  "$DOTFILES_DIR/dot_zshrc.tmpl" "$DOTFILES_DIR/dot_bashrc"; then
+  fail "core commands must not be replaced by eza or bat aliases"
+else
+  pass "core ls and cat commands retain their standard implementations"
 fi
 
 if grep -RiqE 'gemini_cli|binary:[[:space:]]*gemini|command:[[:space:]]*gemini' \

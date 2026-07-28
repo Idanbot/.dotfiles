@@ -18,7 +18,10 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | btop | 1.4.7 | apt | apt | apt-signature |
 | core | starship | 1.26.0 | github | dotfiles-binary | upstream-checksum |
 | core | jq | distro | apt | apt | apt-signature |
+| core | gojq | distro | apt | apt | apt-signature |
 | core | yq | distro | apt | apt | apt-signature |
+| core | pigz | distro | apt | apt | apt-signature |
+| core | zstd | distro | apt | apt | apt-signature |
 | core | htop | distro | apt | apt | apt-signature |
 | core | zoxide | distro | apt | apt | apt-signature |
 | core | direnv | distro | apt | apt | apt-signature |
@@ -43,6 +46,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | editor | neovim | 0.12.4 | github | dotfiles-runtime | pinned-sha256 |
 | database | usql | 0.21.4 | github | dotfiles-binary | pinned-sha256 |
 | database | iredis | 1.15.0 | pypi | uv | pypi |
+| database | pgloader | distro | apt | apt | apt-signature |
 | cloud | docker | distro | apt_repo | apt | apt-signature |
 | cloud | kubectl | 1.36.3 | direct | dotfiles-binary | upstream-checksum |
 | cloud | helm | 4.2.3 | github | dotfiles-binary | upstream-checksum |
@@ -53,7 +57,11 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | cloud | gcloud | distro | apt_repo | apt | apt-signature |
 | cloud | azure_cli | distro | apt_repo | apt | apt-signature |
 | cloud | cloudflared | 2026.7.3 | github | vendor-installer | pinned-sha256 |
+| cloud | s5cmd | 2.3.0 | github | dotfiles-binary | upstream-checksum |
+| cloud | kcat | distro | apt | apt | apt-signature |
 | cloud | stern | 1.34.0 | github | dotfiles-binary | upstream-checksum |
+| cloud | helmfile | 1.7.1 | github | dotfiles-binary | upstream-checksum |
+| cloud | kubectx | 0.11.0 | github | dotfiles-binary | upstream-checksum |
 | terminal | kitty | 0.48.1 | github | dotfiles-binary | pinned-sha256 |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |

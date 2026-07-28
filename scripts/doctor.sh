@@ -202,7 +202,7 @@ fi
 
 if selected terminal; then
   doctor_step "Terminal"
-  for command in fzf fd bat eza lazygit starship sops lazydocker tldr; do
+  for command in fzf fd bat eza lazygit starship sops lazydocker tldr curlie gojq pigz zstd; do
     check_command "$command" true
   done
 fi
@@ -224,7 +224,9 @@ fi
 
 if selected cloud; then
   doctor_step "Cloud"
-  for command in docker kubectl helm terraform ansible k9s aws gcloud az cloud-context; do
+  for command in \
+    docker kubectl helm terraform ansible k9s aws gcloud az cloud-context \
+    s5cmd kcat stern helmfile kubectx pgloader; do
     check_command "$command" true
   done
 fi

@@ -230,12 +230,15 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - name: Install archive prerequisites
-        run: sudo apt-get update -qq && sudo apt-get install -y curl jq yq
-      - name: Verify upstream checksum paths
+      - name: Install tool smoke prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y curl jq yq gojq pigz zstd kcat pgloader
+      - name: Verify tool installation paths
         run: |
           tests/test-github-release-tools.sh "$PWD"
           tests/test-external-tools.sh "$PWD"
+          tests/test-ubuntu-package-tools.sh
 
   pre-matrix:
     name: Pre-Matrix Gate

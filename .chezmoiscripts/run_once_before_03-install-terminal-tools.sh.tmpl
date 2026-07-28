@@ -22,7 +22,7 @@ else
   log_error "Checksum-pinned fzf external is missing"
 fi
 
-apt_install fd-find ripgrep bat btop htop jq
+apt_install fd-find ripgrep bat btop htop jq gojq pigz zstd
 if is_installed fdfind; then
   managed_link "$(command -v fdfind)" "$HOME/.local/bin/fd" fd distro
 fi
@@ -91,7 +91,7 @@ install_github_archive \
   curlie rs/curlie "v${CURLIE_VERSION#v}" \
   "curlie_${CURLIE_VERSION}_linux_${ARCH}.tar.gz" curlie \
   "https://github.com/rs/curlie/releases/download/{tag}/curlie_${CURLIE_VERSION}_checksums.txt" \
-  'curlie --version'
+  'curlie version'
 
 TRIPPY_SHA="$(package_metadata core trippy "sha256_$ARCH")"
 TRIPPY_VERSION="$(package_version core trippy 0.13.0)"

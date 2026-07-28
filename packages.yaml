@@ -14,7 +14,10 @@ core:
   btop: "1.4.7"
   starship: "1.26.0"
   jq: distro
+  gojq: distro
   yq: distro
+  pigz: distro
+  zstd: distro
   htop: distro
   zoxide: distro
   direnv: distro
@@ -47,6 +50,7 @@ editor:
 database:
   usql: "0.21.4"
   iredis: "1.15.0"
+  pgloader: distro
 
 cloud:
   docker: distro
@@ -59,7 +63,11 @@ cloud:
   gcloud: distro
   azure_cli: distro
   cloudflared: "2026.7.3"
+  s5cmd: "2.3.0"
+  kcat: distro
   stern: "1.34.0"
+  helmfile: "1.7.1"
+  kubectx: "0.11.0"
 
 
 terminal:

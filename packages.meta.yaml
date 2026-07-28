@@ -63,10 +63,28 @@ core:
     owner: apt
     package: jq
     integrity: apt-signature
+  gojq:
+    source: apt
+    owner: apt
+    package: gojq
+    binary: gojq
+    integrity: apt-signature
   yq:
     source: apt
     owner: apt
     package: yq
+    integrity: apt-signature
+  pigz:
+    source: apt
+    owner: apt
+    package: pigz
+    binary: pigz
+    integrity: apt-signature
+  zstd:
+    source: apt
+    owner: apt
+    package: zstd
+    binary: zstd
     integrity: apt-signature
   htop:
     source: apt
@@ -258,11 +276,35 @@ cloud:
     integrity: pinned-sha256
     sha256_amd64: 049777d30f9bf93da6df8bbe31383460eb2aa51a832c6551824d56f9fcc55974
     sha256_arm64: d3ea7d22dd337b465da33d6bc1c4b3cfd381407447a2a7d29542c19783430db3
+  s5cmd:
+    source: github
+    owner: dotfiles-binary
+    repo: peak/s5cmd
+    binary: s5cmd
+    integrity: upstream-checksum
+  kcat:
+    source: apt
+    owner: apt
+    package: kcat
+    binary: kcat
+    integrity: apt-signature
   stern:
     source: github
     owner: dotfiles-binary
     repo: stern/stern
     binary: stern
+    integrity: upstream-checksum
+  helmfile:
+    source: github
+    owner: dotfiles-binary
+    repo: helmfile/helmfile
+    binary: helmfile
+    integrity: upstream-checksum
+  kubectx:
+    source: github
+    owner: dotfiles-binary
+    repo: ahmetb/kubectx
+    binary: kubectx
     integrity: upstream-checksum
 
 database:
@@ -281,6 +323,12 @@ database:
     package: iredis
     binary: iredis
     integrity: pypi
+  pgloader:
+    source: apt
+    owner: apt
+    package: pgloader
+    binary: pgloader
+    integrity: apt-signature
 
 terminal:
   kitty:

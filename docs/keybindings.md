@@ -135,8 +135,6 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 | gd9 | `gcc -std=c99 -pedantic-errors -Wall -Wextra -g` |
 | gc9 | `gcc -std=c99 -pedantic-errors -Wall -Wextra -DNDEBUG -O3` |
 | ssh | `TERM=xterm-256color ssh` |
-| ls | `eza --icons=always -hg` |
-| cat | `bat --paging=never --style=full` |
 | tm | `dot-workspace` |
 | ytmp4 | `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best"` |
 | cheat | `"curl -s https://cht.sh/"` |

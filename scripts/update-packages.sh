@@ -192,11 +192,16 @@ github_asset_spec() {
     core.sops) printf '%s\n' 'getsops/sops|v{version}|sops-v{version}.linux.{arch}|amd64|arm64' ;;
     core.lazydocker) printf '%s\n' 'jesseduffield/lazydocker|v{version}|lazydocker_{version}_Linux_{arch}.tar.gz|x86_64|arm64' ;;
     core.tealdeer) printf '%s\n' 'dbrgn/tealdeer|v{version}|tealdeer-linux-{arch}-musl|x86_64|aarch64' ;;
+    core.curlie) printf '%s\n' 'rs/curlie|v{version}|curlie_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
     languages.uv) printf '%s\n' 'astral-sh/uv|{version}|uv-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     history.atuin) printf '%s\n' 'atuinsh/atuin|v{version}|atuin-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     editor.neovim) printf '%s\n' 'neovim/neovim|v{version}|nvim-linux-{arch}.tar.gz|x86_64|arm64' ;;
     cloud.k9s) printf '%s\n' 'derailed/k9s|v{version}|k9s_Linux_{arch}.tar.gz|amd64|arm64' ;;
     cloud.cloudflared) printf '%s\n' 'cloudflare/cloudflared|{version}|cloudflared-linux-{arch}.deb|amd64|arm64' ;;
+    cloud.s5cmd) printf '%s\n' 'peak/s5cmd|v{version}|s5cmd_{version}_Linux-{arch}.tar.gz|64bit|arm64' ;;
+    cloud.stern) printf '%s\n' 'stern/stern|v{version}|stern_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
+    cloud.helmfile) printf '%s\n' 'helmfile/helmfile|v{version}|helmfile_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
+    cloud.kubectx) printf '%s\n' 'ahmetb/kubectx|v{version}|kubectx_v{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
     fonts.nerd_font_version)
       printf 'ryanoasis/nerd-fonts|v{version}|%s.zip|shared|shared\n' \
         "$(package_version fonts nerd_font FiraMono)"
@@ -459,6 +464,7 @@ run_live_audit() {
   audit_github core sops getsops/sops
   audit_github core lazydocker jesseduffield/lazydocker
   audit_github core tealdeer dbrgn/tealdeer
+  audit_github core curlie rs/curlie
 
   if wanted languages.go; then
     latest="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json' 2>/dev/null | jq -r '.[0].version' | sed 's/^go//' || true)"
@@ -512,7 +518,10 @@ run_live_audit() {
     add_candidate cloud aws_cli "$latest"
   fi
   audit_github cloud cloudflared cloudflare/cloudflared
+  audit_github cloud s5cmd peak/s5cmd
   audit_github cloud stern stern/stern
+  audit_github cloud helmfile helmfile/helmfile
+  audit_github cloud kubectx ahmetb/kubectx
   audit_github database usql xo/usql
   audit_pypi database iredis iredis
   audit_github system git_credential_manager git-ecosystem/git-credential-manager

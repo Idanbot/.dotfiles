@@ -21,11 +21,15 @@ ARCH="$(get_arch)"
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
+    CLOUD_ARCH=amd64
+    S5CMD_ARCH=64bit
     OMP_ARCH=x64
     HERDR_ARCH=x86_64
     ;;
   arm64)
     RELEASE_ARCH=aarch64
+    CLOUD_ARCH=arm64
+    S5CMD_ARCH=arm64
     OMP_ARCH=arm64
     HERDR_ARCH=aarch64
     ;;
@@ -73,6 +77,36 @@ install_github_archive starship starship/starship "v$STARSHIP_VERSION" \
   "https://github.com/starship/starship/releases/download/{tag}/starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz.sha256" \
   'starship --version'
 
+CURLIE_VERSION="$(package_version core curlie 1.8.2)"
+install_github_archive curlie rs/curlie "v$CURLIE_VERSION" \
+  "curlie_${CURLIE_VERSION}_linux_${ARCH}.tar.gz" curlie \
+  "https://github.com/rs/curlie/releases/download/{tag}/curlie_${CURLIE_VERSION}_checksums.txt" \
+  'curlie version'
+
+S5CMD_VERSION="$(package_version cloud s5cmd 2.3.0)"
+install_github_archive s5cmd peak/s5cmd "v$S5CMD_VERSION" \
+  "s5cmd_{version}_Linux-${S5CMD_ARCH}.tar.gz" s5cmd \
+  'https://github.com/peak/s5cmd/releases/download/{tag}/s5cmd_checksums.txt' \
+  's5cmd version'
+
+HELMFILE_VERSION="$(package_version cloud helmfile 1.7.1)"
+install_github_archive helmfile helmfile/helmfile "v$HELMFILE_VERSION" \
+  "helmfile_{version}_linux_${CLOUD_ARCH}.tar.gz" helmfile \
+  'https://github.com/helmfile/helmfile/releases/download/{tag}/helmfile_{version}_checksums.txt' \
+  'helmfile --version'
+
+KUBECTX_VERSION="$(package_version cloud kubectx 0.11.0)"
+install_github_archive kubectx ahmetb/kubectx "v$KUBECTX_VERSION" \
+  "kubectx_v{version}_linux_${RELEASE_ARCH}.tar.gz" kubectx \
+  'https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt' \
+  'kubectx --version'
+
+STERN_VERSION="$(package_version cloud stern 1.34.0)"
+install_github_archive stern stern/stern "v$STERN_VERSION" \
+  "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
+  'https://github.com/stern/stern/releases/download/{tag}/checksums.txt' \
+  'stern --version'
+
 OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "omp-linux-$OMP_ARCH" omp \
   "sha256:$OMP_SHA" 'omp --version'
@@ -81,11 +115,14 @@ HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
 install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
 
-for binary in eza lazygit lazydocker sops tldr starship omp herdr; do
+for binary in \
+  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx stern \
+  omp herdr; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
+s5cmd version >/dev/null
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 8 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 13 ]]
 
 export HERDR_CONFIG_PATH="$DOTFILES_DIR/dot_config/herdr/config.toml"
 export SHELL=/bin/bash

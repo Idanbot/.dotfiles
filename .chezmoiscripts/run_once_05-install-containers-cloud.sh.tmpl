@@ -13,11 +13,15 @@ case "$ARCH" in
     RELEASE_ARCH=amd64
     HASHI_ARCH=amd64
     AWS_ARCH=x86_64
+    S5CMD_ARCH=64bit
+    KUBECTX_ARCH=x86_64
     ;;
   arm64)
     RELEASE_ARCH=arm64
     HASHI_ARCH=arm64
     AWS_ARCH=aarch64
+    S5CMD_ARCH=arm64
+    KUBECTX_ARCH=arm64
     ;;
   *)
     log_error "Unsupported cloud-tool architecture: $ARCH"
@@ -82,7 +86,7 @@ else
   log_skip "Terraform $TERRAFORM_VERSION already installed or newer"
 fi
 
-apt_install ansible
+apt_install ansible kcat pgloader
 
 K9S_VERSION="$(package_version cloud k9s 0.51.0)"
 install_github_archive \
@@ -173,6 +177,27 @@ install_github_archive \
   "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
   "https://github.com/stern/stern/releases/download/{tag}/checksums.txt" \
   'stern --version'
+
+S5CMD_VERSION="$(package_version cloud s5cmd 2.3.0)"
+install_github_archive \
+  s5cmd peak/s5cmd "v${S5CMD_VERSION#v}" \
+  "s5cmd_{version}_Linux-${S5CMD_ARCH}.tar.gz" s5cmd \
+  "https://github.com/peak/s5cmd/releases/download/{tag}/s5cmd_checksums.txt" \
+  's5cmd version'
+
+HELMFILE_VERSION="$(package_version cloud helmfile 1.7.1)"
+install_github_archive \
+  helmfile helmfile/helmfile "v${HELMFILE_VERSION#v}" \
+  "helmfile_{version}_linux_${RELEASE_ARCH}.tar.gz" helmfile \
+  "https://github.com/helmfile/helmfile/releases/download/{tag}/helmfile_{version}_checksums.txt" \
+  'helmfile --version'
+
+KUBECTX_VERSION="$(package_version cloud kubectx 0.11.0)"
+install_github_archive \
+  kubectx ahmetb/kubectx "v${KUBECTX_VERSION#v}" \
+  "kubectx_v{version}_linux_${KUBECTX_ARCH}.tar.gz" kubectx \
+  "https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt" \
+  'kubectx --version'
 
 USQL_SHA="$(package_metadata database usql "sha256_$ARCH")"
 USQL_VERSION="$(package_version database usql 0.21.4)"

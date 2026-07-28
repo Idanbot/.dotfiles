@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: d1af59050bc8f1b6e927f88523a7b4c27ea0214adc165ba0eda3e89d0d7c270c
-  metadata: 456d0ae938aaf3c934573164ef8c8cc30c2fcd7e37d89faf40e894ddb87ed735
+  packages: 33200a61e5a17ca9f363bae6740403a294ade66ed333e978b04cf6d0324098c2
+  metadata: e0389b6e5f2a60c7632d538d70cbe506fda04626152aae93f43a76fca4aee9c5
 
 tools:
   - section: bootstrap
@@ -87,11 +87,35 @@ tools:
     package: jq
     integrity: apt-signature
   - section: core
+    name: gojq
+    version: distro
+    source: apt
+    owner: apt
+    package: gojq
+    binary: gojq
+    integrity: apt-signature
+  - section: core
     name: yq
     version: distro
     source: apt
     owner: apt
     package: yq
+    integrity: apt-signature
+  - section: core
+    name: pigz
+    version: distro
+    source: apt
+    owner: apt
+    package: pigz
+    binary: pigz
+    integrity: apt-signature
+  - section: core
+    name: zstd
+    version: distro
+    source: apt
+    owner: apt
+    package: zstd
+    binary: zstd
     integrity: apt-signature
   - section: core
     name: htop
@@ -279,6 +303,14 @@ tools:
     package: iredis
     binary: iredis
     integrity: pypi
+  - section: database
+    name: pgloader
+    version: distro
+    source: apt
+    owner: apt
+    package: pgloader
+    binary: pgloader
+    integrity: apt-signature
   - section: cloud
     name: docker
     version: distro
@@ -354,12 +386,44 @@ tools:
     sha256_arm64: d3ea7d22dd337b465da33d6bc1c4b3cfd381407447a2a7d29542c19783430db3
     integrity: pinned-sha256
   - section: cloud
+    name: s5cmd
+    version: 2.3.0
+    source: github
+    owner: dotfiles-binary
+    repo: peak/s5cmd
+    binary: s5cmd
+    integrity: upstream-checksum
+  - section: cloud
+    name: kcat
+    version: distro
+    source: apt
+    owner: apt
+    package: kcat
+    binary: kcat
+    integrity: apt-signature
+  - section: cloud
     name: stern
     version: 1.34.0
     source: github
     owner: dotfiles-binary
     repo: stern/stern
     binary: stern
+    integrity: upstream-checksum
+  - section: cloud
+    name: helmfile
+    version: 1.7.1
+    source: github
+    owner: dotfiles-binary
+    repo: helmfile/helmfile
+    binary: helmfile
+    integrity: upstream-checksum
+  - section: cloud
+    name: kubectx
+    version: 0.11.0
+    source: github
+    owner: dotfiles-binary
+    repo: ahmetb/kubectx
+    binary: kubectx
     integrity: upstream-checksum
   - section: terminal
     name: kitty

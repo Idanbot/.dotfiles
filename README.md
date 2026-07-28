@@ -79,6 +79,12 @@ Selectors can extend or reduce a profile:
 `languages` dependency for `ai`, `tmux`, and `media`. `--sections` is exact
 expert mode and does not add dependencies.
 
+The common terminal baseline includes `jq`, `gojq`, `pigz`, `zstd`, `curlie`,
+`bat`, and `eza`. Enhanced tools keep their own command names: standard
+commands such as `cat` and `ls` are not replaced by aliases. The cloud profile
+adds `s5cmd`, `kcat`, `stern`, `helmfile`, and `kubectx`; database utilities
+include `usql`, `iredis`, and `pgloader`.
+
 ## Reliability Model
 
 The installer follows one path for local, one-line, CI, native, and WSL runs:
@@ -296,10 +302,14 @@ APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
 the repository; all upgrades remain explicit local review decisions. The report
-covers pinned GitHub/direct downloads, npm packages, Rust, Python, Java, Node,
-and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
-vendor-signed APT repositories and are upgraded whenever the `cloud` section
-runs.
+covers pinned GitHub/direct downloads including `s5cmd`, `stern`, `helmfile`,
+and `kubectx`, plus npm packages, Rust, Python, Java, Node, and AWS CLI. Google
+Cloud CLI and Azure CLI are rolling tools from their vendor-signed APT
+repositories and are upgraded whenever the `cloud` section runs.
+
+Always-on CI downloads and verifies the release assets and executes the new
+CLIs. It also installs and runs the Ubuntu-managed `gojq`, `pigz`, `zstd`,
+`kcat`, and `pgloader` packages before the installation matrices begin.
 
 Check current versions and integrity values:
 
