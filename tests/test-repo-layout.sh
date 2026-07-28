@@ -23,9 +23,14 @@ required=(
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
-  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh
-  dot_local/bin/executable_cloud-context
+  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
+  tests/test-ssh-access.sh
+  dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
+  dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
+  dot_config/agents/AGENTS.md dot_codex/symlink_AGENTS.md
+  dot_claude/symlink_CLAUDE.md dot_config/opencode/symlink_AGENTS.md
+  dot_gemini/symlink_GEMINI.md dot_omp/agent/symlink_AGENTS.md
 )
 for path in "${required[@]}"; do
   [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
@@ -148,11 +153,72 @@ else
   fail "managed Go and Rust require stable shims for same-run command discovery"
 fi
 
-if grep -Fq 'CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \
-  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
-  pass "Codex standalone installation cannot launch an interactive session"
+if grep -Fq 'retry_command "Codex standalone installer" 4 5' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
+  grep -Fq 'env CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"' \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
+  pass "Codex standalone installation is noninteractive and retries transient vendor failures"
 else
-  fail "Codex standalone installation must suppress vendor prompts"
+  fail "Codex standalone installation must suppress vendor prompts and retry transient failures"
+fi
+
+AI_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
+if grep -Fq 'package_version ai_tools serena' "$AI_INSTALLER" &&
+  grep -Fq 'uv tool install --force -p 3.13 "serena-agent==${SERENA_VERSION}"' "$AI_INSTALLER" &&
+  grep -Fq 'package_version ai_tools context_mode' "$AI_INSTALLER" &&
+  grep -Fq 'context-mode,better-sqlite3' "$AI_INSTALLER"; then
+  pass "optional MCP runtimes are versioned and installed with explicit build-script approval"
+else
+  fail "Serena and context-mode installation contracts are incomplete"
+fi
+
+MCP_MANAGER="$DOTFILES_DIR/dot_local/bin/executable_agent-mcp"
+if grep -Fq 'ALL_AGENTS=(codex claude agy opencode omp)' "$MCP_MANAGER" &&
+  grep -Fq 'ALL_SERVERS=(serena context-mode)' "$MCP_MANAGER" &&
+  grep -Fq 'Servers are installed but disabled until explicitly enabled.' "$MCP_MANAGER"; then
+  pass "optional MCP manager covers every supported agent and defaults off"
+else
+  fail "optional MCP manager coverage or default-off policy is incomplete"
+fi
+
+AGENT_GUIDANCE="$DOTFILES_DIR/dot_config/agents/AGENTS.md"
+if [[ "$(wc -l <"$AGENT_GUIDANCE")" -le 100 ]] &&
+  grep -Fq '`fdfind` or `fd`' "$AGENT_GUIDANCE" &&
+  grep -Fq '`gojq` (or `jq`)' "$AGENT_GUIDANCE" &&
+  grep -Fq '`pigz`' "$AGENT_GUIDANCE" &&
+  grep -Fq '`zstd`' "$AGENT_GUIDANCE"; then
+  pass "global agent guidance is concise and names the managed engineering tools"
+else
+  fail "global agent guidance is too long or omits managed tooling"
+fi
+
+for link_spec in \
+  'dot_codex/symlink_AGENTS.md:../.config/agents/AGENTS.md' \
+  'dot_claude/symlink_CLAUDE.md:../.config/agents/AGENTS.md' \
+  'dot_config/opencode/symlink_AGENTS.md:../agents/AGENTS.md' \
+  'dot_gemini/symlink_GEMINI.md:../.config/agents/AGENTS.md' \
+  'dot_omp/agent/symlink_AGENTS.md:../../.config/agents/AGENTS.md'; do
+  link_path="${link_spec%%:*}"
+  link_target="${link_spec#*:}"
+  if [[ "$(cat "$DOTFILES_DIR/$link_path")" == "$link_target" ]]; then
+    pass "$link_path targets the canonical agent guidance"
+  else
+    fail "$link_path has an unexpected target"
+  fi
+done
+
+SSH_CONFIG="$DOTFILES_DIR/private_dot_ssh/private_config.tmpl"
+if grep -Fq 'AddKeysToAgent 8h' "$SSH_CONFIG" &&
+  grep -Fq 'ControlPath ~/.ssh/cm-%C' "$SSH_CONFIG" &&
+  grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$SSH_CONFIG" &&
+  grep -Fq 'PreferredAuthentications publickey' "$SSH_CONFIG" &&
+  grep -Fq 'PasswordAuthentication no' "$SSH_CONFIG" &&
+  grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG" &&
+  grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG" &&
+  ! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"; then
+  pass "SSH persists unlocked keys only in agent memory and delegates Access transport"
+else
+  fail "SSH key caching or Cloudflare Access configuration is unsafe or incomplete"
 fi
 
 if grep -Fq 'prefix = "ctrl+s"' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
@@ -185,7 +251,9 @@ else
   fail "Herdr integration installation is incomplete"
 fi
 
-for preserved in .bash_history .zsh_history .lesshst '.zcompdump*' .zsh_sessions/ .local/share/zsh/; do
+for preserved in \
+  .bash_history .zsh_history .lesshst '.zcompdump*' .zsh_sessions/ \
+  .local/share/zsh/ .cloudflared/; do
   grep -Fxq "$preserved" "$DOTFILES_DIR/.chezmoiignore" && pass "preserves $preserved" || fail "missing preservation rule: $preserved"
 done
 

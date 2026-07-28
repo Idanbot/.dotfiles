@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+# Cloudflare Access-aware SSH helper and ProxyCommand endpoint.
+
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  cloudflare-ssh login HOST
+  cloudflare-ssh connect HOST [SSH_ARGS...]
+  cloudflare-ssh install-key HOST [PUBLIC_KEY]
+  cloudflare-ssh proxy HOST
+
+login       Authenticate to the host's Cloudflare Access application.
+connect     Open SSH; on transport failure, authenticate and retry once.
+install-key Authenticate, then install your public key with ssh-copy-id.
+proxy       Internal SSH ProxyCommand transport; normally not called directly.
+EOF
+}
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf 'Required command is unavailable: %s\n' "$1" >&2
+    exit 127
+  }
+}
+
+resolve_hostname() {
+  local target="$1" hostname
+  hostname="$(
+    ssh -G "$target" 2>/dev/null |
+      awk '$1 == "hostname" { print $2; exit }'
+  )"
+  [[ -n "$hostname" ]] || {
+    printf 'Unable to resolve SSH hostname for %s\n' "$target" >&2
+    return 1
+  }
+  printf '%s\n' "$hostname"
+}
+
+access_login() {
+  local hostname
+  hostname="$(resolve_hostname "$1")"
+  cloudflared access login "https://${hostname}"
+}
+
+[[ $# -ge 1 ]] || {
+  usage >&2
+  exit 2
+}
+
+command_name="$1"
+shift
+case "$command_name" in
+  login)
+    [[ $# -eq 1 ]] || {
+      usage >&2
+      exit 2
+    }
+    require_command cloudflared
+    require_command ssh
+    access_login "$1"
+    ;;
+  connect)
+    [[ $# -ge 1 ]] || {
+      usage >&2
+      exit 2
+    }
+    require_command cloudflared
+    require_command ssh
+    target="$1"
+    shift
+    if ssh "$target" "$@"; then
+      exit 0
+    else
+      ssh_status=$?
+    fi
+    [[ "$ssh_status" -eq 255 ]] || exit "$ssh_status"
+    printf 'SSH transport failed; refreshing Cloudflare Access and retrying once.\n' >&2
+    access_login "$target"
+    exec ssh "$target" "$@"
+    ;;
+  install-key)
+    [[ $# -ge 1 && $# -le 2 ]] || {
+      usage >&2
+      exit 2
+    }
+    require_command cloudflared
+    require_command ssh
+    require_command ssh-copy-id
+    target="$1"
+    public_key="${2:-$HOME/.ssh/id_ed25519.pub}"
+    [[ -f "$public_key" ]] || {
+      printf 'SSH public key not found: %s\n' "$public_key" >&2
+      exit 1
+    }
+    access_login "$target"
+    exec ssh-copy-id -i "$public_key" "$target"
+    ;;
+  proxy)
+    [[ $# -eq 1 ]] || {
+      usage >&2
+      exit 2
+    }
+    require_command cloudflared
+    exec cloudflared access ssh --hostname "$1"
+    ;;
+  --help | -h | help)
+    usage
+    ;;
+  *)
+    printf 'Unknown command: %s\n' "$command_name" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

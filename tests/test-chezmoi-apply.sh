@@ -23,14 +23,22 @@ run_fixture() {
   local is_wsl="$2"
   local expected_history='fixture-history-must-survive'
   local expected_overlay='export FIXTURE_LOCAL=preserved'
+  local expected_access_state='fixture-cloudflare-session-must-survive'
 
   export HOME="$TMP_ROOT/home-$profile"
   export DOTFILES_WSL="$is_wsl"
-  mkdir -p "$HOME/.config/chezmoi" "$HOME/.config/dotfiles"
+  mkdir -p \
+    "$HOME/.config/chezmoi" \
+    "$HOME/.config/dotfiles" \
+    "$HOME/.cloudflared"
 
   printf '%s\n' "$expected_history" >"$HOME/.zsh_history"
   printf '%s\n' "$expected_overlay" >"$HOME/.config/dotfiles/local.zsh"
-  chmod 600 "$HOME/.zsh_history" "$HOME/.config/dotfiles/local.zsh"
+  printf '%s\n' "$expected_access_state" >"$HOME/.cloudflared/cert.pem"
+  chmod 600 \
+    "$HOME/.zsh_history" \
+    "$HOME/.config/dotfiles/local.zsh" \
+    "$HOME/.cloudflared/cert.pem"
 
   cat >"$HOME/.config/chezmoi/chezmoi.yaml" <<EOF
 data:
@@ -51,12 +59,28 @@ EOF
   test -f "$HOME/.gitconfig"
   test -f "$HOME/.config/herdr/config.toml"
   test -f "$HOME/.config/dotfiles/agents.yaml"
+  test -f "$HOME/.config/agents/AGENTS.md"
+  test -x "$HOME/.local/bin/agent-mcp"
+  test -x "$HOME/.local/bin/cloudflare-ssh"
+  test -x "$HOME/.local/bin/ssh-key-load"
   grep -Fq 'prefix = "ctrl+s"' "$HOME/.config/herdr/config.toml"
   grep -Fq 'workspace:' "$HOME/.config/dotfiles/agents.yaml"
+  for instruction_path in \
+    "$HOME/.codex/AGENTS.md" \
+    "$HOME/.claude/CLAUDE.md" \
+    "$HOME/.gemini/GEMINI.md" \
+    "$HOME/.config/opencode/AGENTS.md" \
+    "$HOME/.omp/agent/AGENTS.md"; do
+    test -L "$instruction_path"
+    test "$(readlink -f "$instruction_path")" = \
+      "$(readlink -f "$HOME/.config/agents/AGENTS.md")"
+  done
   test "$(cat "$HOME/.zsh_history")" = "$expected_history"
   test "$(cat "$HOME/.config/dotfiles/local.zsh")" = "$expected_overlay"
+  test "$(cat "$HOME/.cloudflared/cert.pem")" = "$expected_access_state"
   test "$(stat -c '%a' "$HOME/.zsh_history")" = 600
   test "$(stat -c '%a' "$HOME/.config/dotfiles/local.zsh")" = 600
+  test "$(stat -c '%a' "$HOME/.cloudflared/cert.pem")" = 600
 
   if [[ "$is_wsl" == true ]]; then
     test ! -e "$HOME/.config/kitty"

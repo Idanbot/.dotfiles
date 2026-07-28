@@ -23,6 +23,14 @@ version_major_matches 'openjdk 21.0.8' 21
 [[ "$(package_version languages rust)" == 1.97.1 ]]
 [[ "$(package_version languages java)" == 25.0.3+9 ]]
 
+RETRY_COUNT=0
+retry_fixture() {
+  ((RETRY_COUNT++)) || true
+  ((RETRY_COUNT >= 3))
+}
+retry_command "retry fixture" 3 0 retry_fixture
+[[ "$RETRY_COUNT" -eq 3 ]]
+
 GO_INDEX_FIXTURE="$(mktemp)"
 trap 'rm -f "$GO_INDEX_FIXTURE"' EXIT
 cat >"$GO_INDEX_FIXTURE" <<'JSON'

@@ -5,9 +5,11 @@ After=network.target
 
 [Service]
 Type=simple
-Environment=SSH_AUTH_SOCK=%t/ssh-agent.socket
-# Run ssh-agent in the foreground (-D) with the designated socket path
-ExecStart=/usr/bin/ssh-agent -D -a $SSH_AUTH_SOCK
+UMask=0077
+ExecStartPre=/usr/bin/rm -f %t/ssh-agent.socket
+ExecStart=/usr/bin/ssh-agent -D -a %t/ssh-agent.socket
+Restart=on-failure
+RestartSec=2
 
 [Install]
 WantedBy=default.target

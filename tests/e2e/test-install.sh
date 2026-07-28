@@ -138,6 +138,8 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   pgloader --version >/dev/null
   command -v gcloud >/dev/null
   command -v az >/dev/null
+  command -v cloudflare-ssh >/dev/null
+  cloudflare-ssh --help >/dev/null
   /dotfiles/tests/test-cloud-context-starship.sh /dotfiles
 fi
 
@@ -145,6 +147,42 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   for agent in claude codex agy opencode omp; do
     command -v "$agent" >/dev/null
     "$agent" --version >/dev/null
+  done
+  assert_version_contains Serena "$(manifest_version ai_tools serena)" serena --version
+  context_mode_manifest="$HOME/.local/share/npm/lib/node_modules/context-mode/package.json"
+  [[ -f "$context_mode_manifest" ]]
+  [[ "$(gojq -r '.version' "$context_mode_manifest")" == "$(manifest_version ai_tools context_mode)" ]]
+  command -v agent-mcp >/dev/null
+  mcp_status="$(agent-mcp status all)"
+  if grep -Eq '[[:space:]]enabled$' <<<"$mcp_status"; then
+    printf 'Optional MCP server was enabled without explicit user action:\n%s\n' "$mcp_status" >&2
+    exit 1
+  fi
+  agent-mcp enable all --agent codex,claude,agy,opencode,omp >/dev/null
+  mcp_status="$(agent-mcp status all)"
+  enabled_count="$(grep -Ec '[[:space:]]enabled$' <<<"$mcp_status" || true)"
+  if [[ "$enabled_count" -ne 10 ]]; then
+    printf 'Expected 10 enabled agent/MCP registrations, got %s:\n%s\n' \
+      "$enabled_count" "$mcp_status" >&2
+    exit 1
+  fi
+  agent-mcp disable all --agent codex,claude,agy,opencode,omp >/dev/null
+  mcp_status="$(agent-mcp status all)"
+  if grep -Eq '[[:space:]]enabled$' <<<"$mcp_status"; then
+    printf 'Optional MCP server remained enabled after cleanup:\n%s\n' "$mcp_status" >&2
+    exit 1
+  fi
+
+  canonical_instructions="$HOME/.config/agents/AGENTS.md"
+  [[ -f "$canonical_instructions" ]]
+  for agent_instructions in \
+    "$HOME/.codex/AGENTS.md" \
+    "$HOME/.claude/CLAUDE.md" \
+    "$HOME/.gemini/GEMINI.md" \
+    "$HOME/.config/opencode/AGENTS.md" \
+    "$HOME/.omp/agent/AGENTS.md"; do
+    [[ -L "$agent_instructions" ]]
+    [[ "$(readlink -f "$agent_instructions")" == "$(readlink -f "$canonical_instructions")" ]]
   done
   ! command -v gemini >/dev/null 2>&1
 fi
@@ -171,6 +209,15 @@ elif [[ ",$selected_sections," == *,desktop,* ]]; then
 else
   [[ -f "$HOME/.config/kitty/kitty.conf" ]]
   ! command -v kitty >/dev/null 2>&1
+fi
+
+if [[ ",$selected_sections," == *,system,* ]]; then
+  command -v ssh-key-load >/dev/null
+  ssh-key-load --help >/dev/null
+  grep -Fq 'AddKeysToAgent 8h' "$HOME/.ssh/config"
+  grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$HOME/.ssh/config"
+  grep -Fq 'PreferredAuthentications publickey' "$HOME/.ssh/config"
+  grep -Fq 'PasswordAuthentication no' "$HOME/.ssh/config"
 fi
 
 dot doctor --quick --sections "$selected_sections" >/dev/null

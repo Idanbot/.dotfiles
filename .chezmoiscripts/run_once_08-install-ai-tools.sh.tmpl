@@ -33,7 +33,8 @@ if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   download_verified \
     https://chatgpt.com/codex/install.sh "$tmpdir/codex-install.sh" \
     "sha256:$CODEX_INSTALLER_SHA" codex-install.sh
-  CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
+  retry_command "Codex standalone installer" 4 5 \
+    env CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
   rm -rf "$tmpdir"
   export PATH="$HOME/.local/bin:$PATH"
   is_installed codex || {
@@ -59,7 +60,8 @@ else
     https://antigravity.google/cli/install.sh "$tmpdir/antigravity-install.sh" \
     "sha256:$ANTIGRAVITY_INSTALLER_SHA" antigravity-install.sh
   # Contain the vendor's shell-profile edits; chezmoi already manages PATH.
-  HOME="$tmpdir/home" bash "$tmpdir/antigravity-install.sh" \
+  retry_command "Antigravity standalone installer" 4 5 \
+    env HOME="$tmpdir/home" bash "$tmpdir/antigravity-install.sh" \
     --dir "$install_home/.local/bin"
   rm -rf "$tmpdir"
   export PATH="$HOME/.local/bin:$PATH"
@@ -89,6 +91,27 @@ OMP_SHA256="$(package_metadata ai_tools omp "sha256_$(get_arch)")"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
   "sha256:$OMP_SHA256" 'omp --version'
 
+SERENA_VERSION="$(package_version ai_tools serena 1.6.1)"
+if ! is_installed serena ||
+  ! version_ge "$(serena --version 2>/dev/null || true)" "$SERENA_VERSION"; then
+  log_info "Installing optional Serena MCP runtime $SERENA_VERSION"
+  uv tool install --force -p 3.13 "serena-agent==${SERENA_VERSION}"
+  record_install serena "$SERENA_VERSION" uv:serena-agent \
+    "$HOME/.local/share/uv/tools/serena-agent"
+  ((_INSTALLED++)) || true
+  log_success "Serena $SERENA_VERSION installed"
+else
+  log_skip "Serena $SERENA_VERSION already installed or newer"
+fi
+if [[ ! -f "$HOME/.serena/serena_config.yml" ]]; then
+  log_info "Initializing Serena's local language-server configuration"
+  serena init
+fi
+
+CONTEXT_MODE_VERSION="$(package_version ai_tools context_mode 1.0.169)"
+npm_install_global context-mode "$CONTEXT_MODE_VERSION" context-mode \
+  context-mode,better-sqlite3
+
 for agent in claude codex agy opencode omp; do
   if version_output="$("$agent" --version 2>&1)"; then
     log_success "$agent executable validation passed"
@@ -96,6 +119,15 @@ for agent in claude codex agy opencode omp; do
     log_error "$agent failed its noninteractive version check: ${version_output:-no output}"
   fi
 done
+
+for mcp_runtime in serena context-mode agent-mcp; do
+  if is_installed "$mcp_runtime"; then
+    log_success "$mcp_runtime optional runtime is available"
+  else
+    log_error "$mcp_runtime optional runtime is unavailable"
+  fi
+done
+log_info "Optional MCP servers are disabled by default; use 'agent-mcp enable <server>'"
 
 if is_installed herdr; then
   log_info "Installing bundled Herdr agent integrations"

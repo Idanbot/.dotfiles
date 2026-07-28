@@ -29,6 +29,10 @@ The doctor checks existing local overlays for private modes. Installer logs are
 mode `0600`, ANSI-free on disk, and redact common `token=`, `password=`,
 `secret=`, and `api_key=` assignments.
 
+SSH private-key passphrases may be held in `ssh-agent` memory for a bounded
+lifetime, but are never written by the bootstrap. Cloudflare Access session
+state under `~/.cloudflared/` is machine-local and explicitly unmanaged.
+
 Redaction is defense in depth, not permission to pass secrets through the
 installer environment or command line.
 

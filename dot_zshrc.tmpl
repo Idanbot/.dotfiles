@@ -6,7 +6,25 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 export GOPATH=$HOME/go
-export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+_dotfiles_ssh_agent_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+_dotfiles_ssh_agent_status=2
+if [[ -n "${SSH_AUTH_SOCK:-}" && -S "$SSH_AUTH_SOCK" ]]; then
+  if ssh-add -l >/dev/null 2>&1; then
+    _dotfiles_ssh_agent_status=0
+  else
+    _dotfiles_ssh_agent_status=$?
+  fi
+fi
+if (( _dotfiles_ssh_agent_status > 1 )) && [[ -S "$_dotfiles_ssh_agent_socket" ]]; then
+  if SSH_AUTH_SOCK="$_dotfiles_ssh_agent_socket" ssh-add -l >/dev/null 2>&1; then
+    _dotfiles_ssh_agent_status=0
+  else
+    _dotfiles_ssh_agent_status=$?
+  fi
+  (( _dotfiles_ssh_agent_status <= 1 )) &&
+    export SSH_AUTH_SOCK="$_dotfiles_ssh_agent_socket"
+fi
+unset _dotfiles_ssh_agent_socket _dotfiles_ssh_agent_status
 
 # If you come from bash you might have to change your $PATH.
 export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/.local/share/npm/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"

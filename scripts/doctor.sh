@@ -140,6 +140,17 @@ check_file() {
     result fail "$label" "missing $path" "rerun the section that manages $label"
 }
 
+check_instruction_link() {
+  local path="$1" label="$2" canonical="$HOME/.config/agents/AGENTS.md"
+  if [[ -f "$canonical" && -L "$path" ]] &&
+    [[ "$(readlink -f "$path")" == "$(readlink -f "$canonical")" ]]; then
+    result pass "$label" "$path -> $canonical"
+  else
+    result fail "$label" "$path does not resolve to $canonical" \
+      "rerun chezmoi apply to restore shared agent instructions"
+  fi
+}
+
 check_ledger() {
   local ledger="$1" malformed duplicates
   [[ -f "$ledger" ]] || {
@@ -226,7 +237,7 @@ if selected cloud; then
   doctor_step "Cloud"
   for command in \
     docker kubectl helm terraform ansible k9s aws gcloud az cloud-context \
-    s5cmd kcat stern helmfile kubectx pgloader; do
+    s5cmd kcat stern helmfile kubectx pgloader cloudflare-ssh; do
     check_command "$command" true
   done
 fi
@@ -282,9 +293,15 @@ fi
 
 if selected ai; then
   doctor_step "Agent CLIs"
-  for command in claude codex agy opencode omp; do
+  for command in claude codex agy opencode omp serena context-mode agent-mcp; do
     check_command "$command" true
   done
+  check_file "$HOME/.config/agents/AGENTS.md" agent-instructions
+  check_instruction_link "$HOME/.codex/AGENTS.md" codex-instructions
+  check_instruction_link "$HOME/.claude/CLAUDE.md" claude-instructions
+  check_instruction_link "$HOME/.gemini/GEMINI.md" antigravity-instructions
+  check_instruction_link "$HOME/.config/opencode/AGENTS.md" opencode-instructions
+  check_instruction_link "$HOME/.omp/agent/AGENTS.md" omp-instructions
   result warn agent-auth "authentication is intentionally manual"
 fi
 
@@ -303,6 +320,8 @@ fi
 if selected system; then
   doctor_step "System"
   check_command git-credential-manager true
+  check_command ssh-key-load true
+  check_file "$HOME/.ssh/config" ssh-config
 fi
 if selected theme; then
   doctor_step "Themes"

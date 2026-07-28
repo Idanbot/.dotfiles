@@ -192,6 +192,9 @@ dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
 dot workspace [directory]  open a backend-aware agent workspace
 cloud-context [command]    save, load, inspect, or clear cloud CLI contexts
+agent-mcp [command]        enable, disable, or inspect optional MCP servers
+ssh-key-load [flags]       cache an SSH key passphrase in agent memory
+cloudflare-ssh [command]   authenticate and connect through Cloudflare Access
 ```
 
 Machine-specific choices live in
@@ -246,6 +249,34 @@ OpenCode, and OMP integrations. These add lifecycle/session hooks but do not
 authenticate an agent or copy its credentials. Inspect them with
 `herdr integration status`.
 
+Serena and context-mode are installed as optional MCP runtimes but are
+disconnected from every agent by default. `agent-mcp` changes only the selected
+agents and preserves unrelated configuration:
+
+```bash
+agent-mcp status all
+agent-mcp enable serena
+agent-mcp enable context-mode --agent codex,claude
+agent-mcp disable serena --agent agy,opencode,omp
+agent-mcp disable all
+```
+
+Supported agent names are `codex`, `claude`, `agy`, `opencode`, and `omp`.
+Restart active agent sessions after a change. Codex and Claude are configured
+through their native MCP commands; Antigravity, OpenCode, and OMP receive
+atomic JSON updates. Serena resolves the project from each agent's working
+directory except in Antigravity, where its agent must activate the current
+project once after enabling Serena. This MCP-only toggle deliberately avoids
+installing persistent hooks or plugins. Neither MCP is authenticated or granted
+extra permissions.
+
+A concise shared policy lives at `~/.config/agents/AGENTS.md`. Symlinks expose
+it as Codex `~/.codex/AGENTS.md`, Claude `~/.claude/CLAUDE.md`, Antigravity
+`~/.gemini/GEMINI.md`, OpenCode `~/.config/opencode/AGENTS.md`, and OMP
+`~/.omp/agent/AGENTS.md`. Repository and directory-level instructions override
+these global defaults. The policy prefers `rg`, `fdfind`/`fd`, `gojq`, `yq`,
+`pigz`, `zstd`, and explicit enhanced commands without replacing core tools.
+
 This is a supervised launcher, not a branch-isolation system. It does not
 create worktrees, coordinate concurrent edits, commit, merge, or push. Use one
 editing agent at a time in a working directory; use the other windows for
@@ -270,6 +301,40 @@ Local extension points:
 History paths such as `~/.zsh_history`, `~/.bash_history`, `.zcompdump*`, and
 local Zsh state directories are explicitly ignored. WSL also ignores native
 Kitty configuration.
+
+## SSH and Cloudflare Access
+
+The bootstrap does not save SSH login passwords or private-key passphrases.
+`ssh-agent.service` keeps unlocked keys in memory, and the shell respects a
+working forwarded agent before using the managed runtime socket. Load the
+default Ed25519 key for eight hours, or choose a different lifetime:
+
+```bash
+ssh-key-load
+ssh-key-load --lifetime 2h
+ssh-key-load --list
+ssh-key-load --clear
+```
+
+For a new host, create or restore a private key manually, then install only its
+public half. `install-key` may request the remote account password once:
+
+```bash
+ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519
+ssh-key-load
+cloudflare-ssh login rpi4
+cloudflare-ssh install-key rpi4
+ssh rpi4
+```
+
+The managed `rpi4` and `t420` targets use `cloudflared access ssh` as their
+OpenSSH transport. Plain `ssh rpi4` lets Cloudflare open authentication when
+its local session is missing or expired. `cloudflare-ssh connect rpi4` uses
+that normal path first, then runs an explicit Access login and retries once
+after an SSH transport failure. Access state under
+`~/.cloudflared/`, private keys, and `~/.ssh/config.local` remain local and
+untracked. OpenSSH connection multiplexing reuses authenticated connections
+for ten minutes without persisting a password.
 
 ## Secrets Boundary
 
@@ -303,9 +368,10 @@ commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
 the repository; all upgrades remain explicit local review decisions. The report
 covers pinned GitHub/direct downloads including `s5cmd`, `stern`, `helmfile`,
-and `kubectx`, plus npm packages, Rust, Python, Java, Node, and AWS CLI. Google
-Cloud CLI and Azure CLI are rolling tools from their vendor-signed APT
-repositories and are upgraded whenever the `cloud` section runs.
+and `kubectx`, plus Serena, context-mode, npm packages, Rust, Python, Java,
+Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
+vendor-signed APT repositories and are upgraded whenever the `cloud` section
+runs.
 
 Always-on CI downloads and verifies the release assets and executes the new
 CLIs. It also installs and runs the Ubuntu-managed `gojq`, `pigz`, `zstd`,

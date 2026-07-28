@@ -22,6 +22,11 @@ record_install gemini 0.50.0 npm:@google/gemini-cli "$HOME/.local/share/npm/gemi
 forget_install gemini
 ! grep -q '^gemini' "$DOTFILES_STATE_DIR/installed.tsv"
 
+record_install serena 1.6.1 uv:serena-agent "$HOME/.local/share/uv/tools/serena-agent"
+"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run serena |
+  grep -Fq 'would uv tool uninstall serena-agent'
+forget_install serena
+
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run demo | grep -Fq 'would remove'
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" demo >/dev/null
 [[ ! -e "$HOME/.local/bin/demo" ]]

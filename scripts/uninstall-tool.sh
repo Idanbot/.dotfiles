@@ -68,8 +68,10 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
       prefix="$HOME/.local/share/npm"
       [[ "$DRY_RUN" == true ]] && printf 'would npm uninstall %s\n' "$package" || npm uninstall --global --prefix "$prefix" "$package"
       ;;
-    uv)
-      [[ "$DRY_RUN" == true ]] && printf 'would uv tool uninstall %s\n' "$tool" || uv tool uninstall "$tool"
+    uv | uv:*)
+      package="${owner#uv:}"
+      [[ "$package" == uv ]] && package="$tool"
+      [[ "$DRY_RUN" == true ]] && printf 'would uv tool uninstall %s\n' "$package" || uv tool uninstall "$package"
       ;;
     dpkg)
       if [[ "$INCLUDE_PACKAGES" == true ]]; then

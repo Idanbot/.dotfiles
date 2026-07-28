@@ -96,4 +96,24 @@ if [ "${DOTFILES_ENABLE_ATUIN:-0}" = 1 ] && command -v atuin >/dev/null 2>&1; th
   eval "$(atuin init bash)"
 fi
 
-export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+_dotfiles_ssh_agent_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+_dotfiles_ssh_agent_status=2
+if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "$SSH_AUTH_SOCK" ]; then
+  if ssh-add -l >/dev/null 2>&1; then
+    _dotfiles_ssh_agent_status=0
+  else
+    _dotfiles_ssh_agent_status=$?
+  fi
+fi
+if [ "$_dotfiles_ssh_agent_status" -gt 1 ] &&
+  [ -S "$_dotfiles_ssh_agent_socket" ]; then
+  if SSH_AUTH_SOCK="$_dotfiles_ssh_agent_socket" ssh-add -l >/dev/null 2>&1; then
+    _dotfiles_ssh_agent_status=0
+  else
+    _dotfiles_ssh_agent_status=$?
+  fi
+  if [ "$_dotfiles_ssh_agent_status" -le 1 ]; then
+    export SSH_AUTH_SOCK="$_dotfiles_ssh_agent_socket"
+  fi
+fi
+unset _dotfiles_ssh_agent_socket _dotfiles_ssh_agent_status

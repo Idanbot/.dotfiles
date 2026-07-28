@@ -6,15 +6,17 @@ Include ~/.ssh/config.local
 
 # Global Defaults
 Host *
-    # Automatically add keys to active agent after first use
-    AddKeysToAgent yes
+    # Cache unlocked keys in the active agent for eight hours, never on disk.
+    AddKeysToAgent 8h
     # Keep connections alive in background
     ServerAliveInterval 60
     ServerAliveCountMax 10
     # Enable connection multiplexing (faster subsequent connections)
     ControlMaster auto
-    ControlPath ~/.ssh/sockets/%r@%h-%p
+    # %C hashes connection details and avoids Unix socket path-length failures.
+    ControlPath ~/.ssh/cm-%C
     ControlPersist 600
+    UpdateHostKeys yes
 
 # GitHub
 Host github.com
@@ -32,14 +34,25 @@ Host gitlab.com
 Host rpi4
     HostName rpi4-ssh.idanbot.uk
     User idan
-    ProxyCommand /usr/bin/cloudflared access ssh --hostname %h
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    ConnectTimeout 15
+    ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h
 
 # ThinkPad T420 (Cloudflare Access SSH)
 Host t420
     HostName t420.idanbot.uk
     User idan
-    ProxyCommand /usr/bin/cloudflared access ssh --hostname %h
-
+    IdentityFile ~/.ssh/id_ed25519
+    IdentitiesOnly yes
+    PreferredAuthentications publickey
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+    ConnectTimeout 15
+    ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h
 
 # Add any custom hosts below or use chezmoi templates to customize per machine:
 # {{ "{{" }}- if eq .chezmoi.hostname "your-work-host" {{ "}}" }}

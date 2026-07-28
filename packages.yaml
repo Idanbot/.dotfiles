@@ -89,6 +89,8 @@ ai_tools:
   antigravity_cli: standalone
   opencode: "1.17.18"
   omp: "16.4.0"
+  serena: "1.6.1"
+  context_mode: "1.0.169"
 
 media:
   yt_dlp: "2026.07.04"

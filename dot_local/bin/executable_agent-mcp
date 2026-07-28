@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+# Enable or disable optional MCP servers across supported agent harnesses.
+
+set -euo pipefail
+umask 077
+
+ALL_AGENTS=(codex claude agy opencode omp)
+ALL_SERVERS=(serena context-mode)
+
+usage() {
+  cat <<'EOF'
+Usage:
+  agent-mcp status [serena|context-mode|all] [--agent AGENT[,AGENT...]]
+  agent-mcp enable <serena|context-mode|all> [--agent AGENT[,AGENT...]]
+  agent-mcp disable <serena|context-mode|all> [--agent AGENT[,AGENT...]]
+
+Agents: codex, claude, agy, opencode, omp, all
+
+Examples:
+  agent-mcp enable serena
+  agent-mcp enable context-mode --agent codex,claude
+  agent-mcp disable all --agent omp
+  agent-mcp status all
+
+Servers are installed but disabled until explicitly enabled. Restart active
+agent sessions after changing their MCP configuration.
+EOF
+}
+
+die() {
+  printf 'agent-mcp: %s\n' "$*" >&2
+  exit 1
+}
+
+contains() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    [[ "$item" == "$needle" ]] && return 0
+  done
+  return 1
+}
+
+ensure_runtime() {
+  command -v "$1" >/dev/null 2>&1 ||
+    die "$1 is not installed; apply the dotfiles agent profile first"
+}
+
+ensure_json_file() {
+  local path="$1"
+  mkdir -p "$(dirname "$path")"
+  if [[ ! -e "$path" ]]; then
+    printf '{}\n' >"$path"
+    chmod 600 "$path"
+  fi
+  gojq empty "$path" >/dev/null 2>&1 ||
+    die "$path is not valid JSON; fix it before using agent-mcp"
+}
+
+json_update() {
+  local path="$1" filter="$2" mode tmp
+  shift 2
+  ensure_runtime gojq
+  ensure_json_file "$path"
+  mode="$(stat -c '%a' "$path" 2>/dev/null || printf 600)"
+  tmp="$(mktemp "${path}.tmp.XXXXXX")"
+  if ! gojq "$@" "$filter" "$path" >"$tmp"; then
+    rm -f "$tmp"
+    die "failed to update $path"
+  fi
+  chmod "$mode" "$tmp"
+  mv "$tmp" "$path"
+}
+
+enable_native() {
+  local agent="$1" server="$2"
+  case "$agent:$server" in
+    codex:serena)
+      ensure_runtime codex
+      codex mcp remove serena >/dev/null 2>&1 || true
+      codex mcp add serena -- \
+        serena start-mcp-server --project-from-cwd --context=codex
+      ;;
+    codex:context-mode)
+      ensure_runtime codex
+      codex mcp remove context-mode >/dev/null 2>&1 || true
+      codex mcp add context-mode --env CONTEXT_MODE_PLATFORM=codex -- context-mode
+      ;;
+    claude:serena)
+      ensure_runtime claude
+      claude mcp remove serena --scope user >/dev/null 2>&1 || true
+      claude mcp add --transport stdio --scope user serena -- \
+        serena start-mcp-server --context=claude-code --project-from-cwd
+      ;;
+    claude:context-mode)
+      ensure_runtime claude
+      claude mcp remove context-mode --scope user >/dev/null 2>&1 || true
+      claude mcp add --transport stdio --scope user \
+        context-mode -e CONTEXT_MODE_PLATFORM=claude-code -- context-mode
+      ;;
+  esac
+}
+
+enable_json() {
+  local agent="$1" server="$2" path
+  case "$agent:$server" in
+    agy:serena)
+      path="$HOME/.gemini/config/mcp_config.json"
+      json_update "$path" \
+        '.mcpServers = (.mcpServers // {}) |
+         .mcpServers[$name] = {
+           command: "serena",
+           args: ["start-mcp-server", "--context=antigravity"]
+         }' --arg name "$server"
+      ;;
+    agy:context-mode)
+      path="$HOME/.gemini/config/mcp_config.json"
+      json_update "$path" \
+        '.mcpServers = (.mcpServers // {}) |
+         .mcpServers[$name] = {
+           command: "context-mode",
+           env: {CONTEXT_MODE_PLATFORM: "antigravity-cli"}
+         }' --arg name "$server"
+      ;;
+    opencode:serena)
+      path="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+      json_update "$path" \
+        '.mcp = (.mcp // {}) |
+         .mcp[$name] = {
+           type: "local",
+           command: [
+             "serena", "start-mcp-server", "--context=ide", "--project-from-cwd"
+           ],
+           enabled: true
+         }' --arg name "$server"
+      ;;
+    opencode:context-mode)
+      path="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+      json_update "$path" \
+        '.mcp = (.mcp // {}) |
+         .mcp[$name] = {
+           type: "local",
+           command: ["context-mode"],
+           environment: {CONTEXT_MODE_PLATFORM: "opencode"},
+           enabled: true
+         }' --arg name "$server"
+      ;;
+    omp:serena)
+      path="$HOME/.omp/agent/mcp.json"
+      json_update "$path" \
+        '.["$schema"] = (
+           .["$schema"] //
+           "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json"
+         ) |
+         .mcpServers = (.mcpServers // {}) |
+         .disabledServers = ((.disabledServers // []) - [$name]) |
+         .mcpServers[$name] = {
+           type: "stdio",
+           command: "serena",
+           args: ["start-mcp-server", "--context=ide", "--project-from-cwd"],
+           enabled: true
+         }' --arg name "$server"
+      ;;
+    omp:context-mode)
+      path="$HOME/.omp/agent/mcp.json"
+      json_update "$path" \
+        '.["$schema"] = (
+           .["$schema"] //
+           "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json"
+         ) |
+         .mcpServers = (.mcpServers // {}) |
+         .disabledServers = ((.disabledServers // []) - [$name]) |
+         .mcpServers[$name] = {
+           type: "stdio",
+           command: "context-mode",
+           env: {CONTEXT_MODE_PLATFORM: "omp"},
+           enabled: true
+         }' --arg name "$server"
+      ;;
+  esac
+}
+
+disable_server() {
+  local agent="$1" server="$2" path
+  case "$agent" in
+    codex)
+      ensure_runtime codex
+      codex mcp remove "$server" >/dev/null 2>&1 || true
+      ;;
+    claude)
+      ensure_runtime claude
+      claude mcp remove "$server" --scope user >/dev/null 2>&1 || true
+      ;;
+    agy)
+      path="$HOME/.gemini/config/mcp_config.json"
+      [[ -f "$path" ]] ||
+        return 0
+      json_update "$path" \
+        'if .mcpServers then del(.mcpServers[$name]) else . end' \
+        --arg name "$server"
+      ;;
+    opencode)
+      path="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+      [[ -f "$path" ]] ||
+        return 0
+      json_update "$path" \
+        'if .mcp[$name] then .mcp[$name].enabled = false else . end' \
+        --arg name "$server"
+      ;;
+    omp)
+      path="$HOME/.omp/agent/mcp.json"
+      [[ -f "$path" ]] ||
+        return 0
+      json_update "$path" \
+        'if .mcpServers[$name] then
+           .mcpServers[$name].enabled = false |
+           .disabledServers = (((.disabledServers // []) + [$name]) | unique)
+         else . end' --arg name "$server"
+      ;;
+  esac
+}
+
+server_enabled() {
+  local agent="$1" server="$2" path
+  case "$agent" in
+    codex)
+      command -v codex >/dev/null 2>&1 &&
+        codex mcp get "$server" >/dev/null 2>&1
+      ;;
+    claude)
+      command -v claude >/dev/null 2>&1 &&
+        claude mcp get "$server" >/dev/null 2>&1
+      ;;
+    agy)
+      path="$HOME/.gemini/config/mcp_config.json"
+      [[ -f "$path" ]] &&
+        gojq -e --arg name "$server" '.mcpServers[$name] != null' \
+          "$path" >/dev/null 2>&1
+      ;;
+    opencode)
+      path="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/opencode.json"
+      [[ -f "$path" ]] &&
+        gojq -e --arg name "$server" \
+          '.mcp[$name] != null and (.mcp[$name].enabled != false)' \
+          "$path" >/dev/null 2>&1
+      ;;
+    omp)
+      path="$HOME/.omp/agent/mcp.json"
+      [[ -f "$path" ]] &&
+        gojq -e --arg name "$server" \
+          '.mcpServers[$name] != null and
+           (.mcpServers[$name].enabled != false) and
+           (((.disabledServers // []) | index($name)) == null)' \
+          "$path" >/dev/null 2>&1
+      ;;
+  esac
+}
+
+action="${1:-status}"
+case "$action" in
+  on) action=enable ;;
+  off) action=disable ;;
+  list) action=status ;;
+esac
+contains "$action" enable disable status || {
+  usage >&2
+  exit 2
+}
+shift || true
+
+server_arg=all
+if (($#)) && [[ "$1" != -* ]]; then
+  server_arg="$1"
+  shift
+elif [[ "$action" != status ]]; then
+  die "$action requires serena, context-mode, or all"
+fi
+contains "$server_arg" serena context-mode all || {
+  usage >&2
+  exit 2
+}
+
+agent_arg=all
+while (($#)); do
+  case "$1" in
+    --agent | -a)
+      [[ $# -ge 2 ]] || die "$1 requires an agent list"
+      agent_arg="$2"
+      shift 2
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+if [[ "$server_arg" == all ]]; then
+  servers=("${ALL_SERVERS[@]}")
+else
+  servers=("$server_arg")
+fi
+
+if [[ "$agent_arg" == all ]]; then
+  agents=("${ALL_AGENTS[@]}")
+else
+  IFS=, read -r -a agents <<<"$agent_arg"
+  for agent in "${agents[@]}"; do
+    contains "$agent" "${ALL_AGENTS[@]}" || die "unsupported agent: $agent"
+  done
+fi
+
+if [[ "$action" == enable ]]; then
+  for server in "${servers[@]}"; do
+    ensure_runtime "$server"
+  done
+fi
+
+for server in "${servers[@]}"; do
+  for agent in "${agents[@]}"; do
+    case "$action" in
+      enable)
+        case "$agent" in
+          codex | claude) enable_native "$agent" "$server" ;;
+          *) enable_json "$agent" "$server" ;;
+        esac
+        printf 'enabled  %-12s %s\n' "$server" "$agent"
+        ;;
+      disable)
+        disable_server "$agent" "$server"
+        printf 'disabled %-12s %s\n' "$server" "$agent"
+        ;;
+      status)
+        state=disabled
+        server_enabled "$agent" "$server" && state=enabled
+        printf '%-12s %-12s %s\n' "$server" "$agent" "$state"
+        ;;
+    esac
+  done
+done

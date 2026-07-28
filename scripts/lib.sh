@@ -190,6 +190,28 @@ install_if_missing() {
   fi
 }
 
+retry_command() {
+  local label="$1" attempts="$2" delay="$3"
+  shift 3
+  local attempt status
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if "$@"; then
+      return 0
+    else
+      status=$?
+    fi
+
+    if ((attempt == attempts)); then
+      log_error "$label failed after $attempts attempts"
+      return "$status"
+    fi
+
+    log_warn "$label failed (attempt $attempt/$attempts); retrying in ${delay}s"
+    sleep "$delay"
+  done
+}
+
 download() {
   local url="$1" dest="$2"
   mkdir -p "$(dirname "$dest")"
@@ -523,7 +545,7 @@ activate_node_paths() {
 
 npm_install_global() {
   local package="$1" version="$2" binary="$3" allow_scripts="${4:-}"
-  local prefix
+  local prefix package_manifest installed_version=""
   local -a npm_args=(
     install --global --prefix
     "$(npm_global_prefix)"
@@ -531,8 +553,20 @@ npm_install_global() {
     --no-fund
   )
   prefix="$(npm_global_prefix)"
+  package_manifest="$prefix/lib/node_modules/$package/package.json"
   activate_node_paths
-  if command_exists "$binary" && version_ge "$($binary --version 2>/dev/null || true)" "$version"; then
+  if [[ -f "$package_manifest" ]]; then
+    if command_exists gojq; then
+      installed_version="$(gojq -r '.version // ""' "$package_manifest" 2>/dev/null || true)"
+    elif command_exists node; then
+      installed_version="$(node -e \
+        'process.stdout.write(require(process.argv[1]).version || "")' \
+        "$package_manifest" 2>/dev/null || true)"
+    fi
+  fi
+  [[ -n "$installed_version" ]] ||
+    installed_version="$($binary --version 2>/dev/null || true)"
+  if command_exists "$binary" && version_ge "$installed_version" "$version"; then
     [[ -x "$prefix/bin/$binary" ]] &&
       managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary" "$binary" "$version"
     log_skip "$binary $version already installed or newer"

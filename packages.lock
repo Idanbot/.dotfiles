@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 33200a61e5a17ca9f363bae6740403a294ade66ed333e978b04cf6d0324098c2
-  metadata: e0389b6e5f2a60c7632d538d70cbe506fda04626152aae93f43a76fca4aee9c5
+  packages: 16979eca51c294bd1e934161bea104b211368122061a4e22d659eb377cffdc8c
+  metadata: 1f16cab819023596354ce195e1f04f4f4c15dbc50fd8236ef736ac135e41d608
 
 tools:
   - section: bootstrap
@@ -530,6 +530,22 @@ tools:
     sha256_amd64: c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
     sha256_arm64: 6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
     integrity: pinned-sha256
+  - section: ai_tools
+    name: serena
+    version: 1.6.1
+    source: uv
+    owner: uv
+    package: serena-agent
+    binary: serena
+    integrity: pypi
+  - section: ai_tools
+    name: context_mode
+    version: 1.0.169
+    source: npm
+    owner: npm
+    package: context-mode
+    binary: context-mode
+    integrity: npm-registry
   - section: media
     name: yt_dlp
     version: 2026.07.04

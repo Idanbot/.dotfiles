@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Load SSH private keys into the per-user agent without persisting passphrases.
+
+set -euo pipefail
+
+DEFAULT_KEY="${HOME}/.ssh/id_ed25519"
+LIFETIME="${SSH_KEY_LIFETIME:-8h}"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ssh-key-load [--key PATH] [--lifetime TIME]
+  ssh-key-load --list
+  ssh-key-load --clear
+
+The passphrase is cached only in ssh-agent memory. It is never written to disk.
+EOF
+}
+
+ensure_agent() {
+  local managed_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket" status
+
+  if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+    status=0
+    ssh-add -l >/dev/null 2>&1 || status=$?
+    # ssh-add returns 1 when the agent is reachable but has no identities.
+    ((status <= 1)) && return 0
+  fi
+
+  if command -v systemctl >/dev/null 2>&1 &&
+    systemctl --user start ssh-agent.service >/dev/null 2>&1 &&
+    [[ -S "$managed_socket" ]]; then
+    export SSH_AUTH_SOCK="$managed_socket"
+    return 0
+  fi
+
+  printf 'No usable SSH agent is available. Start ssh-agent.service or provide SSH_AUTH_SOCK.\n' >&2
+  return 1
+}
+
+action=load
+key="$DEFAULT_KEY"
+while (($#)); do
+  case "$1" in
+    --key)
+      [[ $# -ge 2 ]] || {
+        printf '%s\n' '--key requires a path' >&2
+        exit 2
+      }
+      key="$2"
+      shift 2
+      ;;
+    --lifetime)
+      [[ $# -ge 2 ]] || {
+        printf '%s\n' '--lifetime requires a duration' >&2
+        exit 2
+      }
+      LIFETIME="$2"
+      shift 2
+      ;;
+    --list | -l)
+      action=list
+      shift
+      ;;
+    --clear)
+      action=clear
+      shift
+      ;;
+    --help | -h)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown argument: %s\n' "$1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+ensure_agent
+
+case "$action" in
+  list)
+    ssh-add -l
+    ;;
+  clear)
+    ssh-add -D
+    ;;
+  load)
+    [[ -f "$key" ]] || {
+      printf 'SSH private key not found: %s\n' "$key" >&2
+      printf 'Create one with: ssh-keygen -t ed25519 -a 100 -f %s\n' "$key" >&2
+      exit 1
+    }
+    ssh-add -t "$LIFETIME" "$key"
+    ;;
+esac
