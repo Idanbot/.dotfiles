@@ -124,12 +124,12 @@ style = "fg:peach bg:mantle"
 format = '[ $symbol ($version) ]($style)'
 
 [terraform]
-symbol = ""
+symbol = "󱁢"
 style = "fg:pink bg:mantle"
 format = '[($workspace) $symbol ($version) ]($style)'
 
 [docker_context]
-symbol = ""
+symbol = ""
 style = "fg:blue bg:mantle"
 format = '[ $symbol $context ]($style)'
 
@@ -137,7 +137,7 @@ format = '[ $symbol $context ]($style)'
 disabled = false
 detect_files = []
 detect_folders = []
-symbol = " "
+symbol = "󱃾"
 style = "fg:sapphire bg:mantle"
 format = '[ $symbol$context( \($namespace\)) ]($style)'
 
@@ -151,7 +151,7 @@ context_pattern = "arn:aws:eks:.*:cluster/(?P<clustername>.*)"
 context_alias = "$clustername"
 
 [aws]
-symbol = ""
+symbol = ""
 style = "fg:peach bg:mantle"
 format = '[ $symbol $profile( $region) ]($style)'
 
@@ -166,7 +166,7 @@ format = '[ $symbol$output ]($style)'
 us-east-1 = "us-east-1"
 
 [gcloud]
-symbol = " "
+symbol = ""
 style = "fg:sky bg:mantle"
 format = '([ $symbol $project( $region) ]($style))'
 
@@ -184,7 +184,7 @@ format = '([ $symbol $project( $region) ]($style))'
 
 [azure]
 disabled = false
-symbol = ""
+symbol = "󰠅"
 style = "fg:blue bg:mantle"
 format = '[ $symbol$subscription ]($style)'
 

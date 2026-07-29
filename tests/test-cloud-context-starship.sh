@@ -156,11 +156,15 @@ load_context() {
 load_context --load work
 [[ "$(render_module kubernetes)" == *dev-cluster* ]]
 [[ "$(render_module kubernetes)" == *agents* ]]
+[[ "$(render_module kubernetes)" == *󱃾* ]]
 [[ "$(render_module gcloud)" == *project-123* ]]
+[[ "$(render_module gcloud)" == ** ]]
 [[ "$(render_module aws)" == *work* ]]
 [[ "$(render_module aws)" == *eu-west-1* ]]
+[[ "$(render_module aws)" == ** ]]
 [[ "$(render_module custom.aws_account)" == *123456789012* ]]
 [[ "$(render_module azure)" == *Engineering* ]]
+[[ "$(render_module azure)" == *󰠅* ]]
 
 load_context --clear
 [[ -z "$(render_module kubernetes)" ]]

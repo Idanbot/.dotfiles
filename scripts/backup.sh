@@ -86,8 +86,6 @@ create_backup() {
       type=directory
       mode="$(stat -c '%a' "$target")"
       hash='-'
-      mkdir -p "$dir/files/$(dirname "$rel")"
-      cp -a "$target" "$dir/files/$rel"
     else
       type=absent
       mode='-'
@@ -156,11 +154,21 @@ restore_backup() {
     }
     target="$HOME/$rel"
     source="$dir/files/$rel"
-    rm -rf -- "$target"
     if [[ "$type" == absent ]]; then
+      rm -rf -- "$target"
       printf 'removed newly-created ~/%s\n' "$rel"
       continue
     fi
+    if [[ "$type" == directory ]]; then
+      if [[ -e "$target" && ! -d "$target" ]] || [[ -L "$target" ]]; then
+        rm -rf -- "$target"
+      fi
+      mkdir -p "$target"
+      chmod "$mode" "$target"
+      printf 'restored directory metadata ~/%s\n' "$rel"
+      continue
+    fi
+    rm -rf -- "$target"
     mkdir -p "$(dirname "$target")"
     cp -a "$source" "$target"
     if [[ "$type" == file ]]; then
