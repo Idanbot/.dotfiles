@@ -91,6 +91,35 @@ log_step() {
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 is_installed() { command_exists "$1"; }
+dpkg_package_installed() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -Fq 'install ok installed'
+}
+
+docker_apt_packages() {
+  local has_ce=false
+  if dpkg_package_installed containerd.io ||
+    dpkg_package_installed docker-ce ||
+    dpkg_package_installed docker-ce-cli; then
+    has_ce=true
+  fi
+
+  if is_installed docker; then
+    if docker compose version >/dev/null 2>&1; then
+      return 0
+    fi
+    if [[ "$has_ce" == true ]]; then
+      printf '%s\n' docker-compose-plugin
+    else
+      printf '%s\n' docker-compose-v2
+    fi
+  elif [[ "$has_ce" == true ]]; then
+    printf '%s\n' \
+      docker-ce docker-ce-cli containerd.io \
+      docker-buildx-plugin docker-compose-plugin
+  else
+    printf '%s\n' docker.io docker-compose-v2
+  fi
+}
 
 cleanup_sudo_keepalive() {
   if [[ -n "${_SUDO_KEEPALIVE_PID:-}" ]]; then
@@ -132,7 +161,7 @@ apt_update() {
 apt_install() {
   local packages=("$@") to_install=() pkg
   for pkg in "${packages[@]}"; do
-    if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -Fq 'install ok installed'; then
+    if dpkg_package_installed "$pkg"; then
       log_skip "$pkg (apt) already installed"
     else
       to_install+=("$pkg")

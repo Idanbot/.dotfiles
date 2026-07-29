@@ -306,6 +306,12 @@ cloud:
     repo: ahmetb/kubectx
     binary: kubectx
     integrity: upstream-checksum
+  kubens:
+    source: github
+    owner: dotfiles-binary
+    repo: ahmetb/kubectx
+    binary: kubens
+    integrity: upstream-checksum
 
 database:
   usql:

@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 16979eca51c294bd1e934161bea104b211368122061a4e22d659eb377cffdc8c
-  metadata: 1f16cab819023596354ce195e1f04f4f4c15dbc50fd8236ef736ac135e41d608
+  packages: 8353ae710c6d719894b3b41c90676b45ecd5fb11b2217b1a6bdeaab6e83d8c6c
+  metadata: 954f3bcc49521b0295f65dd088e4d4c2b3082a891383dfee5aa2618e4e4cd97f
 
 tools:
   - section: bootstrap
@@ -424,6 +424,14 @@ tools:
     owner: dotfiles-binary
     repo: ahmetb/kubectx
     binary: kubectx
+    integrity: upstream-checksum
+  - section: cloud
+    name: kubens
+    version: 0.11.0
+    source: github
+    owner: dotfiles-binary
+    repo: ahmetb/kubectx
+    binary: kubens
     integrity: upstream-checksum
   - section: terminal
     name: kitty

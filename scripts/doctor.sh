@@ -237,7 +237,7 @@ if selected cloud; then
   doctor_step "Cloud"
   for command in \
     docker kubectl helm terraform ansible k9s aws gcloud az cloud-context \
-    s5cmd kcat stern helmfile kubectx pgloader cloudflare-ssh; do
+    s5cmd kcat stern helmfile kubectx kubens pgloader cloudflare-ssh; do
     check_command "$command" true
   done
 fi

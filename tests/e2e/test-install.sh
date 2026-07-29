@@ -135,6 +135,7 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   assert_version_contains stern "$(manifest_version cloud stern)" stern --version
   assert_version_contains helmfile "$(manifest_version cloud helmfile)" helmfile --version
   assert_version_contains kubectx "$(manifest_version cloud kubectx)" kubectx --version
+  assert_version_contains kubens "$(manifest_version cloud kubens)" kubens --version
   pgloader --version >/dev/null
   command -v gcloud >/dev/null
   command -v az >/dev/null

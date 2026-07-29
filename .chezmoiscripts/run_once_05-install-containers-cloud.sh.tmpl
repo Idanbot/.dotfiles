@@ -29,9 +29,21 @@ case "$ARCH" in
     ;;
 esac
 
-# Ubuntu's signed packages are the sole Docker owner. On WSL, Docker Desktop
-# supplies the daemon; on native Ubuntu docker.io supplies both CLI and daemon.
-apt_install docker.io docker-compose-v2
+# Preserve the installed Docker package family. Docker CE's containerd.io
+# conflicts with Ubuntu's containerd dependency from docker.io.
+mapfile -t DOCKER_PACKAGES < <(docker_apt_packages)
+if [[ ${#DOCKER_PACKAGES[@]} -gt 0 ]]; then
+  if dpkg_package_installed containerd.io ||
+    dpkg_package_installed docker-ce ||
+    dpkg_package_installed docker-ce-cli; then
+    log_info "Docker CE package ownership detected"
+  else
+    log_info "Ubuntu Docker package ownership selected"
+  fi
+  apt_install "${DOCKER_PACKAGES[@]}"
+else
+  log_skip "Docker CLI and Compose plugin already installed"
+fi
 if is_installed docker && [[ ! -f /usr/share/zsh/vendor-completions/_docker ]]; then
   sudo mkdir -p /usr/share/zsh/vendor-completions
   docker completion zsh | sudo tee /usr/share/zsh/vendor-completions/_docker >/dev/null
@@ -198,6 +210,13 @@ install_github_archive \
   "kubectx_v{version}_linux_${KUBECTX_ARCH}.tar.gz" kubectx \
   "https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt" \
   'kubectx --version'
+
+KUBENS_VERSION="$(package_version cloud kubens 0.11.0)"
+install_github_archive \
+  kubens ahmetb/kubectx "v${KUBENS_VERSION#v}" \
+  "kubens_v{version}_linux_${KUBECTX_ARCH}.tar.gz" kubens \
+  "https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt" \
+  'kubens --version'
 
 USQL_SHA="$(package_metadata database usql "sha256_$ARCH")"
 USQL_VERSION="$(package_version database usql 0.21.4)"

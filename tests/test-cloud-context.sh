@@ -24,8 +24,9 @@ make_mock() {
 
 make_mock kubectl '
 case "$*" in
-  "config current-context") printf "dev-cluster\n" ;;
-  "config get-contexts dev-cluster -o name") printf "dev-cluster\n" ;;
+  "config current-context") printf "lab\n" ;;
+  "config get-contexts lab -o name") printf "lab\n" ;;
+  "config view --minify --output jsonpath={..namespace}") printf "team-a\n" ;;
 esac'
 make_mock gcloud '
 case "$*" in
@@ -57,7 +58,7 @@ SCRIPT="$DOTFILES_DIR/dot_local/bin/executable_cloud-context"
 "$SCRIPT" --save workstation >/dev/null
 PROFILE="$HOME/.config/dotfiles/cloud-contexts/workstation.tsv"
 [[ -f "$PROFILE" && "$(stat -c '%a' "$PROFILE")" == 600 ]]
-grep -Fq $'kubectl_context\tdev-cluster' "$PROFILE"
+grep -Fq $'kubectl_context\tlab' "$PROFILE"
 grep -Fq $'gcloud_project\tproject-123' "$PROFILE"
 grep -Fq $'aws_profile\twork' "$PROFILE"
 grep -Fq $'azure_subscription\t00000000-0000-0000-0000-000000000001' "$PROFILE"
@@ -65,7 +66,7 @@ grep -Fq $'azure_subscription\t00000000-0000-0000-0000-000000000001' "$PROFILE"
 
 : >"$CALLS"
 "$SCRIPT" --load workstation >/dev/null
-grep -Fq $'kubectl\tconfig use-context dev-cluster' "$CALLS"
+grep -Fq $'kubectl\tconfig use-context lab' "$CALLS"
 grep -Fq $'gcloud\tconfig configurations activate work --quiet' "$CALLS"
 grep -Fq $'gcloud\tconfig set project project-123 --quiet' "$CALLS"
 grep -Fq $'az\taccount set --subscription 00000000-0000-0000-0000-000000000001' "$CALLS"
@@ -79,6 +80,16 @@ grep -Fq $'az\taccount clear' "$CALLS"
 grep -Fq 'unset AWS_PROFILE' "$HOME/.local/state/dotfiles/cloud-context.env"
 
 [[ "$("$SCRIPT" prompt aws)" == 123456789012 ]]
+[[ "$("$SCRIPT" prompt kubectl)" == 'lab (team-a)' ]]
+long_context=organization-production-europe-west1-primary-cluster
+make_mock kubectl "
+case \"\$*\" in
+  \"config current-context\") printf '%s\\n' '$long_context' ;;
+esac"
+short_context="$("$SCRIPT" prompt kubectl)"
+[[ "${#short_context}" -le 28 ]]
+[[ "$short_context" == *...* ]]
+[[ "$short_context" != "$long_context" ]]
 [[ "$("$SCRIPT" --list)" == workstation ]]
 
 for provider in kubectl gcloud aws azure; do
@@ -107,7 +118,7 @@ rm -f "$XDG_STATE_HOME/dotfiles/cloud-context-aws.cache"
 
 cp "$PROFILE" "${PROFILE%/*}/missing.tsv"
 sed -i \
-  -e 's/dev-cluster/missing-cluster/' \
+  -e 's/\tlab$/\tmissing-cluster/' \
   -e 's/\twork$/\tmissing/' \
   -e 's/00000000-0000-0000-0000-000000000001/ffffffff-ffff-ffff-ffff-ffffffffffff/' \
   "${PROFILE%/*}/missing.tsv"
@@ -125,6 +136,7 @@ if PATH="$MOCK_BIN" "$SYSTEM_BASH" "$SCRIPT" --clear kubectl >/dev/null 2>&1; th
 fi
 
 grep -Fq '${custom.aws_account}' "$DOTFILES_DIR/dot_config/starship.toml"
+grep -Fq '${custom.kubernetes_context}' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq '$azure' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq 'command cloud-context "$@"' "$DOTFILES_DIR/dot_zshrc.tmpl"
 

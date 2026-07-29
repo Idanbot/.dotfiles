@@ -504,6 +504,33 @@ prompt_aws() {
   fi
 }
 
+shorten_prompt_label() {
+  local value="$1" max="${2:-28}" head tail
+  [[ "$max" =~ ^[0-9]+$ && "$max" -ge 16 ]] || max=28
+  if ((${#value} <= max)); then
+    printf '%s\n' "$value"
+    return
+  fi
+  head=$((max / 3))
+  tail=$((max - head - 3))
+  printf '%s...%s\n' "${value:0:head}" "${value: -tail}"
+}
+
+prompt_kubectl() {
+  local context namespace output
+  context="$(clean "$(kubectl_context)")"
+  [[ -n "$context" ]] || return 1
+  output="$(shorten_prompt_label "$context" "${CLOUD_CONTEXT_MAX_LENGTH:-28}")"
+  namespace="$(
+    kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null || true
+  )"
+  if [[ -n "$namespace" && "$namespace" != default ]]; then
+    printf '%s (%s)\n' "$output" "$(clean "$namespace")"
+  else
+    printf '%s\n' "$output"
+  fi
+}
+
 case "${1:---status}" in
   --status | status) show_status ;;
   -s | --save)
@@ -529,8 +556,11 @@ case "${1:---status}" in
       sed 's/\.tsv$//' | sort
     ;;
   prompt)
-    [[ "${2:-}" == aws ]] || exit 2
-    prompt_aws
+    case "${2:-}" in
+      aws) prompt_aws ;;
+      kubectl | kube) prompt_kubectl ;;
+      *) exit 2 ;;
+    esac
     ;;
   -h | --help | help) usage ;;
   *)

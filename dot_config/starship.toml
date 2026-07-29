@@ -25,7 +25,7 @@ $rust\
 $java\
 $terraform\
 $docker_context\
-$kubernetes\
+${custom.kubernetes_context}\
 $aws\
 ${custom.aws_account}\
 $gcloud\
@@ -133,22 +133,12 @@ symbol = ""
 style = "fg:blue bg:mantle"
 format = '[ $symbol $context ]($style)'
 
-[kubernetes]
-disabled = false
-detect_files = []
-detect_folders = []
+[custom.kubernetes_context]
+command = "cloud-context prompt kubectl"
+when = "cloud-context prompt kubectl >/dev/null 2>&1"
 symbol = "󱃾"
 style = "fg:sapphire bg:mantle"
-format = '[ $symbol$context( \($namespace\)) ]($style)'
-
-[[kubernetes.contexts]]
-context_pattern = "^(x|minikube|docker-desktop)$"
-context_alias = ""
-symbol = ""
-
-[[kubernetes.contexts]]
-context_pattern = "arn:aws:eks:.*:cluster/(?P<clustername>.*)"
-context_alias = "$clustername"
+format = '[ $symbol $output ]($style)'
 
 [aws]
 symbol = ""

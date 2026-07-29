@@ -82,7 +82,7 @@ expert mode and does not add dependencies.
 The common terminal baseline includes `jq`, `gojq`, `pigz`, `zstd`, `curlie`,
 `bat`, and `eza`. Enhanced tools keep their own command names: standard
 commands such as `cat` and `ls` are not replaced by aliases. The cloud profile
-adds `s5cmd`, `kcat`, `stern`, `helmfile`, and `kubectx`; database utilities
+adds `s5cmd`, `kcat`, `stern`, `helmfile`, `kubectx`, and `kubens`; database utilities
 include `usql`, `iredis`, and `pgloader`.
 
 ## Reliability Model
@@ -368,7 +368,7 @@ commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
 the repository; all upgrades remain explicit local review decisions. The report
 covers pinned GitHub/direct downloads including `s5cmd`, `stern`, `helmfile`,
-and `kubectx`, plus Serena, context-mode, npm packages, Rust, Python, Java,
+`kubectx`, and `kubens`, plus Serena, context-mode, npm packages, Rust, Python, Java,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.
@@ -420,7 +420,8 @@ unattended.
 
 Starship displays the active Kubernetes context/namespace, AWS profile and
 account ID, Google Cloud project, and Azure subscription. A provider segment is
-hidden when no corresponding context is active.
+hidden when no corresponding context is active. Kubernetes contexts longer
+than 28 characters retain recognizable leading and trailing text.
 
 `cloud-context` stores context identifiers only. It never copies credentials or
 tokens, and activates saved values through each provider's native CLI:

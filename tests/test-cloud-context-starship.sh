@@ -25,7 +25,7 @@ mkdir -p \
   "$MOCK_BIN" "$MOCK_STATE" "$HOME/.kube" \
   "$CLOUDSDK_CONFIG/configurations" "$HOME/.aws" "$HOME/.azure" \
   "$XDG_CONFIG_HOME/dotfiles/cloud-contexts"
-printf '%s\n' dev-cluster >"$MOCK_STATE/known-kube"
+printf '%s\n' lab >"$MOCK_STATE/known-kube"
 printf '%s\n' work >"$MOCK_STATE/known-gcloud"
 printf '%s\n' work >"$MOCK_STATE/known-aws"
 printf '%s\n' 00000000-0000-0000-0000-000000000001 >"$MOCK_STATE/known-azure"
@@ -42,21 +42,24 @@ case "$*" in
   "config current-context")
     awk '/^current-context:/ {gsub(/"/, "", $2); print $2}' "$KUBECONFIG"
     ;;
-  "config get-contexts dev-cluster -o name") printf 'dev-cluster\n' ;;
-  "config use-context dev-cluster")
+  "config get-contexts lab -o name") printf 'lab\n' ;;
+  "config use-context lab")
     cat >"$KUBECONFIG" <<'YAML'
 apiVersion: v1
-current-context: dev-cluster
+current-context: lab
 contexts:
-  - name: dev-cluster
+  - name: lab
     context:
-      cluster: dev-cluster
-      namespace: agents
+      cluster: lab
+      namespace: team-a
 clusters:
-  - name: dev-cluster
+  - name: lab
     cluster:
       server: https://example.invalid
 YAML
+    ;;
+  "config view --minify --output jsonpath={..namespace}")
+    awk '/namespace:/ {print $2; exit}' "$KUBECONFIG"
     ;;
   "config unset current-context")
     sed -i 's/^current-context:.*/current-context: ""/' "$KUBECONFIG"
@@ -120,7 +123,7 @@ export PATH="$MOCK_BIN:$PATH"
 
 PROFILE="$XDG_CONFIG_HOME/dotfiles/cloud-contexts/work.tsv"
 cat >"$PROFILE" <<'EOF'
-kubectl_context	dev-cluster
+kubectl_context	lab
 gcloud_configuration	work
 gcloud_project	project-123
 aws_profile	work
@@ -147,16 +150,15 @@ load_context() {
 }
 
 [[ "$(starship prompt --path "$TMP_ROOT" --status 0 --cmd-duration 0)" != *".aws_account"* ]]
-[[ -z "$(render_module kubernetes)" ]]
+[[ -z "$(render_module custom.kubernetes_context)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module custom.aws_account)" ]]
 [[ -z "$(render_module azure)" ]]
 
 load_context --load work
-[[ "$(render_module kubernetes)" == *dev-cluster* ]]
-[[ "$(render_module kubernetes)" == *agents* ]]
-[[ "$(render_module kubernetes)" == *󱃾* ]]
+[[ "$(render_module custom.kubernetes_context)" == *"󱃾 lab"* ]]
+[[ "$(render_module custom.kubernetes_context)" == *team-a* ]]
 [[ "$(render_module gcloud)" == *project-123* ]]
 [[ "$(render_module gcloud)" == ** ]]
 [[ "$(render_module aws)" == *work* ]]
@@ -166,16 +168,23 @@ load_context --load work
 [[ "$(render_module azure)" == *Engineering* ]]
 [[ "$(render_module azure)" == *󰠅* ]]
 
+long_context=organization-production-europe-west1-primary-cluster
+sed -i "s/current-context: lab/current-context: $long_context/" "$KUBECONFIG"
+kube_prompt="$(render_module custom.kubernetes_context)"
+[[ "$kube_prompt" == *"󱃾 "*"..."* ]]
+[[ "$kube_prompt" != *"$long_context"* ]]
+sed -i "s/current-context: $long_context/current-context: lab/" "$KUBECONFIG"
+
 load_context --clear
-[[ -z "$(render_module kubernetes)" ]]
+[[ -z "$(render_module custom.kubernetes_context)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module custom.aws_account)" ]]
 [[ -z "$(render_module azure)" ]]
 
 load_context --test all
-[[ "$(render_module kubernetes)" == *cloud-context-test* ]]
-[[ "$(render_module kubernetes)" == *test* ]]
+[[ "$(render_module custom.kubernetes_context)" == *cloud-context-test* ]]
+[[ "$(render_module custom.kubernetes_context)" == *test* ]]
 [[ "$(render_module gcloud)" == *cloud-context-test* ]]
 [[ "$(render_module aws)" == *cloud-context-test* ]]
 [[ "$(render_module aws)" == *us-east-1* ]]
@@ -183,7 +192,7 @@ load_context --test all
 [[ "$(render_module azure)" == *"Cloud Context Test"* ]]
 
 load_context --test-clear
-[[ -z "$(render_module kubernetes)" ]]
+[[ -z "$(render_module custom.kubernetes_context)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module custom.aws_account)" ]]

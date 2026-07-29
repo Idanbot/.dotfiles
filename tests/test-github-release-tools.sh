@@ -101,6 +101,12 @@ install_github_archive kubectx ahmetb/kubectx "v$KUBECTX_VERSION" \
   'https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt' \
   'kubectx --version'
 
+KUBENS_VERSION="$(package_version cloud kubens 0.11.0)"
+install_github_archive kubens ahmetb/kubectx "v$KUBENS_VERSION" \
+  "kubens_v{version}_linux_${RELEASE_ARCH}.tar.gz" kubens \
+  'https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt' \
+  'kubens --version'
+
 STERN_VERSION="$(package_version cloud stern 1.34.0)"
 install_github_archive stern stern/stern "v$STERN_VERSION" \
   "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
@@ -116,7 +122,7 @@ install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
 
 for binary in \
-  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx stern \
+  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
   omp herdr; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done

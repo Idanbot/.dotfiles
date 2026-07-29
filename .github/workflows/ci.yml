@@ -95,6 +95,7 @@ jobs:
           tests/test-kitty.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"
           tests/test-cloud-context-starship.sh "$PWD"
+          tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"
@@ -338,6 +339,7 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
+                test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
                 /dotfiles/tests/$test /dotfiles
