@@ -174,9 +174,9 @@ format = '([ $symbol $project( $region) ]($style))'
 
 [azure]
 disabled = false
-symbol = "󰠅 "
+symbol = "󰠅"
 style = "fg:blue bg:mantle"
-format = '[ $symbol$subscription ]($style)'
+format = '[ $symbol $subscription ]($style)'
 
 [status]
 disabled = false

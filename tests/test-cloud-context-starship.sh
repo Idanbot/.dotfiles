@@ -189,7 +189,7 @@ load_context --load work
 [[ "$(render_module aws)" == ** ]]
 [[ "$(render_module custom.aws_account)" == *123456789012* ]]
 [[ "$(render_module azure)" == *Engineering* ]]
-[[ "$(render_module azure)" == *󰠅* ]]
+[[ "$(render_module azure)" == *"󰠅 Engineering"* ]]
 
 FZF_PICK=project-456 load_context --select gcloud
 [[ "$(render_module gcloud)" == *project-456* ]]
