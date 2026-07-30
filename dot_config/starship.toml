@@ -136,9 +136,9 @@ format = '[ $symbol $context ]($style)'
 [custom.kubernetes_context]
 command = "cloud-context prompt kubectl"
 when = "cloud-context prompt kubectl >/dev/null 2>&1"
-symbol = "󱃾"
+symbol = "󱃾 "
 style = "fg:sapphire bg:mantle"
-format = '[ $symbol $output ]($style)'
+format = '[ $symbol$output ]($style)'
 
 [aws]
 symbol = ""
@@ -174,7 +174,7 @@ format = '([ $symbol $project( $region) ]($style))'
 
 [azure]
 disabled = false
-symbol = "󰠅"
+symbol = "󰠅 "
 style = "fg:blue bg:mantle"
 format = '[ $symbol$subscription ]($style)'
 
