@@ -141,9 +141,9 @@ style = "fg:sapphire bg:mantle"
 format = '[ $symbol$output ]($style)'
 
 [aws]
-symbol = ""
+symbol = " "
 style = "fg:peach bg:mantle"
-format = '[ $symbol $profile( $region) ]($style)'
+format = '[ $symbol$profile( $region) ]($style)'
 
 [custom.aws_account]
 command = "cloud-context prompt aws"
