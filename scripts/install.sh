@@ -571,6 +571,7 @@ export DOTFILES_EVENT_LOG="$EVENT_LOG"
 setup_run_state() {
   umask 077
   mkdir -p "$CHECKPOINT_DIR" "$LOG_DIR"
+  chmod 700 "$STATE_ROOT" "$STATE_ROOT/runs" "$RUN_DIR" "$CHECKPOINT_DIR" "$LOG_DIR"
   printf '%s\n' "$DOTFILES_RUN_ID" >"$STATE_ROOT/runs/latest"
   printf '%s\n' "${PROFILE_NAME:-custom}" >"$RUN_DIR/profile"
   printf '%s\n' "$(join_by_comma "${SELECTED_SECTIONS[@]}")" >"$RUN_DIR/sections"

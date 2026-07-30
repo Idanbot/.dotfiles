@@ -56,6 +56,60 @@ if "$DOTFILES_DIR/scripts/doctor.sh" --sections detect,unknown --quick >/dev/nul
   exit 1
 fi
 
+cat >"$TMP_ROOT/bin/fc-list" <<'EOF'
+#!/usr/bin/env bash
+printf 'FiraMono Nerd Font\n'
+for ((i = 0; i < 10000; i++)); do
+  printf 'Unrelated Font %s\n' "$i"
+done
+EOF
+chmod +x "$TMP_ROOT/bin/fc-list"
+chmod 755 "$TMP_ROOT/home/.local/state/dotfiles"
+registered_font_json="$(
+  HOME="$TMP_ROOT/home" \
+    DOTFILES_SOURCE_DIR="$DOTFILES_DIR" \
+    DOTFILES_STATE_DIR="$TMP_ROOT/home/.local/state/dotfiles" \
+    PATH="$TMP_ROOT/bin:$SYSTEM_PATH" \
+    "$DOTFILES_DIR/scripts/doctor.sh" --sections fonts --quick --json
+)"
+python3 -c '
+import json, sys
+report = json.load(sys.stdin)
+assert report["healthy"] is True
+assert any(
+    result["name"] == "nerd-font"
+    and result["state"] == "pass"
+    and "fontconfig" in result["detail"]
+    for result in report["results"]
+)
+' <<<"$registered_font_json"
+[[ "$(stat -c '%a' "$TMP_ROOT/home/.local/state/dotfiles")" == 700 ]]
+
+mkdir -p "$TMP_ROOT/home/.local/share/fonts/FiraMono"
+printf 'font fixture\n' \
+  >"$TMP_ROOT/home/.local/share/fonts/FiraMono/FiraMonoNerdFont-Regular.otf"
+cat >"$TMP_ROOT/bin/fc-list" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP_ROOT/bin/fc-list"
+font_json="$(
+  HOME="$TMP_ROOT/home" \
+    DOTFILES_SOURCE_DIR="$DOTFILES_DIR" \
+    DOTFILES_STATE_DIR="$TMP_ROOT/home/.local/state/dotfiles" \
+    PATH="$TMP_ROOT/bin:$SYSTEM_PATH" \
+    "$DOTFILES_DIR/scripts/doctor.sh" --sections fonts --quick --json
+)"
+python3 -c '
+import json, sys
+report = json.load(sys.stdin)
+assert report["healthy"] is True
+assert any(
+    result["name"] == "nerd-font" and result["state"] == "pass"
+    for result in report["results"]
+)
+' <<<"$font_json"
+
 printf 'broken\trow\n' >"$TMP_ROOT/home/.local/state/dotfiles/installed.tsv"
 if HOME="$TMP_ROOT/home" \
   DOTFILES_SOURCE_DIR="$DOTFILES_DIR" \

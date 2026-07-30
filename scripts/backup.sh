@@ -60,6 +60,7 @@ create_backup() {
   dir="$BACKUP_ROOT/$id"
   manifest="$dir/manifest.tsv"
   mkdir -p "$dir/files"
+  chmod 700 "$STATE_ROOT" "$BACKUP_ROOT" "$dir" "$dir/files"
   printf 'path\ttype\tmode\tsha256\n' >"$manifest"
 
   while IFS= read -r line; do

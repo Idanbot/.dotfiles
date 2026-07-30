@@ -22,6 +22,7 @@ printf 'MM .zshrc\nMM .config/example/value\n M .local\nMM .local/share/example/
 output="$($DOTFILES_DIR/scripts/backup.sh create --status-file "$status_file" --run-id test)"
 backup_id="$(sed -n 's/^backup_id=//p' <<<"$output")"
 [[ -n "$backup_id" ]]
+[[ "$(stat -c '%a' "$DOTFILES_STATE_DIR")" == 700 ]]
 
 printf 'changed\n' >"$HOME/.zshrc"
 printf 'changed nested\n' >"$HOME/.config/example/value"

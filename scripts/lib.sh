@@ -529,13 +529,33 @@ managed_state_root() {
   printf '%s\n' "${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
 }
 
+ensure_private_directory() {
+  local directory="$1"
+  umask 077
+  mkdir -p "$directory"
+  chmod 700 "$directory"
+}
+
+nerd_font_files_present() {
+  local name="$1" directory="${2:-$HOME/.local/share/fonts/$1}"
+  [[ -d "$directory" ]] || return 1
+  find "$directory" -maxdepth 1 -type f -size +0 \
+    \( -iname "${name}NerdFont*.otf" -o -iname "${name}NerdFont*.ttf" \) \
+    -print -quit 2>/dev/null | grep -q .
+}
+
+nerd_font_registered() {
+  local name="$1"
+  command_exists fc-list &&
+    fc-list 2>/dev/null | grep -Fi "${name} Nerd Font" >/dev/null
+}
+
 record_install() {
   local tool="$1" version="$2" owner="$3" target="$4"
   local ledger root
   root="$(managed_state_root)"
   ledger="$root/installed.tsv"
-  umask 077
-  mkdir -p "$root"
+  ensure_private_directory "$root"
   touch "$ledger"
   awk -F '\t' -v tool="$tool" -v target="$target" \
     '!( $1 == tool && $4 == target )' "$ledger" >"$ledger.tmp"

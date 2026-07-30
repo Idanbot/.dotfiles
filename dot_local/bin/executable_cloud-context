@@ -32,6 +32,11 @@ warn() { printf '[WARN] %s\n' "$*" >&2; }
 info() { printf '[INFO] %s\n' "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 clean() { tr '\t\r\n' '   ' <<<"${1:-}" | sed 's/[[:space:]]*$//'; }
+ensure_state_root() {
+  umask 077
+  mkdir -p "$STATE_ROOT"
+  chmod 700 "$STATE_ROOT"
+}
 
 normalize_provider() {
   case "${1:-all}" in
@@ -106,7 +111,7 @@ azure_value() {
 write_aws_env() {
   local profile="${1:-}" region="${2:-}"
   umask 077
-  mkdir -p "$STATE_ROOT"
+  ensure_state_root
   {
     if [[ -n "$profile" && "$profile" != default ]]; then
       printf 'export AWS_PROFILE=%q\n' "$profile"
@@ -400,7 +405,7 @@ write_test_environment() {
   local name
   local -a enabled
   umask 077
-  mkdir -p "$STATE_ROOT"
+  ensure_state_root
   shopt -s nullglob
   enabled=("$TEST_ROOT"/enabled-*)
   shopt -u nullglob
@@ -494,7 +499,7 @@ prompt_aws() {
   account="$(aws_account)"
   [[ "$account" =~ ^[0-9]{12}$ ]] || account=-
   umask 077
-  mkdir -p "$STATE_ROOT"
+  ensure_state_root
   printf '%s\t%s\t%s\n' "$now" "$profile" "$account" >"$AWS_CACHE"
   chmod 600 "$AWS_CACHE"
   if [[ "$account" != - ]]; then

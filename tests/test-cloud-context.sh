@@ -74,6 +74,7 @@ grep -Fq 'export AWS_PROFILE=work' "$HOME/.local/state/dotfiles/cloud-context.en
 
 : >"$CALLS"
 "$SCRIPT" --clear >/dev/null
+[[ "$(stat -c '%a' "$XDG_STATE_HOME/dotfiles")" == 700 ]]
 grep -Fq $'kubectl\tconfig unset current-context' "$CALLS"
 grep -Fq $'gcloud\tconfig unset project --quiet' "$CALLS"
 grep -Fq $'az\taccount clear' "$CALLS"

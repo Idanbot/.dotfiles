@@ -311,7 +311,16 @@ if selected media && is_native; then
 fi
 if selected fonts; then
   doctor_step "Fonts"
-  fc-list 2>/dev/null | grep -qi 'FiraMono Nerd' && result pass nerd-font "FiraMono detected" || result fail nerd-font "FiraMono Nerd Font missing"
+  FONT_NAME="$(package_version fonts nerd_font FiraMono)"
+  FONT_DIR="$HOME/.local/share/fonts/$FONT_NAME"
+  if nerd_font_registered "$FONT_NAME"; then
+    result pass nerd-font "$FONT_NAME detected by fontconfig"
+  elif nerd_font_files_present "$FONT_NAME" "$FONT_DIR"; then
+    result pass nerd-font "$FONT_NAME files installed at $FONT_DIR"
+  else
+    result fail nerd-font "$FONT_NAME Nerd Font missing" \
+      "rerun: $DOTFILES_SOURCE_DIR/scripts/run-section.sh fonts"
+  fi
 fi
 if selected desktop && is_native; then
   doctor_step "Desktop"
@@ -336,7 +345,7 @@ else
   result fail source-integrity "source is incomplete at $DOTFILES_SOURCE_DIR" \
     "repair with: dot sync --profile base"
 fi
-if mkdir -p "$STATE_ROOT" 2>/dev/null && [[ -w "$STATE_ROOT" ]]; then
+if ensure_private_directory "$STATE_ROOT" 2>/dev/null && [[ -w "$STATE_ROOT" ]]; then
   result pass state-directory "$STATE_ROOT is writable"
 else
   result fail state-directory "$STATE_ROOT is not writable" \

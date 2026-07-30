@@ -8,6 +8,8 @@ PASSES="${E2E_PASSES:-2}"
 ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}"
 STATE_DIR="$HOME/.local/state/dotfiles"
 mkdir -p "$ARTIFACT_DIR"
+mkdir -p "$STATE_DIR"
+chmod 755 "$STATE_DIR"
 mkdir -p "$HOME/.config/dotfiles"
 printf 'history-sentinel\n' >"$HOME/.zsh_history"
 printf '# e2e-local-sentinel\n' >"$HOME/.config/dotfiles/local.zsh"
@@ -68,6 +70,10 @@ ledger="$STATE_DIR/installed.tsv"
 }
 [[ "$(stat -c '%a' "$ledger")" == 600 ]] || {
   printf 'Ledger mode is not 600\n' >&2
+  exit 1
+}
+[[ "$(stat -c '%a' "$STATE_DIR")" == 700 ]] || {
+  printf 'State directory mode is not 700\n' >&2
   exit 1
 }
 

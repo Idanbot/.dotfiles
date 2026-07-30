@@ -20,6 +20,7 @@ for expected in \
   'write_run_summary failure' \
   'Resume after fixing the cause' \
   'sed -u -E' \
+  'chmod 700 "$STATE_ROOT"' \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"'; do
   grep -Fq "$expected" "$INSTALL" && pass "$expected" || fail "installer missing $expected"
 done
