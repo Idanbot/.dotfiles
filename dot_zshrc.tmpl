@@ -328,6 +328,9 @@ _cloud_context_source_env
 cloud-context() {
   command cloud-context "$@" || return
   _cloud_context_source_env
+  case "${1:-}" in
+    -t | --test) command cloud-context --status ;;
+  esac
 }
 alias cctx=cloud-context
 

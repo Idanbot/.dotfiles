@@ -4,6 +4,8 @@
 set -euo pipefail
 
 CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/cloud-contexts"
+RECENT_PROFILE_ROOT="$CONFIG_ROOT/.recent-profiles"
+RECENT_SELECTION_ROOT="$CONFIG_ROOT/.recent-selections"
 STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 AWS_ENV="$STATE_ROOT/cloud-context.env"
 AWS_CACHE="$STATE_ROOT/cloud-context-aws.cache"
@@ -18,13 +20,17 @@ Usage: cloud-context [command]
   --status                  Show active provider contexts
   -s, --save NAME           Save current kubectl, gcloud, AWS, and Azure contexts
   -l, --load NAME           Activate a saved context profile through native CLIs
+      --select PROVIDER     Pick a GCP project, AWS profile, or Azure subscription
+      --recent              Pick one of the five most recent pre-clear profiles
   -c, --clear [PROVIDER]    Clear one provider, or all providers when omitted
-  -t, --test [PROVIDER]     Add an isolated fake context for one provider or all
+  -t, --test [PROVIDER] [--yes]
+                            Clear old fakes, then add an isolated fake context
       --test-clear [PROVIDER]
                             Remove one fake context or all fake contexts
   --list                    List saved profiles
 
-Providers: kubectl, gcloud, aws, azure
+Selectable providers: gcloud, aws, azure
+Clear/test providers: kubectl, gcloud, aws, azure
 USAGE
 }
 
@@ -36,6 +42,12 @@ ensure_state_root() {
   umask 077
   mkdir -p "$STATE_ROOT"
   chmod 700 "$STATE_ROOT"
+}
+
+ensure_config_roots() {
+  umask 077
+  mkdir -p "$CONFIG_ROOT" "$RECENT_PROFILE_ROOT" "$RECENT_SELECTION_ROOT"
+  chmod 700 "$CONFIG_ROOT" "$RECENT_PROFILE_ROOT" "$RECENT_SELECTION_ROOT"
 }
 
 normalize_provider() {
@@ -67,6 +79,13 @@ profile_path() {
 read_value() {
   local file="$1" key="$2"
   awk -F '\t' -v key="$key" '$1 == key { print substr($0, index($0, "\t") + 1); exit }' "$file"
+}
+
+require_fzf() {
+  have fzf || {
+    printf 'fzf is required for interactive cloud context selection\n' >&2
+    return 1
+  }
 }
 
 kubectl_context() {
@@ -149,11 +168,10 @@ show_status() {
   printf 'azure    %s%s\n' "${azname:-<none>}" "${azid:+ ($azid)}"
 }
 
-save_profile() {
-  local name="$1" file
-  file="$(profile_path "$name")"
+write_profile_file() {
+  local file="$1"
   umask 077
-  mkdir -p "$CONFIG_ROOT"
+  ensure_config_roots
   {
     printf 'kubectl_context\t%s\n' "$(clean "$(kubectl_context)")"
     printf 'gcloud_configuration\t%s\n' "$(clean "$(gcloud_configuration)")"
@@ -163,7 +181,212 @@ save_profile() {
     printf 'azure_subscription\t%s\n' "$(clean "$(azure_value id)")"
   } >"$file"
   chmod 600 "$file"
+}
+
+save_profile() {
+  local name="$1" file
+  file="$(profile_path "$name")"
+  write_profile_file "$file"
   info "Saved cloud context profile '$name' (identifiers only)"
+}
+
+profile_has_context() {
+  local file="$1" aws
+  aws="$(read_value "$file" aws_profile)"
+  [[ -n "$(read_value "$file" kubectl_context)" ||
+  -n "$(read_value "$file" gcloud_configuration)" ||
+  -n "$(read_value "$file" gcloud_project)" ||
+  (-n "$aws" && "$aws" != default) ||
+  -n "$(read_value "$file" aws_region)" ||
+  -n "$(read_value "$file" azure_subscription)" ]]
+}
+
+prune_recent_profiles() {
+  find "$RECENT_PROFILE_ROOT" -maxdepth 1 -type f -name '*.tsv' -printf '%f\n' |
+    sort -r |
+    awk 'NR > 5' |
+    while IFS= read -r stale; do
+      rm -f "$RECENT_PROFILE_ROOT/$stale"
+    done
+}
+
+snapshot_recent_profile() {
+  local timestamp file name suffix=0
+  timestamp="${CLOUD_CONTEXT_TIMESTAMP:-$(date -u '+%Y%m%d-%H%M%S')}"
+  [[ "$timestamp" =~ ^[0-9]{8}-[0-9]{6}$ ]] || {
+    warn "Ignoring invalid CLOUD_CONTEXT_TIMESTAMP override"
+    timestamp="$(date -u '+%Y%m%d-%H%M%S')"
+  }
+  ensure_config_roots
+  file="$RECENT_PROFILE_ROOT/$timestamp.tsv"
+  while [[ -e "$file" ]]; do
+    ((suffix += 1))
+    file="$RECENT_PROFILE_ROOT/$timestamp-$suffix.tsv"
+  done
+  write_profile_file "$file"
+  if ! profile_has_context "$file"; then
+    rm -f "$file"
+    return
+  fi
+  prune_recent_profiles
+  name="${file##*/}"
+  info "Cached current contexts as recent profile '${name%.tsv}'"
+}
+
+remember_selection() {
+  local provider="$1" value="$2" file tmp
+  ensure_config_roots
+  file="$RECENT_SELECTION_ROOT/$provider"
+  tmp="$(mktemp "$RECENT_SELECTION_ROOT/.${provider}.XXXXXX")"
+  {
+    printf '%s\n' "$value"
+    [[ ! -r "$file" ]] || cat "$file"
+  } | awk 'NF && !seen[$0]++ { print }' | head -n 5 >"$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$file"
+}
+
+order_selections() {
+  local provider="$1" file="$RECENT_SELECTION_ROOT/$1"
+  [[ -r "$file" ]] || file=/dev/null
+  awk '
+    FILENAME == ARGV[1] {
+      if (NF) recent[++recent_count] = $0
+      next
+    }
+    NF && !available[$0]++ { choices[++choice_count] = $0 }
+    END {
+      for (i = 1; i <= recent_count; i++) {
+        value = recent[i]
+        if (available[value] && !shown[value]++) print value
+      }
+      for (i = 1; i <= choice_count; i++) {
+        value = choices[i]
+        if (!shown[value]++) print value
+      }
+    }
+  ' "$file" -
+}
+
+fzf_pick() {
+  local prompt="$1"
+  shift
+  require_fzf
+  fzf --height=60% --layout=reverse --border \
+    --prompt="$prompt> " --header='Enter: select  Esc: cancel' "$@"
+}
+
+select_gcloud_project() {
+  local current choice
+  have gcloud || {
+    warn "gcloud is unavailable"
+    return 1
+  }
+  current="$(clean "$(gcloud_project)")"
+  choice="$(
+    {
+      [[ -z "$current" ]] || printf '%s\n' "$current"
+      gcloud projects list --format='value(projectId)'
+    } | order_selections gcloud | fzf_pick 'GCP project'
+  )" || return
+  choice="$(clean "$choice")"
+  [[ -n "$choice" ]] || return 1
+  gcloud config set project "$choice" --quiet >/dev/null
+  remember_selection gcloud "$choice"
+  info "Selected GCP project '$choice'"
+}
+
+select_aws_profile() {
+  local current choice region
+  have aws || {
+    warn "AWS CLI is unavailable"
+    return 1
+  }
+  current="$(clean "$(aws_profile)")"
+  choice="$(
+    {
+      [[ -z "$current" ]] || printf '%s\n' "$current"
+      aws configure list-profiles
+    } | order_selections aws | fzf_pick 'AWS profile'
+  )" || return
+  choice="$(clean "$choice")"
+  [[ -n "$choice" ]] || return 1
+  region="$(aws configure get region --profile "$choice" 2>/dev/null || true)"
+  write_aws_env "$choice" "$(clean "$region")"
+  remember_selection aws "$choice"
+  info "Selected AWS profile '$choice'"
+  info "The Zsh wrapper applies it to this shell"
+}
+
+order_tabbed_selections() {
+  local provider="$1" file="$RECENT_SELECTION_ROOT/$1"
+  [[ -r "$file" ]] || file=/dev/null
+  awk -F '\t' '
+    FILENAME == ARGV[1] {
+      if (NF) recent[++recent_count] = $1
+      next
+    }
+    NF && !available[$1]++ {
+      choices[++choice_count] = $0
+      keys[choice_count] = $1
+    }
+    END {
+      for (i = 1; i <= recent_count; i++) {
+        key = recent[i]
+        if (!available[key] || shown[key]++) continue
+        for (j = 1; j <= choice_count; j++) {
+          if (keys[j] == key) {
+            print choices[j]
+            break
+          }
+        }
+      }
+      for (i = 1; i <= choice_count; i++) {
+        key = keys[i]
+        if (!shown[key]++) print choices[i]
+      }
+    }
+  ' "$file" -
+}
+
+select_azure_subscription() {
+  local current_id current_name choice subscription_id subscription_name
+  have az || {
+    warn "Azure CLI is unavailable"
+    return 1
+  }
+  current_id="$(clean "$(azure_value id)")"
+  current_name="$(clean "$(azure_value name)")"
+  choice="$(
+    {
+      [[ -z "$current_id" ]] ||
+        printf '%s\t%s\n' "$current_id" "${current_name:-$current_id}"
+      az account list --query '[].[id,name]' -o tsv
+    } |
+      order_tabbed_selections azure |
+      fzf_pick 'Azure subscription' --delimiter=$'\t' --with-nth=2,1
+  )" || return
+  subscription_id="${choice%%$'\t'*}"
+  subscription_name="${choice#*$'\t'}"
+  subscription_id="$(clean "$subscription_id")"
+  subscription_name="$(clean "$subscription_name")"
+  [[ -n "$subscription_id" ]] || return 1
+  az account set --subscription "$subscription_id" >/dev/null
+  remember_selection azure "$subscription_id"
+  info "Selected Azure subscription '${subscription_name:-$subscription_id}'"
+}
+
+select_provider() {
+  case "${1:-}" in
+    gcloud | google) select_gcloud_project ;;
+    aws) select_aws_profile ;;
+    azure | az) select_azure_subscription ;;
+    *)
+      printf 'Unknown selectable provider: %s (expected gcloud, aws, or azure)\n' \
+        "${1:-<none>}" >&2
+      return 2
+      ;;
+  esac
 }
 
 validate_profile_contexts() {
@@ -212,12 +435,11 @@ validate_profile_contexts() {
   [[ "$failed" == false ]]
 }
 
-load_profile() {
-  local name="$1" file kube gconfig gproject aprofile aregion azure failed=false
-  file="$(profile_path "$name")"
+load_profile_file() {
+  local file="$1" name="$2" kube gconfig gproject aprofile aregion azure failed=false
   [[ -r "$file" ]] || {
     printf 'Cloud context profile not found: %s\n' "$name" >&2
-    exit 1
+    return 1
   }
   kube="$(read_value "$file" kubectl_context)"
   gconfig="$(read_value "$file" gcloud_configuration)"
@@ -268,6 +490,31 @@ load_profile() {
   info "AWS selection is active in this shell through the Zsh cloud-context wrapper"
 }
 
+load_profile() {
+  local name="$1"
+  load_profile_file "$(profile_path "$name")" "$name"
+}
+
+load_recent_profile() {
+  local choice file
+  require_fzf
+  [[ -d "$RECENT_PROFILE_ROOT" ]] || {
+    info "No recent cloud context profiles"
+    return 1
+  }
+  choice="$(
+    find "$RECENT_PROFILE_ROOT" -maxdepth 1 -type f -name '*.tsv' -printf '%f\n' |
+      sort -r |
+      sed 's/\.tsv$//' |
+      fzf_pick 'Recent context'
+  )" || return
+  choice="$(clean "$choice")"
+  [[ -n "$choice" ]] || return 1
+  validate_name "$choice"
+  file="$RECENT_PROFILE_ROOT/$choice.tsv"
+  load_profile_file "$file" "$choice"
+}
+
 clear_provider() {
   case "$1" in
     kubectl | kube)
@@ -315,6 +562,8 @@ clear_provider() {
 
 clear_contexts() {
   local provider="${1:-all}" failed=false
+  provider="$(normalize_provider "$provider")"
+  snapshot_recent_profile
   if [[ "$provider" == all ]]; then
     clear_provider kubectl || failed=true
     clear_provider gcloud || failed=true
@@ -445,9 +694,28 @@ write_test_environment() {
   rm -f "$AWS_CACHE"
 }
 
+confirm_test_reset() {
+  local assume_yes="${1:-false}" answer
+  if [[ "$assume_yes" == true || "${CLOUD_CONTEXT_ASSUME_YES:-0}" == 1 ]]; then
+    return
+  fi
+  [[ -t 0 ]] || {
+    warn "Test context reset requires confirmation; rerun with --yes"
+    return 1
+  }
+  printf 'Clear existing fake cloud contexts before testing? [y/N] ' >&2
+  IFS= read -r answer
+  [[ "$answer" == [Yy] || "$answer" == [Yy][Ee][Ss] ]] || {
+    info "Test context change cancelled"
+    return 1
+  }
+}
+
 test_contexts() {
-  local provider
+  local provider assume_yes="${2:-false}"
   provider="$(normalize_provider "${1:-all}")"
+  confirm_test_reset "$assume_yes"
+  clear_test_contexts all
   snapshot_test_environment
   write_test_fixtures
   if [[ "$provider" == all ]]; then
@@ -459,6 +727,24 @@ test_contexts() {
   write_test_environment
   info "Enabled isolated fake ${provider/all/all providers} context"
   info "The Zsh wrapper applies it to this shell; use cloud-context --test-clear"
+}
+
+run_test_command() {
+  local provider=all assume_yes=false arg provider_set=false
+  for arg in "$@"; do
+    case "$arg" in
+      -y | --yes) assume_yes=true ;;
+      *)
+        [[ "$provider_set" == false ]] || {
+          printf 'Only one test provider may be selected\n' >&2
+          return 2
+        }
+        provider="$arg"
+        provider_set=true
+        ;;
+    esac
+  done
+  test_contexts "$provider" "$assume_yes"
 }
 
 clear_test_contexts() {
@@ -552,8 +838,16 @@ case "${1:---status}" in
     }
     load_profile "$2"
     ;;
+  --select)
+    [[ -n "${2:-}" ]] || {
+      usage >&2
+      exit 2
+    }
+    select_provider "$2"
+    ;;
+  --recent) load_recent_profile ;;
   -c | --clear) clear_contexts "${2:-all}" ;;
-  -t | --test) test_contexts "${2:-all}" ;;
+  -t | --test) run_test_command "${@:2}" ;;
   --test-clear) clear_test_contexts "${2:-all}" ;;
   --list | list)
     [[ -d "$CONFIG_ROOT" ]] &&

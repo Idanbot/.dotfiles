@@ -95,6 +95,8 @@ jobs:
           tests/test-kitty.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"
           tests/test-cloud-context-starship.sh "$PWD"
+          tests/test-e2e-report.sh "$PWD"
+          tests/test-performance-report.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
@@ -368,6 +370,12 @@ jobs:
           docker compose -f .github/e2e/compose.yaml --profile base \
             up --build --abort-on-container-exit \
             --exit-code-from "$E2E_SERVICE" "$E2E_SERVICE"
+      - name: Publish performance budget report
+        if: always()
+        run: |
+          find artifacts -type f -name performance.md -print0 |
+            sort -z |
+            xargs -0 -r cat >>"$GITHUB_STEP_SUMMARY"
       - name: Upload E2E observability bundle
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -425,6 +433,12 @@ jobs:
           docker compose -f .github/e2e/compose.yaml --profile "$E2E_SERVICE" \
             up --build --abort-on-container-exit \
             --exit-code-from "$E2E_SERVICE" "$E2E_SERVICE"
+      - name: Publish performance budget report
+        if: always()
+        run: |
+          find artifacts -type f -name performance.md -print0 |
+            sort -z |
+            xargs -0 -r cat >>"$GITHUB_STEP_SUMMARY"
       - name: Upload profile logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

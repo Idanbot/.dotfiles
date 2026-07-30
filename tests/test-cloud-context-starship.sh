@@ -31,7 +31,7 @@ printf '%s\n' work >"$MOCK_STATE/known-aws"
 printf '%s\n' 00000000-0000-0000-0000-000000000001 >"$MOCK_STATE/known-azure"
 printf '{"installationId":"test","subscriptions":[]}\n' \
   >"$HOME/.azure/azureProfile.json"
-printf '[profile work]\nregion = eu-west-1\ncredential_process = /bin/false\n' \
+printf '[profile work]\nregion = eu-west-1\ncredential_process = /bin/false\n[profile personal]\nregion = us-east-2\ncredential_process = /bin/false\n' \
   >"$HOME/.aws/config"
 printf 'apiVersion: v1\ncurrent-context: ""\ncontexts: []\n' >"$KUBECONFIG"
 
@@ -80,6 +80,11 @@ case "$*" in
     printf '[core]\nproject = project-123\n' \
       >"$CLOUDSDK_CONFIG/configurations/config_work"
     ;;
+  "config set project project-456 --quiet")
+    printf '[core]\nproject = project-456\n' \
+      >"$CLOUDSDK_CONFIG/configurations/config_work"
+    ;;
+  "projects list --format=value(projectId)") printf 'project-123\nproject-456\n' ;;
   "config unset project --quiet")
     : >"$CLOUDSDK_CONFIG/configurations/config_work"
     ;;
@@ -91,10 +96,14 @@ cat >"$MOCK_BIN/aws" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 case "$*" in
-  "configure list-profiles") printf 'work\n' ;;
+  "configure list-profiles") printf 'work\npersonal\n' ;;
   "configure get region --profile work") printf 'eu-west-1\n' ;;
+  "configure get region --profile personal") printf 'us-east-2\n' ;;
   "sts get-caller-identity --query Account --output text")
-    [[ "${AWS_PROFILE:-}" == work ]] && printf '123456789012\n'
+    case "${AWS_PROFILE:-}" in
+      work) printf '123456789012\n' ;;
+      personal) printf '210987654321\n' ;;
+    esac
     ;;
   *) exit 1 ;;
 esac
@@ -104,11 +113,19 @@ cat >"$MOCK_BIN/az" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 id=00000000-0000-0000-0000-000000000001
+other=00000000-0000-0000-0000-000000000002
 case "$*" in
   "account list --query [?id=='$id'].id -o tsv") printf '%s\n' "$id" ;;
+  "account list --query [].[id,name] -o tsv")
+    printf '%s\tEngineering\n%s\tSandbox\n' "$id" "$other"
+    ;;
   "account set --subscription $id")
     printf '{"installationId":"test","subscriptions":[{"id":"%s","name":"Engineering","user":{"name":"test@example.invalid"},"isDefault":true}]}\n' \
       "$id" >"$HOME/.azure/azureProfile.json"
+    ;;
+  "account set --subscription $other")
+    printf '{"installationId":"test","subscriptions":[{"id":"%s","name":"Sandbox","user":{"name":"test@example.invalid"},"isDefault":true}]}\n' \
+      "$other" >"$HOME/.azure/azureProfile.json"
     ;;
   "account clear")
     printf '{"installationId":"test","subscriptions":[]}\n' \
@@ -117,7 +134,13 @@ case "$*" in
   *) exit 1 ;;
 esac
 EOF
-chmod +x "$MOCK_BIN/kubectl" "$MOCK_BIN/gcloud" "$MOCK_BIN/aws" "$MOCK_BIN/az"
+cat >"$MOCK_BIN/fzf" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+grep -Fx -- "$FZF_PICK"
+EOF
+chmod +x "$MOCK_BIN/kubectl" "$MOCK_BIN/gcloud" "$MOCK_BIN/aws" "$MOCK_BIN/az" \
+  "$MOCK_BIN/fzf"
 ln -s "$SCRIPT" "$MOCK_BIN/cloud-context"
 export PATH="$MOCK_BIN:$PATH"
 
@@ -168,6 +191,16 @@ load_context --load work
 [[ "$(render_module azure)" == *Engineering* ]]
 [[ "$(render_module azure)" == *󰠅* ]]
 
+FZF_PICK=project-456 load_context --select gcloud
+[[ "$(render_module gcloud)" == *project-456* ]]
+FZF_PICK=personal load_context --select aws
+[[ "$(render_module aws)" == *personal* ]]
+[[ "$(render_module aws)" == *us-east-2* ]]
+[[ "$(render_module custom.aws_account)" == *210987654321* ]]
+FZF_PICK=$'00000000-0000-0000-0000-000000000002\tSandbox' \
+  load_context --select azure
+[[ "$(render_module azure)" == *Sandbox* ]]
+
 long_context=organization-production-europe-west1-primary-cluster
 sed -i "s/current-context: lab/current-context: $long_context/" "$KUBECONFIG"
 kube_prompt="$(render_module custom.kubernetes_context)"
@@ -182,7 +215,7 @@ load_context --clear
 [[ -z "$(render_module custom.aws_account)" ]]
 [[ -z "$(render_module azure)" ]]
 
-load_context --test all
+load_context --test all --yes
 [[ "$(render_module custom.kubernetes_context)" == *cloud-context-test* ]]
 [[ "$(render_module custom.kubernetes_context)" == *test* ]]
 [[ "$(render_module gcloud)" == *cloud-context-test* ]]

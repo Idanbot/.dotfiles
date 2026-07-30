@@ -17,12 +17,14 @@ required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
+  scripts/e2e-report.sh scripts/performance-report.sh
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
+  tests/test-e2e-report.sh tests/test-performance-report.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
   tests/test-ssh-access.sh
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
@@ -43,6 +45,14 @@ if grep -Fq 'name: Version and Checksum Report' "$CI_WORKFLOW" &&
   pass "push/PR CI publishes the non-mutating upgrade report"
 else
   fail "push/PR CI is missing the version/checksum report"
+fi
+
+if grep -Fq 'tests/test-e2e-report.sh "$PWD"' "$CI_WORKFLOW" &&
+  grep -Fq 'tests/test-performance-report.sh "$PWD"' "$CI_WORKFLOW" &&
+  grep -Fq 'name: Publish performance budget report' "$CI_WORKFLOW"; then
+  pass "CI validates structured E2E reports and publishes performance budgets"
+else
+  fail "CI is missing E2E report or performance budget coverage"
 fi
 
 if find "$DOTFILES_DIR" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.sh.tmpl' \) | grep -q .; then

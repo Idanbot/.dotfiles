@@ -430,6 +430,10 @@ tokens, and activates saved values through each provider's native CLI:
 cloud-context                       # show current contexts
 cloud-context --save work           # save identifiers as profile "work"
 cloud-context --load work           # kubectl/gcloud/aws/az native activation
+cloud-context --select gcloud       # fzf-select a project through gcloud
+cloud-context --select aws          # fzf-select a local AWS profile
+cloud-context --select azure        # fzf-select an Azure subscription
+cloud-context --recent              # fzf-load one of five pre-clear snapshots
 cloud-context --clear               # clear all four contexts
 cloud-context --clear kubectl       # also: gcloud, aws, azure
 cloud-context --test aws            # fake one prompt context without credentials
@@ -445,10 +449,19 @@ AWS profile selection is shell-local, so the managed Zsh wrapper sources only
 Azure uses `az account`. Saved profiles are mode `0600` under
 `~/.config/dotfiles/cloud-contexts/`.
 
+GCP, AWS, and Azure selectors prioritize the five most recently selected values
+before the full provider-native list. Before each `--clear`, the command stores
+the active identifiers as a short UTC timestamp under `.recent-profiles/` and
+keeps only the newest five. These snapshots contain identifiers, never
+credentials, and `--recent` loads one through the same preflighted native CLI
+path as a named profile.
+
 Test contexts live under `~/.local/state/dotfiles/cloud-context-test/` and use
 temporary `KUBECONFIG`, `CLOUDSDK_CONFIG`, AWS config, and `AZURE_CONFIG_DIR`
 overrides. The Zsh wrapper applies and removes those overrides in the current
-shell; real provider configuration and credentials are not changed.
+shell, then prints the active fake contexts. `--test` asks before running
+`--test-clear`; automation must opt in with `--yes`. Real provider configuration
+and credentials are not changed.
 
 Loading preflights the saved Kubernetes context, GCloud configuration, AWS
 profile, and cached Azure subscription before changing any provider. Missing
@@ -560,7 +573,10 @@ workflow.
 
 E2E artifacts include redacted text logs, JSONL events, run summaries,
 checkpoints, the install ledger, environment context, process/memory/disk data,
-and shell-startup timing.
+a concise failure report, JUnit XML, and report-only performance budgets for
+Zsh startup, Starship rendering, and the second installation pass. CI publishes
+the performance table in the job summary; regressions are visible but do not
+block merges until enforcement is explicitly enabled.
 
 ## Repository Map
 

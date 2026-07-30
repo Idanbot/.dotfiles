@@ -4,6 +4,7 @@
 set -euo pipefail
 
 BUDGET_MS="${DOTFILES_ZSH_STARTUP_BUDGET_MS:-3000}"
+REPORT_ONLY="${DOTFILES_PERFORMANCE_REPORT_ONLY:-false}"
 ARTIFACT="${1:-/tmp/zsh-startup.json}"
 DEBUG_DIR="${ARTIFACT%.json}-debug"
 tmp="$(mktemp -d)"
@@ -55,6 +56,6 @@ if grep -Eaiq \
 fi
 if [[ "$median" -gt "$BUDGET_MS" ]]; then
   printf 'zsh startup median %sms exceeded %sms budget\n' "$median" "$BUDGET_MS" >&2
-  exit 1
+  [[ "$REPORT_ONLY" == true ]] || exit 1
 fi
 printf 'zsh startup median: %sms (budget %sms)\n' "$median" "$BUDGET_MS"

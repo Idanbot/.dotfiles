@@ -7,6 +7,12 @@ PROFILE="${E2E_PROFILE:-base}"
 PASSES="${E2E_PASSES:-2}"
 ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}"
 STATE_DIR="$HOME/.local/state/dotfiles"
+CURRENT_PASS=0
+if [[ "${DOTFILES_WSL:-false}" == true ]]; then
+  PLATFORM=wsl
+else
+  PLATFORM=native
+fi
 mkdir -p "$ARTIFACT_DIR"
 mkdir -p "$STATE_DIR"
 chmod 755 "$STATE_DIR"
@@ -44,19 +50,38 @@ collect_diagnostics() {
   # the host runner even when the container and runner use different UIDs.
   chmod -R u=rwX,go=rX "$ARTIFACT_DIR"
 }
-trap 'status=$?; collect_diagnostics "$status"; exit "$status"' EXIT
+
+finalize_e2e() {
+  local status="$?"
+  collect_diagnostics "$status" || true
+  /dotfiles/scripts/e2e-report.sh \
+    --artifacts "$ARTIFACT_DIR" \
+    --state "$STATE_DIR" \
+    --status "$status" \
+    --profile "$PROFILE" \
+    --platform "$PLATFORM" \
+    --passes "$PASSES" \
+    --current-pass "$CURRENT_PASS" || true
+  exit "$status"
+}
+trap finalize_e2e EXIT
 
 printf 'profile=%s\nwsl=%s\npasses=%s\n' "$PROFILE" "${DOTFILES_WSL:-auto}" "$PASSES" >"$ARTIFACT_DIR/context.txt"
 env | sed -E 's/((TOKEN|PASSWORD|SECRET|KEY)=).*/\1[REDACTED]/I' | sort >"$ARTIFACT_DIR/environment.txt"
 
 for pass in $(seq 1 "$PASSES"); do
+  CURRENT_PASS="$pass"
   printf '\n===== E2E %s pass %s/%s =====\n' "$PROFILE" "$pass" "$PASSES"
+  pass_started="$(date +%s%N)"
   DOTFILES_LOG_FILE="$ARTIFACT_DIR/bootstrap-pass-${pass}.log" \
     /dotfiles/scripts/install.sh \
     --source /dotfiles \
     --profile "$PROFILE" \
     --conflict-policy backup \
     --yes
+  pass_ended="$(date +%s%N)"
+  printf '%s\t%s\n' "$pass" "$(((pass_ended - pass_started) / 1000000))" \
+    >>"$ARTIFACT_DIR/install-timings.tsv"
   jq empty "$STATE_DIR/runs"/*/summary.json
 done
 
@@ -240,9 +265,19 @@ for log in "$ARTIFACT_DIR"/bootstrap-pass-*.log; do
   fi
 done
 
-/dotfiles/tests/test-shell-performance.sh "$ARTIFACT_DIR/zsh-startup.json"
+DOTFILES_PERFORMANCE_REPORT_ONLY=true \
+  /dotfiles/tests/test-shell-performance.sh "$ARTIFACT_DIR/zsh-startup.json"
+/dotfiles/scripts/performance-report.sh "$ARTIFACT_DIR"
 
 find "$STATE_DIR/logs" -name '*.jsonl' -exec sh -c 'while IFS= read -r line; do printf "%s" "$line" | jq -e . >/dev/null; done < "$1"' _ {} \;
 collect_diagnostics 0
+/dotfiles/scripts/e2e-report.sh \
+  --artifacts "$ARTIFACT_DIR" \
+  --state "$STATE_DIR" \
+  --status 0 \
+  --profile "$PROFILE" \
+  --platform "$PLATFORM" \
+  --passes "$PASSES" \
+  --current-pass "$CURRENT_PASS"
 trap - EXIT
 printf 'E2E profile %s passed (%s installation pass(es))\n' "$PROFILE" "$PASSES"
