@@ -72,6 +72,9 @@ cat >"$MOCK_BIN/gcloud" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 case "$*" in
+  "auth list --filter=status:ACTIVE --format=value(account)")
+    printf 'user@example.invalid\n'
+    ;;
   "config configurations describe work --format=value(name)") printf 'work\n' ;;
   "config configurations activate work --quiet")
     printf 'work\n' >"$CLOUDSDK_CONFIG/active_config"
@@ -84,7 +87,9 @@ case "$*" in
     printf '[core]\nproject = project-456\n' \
       >"$CLOUDSDK_CONFIG/configurations/config_work"
     ;;
-  "projects list --format=value(projectId)") printf 'project-123\nproject-456\n' ;;
+  "projects list --filter=lifecycleState:ACTIVE --format=value(projectId) --quiet")
+    printf 'project-123\nproject-456\n'
+    ;;
   "config unset project --quiet")
     : >"$CLOUDSDK_CONFIG/configurations/config_work"
     ;;
@@ -204,7 +209,8 @@ FZF_PICK=$'00000000-0000-0000-0000-000000000002\tSandbox' \
 long_context=organization-production-europe-west1-primary-cluster
 sed -i "s/current-context: lab/current-context: $long_context/" "$KUBECONFIG"
 kube_prompt="$(render_module custom.kubernetes_context)"
-[[ "$kube_prompt" == *"󱃾 "*"..."* ]]
+short_context="..${long_context: -26}"
+[[ "$kube_prompt" == *"󱃾 $short_context"* ]]
 [[ "$kube_prompt" != *"$long_context"* ]]
 sed -i "s/current-context: $long_context/current-context: lab/" "$KUBECONFIG"
 

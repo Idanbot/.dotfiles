@@ -29,6 +29,32 @@ case "$ARCH" in
     ;;
 esac
 
+# Converge legacy and current Microsoft repository definitions before the first
+# apt operation so duplicate-source warnings cannot leak into this section.
+if [[ ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
+  log_info "Installing Microsoft's Azure CLI repository signing key"
+  sudo mkdir -p /etc/apt/keyrings
+  install_apt_key \
+    https://packages.microsoft.com/keys/microsoft.asc \
+    /etc/apt/keyrings/microsoft.gpg \
+    BC528686B50D79E339D3721CEB3E94ADBE1229CF
+fi
+AZURE_CODENAME="$(
+  . /etc/os-release
+  printf '%s' "$VERSION_CODENAME"
+)"
+AZURE_APT_SOURCE="$(printf '%s\n' \
+  'Types: deb' \
+  'URIs: https://packages.microsoft.com/repos/azure-cli/' \
+  "Suites: $AZURE_CODENAME" \
+  'Components: main' \
+  "Architectures: $(dpkg --print-architecture)" \
+  'Signed-By: /etc/apt/keyrings/microsoft.gpg')"
+reconcile_apt_source \
+  /etc/apt/sources.list.d/azure-cli.sources \
+  "$AZURE_APT_SOURCE" \
+  /etc/apt/sources.list.d/azure-cli.list
+
 # Preserve the installed Docker package family. Docker CE's containerd.io
 # conflicts with Ubuntu's containerd dependency from docker.io.
 mapfile -t DOCKER_PACKAGES < <(docker_apt_packages)
@@ -140,22 +166,6 @@ if [[ ! -f /etc/apt/sources.list.d/google-cloud-sdk.list ||
   printf '%s\n' \
     'deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main' |
     sudo tee /etc/apt/sources.list.d/google-cloud-sdk.list >/dev/null
-fi
-
-if [[ ! -f /etc/apt/sources.list.d/azure-cli.list ||
-  ! -f /etc/apt/keyrings/microsoft.gpg ]]; then
-  log_info "Configuring Microsoft's signed Azure CLI apt repository"
-  sudo mkdir -p /etc/apt/keyrings
-  install_apt_key \
-    https://packages.microsoft.com/keys/microsoft.asc \
-    /etc/apt/keyrings/microsoft.gpg \
-    BC528686B50D79E339D3721CEB3E94ADBE1229CF
-  printf 'deb [arch=%s signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ %s main\n' \
-    "$(dpkg --print-architecture)" "$(
-      . /etc/os-release
-      printf '%s' "$VERSION_CODENAME"
-    )" |
-    sudo tee /etc/apt/sources.list.d/azure-cli.list >/dev/null
 fi
 
 apt_update

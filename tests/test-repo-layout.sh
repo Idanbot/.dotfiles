@@ -55,6 +55,15 @@ else
   fail "CI is missing E2E report or performance budget coverage"
 fi
 
+CLOUD_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
+if grep -Fq '/etc/apt/sources.list.d/azure-cli.sources' "$CLOUD_INSTALLER" &&
+  grep -Fq '/etc/apt/sources.list.d/azure-cli.list' "$CLOUD_INSTALLER" &&
+  grep -Fq 'reconcile_apt_source' "$CLOUD_INSTALLER"; then
+  pass "Azure CLI repository converges legacy and Deb822 sources"
+else
+  fail "Azure CLI repository migration does not prevent duplicate apt sources"
+fi
+
 if find "$DOTFILES_DIR" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.sh.tmpl' \) | grep -q .; then
   fail "shell entrypoints must live under scripts/, tests/, or .chezmoiscripts/"
 else

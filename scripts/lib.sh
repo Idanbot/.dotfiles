@@ -184,6 +184,16 @@ apt_install() {
   done
 }
 
+reconcile_apt_source() {
+  local destination="$1" content="$2" obsolete
+  shift 2
+  sudo mkdir -p "$(dirname "$destination")"
+  printf '%s\n' "$content" | sudo tee "$destination" >/dev/null
+  for obsolete in "$@"; do
+    [[ "$obsolete" == "$destination" ]] || sudo rm -f "$obsolete"
+  done
+}
+
 install_apt_key() {
   local url="$1" destination="$2" expected_fingerprint="$3"
   local armored actual tmp
@@ -490,7 +500,7 @@ package_version() {
     inside && $1 == key ":" {
       value = $2
       sub(/[[:space:]#].*$/, "", value)
-      gsub(/[\047\"]/, "", value)
+      gsub(/[\047"]/, "", value)
       print value
       found = 1
       exit
@@ -516,7 +526,7 @@ package_metadata() {
       value = $0
       sub("^    " field ":[[:space:]]*", "", value)
       sub(/[[:space:]]+#.*$/, "", value)
-      gsub(/^[\047\"]|[\047\"]$/, "", value)
+      gsub(/^[\047"]|[\047"]$/, "", value)
       print value
       found = 1
       exit

@@ -59,7 +59,7 @@ jobs:
       - name: Install lint tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq
+          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq gawk
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
           ./scripts/install-chezmoi.sh
           starship_version="$(yq -r '.core.starship' packages.yaml)"

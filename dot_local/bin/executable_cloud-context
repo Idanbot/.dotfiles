@@ -277,17 +277,54 @@ fzf_pick() {
 }
 
 select_gcloud_project() {
-  local current choice
+  local current choice choices projects active_account discovery_timeout discovery_status
   have gcloud || {
     warn "gcloud is unavailable"
     return 1
   }
+  require_fzf
+  active_account="$(
+    gcloud auth list --filter='status:ACTIVE' --format='value(account)' 2>/dev/null |
+      head -n 1
+  )"
+  active_account="$(clean "$active_account")"
+  [[ -n "$active_account" ]] || {
+    warn "No active GCloud account; run 'gcloud auth login'"
+    return 1
+  }
+  discovery_timeout="${CLOUD_CONTEXT_DISCOVERY_TIMEOUT:-20}"
+  [[ "$discovery_timeout" =~ ^[1-9][0-9]*$ ]] || discovery_timeout=20
+  projects=""
+  if projects="$(
+    timeout "$discovery_timeout" \
+      gcloud projects list \
+      --filter='lifecycleState:ACTIVE' \
+      --format='value(projectId)' \
+      --quiet 2>/dev/null
+  )"; then
+    :
+  else
+    discovery_status=$?
+    if [[ "$discovery_status" -eq 124 ]]; then
+      warn "GCloud project discovery timed out after ${discovery_timeout}s"
+    else
+      warn "GCloud project discovery failed; run 'gcloud projects list' for details"
+    fi
+    return 1
+  fi
   current="$(clean "$(gcloud_project)")"
-  choice="$(
+  choices="$(
     {
       [[ -z "$current" ]] || printf '%s\n' "$current"
-      gcloud projects list --format='value(projectId)'
-    } | order_selections gcloud | fzf_pick 'GCP project'
+      printf '%s\n' "$projects"
+    } | order_selections gcloud
+  )"
+  [[ -n "$choices" ]] || {
+    warn "No accessible GCloud projects were found"
+    return 1
+  }
+  choice="$(
+    printf '%s\n' "$choices" | fzf_pick 'GCP project'
   )" || return
   choice="$(clean "$choice")"
   [[ -n "$choice" ]] || return 1
@@ -796,15 +833,14 @@ prompt_aws() {
 }
 
 shorten_prompt_label() {
-  local value="$1" max="${2:-28}" head tail
+  local value="$1" max="${2:-28}" tail
   [[ "$max" =~ ^[0-9]+$ && "$max" -ge 16 ]] || max=28
   if ((${#value} <= max)); then
     printf '%s\n' "$value"
     return
   fi
-  head=$((max / 3))
-  tail=$((max - head - 3))
-  printf '%s...%s\n' "${value:0:head}" "${value: -tail}"
+  tail=$((max - 2))
+  printf '..%s\n' "${value: -tail}"
 }
 
 prompt_kubectl() {

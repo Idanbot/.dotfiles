@@ -23,6 +23,14 @@ version_major_matches 'openjdk 21.0.8' 21
 [[ "$(package_version languages rust)" == 1.97.1 ]]
 [[ "$(package_version languages java)" == 25.0.3+9 ]]
 
+PARSER_STDERR="$(mktemp)"
+package_version cloud cloudflared >/dev/null 2>"$PARSER_STDERR"
+package_metadata cloud cloudflared sha256_amd64 >/dev/null 2>>"$PARSER_STDERR"
+if [[ -s "$PARSER_STDERR" ]]; then
+  cat "$PARSER_STDERR" >&2
+  exit 1
+fi
+
 RETRY_COUNT=0
 retry_fixture() {
   ((RETRY_COUNT++)) || true
@@ -32,7 +40,8 @@ retry_command "retry fixture" 3 0 retry_fixture
 [[ "$RETRY_COUNT" -eq 3 ]]
 
 GO_INDEX_FIXTURE="$(mktemp)"
-trap 'rm -f "$GO_INDEX_FIXTURE"' EXIT
+APT_SOURCE_FIXTURE="$(mktemp -d)"
+trap 'rm -f "$GO_INDEX_FIXTURE" "$PARSER_STDERR"; rm -rf "$APT_SOURCE_FIXTURE"' EXIT
 cat >"$GO_INDEX_FIXTURE" <<'JSON'
 [
   {
@@ -48,5 +57,19 @@ cat >"$GO_INDEX_FIXTURE" <<'JSON'
 JSON
 [[ "$(go_checksum_from_index "$GO_INDEX_FIXTURE" go1.26.5.linux-amd64.tar.gz)" == 5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053 ]]
 ! go_checksum_from_index "$GO_INDEX_FIXTURE" go1.26.5.linux-arm64.tar.gz >/dev/null 2>&1
+
+mkdir -p "$APT_SOURCE_FIXTURE/sources.list.d"
+touch \
+  "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.list" \
+  "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.sources"
+sudo() { "$@"; }
+reconcile_apt_source \
+  "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.sources" \
+  $'Types: deb\nURIs: https://packages.example.invalid/azure-cli/\nSuites: noble\nComponents: main' \
+  "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.list"
+unset -f sudo
+[[ ! -e "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.list" ]]
+grep -Fq 'Types: deb' "$APT_SOURCE_FIXTURE/sources.list.d/azure-cli.sources"
+[[ "$(find "$APT_SOURCE_FIXTURE/sources.list.d" -type f | wc -l)" == 1 ]]
 
 printf 'Version helper test passed\n'

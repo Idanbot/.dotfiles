@@ -42,15 +42,27 @@ case "$*" in
 esac'
 make_mock gcloud '
 case "$*" in
+  "auth list --filter=status:ACTIVE --format=value(account)")
+    [[ "${GCLOUD_NO_ACTIVE:-0}" == 1 ]] || printf "user@example.invalid\n"
+    ;;
   *"config configurations list"*)
     [[ "${CLOUDSDK_CONFIG:-}" == *cloud-context-test* ]] &&
       printf "test\n" || printf "work\n"
     ;;
   "config get-value project")
-    [[ "${CLOUDSDK_CONFIG:-}" == *cloud-context-test* ]] &&
-      printf "cloud-context-test\n" || printf "project-123\n"
+    if [[ "${CLOUDSDK_CONFIG:-}" == *cloud-context-test* ]]; then
+      printf "cloud-context-test\n"
+    elif [[ "${GCLOUD_PROJECT_UNSET:-0}" == 1 ]]; then
+      printf "(unset)\n"
+    else
+      printf "project-123\n"
+    fi
     ;;
-  "projects list --format=value(projectId)") printf "project-123\nproject-456\n" ;;
+  "projects list --filter=lifecycleState:ACTIVE --format=value(projectId) --quiet")
+    [[ "${GCLOUD_PROJECTS_DELAY:-0}" == 0 ]] || sleep "$GCLOUD_PROJECTS_DELAY"
+    [[ "${GCLOUD_PROJECTS_EMPTY:-0}" == 1 ]] ||
+      printf "project-123\nproject-456\n"
+    ;;
   "config configurations describe work --format=value(name)") printf "work\n" ;;
 esac'
 make_mock aws '
@@ -132,6 +144,32 @@ FZF_INPUT="$TMP_ROOT/azure-fzf-input" "$SCRIPT" --select azure >/dev/null
 [[ "$(<"$TMP_ROOT/azure-fzf-input")" == $'00000000-0000-0000-0000-000000000002\tSandbox\n00000000-0000-0000-0000-000000000001\tEngineering' ]]
 
 : >"$CALLS"
+if GCLOUD_NO_ACTIVE=1 "$SCRIPT" --select gcloud >"$TMP_ROOT/no-account.out" 2>&1; then
+  echo "GCloud selection succeeded without an active account" >&2
+  exit 1
+fi
+grep -Fq 'No active GCloud account' "$TMP_ROOT/no-account.out"
+! grep -Fq $'fzf\t' "$CALLS"
+
+: >"$CALLS"
+if GCLOUD_PROJECT_UNSET=1 GCLOUD_PROJECTS_EMPTY=1 \
+  "$SCRIPT" --select gcloud >"$TMP_ROOT/no-projects.out" 2>&1; then
+  echo "GCloud selection succeeded without accessible projects" >&2
+  exit 1
+fi
+grep -Fq 'No accessible GCloud projects' "$TMP_ROOT/no-projects.out"
+! grep -Fq $'fzf\t' "$CALLS"
+
+: >"$CALLS"
+if CLOUD_CONTEXT_DISCOVERY_TIMEOUT=1 GCLOUD_PROJECTS_DELAY=2 \
+  "$SCRIPT" --select gcloud >"$TMP_ROOT/projects-timeout.out" 2>&1; then
+  echo "GCloud selection succeeded after project discovery timed out" >&2
+  exit 1
+fi
+grep -Fq 'GCloud project discovery timed out' "$TMP_ROOT/projects-timeout.out"
+! grep -Fq $'fzf\t' "$CALLS"
+
+: >"$CALLS"
 "$SCRIPT" --clear >/dev/null
 [[ "$(stat -c '%a' "$XDG_STATE_HOME/dotfiles")" == 700 ]]
 grep -Fq $'kubectl\tconfig unset current-context' "$CALLS"
@@ -171,9 +209,9 @@ case \"\$*\" in
     ;;
 esac"
 short_context="$("$SCRIPT" prompt kubectl)"
-[[ "${#short_context}" -le 28 ]]
-[[ "$short_context" == *...* ]]
-[[ "$short_context" != "$long_context" ]]
+expected_short="..${long_context: -26}"
+[[ "$short_context" == "$expected_short" ]]
+[[ "${#short_context}" -eq 28 ]]
 [[ "$("$SCRIPT" --list)" == workstation ]]
 
 "$SCRIPT" --test aws --yes >/dev/null
