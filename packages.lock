@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 8353ae710c6d719894b3b41c90676b45ecd5fb11b2217b1a6bdeaab6e83d8c6c
-  metadata: 954f3bcc49521b0295f65dd088e4d4c2b3082a891383dfee5aa2618e4e4cd97f
+  packages: ca2f3bd351bf0068064690053939f3b4b6128d538e4d7689c8276a11574c04a1
+  metadata: e4d7eece00e4eeb3e1f1c78131ac8d75dcf6995d7f0887fa6a8c0f63eca7838c
 
 tools:
   - section: bootstrap
@@ -433,6 +433,14 @@ tools:
     repo: ahmetb/kubectx
     binary: kubens
     integrity: upstream-checksum
+  - section: cloud
+    name: kubecolor
+    version: 0.6.0
+    source: github
+    owner: dotfiles-binary
+    repo: kubecolor/kubecolor
+    binary: kubecolor
+    integrity: upstream-checksum
   - section: terminal
     name: kitty
     version: 0.48.1
@@ -508,7 +516,7 @@ tools:
     owner: vendor-installer
     binary: codex
     url: "https://chatgpt.com/codex/install.sh"
-    sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+    sha256: ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a
     integrity: pinned-sha256
   - section: ai_tools
     name: antigravity_cli

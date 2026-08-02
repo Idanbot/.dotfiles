@@ -228,6 +228,13 @@ install_github_archive \
   "https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt" \
   'kubens --version'
 
+KUBECOLOR_VERSION="$(package_version cloud kubecolor 0.6.0)"
+install_github_archive \
+  kubecolor kubecolor/kubecolor "v${KUBECOLOR_VERSION#v}" \
+  "kubecolor_{version}_linux_${RELEASE_ARCH}.tar.gz" kubecolor \
+  "https://github.com/kubecolor/kubecolor/releases/download/{tag}/checksums.txt" \
+  'kubecolor --kubecolor-version'
+
 USQL_SHA="$(package_metadata database usql "sha256_$ARCH")"
 USQL_VERSION="$(package_version database usql 0.21.4)"
 install_github_archive \

@@ -107,6 +107,12 @@ install_github_archive kubens ahmetb/kubectx "v$KUBENS_VERSION" \
   'https://github.com/ahmetb/kubectx/releases/download/{tag}/checksums.txt' \
   'kubens --version'
 
+KUBECOLOR_VERSION="$(package_version cloud kubecolor 0.6.0)"
+install_github_archive kubecolor kubecolor/kubecolor "v$KUBECOLOR_VERSION" \
+  "kubecolor_{version}_linux_${CLOUD_ARCH}.tar.gz" kubecolor \
+  'https://github.com/kubecolor/kubecolor/releases/download/{tag}/checksums.txt' \
+  'kubecolor --kubecolor-version'
+
 STERN_VERSION="$(package_version cloud stern 1.34.0)"
 install_github_archive stern stern/stern "v$STERN_VERSION" \
   "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
@@ -122,13 +128,13 @@ install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
 
 for binary in \
-  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
+  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens kubecolor stern \
   omp herdr; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 13 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 14 ]]
 
 export HERDR_CONFIG_PATH="$DOTFILES_DIR/dot_config/herdr/config.toml"
 export SHELL=/bin/bash

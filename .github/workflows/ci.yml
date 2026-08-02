@@ -242,6 +242,7 @@ jobs:
       - name: Verify tool installation paths
         run: |
           tests/test-github-release-tools.sh "$PWD"
+          tests/test-mutable-installers.sh "$PWD"
           tests/test-external-tools.sh "$PWD"
           tests/test-ubuntu-package-tools.sh
 

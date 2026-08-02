@@ -63,6 +63,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | cloud | helmfile | 1.7.1 | github | dotfiles-binary | upstream-checksum |
 | cloud | kubectx | 0.11.0 | github | dotfiles-binary | upstream-checksum |
 | cloud | kubens | 0.11.0 | github | dotfiles-binary | upstream-checksum |
+| cloud | kubecolor | 0.6.0 | github | dotfiles-binary | upstream-checksum |
 | terminal | kitty | 0.48.1 | github | dotfiles-binary | pinned-sha256 |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |

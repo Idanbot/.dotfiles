@@ -203,6 +203,7 @@ github_asset_spec() {
     cloud.helmfile) printf '%s\n' 'helmfile/helmfile|v{version}|helmfile_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
     cloud.kubectx) printf '%s\n' 'ahmetb/kubectx|v{version}|kubectx_v{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
     cloud.kubens) printf '%s\n' 'ahmetb/kubectx|v{version}|kubens_v{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
+    cloud.kubecolor) printf '%s\n' 'kubecolor/kubecolor|v{version}|kubecolor_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
     fonts.nerd_font_version)
       printf 'ryanoasis/nerd-fonts|v{version}|%s.zip|shared|shared\n' \
         "$(package_version fonts nerd_font FiraMono)"
@@ -524,6 +525,7 @@ run_live_audit() {
   audit_github cloud helmfile helmfile/helmfile
   audit_github cloud kubectx ahmetb/kubectx
   audit_github cloud kubens ahmetb/kubectx
+  audit_github cloud kubecolor kubecolor/kubecolor
   audit_github database usql xo/usql
   audit_pypi database iredis iredis
   audit_github system git_credential_manager git-ecosystem/git-credential-manager

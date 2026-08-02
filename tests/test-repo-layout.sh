@@ -23,6 +23,7 @@ required=(
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
+  tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-e2e-report.sh tests/test-performance-report.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh

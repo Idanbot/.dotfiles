@@ -312,6 +312,12 @@ cloud:
     repo: ahmetb/kubectx
     binary: kubens
     integrity: upstream-checksum
+  kubecolor:
+    source: github
+    owner: dotfiles-binary
+    repo: kubecolor/kubecolor
+    binary: kubecolor
+    integrity: upstream-checksum
 
 database:
   usql:
@@ -401,7 +407,7 @@ ai_tools:
     url: https://chatgpt.com/codex/install.sh
     binary: codex
     integrity: pinned-sha256
-    sha256: 1154e9daf713aacd1534efca8042bfd6665ad24bc1d1dfd86b8f439fe60a7a5d
+    sha256: ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a
   antigravity_cli:
     source: install_script
     owner: vendor-installer
