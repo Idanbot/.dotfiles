@@ -142,11 +142,12 @@ install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
 
 for binary in \
-  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens kubecolor stern \
+  eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
   omp herdr; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
+kubecolor --kubecolor-version >/dev/null
 
 [[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 14 ]]
 
