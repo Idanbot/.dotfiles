@@ -238,7 +238,7 @@ jobs:
       - name: Install tool smoke prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y curl jq yq gojq pigz zstd kcat pgloader
+          sudo apt-get install -y curl jq yq gojq pigz zstd unzip kcat pgloader
       - name: Verify tool installation paths
         run: |
           tests/test-github-release-tools.sh "$PWD"

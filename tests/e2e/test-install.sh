@@ -137,6 +137,8 @@ assert_version_contains() {
 
 if [[ ",$selected_sections," == *,terminal,* ]]; then
   assert_version_contains curlie "$(manifest_version core curlie)" curlie version
+  assert_version_contains ast-grep "$(manifest_version core ast_grep)" ast-grep --version
+  assert_version_contains gitleaks "$(manifest_version core gitleaks)" gitleaks version
   printf '{"ready":true}\n' | gojq -e '.ready == true' >/dev/null
   [[ "$(printf 'pigz-smoke\n' | pigz | pigz -d)" == pigz-smoke ]]
   [[ "$(printf 'zstd-smoke\n' | zstd -q | zstd -dq)" == zstd-smoke ]]

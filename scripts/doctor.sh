@@ -213,7 +213,7 @@ fi
 
 if selected terminal; then
   doctor_step "Terminal"
-  for command in fzf fd bat eza lazygit starship sops lazydocker tldr curlie gojq pigz zstd; do
+  for command in fzf fd bat eza lazygit starship sops lazydocker tldr curlie ast-grep gitleaks gojq pigz zstd; do
     check_command "$command" true
   done
 fi

@@ -149,6 +149,22 @@ core:
     integrity: pinned-sha256
     sha256_amd64: aa2b7b2a0773f3cc04da691100419049950b690fe3736d25e24ac955b63d6056
     sha256_arm64: 73af939aa94e9e0f07cac2b3c8177e02a6b1c3be88299d85988e02be81ae7004
+  ast_grep:
+    source: github
+    owner: dotfiles-binary
+    repo: ast-grep/ast-grep
+    binary: ast-grep
+    integrity: pinned-sha256
+    sha256_amd64: 78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41
+    sha256_arm64: 62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94
+  gitleaks:
+    source: github
+    owner: dotfiles-binary
+    repo: gitleaks/gitleaks
+    binary: gitleaks
+    integrity: pinned-sha256
+    sha256_amd64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    sha256_arm64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
 
 
 languages:

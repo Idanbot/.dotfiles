@@ -33,6 +33,8 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | tealdeer | 1.8.1 | github | dotfiles-binary | upstream-checksum |
 | core | curlie | 1.8.2 | github | dotfiles-binary | upstream-checksum |
 | core | trippy | 0.13.0 | github | dotfiles-binary | pinned-sha256 |
+| core | ast_grep | 0.45.0 | github | dotfiles-binary | pinned-sha256 |
+| core | gitleaks | 8.30.1 | github | dotfiles-binary | pinned-sha256 |
 | languages | go | 1.26.5 | direct | dotfiles-runtime | upstream-checksum |
 | languages | rust | 1.97.1 | rustup | rustup | upstream-checksum |
 | languages | cargo | 1.97.1 | rustup | rustup | rustup |

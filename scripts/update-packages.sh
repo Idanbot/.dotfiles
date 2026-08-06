@@ -193,6 +193,8 @@ github_asset_spec() {
     core.lazydocker) printf '%s\n' 'jesseduffield/lazydocker|v{version}|lazydocker_{version}_Linux_{arch}.tar.gz|x86_64|arm64' ;;
     core.tealdeer) printf '%s\n' 'dbrgn/tealdeer|v{version}|tealdeer-linux-{arch}-musl|x86_64|aarch64' ;;
     core.curlie) printf '%s\n' 'rs/curlie|v{version}|curlie_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
+    core.ast_grep) printf '%s\n' 'ast-grep/ast-grep|{version}|app-{arch}-unknown-linux-gnu.zip|x86_64|aarch64' ;;
+    core.gitleaks) printf '%s\n' 'gitleaks/gitleaks|v{version}|gitleaks_{version}_linux_{arch}.tar.gz|x64|arm64' ;;
     languages.uv) printf '%s\n' 'astral-sh/uv|{version}|uv-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     history.atuin) printf '%s\n' 'atuinsh/atuin|v{version}|atuin-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     editor.neovim) printf '%s\n' 'neovim/neovim|v{version}|nvim-linux-{arch}.tar.gz|x86_64|arm64' ;;
@@ -467,6 +469,8 @@ run_live_audit() {
   audit_github core lazydocker jesseduffield/lazydocker
   audit_github core tealdeer dbrgn/tealdeer
   audit_github core curlie rs/curlie
+  audit_github core ast_grep ast-grep/ast-grep
+  audit_github core gitleaks gitleaks/gitleaks
 
   if wanted languages.go; then
     latest="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json' 2>/dev/null | jq -r '.[0].version' | sed 's/^go//' || true)"

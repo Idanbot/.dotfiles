@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: ca2f3bd351bf0068064690053939f3b4b6128d538e4d7689c8276a11574c04a1
-  metadata: e4d7eece00e4eeb3e1f1c78131ac8d75dcf6995d7f0887fa6a8c0f63eca7838c
+  packages: 9e805f2f4e3503b75b0ec8d87e6c8ae2f01654bf48f8ce6f007363712e2dddb5
+  metadata: a1fc907f3d28a0ba5ad6113374c7e953ccb1c5c86a7aacd308d0414562091a58
 
 tools:
   - section: bootstrap
@@ -201,6 +201,26 @@ tools:
     binary: trip
     sha256_amd64: aa2b7b2a0773f3cc04da691100419049950b690fe3736d25e24ac955b63d6056
     sha256_arm64: 73af939aa94e9e0f07cac2b3c8177e02a6b1c3be88299d85988e02be81ae7004
+    integrity: pinned-sha256
+  - section: core
+    name: ast_grep
+    version: 0.45.0
+    source: github
+    owner: dotfiles-binary
+    repo: ast-grep/ast-grep
+    binary: ast-grep
+    sha256_amd64: 78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41
+    sha256_arm64: 62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94
+    integrity: pinned-sha256
+  - section: core
+    name: gitleaks
+    version: 8.30.1
+    source: github
+    owner: dotfiles-binary
+    repo: gitleaks/gitleaks
+    binary: gitleaks
+    sha256_amd64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    sha256_arm64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
     integrity: pinned-sha256
   - section: languages
     name: go

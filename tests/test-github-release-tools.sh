@@ -21,6 +21,8 @@ ARCH="$(get_arch)"
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
+    AST_GREP_ARCH=x86_64
+    GITLEAKS_ARCH=x64
     CLOUD_ARCH=amd64
     S5CMD_ARCH=64bit
     OMP_ARCH=x64
@@ -28,6 +30,8 @@ case "$ARCH" in
     ;;
   arm64)
     RELEASE_ARCH=aarch64
+    AST_GREP_ARCH=aarch64
+    GITLEAKS_ARCH=arm64
     CLOUD_ARCH=arm64
     S5CMD_ARCH=arm64
     OMP_ARCH=arm64
@@ -141,15 +145,27 @@ HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
 install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
 
+AST_GREP_VERSION="$(package_version core ast_grep 0.45.0)"
+install_github_archive ast-grep ast-grep/ast-grep "$AST_GREP_VERSION" \
+  "app-${AST_GREP_ARCH}-unknown-linux-gnu.zip" ast-grep \
+  "sha256:$(package_metadata core ast_grep "sha256_$ARCH")" \
+  'ast-grep --version'
+
+GITLEAKS_VERSION="$(package_version core gitleaks 8.30.1)"
+install_github_archive gitleaks gitleaks/gitleaks "v$GITLEAKS_VERSION" \
+  "gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" gitleaks \
+  "sha256:$(package_metadata core gitleaks "sha256_$ARCH")" \
+  'gitleaks version'
+
 for binary in \
   eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
-  omp herdr; do
+  omp herdr ast-grep gitleaks; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
 kubecolor --kubecolor-version >/dev/null
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 14 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 16 ]]
 
 export HERDR_CONFIG_PATH="$DOTFILES_DIR/dot_config/herdr/config.toml"
 export SHELL=/bin/bash

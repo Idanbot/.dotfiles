@@ -453,7 +453,14 @@ install_github_archive() {
   download_verified \
     "https://github.com/${repo}/releases/download/${tag}/${asset}" \
     "$archive" "$checksum_url" "$asset"
-  tar -xf "$archive" -C "$tmpdir" "$member_path"
+  case "$archive" in
+    *.zip)
+      unzip -q "$archive" -d "$tmpdir"
+      ;;
+    *)
+      tar -xf "$archive" -C "$tmpdir" "$member_path"
+      ;;
+  esac
   install_managed_binary "$tmpdir/$member_path" "$binary" "${tag#v}" "github:$repo"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"

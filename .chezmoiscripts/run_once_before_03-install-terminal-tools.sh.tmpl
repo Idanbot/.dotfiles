@@ -33,9 +33,13 @@ fi
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
+    AST_GREP_ARCH=x86_64
+    GITLEAKS_ARCH=x64
     ;;
   arm64)
     RELEASE_ARCH=aarch64
+    AST_GREP_ARCH=aarch64
+    GITLEAKS_ARCH=arm64
     ;;
   *)
     log_error "Unsupported release architecture: $ARCH"
@@ -101,5 +105,21 @@ install_github_archive \
   "trippy-${TRIPPY_VERSION}-${RELEASE_ARCH}-unknown-linux-musl/trip" \
   "sha256:$TRIPPY_SHA" \
   'trip --version'
+
+AST_GREP_SHA="$(package_metadata core ast_grep "sha256_$ARCH")"
+AST_GREP_VERSION="$(package_version core ast_grep 0.45.0)"
+install_github_archive \
+  ast-grep ast-grep/ast-grep "${AST_GREP_VERSION#v}" \
+  "app-${AST_GREP_ARCH}-unknown-linux-gnu.zip" ast-grep \
+  "sha256:$AST_GREP_SHA" \
+  'ast-grep --version'
+
+GITLEAKS_SHA="$(package_metadata core gitleaks "sha256_$ARCH")"
+GITLEAKS_VERSION="$(package_version core gitleaks 8.30.1)"
+install_github_archive \
+  gitleaks gitleaks/gitleaks "v${GITLEAKS_VERSION#v}" \
+  "gitleaks_${GITLEAKS_VERSION#v}_linux_${GITLEAKS_ARCH}.tar.gz" gitleaks \
+  "sha256:$GITLEAKS_SHA" \
+  'gitleaks version'
 
 print_summary "Terminal Tools"

@@ -80,7 +80,7 @@ Selectors can extend or reduce a profile:
 expert mode and does not add dependencies.
 
 The common terminal baseline includes `jq`, `gojq`, `pigz`, `zstd`, `curlie`,
-`bat`, and `eza`. Enhanced tools keep their own command names: standard
+`ast-grep`, `gitleaks`, `bat`, and `eza`. Enhanced tools keep their own command names: standard
 commands such as `cat` and `ls` are not replaced by aliases. The cloud profile
 adds `s5cmd`, `kcat`, `stern`, `helmfile`, `kubectx`, `kubens`, and `kubecolor`;
 database utilities
@@ -368,7 +368,7 @@ APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
 the repository; all upgrades remain explicit local review decisions. The report
-covers pinned GitHub/direct downloads including `s5cmd`, `stern`, `helmfile`,
+covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`, `stern`, `helmfile`,
 `kubectx`, `kubens`, and `kubecolor`, plus Serena, context-mode, npm packages, Rust, Python, Java,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
