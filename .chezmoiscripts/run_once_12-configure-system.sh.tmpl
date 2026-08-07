@@ -9,14 +9,15 @@ log_step "Configuring System"
 require_sudo
 
 ZSH_PATH="$(command -v zsh 2>/dev/null || true)"
-LOGIN_SHELL="$(getent passwd "$USER" 2>/dev/null | cut -d: -f7)"
+TARGET_USER="$(id -un)"
+LOGIN_SHELL="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f7)"
 if [[ -n "$ZSH_PATH" && "$LOGIN_SHELL" == "$ZSH_PATH" ]]; then
   log_skip "Zsh is already the login shell"
 elif [[ -n "$ZSH_PATH" ]]; then
   if is_ci && [[ "${DOTFILES_ALLOW_CI_LOGIN_SHELL_MUTATION:-0}" != 1 ]]; then
     log_skip "Login-shell mutation skipped in CI"
   elif is_ci; then
-    sudo chsh -s "$ZSH_PATH" "$USER"
+    sudo chsh -s "$ZSH_PATH" "$TARGET_USER"
     log_success "Zsh selected as the login shell in the ephemeral CI host"
   else
     chsh -s "$ZSH_PATH"

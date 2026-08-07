@@ -101,6 +101,7 @@ jobs:
           tests/test-ci-outcome.sh "$PWD"
           tests/test-network-faults.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
+          tests/test-system-configuration.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"

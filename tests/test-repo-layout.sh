@@ -27,7 +27,7 @@ required=(
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
   tests/test-ci-outcome.sh tests/test-network-faults.sh
-  tests/test-ci-operations.sh
+  tests/test-ci-operations.sh tests/test-system-configuration.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
   tests/test-ssh-access.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
