@@ -251,19 +251,41 @@ retry_command() {
   done
 }
 
-download() {
-  local url="$1" dest="$2"
-  mkdir -p "$(dirname "$dest")"
+download_once() {
+  local url="$1" dest="$2" partial status
+  partial="${dest}.part.$$"
+  rm -f "$partial"
   if command_exists curl; then
-    curl --proto '=https' --tlsv1.2 \
-      --retry 6 --retry-all-errors --retry-delay 2 --retry-max-time 120 \
-      -fsSLo "$dest" "$url"
+    if curl --proto '=https' --tlsv1.2 \
+      --connect-timeout 20 --max-time 180 \
+      --retry 2 --retry-all-errors --retry-delay 1 --retry-max-time 60 \
+      -fsSL -o "$partial" "$url"; then
+      mv -f "$partial" "$dest"
+      return 0
+    else
+      status=$?
+    fi
   elif command_exists wget; then
-    wget --https-only --tries=3 -qO "$dest" "$url"
+    if wget --https-only --timeout=180 --tries=2 -qO "$partial" "$url"; then
+      mv -f "$partial" "$dest"
+      return 0
+    else
+      status=$?
+    fi
   else
     log_error "curl or wget is required to download $url"
     return 1
   fi
+  rm -f "$partial"
+  return "$status"
+}
+
+download() {
+  local url="$1" dest="$2"
+  local attempts="${DOTFILES_DOWNLOAD_ATTEMPTS:-3}"
+  local delay="${DOTFILES_DOWNLOAD_RETRY_DELAY:-2}"
+  mkdir -p "$(dirname "$dest")"
+  retry_command "Download $url" "$attempts" "$delay" download_once "$url" "$dest"
 }
 
 sha256_file() {
@@ -319,24 +341,29 @@ go_release_checksum() {
 }
 
 verify_sha256() {
-  local file="$1" expected="$2" actual
+  local file="$1" expected="$2" label="${3:-$(basename "$1")}" actual
   actual="$(sha256_file "$file")"
   if [[ ! "$expected" =~ ^[0-9a-fA-F]{64}$ ]]; then
-    log_error "Invalid SHA256 declaration for $(basename "$file")"
+    log_error "Invalid SHA256 declaration for $label"
     return 1
   fi
   if [[ "${actual,,}" != "${expected,,}" ]]; then
-    log_error "Checksum mismatch for $(basename "$file"): expected $expected, got $actual"
+    log_error "Checksum mismatch for $label: expected $expected, got $actual"
     return 1
   fi
-  log_success "Verified SHA256 for $(basename "$file")"
+  log_success "Verified SHA256 for $label"
 }
 
 download_verified() {
   local url="$1" dest="$2" checksum_spec="$3" checksum_name
-  local expected checksum_file
+  local expected checksum_file candidate
   checksum_name="${4:-$(basename "$dest")}"
-  download "$url" "$dest"
+  mkdir -p "$(dirname "$dest")"
+  candidate="$(mktemp "${dest}.verified.XXXXXX")"
+  if ! download "$url" "$candidate"; then
+    rm -f "$candidate"
+    return 1
+  fi
 
   case "$checksum_spec" in
     sha256:*)
@@ -344,23 +371,30 @@ download_verified() {
       ;;
     https://*)
       checksum_file="$(mktemp)"
-      download "$checksum_spec" "$checksum_file"
+      if ! download "$checksum_spec" "$checksum_file"; then
+        rm -f "$checksum_file" "$candidate"
+        return 1
+      fi
       expected="$(checksum_for_asset "$checksum_file" "$checksum_name")"
       rm -f "$checksum_file"
       ;;
     *)
       log_error "Unverified download blocked: $url"
-      rm -f "$dest"
+      rm -f "$candidate"
       return 1
       ;;
   esac
 
   if [[ -z "$expected" ]]; then
     log_error "No checksum found for $checksum_name"
-    rm -f "$dest"
+    rm -f "$candidate"
     return 1
   fi
-  verify_sha256 "$dest" "$expected"
+  if ! verify_sha256 "$candidate" "$expected" "$checksum_name"; then
+    rm -f "$candidate"
+    return 1
+  fi
+  mv -f "$candidate" "$dest"
 }
 
 github_latest_release() {

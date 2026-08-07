@@ -87,8 +87,9 @@ Version comparison and GitHub asset expansion are centralized in `scripts/lib.sh
 Install sections use distro signatures, upstream checksum manifests, pinned
 hashes, or verified signing-key fingerprints. Literal hash changes require
 review. Push/PR CI and the weekly version audit publish a non-mutating upgrade
-report; `scripts/update-packages.sh --apply-all` or `--apply section.tool@version`
-materializes only locally accepted version and integrity changes.
+report. A monthly workflow materializes every fully verified candidate into one
+stable canary PR; it never merges. `scripts/update-packages.sh --apply-all` or
+`--apply section.tool@version` remains available for local acceptance.
 
 ## Agent Workspaces
 
@@ -112,9 +113,10 @@ Fast contracts validate parsing, templates, policies, workspace routing,
 Herdr configuration, ownership,
 recovery, selectors, and generated files. Network release smoke tests execute
 real downloaded binaries, create a real Herdr workspace twice, and apply all
-chezmoi externals. Docker E2E executes
-the same installer path as users, twice, on native and WSL-simulated modes.
+chezmoi externals. Docker E2E executes the same installer path as users, twice,
+on native and WSL-simulated modes. A monthly ephemeral Ubuntu VM separately
+validates login-shell, desktop, fontconfig, and systemd host integration.
 
 Simulation verifies platform branches; it does not claim to emulate the WSL
-kernel or Windows interoperability. `.github/workflows/wsl-e2e.yml` is the
-separate real-host contract.
+kernel or Windows interoperability. `.github/workflows/wsl-e2e.yml` remains the
+separate real-WSL contract.

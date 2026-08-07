@@ -1,0 +1,70 @@
+name: CI Outcome Classification
+
+on:  # zizmor: ignore[dangerous-triggers] only trusted default-branch code executes
+  workflow_run:
+    workflows: ["CI - Reliable Bootstrap"]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: ci-outcome-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  classify:
+    name: Classify completed CI run
+    permissions:
+      actions: read  # fetch the completed run's job conclusions and logs
+      checks: write  # zizmor: ignore[excessive-permissions] publish the diagnostic check
+      contents: read  # checkout the trusted classifier from the default branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout trusted classifier
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch jobs and available logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
+            >"$RUNNER_TEMP/jobs.json"
+          gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log \
+            >"$RUNNER_TEMP/run.log" 2>&1 || true
+      - name: Classify outcome
+        env:
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          ./scripts/classify-ci-run.sh \
+            --jobs "$RUNNER_TEMP/jobs.json" \
+            --conclusion "$RUN_CONCLUSION" \
+            --logs "$RUNNER_TEMP/run.log" \
+            --run-url "$RUN_URL" >"$RUNNER_TEMP/classification.json"
+          jq -r '"## " + .title + "\n\n" + .summary' \
+            "$RUNNER_TEMP/classification.json" >>"$GITHUB_STEP_SUMMARY"
+      - name: Publish classification check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          conclusion="$(jq -r .conclusion "$RUNNER_TEMP/classification.json")"
+          title="$(jq -r .title "$RUNNER_TEMP/classification.json")"
+          summary="$(jq -r .summary "$RUNNER_TEMP/classification.json")"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name='CI Outcome Classification' \
+            -f head_sha="$HEAD_SHA" \
+            -f status=completed \
+            -f conclusion="$conclusion" \
+            -f "output[title]=$title" \
+            -f "output[summary]=$summary" >/dev/null

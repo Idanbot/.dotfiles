@@ -35,3 +35,16 @@ The implementation intentionally keeps authentication manual and limits
 production support to Ubuntu 24.04 native/WSL. Those constraints reduce
 unverifiable branches and prevent a public bootstrap from becoming a secret
 distribution system.
+
+## Operational Follow-up
+
+- Event-aware concurrency preserves explicit manual/heavy diagnostics while
+  allowing stale push and PR runs to be superseded.
+- CI outcome classification identifies cancellation-only and strong runner
+  outage signatures without masking the original workflow result.
+- Download fault injection covers retry exhaustion, partial files, and checksum
+  corruption at the transport boundary.
+- Rolling performance history exposes profile/platform trends across runs.
+- Monthly grouped tool and Actions PRs bound dependency review noise while the
+  tool canary automatically runs heavy E2E.
+- Monthly native Ubuntu VM acceptance covers host integrations Docker cannot.

@@ -17,7 +17,7 @@ required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
-  scripts/e2e-report.sh scripts/performance-report.sh
+  scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/classify-ci-run.sh
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
@@ -25,9 +25,13 @@ required=(
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-update-packages.sh
   tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
-  tests/test-e2e-report.sh tests/test-performance-report.sh
+  tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
+  tests/test-ci-outcome.sh tests/test-network-faults.sh
+  tests/test-ci-operations.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
   tests/test-ssh-access.sh
+  .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
+  .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl

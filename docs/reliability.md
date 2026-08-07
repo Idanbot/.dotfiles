@@ -28,6 +28,11 @@ DOTFILES_FAIL_AT=source:after ./scripts/install.sh --profile minimal --yes
 The recovery suite proves that completed stages are skipped and the original
 run summary becomes successful after resume.
 
+Download fault injection separately proves retries, atomic replacement, and
+checksum rejection. A completed-workflow classifier distinguishes actionable
+job failures from cancellation-only or known hosted-runner interruptions. Its
+diagnostic check never replaces or edits the original CI conclusion.
+
 ## Observability
 
 Console output uses timestamps, stable levels, section banners, durations, and
@@ -42,6 +47,10 @@ On failure, E2E bundles retain:
 - Platform/environment context with common secret variables redacted.
 - Disk, memory, process, APT source, and test-home inventories.
 - Zsh startup timing.
+
+Performance samples are aggregated into a rolling artifact with latest,
+previous, median, minimum, and maximum values per profile/platform metric.
+Trends remain report-only until a budget is deliberately promoted to a gate.
 
 ## Idempotency Definition
 
@@ -69,6 +78,7 @@ not automatic.
 3. Release smoke: real checksummed assets, Herdr server/workspace reuse, and all external archives.
 4. Base E2E: clean native and simulated-WSL install, two passes.
 5. Heavy E2E: developer, agent, cloud, and full profiles.
-6. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
+6. Native VM: real two-pass Ubuntu host integration on a monthly ephemeral VM.
+7. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
 
 The simulated WSL tier must never be described as a real WSL kernel test.

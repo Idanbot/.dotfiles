@@ -1,0 +1,120 @@
+name: Grouped Tool Upgrades
+
+on:
+  schedule:
+    - cron: "17 4 1 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: grouped-tool-upgrades
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  update:
+    name: Refresh one verified monthly upgrade set
+    permissions:
+      contents: write  # zizmor: ignore[excessive-permissions] push one automation branch
+      pull-requests: write  # zizmor: ignore[excessive-permissions] create or refresh one PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install update prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y jq yq python3
+      - name: Resolve and apply one grouped update set
+        id: upgrades
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPGRADE_REPORT: ${{ runner.temp }}/grouped-upgrades.md
+        run: |
+          ./scripts/update-packages.sh --apply-all --report "$UPGRADE_REPORT"
+          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
+          if git diff --quiet -- \
+            packages.yaml packages.meta.yaml packages.lock \
+            .chezmoiexternal.yaml docs/tool-inventory.md; then
+            echo 'changed=false' >>"$GITHUB_OUTPUT"
+            echo 'No fully verified upgrades are available.' >>"$GITHUB_STEP_SUMMARY"
+          else
+            echo 'changed=true' >>"$GITHUB_OUTPUT"
+          fi
+      - name: Validate generated update set in Docker
+        if: steps.upgrades.outputs.changed == 'true'
+        run: |
+          docker build \
+            -f .github/workflows/Dockerfile.ubuntu-24.04 \
+            -t dotfiles-grouped-upgrades .
+          docker run --rm -v "$PWD:/dotfiles:ro" \
+            dotfiles-grouped-upgrades bash -lc '
+              set -e
+              sudo apt-get update -qq
+              sudo apt-get install -y yq
+              /dotfiles/tests/test-package-metadata.sh /dotfiles
+              /dotfiles/tests/test-update-packages.sh /dotfiles
+            '
+      - name: Commit, push, and create or refresh one PR
+        if: steps.upgrades.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPGRADE_REPORT: ${{ runner.temp }}/grouped-upgrades.md
+        run: |
+          branch=automation/grouped-tool-upgrades
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -C "$branch"
+          git add \
+            packages.yaml packages.meta.yaml packages.lock \
+            .chezmoiexternal.yaml docs/tool-inventory.md
+          git commit -m 'chore: refresh grouped tool versions'
+
+          gh auth setup-git
+          remote_sha="$(git ls-remote --heads origin "refs/heads/$branch" | awk '{print $1}')"
+          if [[ -n "$remote_sha" ]]; then
+            git push \
+              --force-with-lease="refs/heads/$branch:$remote_sha" \
+              origin "HEAD:refs/heads/$branch"
+          else
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+
+          body="$RUNNER_TEMP/grouped-upgrades-pr.md"
+          {
+            printf 'This monthly PR aggregates every fully verified tool update into one review.\n\n'
+            printf 'The PR CI automatically enables the heavy developer, agent, cloud, and full E2E matrix.\n\n'
+            cat "$UPGRADE_REPORT"
+          } >"$body"
+          pr_number="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
+          if [[ -n "$pr_number" ]]; then
+            gh pr edit "$pr_number" \
+              --title 'chore: grouped monthly tool upgrades' \
+              --body-file "$body"
+          else
+            gh pr create \
+              --base main \
+              --head "$branch" \
+              --title 'chore: grouped monthly tool upgrades' \
+              --body-file "$body"
+          fi
+      - name: Upload upgrade report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: grouped-monthly-upgrade-report
+          path: ${{ runner.temp }}/grouped-upgrades.md
+          if-no-files-found: warn
+          retention-days: 90

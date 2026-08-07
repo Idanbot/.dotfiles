@@ -19,8 +19,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -97,6 +97,10 @@ jobs:
           tests/test-cloud-context-starship.sh "$PWD"
           tests/test-e2e-report.sh "$PWD"
           tests/test-performance-report.sh "$PWD"
+          tests/test-performance-history.sh "$PWD"
+          tests/test-ci-outcome.sh "$PWD"
+          tests/test-network-faults.sh "$PWD"
+          tests/test-ci-operations.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
@@ -342,6 +346,7 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
+                test-network-faults.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
@@ -385,6 +390,14 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload performance sample
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-sample-base-${{ matrix.service }}
+          path: artifacts/**/performance.json
+          if-no-files-found: warn
+          retention-days: 90
 
   recovery-e2e:
     name: Recovery and Resume E2E
@@ -412,7 +425,10 @@ jobs:
 
   heavy-e2e:
     name: Live ${{ matrix.service }} E2E
-    if: github.event_name == 'schedule' || inputs.run_heavy_e2e == true
+    if: >-
+      github.event_name == 'schedule' ||
+      inputs.run_heavy_e2e == true ||
+      (github.event_name == 'pull_request' && github.head_ref == 'automation/grouped-tool-upgrades')
     needs: [base-e2e, recovery-e2e]
     runs-on: ubuntu-24.04
     strategy:
@@ -448,3 +464,87 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload performance sample
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-sample-heavy-${{ matrix.service }}
+          path: artifacts/**/performance.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  performance-history:
+    name: Rolling Performance History
+    if: >-
+      always() &&
+      needs.base-e2e.result == 'success' &&
+      github.event_name != 'pull_request'
+    needs: [base-e2e, heavy-e2e]
+    permissions:
+      actions: read  # download this run's and prior performance artifacts
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download prior history and current samples
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          input="$RUNNER_TEMP/performance-inputs"
+          mkdir -p "$input/prior" "$input/current"
+
+          prior_id="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=performance-history&per_page=10" \
+              --jq '[.artifacts[] | select(.expired == false)][0].id // empty'
+          )"
+          if [[ -n "$prior_id" ]]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$prior_id/zip" \
+              >"$RUNNER_TEMP/prior-history.zip"
+            unzip -q "$RUNNER_TEMP/prior-history.zip" -d "$input/prior"
+          fi
+
+          mkdir -p "$input/recent"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '[
+              .artifacts[] |
+              select(.expired == false and (.name | startswith("performance-sample-"))) |
+              [.id, .name]
+            ][0:20][] | @tsv' |
+            while IFS=$'\t' read -r artifact_id artifact_name; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+                >"$RUNNER_TEMP/recent-$artifact_id.zip"
+              mkdir -p "$input/recent/$artifact_id-$artifact_name"
+              unzip -q "$RUNNER_TEMP/recent-$artifact_id.zip" \
+                -d "$input/recent/$artifact_id-$artifact_name"
+            done
+
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name | startswith("performance-sample-")) | [.id, .name] | @tsv' |
+            while IFS=$'\t' read -r artifact_id artifact_name; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+                >"$RUNNER_TEMP/$artifact_name.zip"
+              mkdir -p "$input/current/$artifact_name"
+              unzip -q "$RUNNER_TEMP/$artifact_name.zip" -d "$input/current/$artifact_name"
+            done
+      - name: Build trend dashboard
+        run: |
+          ./scripts/performance-history.sh \
+            "$RUNNER_TEMP/performance-inputs" \
+            "$RUNNER_TEMP/performance-dashboard"
+          cat "$RUNNER_TEMP/performance-dashboard/performance-history.md" \
+            >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload rolling performance history
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-history
+          path: ${{ runner.temp }}/performance-dashboard/
+          if-no-files-found: error
+          retention-days: 90

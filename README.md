@@ -367,7 +367,10 @@ Downloads use upstream checksum manifests or repository-pinned SHA256 values.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
-the repository; all upgrades remain explicit local review decisions. The report
+the repository. Once a month, one workflow applies all fully verified updates
+to the stable `automation/grouped-tool-upgrades` branch and creates or refreshes
+one review PR; it never merges automatically. Dependabot likewise groups GitHub
+Actions updates into one monthly PR. The report
 covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`, `stern`, `helmfile`,
 `kubectx`, `kubens`, and `kubecolor`, plus Serena, context-mode, npm packages, Rust, Python, Java,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
@@ -394,6 +397,12 @@ run_id="$(gh run list --workflow=version-audit.yml --limit 1 \
   --json databaseId --jq '.[0].databaseId')"
 gh run view "$run_id"
 gh run download "$run_id" --name weekly-version-checksum-report
+```
+
+Run the grouped update workflow early when needed:
+
+```bash
+gh workflow run grouped-upgrades.yml
 ```
 
 Accept every fully resolved update, or only selected tools:
@@ -569,22 +578,27 @@ Useful variants:
 
 The container validates Ubuntu package and configuration behavior, but it
 cannot prove native GUI integration, physical-device behavior, or Windows/WSL
-interop. Those remain acceptance checks for the target machine or the real-WSL
-workflow.
+interop. The monthly `Native Ubuntu VM Acceptance` workflow covers login-shell,
+fontconfig, Kitty desktop, and systemd integration on an ephemeral Ubuntu host.
+Windows interoperability remains the real-WSL workflow's responsibility.
 
 E2E artifacts include redacted text logs, JSONL events, run summaries,
 checkpoints, the install ledger, environment context, process/memory/disk data,
 a concise failure report, JUnit XML, and report-only performance budgets for
 Zsh startup, Starship rendering, and the second installation pass. CI publishes
-the performance table in the job summary; regressions are visible but do not
-block merges until enforcement is explicitly enabled.
+the performance table in the job summary. A rolling 90-day artifact adds
+latest/previous deltas and median/range trends by profile and platform;
+regressions are visible but do not block merges until enforcement is explicitly
+enabled. CI runs also publish a separate outcome-classification check so GitHub
+runner interruptions are distinguishable from actionable failures without
+altering the original workflow conclusion.
 
 ## Repository Map
 
 ```text
 .chezmoiscripts/       explicit section implementations
 .github/e2e/           Docker profile harness
-.github/workflows/     CI, version audit, and real WSL workflows
+.github/workflows/     CI, maintenance, native VM, and real WSL workflows
 dot_* / private_dot_*  chezmoi-managed configuration
 profiles/              machine profile definitions
 scripts/               orchestrator, recovery, doctor, update helpers

@@ -1,0 +1,110 @@
+name: Native Ubuntu VM Acceptance
+
+on:
+  schedule:
+    - cron: "43 5 15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-ubuntu-vm-acceptance
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  native-vm:
+    name: Two-pass install on ephemeral Ubuntu 24.04 VM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      DOTFILES_CI: "true"
+      DOTFILES_COLOR: always
+      DOTFILES_GIT_NAME: Native VM E2E
+      DOTFILES_GIT_EMAIL: native-vm@example.invalid
+      DOTFILES_ALLOW_CI_LOGIN_SHELL_MUTATION: "1"
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install acceptance-only validators
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y desktop-file-utils fontconfig
+      - name: Run the real installer twice
+        run: |
+          artifact_dir="$GITHUB_WORKSPACE/artifacts/native-vm"
+          mkdir -p "$artifact_dir"
+          for pass in 1 2; do
+            started="$(date +%s%N)"
+            DOTFILES_LOG_FILE="$artifact_dir/bootstrap-pass-$pass.log" \
+              ./scripts/install.sh \
+                --source "$GITHUB_WORKSPACE" \
+                --profile developer \
+                --with fonts,desktop \
+                --conflict-policy backup \
+                --yes
+            ended="$(date +%s%N)"
+            printf '%s\t%s\n' "$pass" "$(((ended - started) / 1000000))" \
+              >>"$artifact_dir/install-timings.tsv"
+          done
+      - name: Validate host integrations
+        run: |
+          sections='detect,core,zsh,terminal,languages,history,tmux,neovim,fonts,desktop,system,theme,services'
+          ./scripts/doctor.sh --acceptance --sections "$sections"
+
+          [[ "$(getent passwd "$USER" | cut -d: -f7)" == "$(command -v zsh)" ]]
+          kitty --version
+          desktop-file-validate "$HOME/.local/share/applications/kitty.desktop"
+          fc-match 'FiraMono Nerd Font' | grep -Fq 'FiraMono'
+          systemd-analyze verify "$HOME/.config/systemd/user/ssh-agent.service"
+          if systemctl --user show-environment >/dev/null 2>&1; then
+            systemctl --user is-enabled ssh-agent.service
+            systemctl --user is-active ssh-agent.service
+          else
+            echo 'Systemd user bus unavailable; static unit validation passed.'
+          fi
+          zsh -lic 'command -v starship >/dev/null; command -v dot >/dev/null'
+      - name: Build performance sample
+        if: always()
+        env:
+          E2E_PROFILE: native-vm
+          DOTFILES_PERFORMANCE_PLATFORM: native-vm
+        run: |
+          artifact_dir="$GITHUB_WORKSPACE/artifacts/native-vm"
+          mkdir -p "$artifact_dir"
+          DOTFILES_PERFORMANCE_REPORT_ONLY=true \
+            ./tests/test-shell-performance.sh "$artifact_dir/zsh-startup.json" || true
+          ./scripts/performance-report.sh "$artifact_dir" || true
+      - name: Collect installer state
+        if: always()
+        run: |
+          mkdir -p artifacts/native-vm/state
+          if [[ -d "$HOME/.local/state/dotfiles" ]]; then
+            cp -a "$HOME/.local/state/dotfiles/." artifacts/native-vm/state/
+          fi
+          chmod -R u=rwX,go=rX artifacts/native-vm
+      - name: Upload native VM acceptance bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: native-vm-e2e
+          path: artifacts/native-vm/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload native VM performance sample
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: performance-sample-native-vm
+          path: artifacts/native-vm/performance.json
+          if-no-files-found: warn
+          retention-days: 90

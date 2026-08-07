@@ -20,6 +20,11 @@ printf '{"budget_ms":1000,"median_ms":12,"runs_ms":[10,12,14]}\n' \
 printf '1\t100\n2\t34\n' >"$ARTIFACT_DIR/install-timings.tsv"
 
 PATH="$MOCK_BIN:$PATH" \
+  E2E_PROFILE=developer \
+  DOTFILES_WSL=true \
+  GITHUB_RUN_ID=1234 \
+  GITHUB_RUN_ATTEMPT=2 \
+  GITHUB_SHA=abc123 \
   DOTFILES_ZSH_REPORT_BUDGET_MS=1 \
   DOTFILES_STARSHIP_BUDGET_MS=1 \
   DOTFILES_SECOND_PASS_BUDGET_MS=1 \
@@ -27,12 +32,20 @@ PATH="$MOCK_BIN:$PATH" \
 
 jq -e '
   .report_only == true and
+  .schema_version == 1 and
+  .context.profile == "developer" and
+  .context.platform == "wsl-simulated" and
+  .context.run_id == "1234" and
+  .context.run_attempt == "2" and
+  .context.commit == "abc123" and
   .metrics.zsh_startup.status == "regression" and
   .metrics.starship_render.status == "regression" and
   .metrics.second_install_pass.status == "regression" and
   .metrics.second_install_pass.value_ms == 34
 ' "$ARTIFACT_DIR/performance.json" >/dev/null
 grep -Fq 'These budgets are report-only and do not block merges.' \
+  "$ARTIFACT_DIR/performance.md"
+grep -Fq 'Profile: `developer` | Platform: `wsl-simulated` | Run: `1234`' \
   "$ARTIFACT_DIR/performance.md"
 
 if PATH="$MOCK_BIN:$PATH" \

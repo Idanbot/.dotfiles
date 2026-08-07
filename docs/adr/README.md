@@ -13,5 +13,6 @@ before they become project direction.
 | [0004: Platform test strategy](0004-platform-test-strategy.md) | Accepted | `.github/e2e/compose.yaml`, `.github/workflows/wsl-e2e.yml` |
 | [0005: Parameterized agent workspaces](0005-agent-workspaces.md) | Superseded | Historical tmuxp-only decision |
 | [0006: Backend-aware agent workspaces](0006-backend-aware-agent-workspaces.md) | Accepted | `dot_local/bin/executable_dot-workspace`, `tests/test-agent-workspace.sh` |
+| [0007: CI operations and maintenance](0007-ci-operations-and-maintenance.md) | Accepted | `.github/workflows/ci.yml`, `tests/test-ci-operations.sh` |
 
-The next decision record uses sequence `0007`.
+The next decision record uses sequence `0008`.

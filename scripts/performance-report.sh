@@ -12,6 +12,18 @@ ZSH_BUDGET_MS="${DOTFILES_ZSH_REPORT_BUDGET_MS:-1000}"
 STARSHIP_BUDGET_MS="${DOTFILES_STARSHIP_BUDGET_MS:-250}"
 SECOND_PASS_BUDGET_MS="${DOTFILES_SECOND_PASS_BUDGET_MS:-180000}"
 ENFORCE="${DOTFILES_PERFORMANCE_ENFORCE:-0}"
+PROFILE="${E2E_PROFILE:-${DOTFILES_PERFORMANCE_PROFILE:-unknown}}"
+if [[ -n "${DOTFILES_PERFORMANCE_PLATFORM:-}" ]]; then
+  PLATFORM="$DOTFILES_PERFORMANCE_PLATFORM"
+elif [[ "${DOTFILES_WSL:-false}" == true ]]; then
+  PLATFORM=wsl-simulated
+else
+  PLATFORM=native
+fi
+RUN_ID="${GITHUB_RUN_ID:-local}"
+RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
+COMMIT="${GITHUB_SHA:-local}"
+GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 
 mkdir -p "$ARTIFACT_DIR"
 
@@ -57,6 +69,12 @@ starship_status="$(metric_status "$starship_ms" "$STARSHIP_BUDGET_MS")"
 second_pass_status="$(metric_status "$second_pass_ms" "$SECOND_PASS_BUDGET_MS")"
 
 jq -n \
+  --arg generated_at "$GENERATED_AT" \
+  --arg profile "$PROFILE" \
+  --arg platform "$PLATFORM" \
+  --arg run_id "$RUN_ID" \
+  --arg run_attempt "$RUN_ATTEMPT" \
+  --arg commit "$COMMIT" \
   --argjson zsh_value "$zsh_ms" \
   --argjson zsh_budget "$ZSH_BUDGET_MS" \
   --arg zsh_status "$zsh_status" \
@@ -67,6 +85,15 @@ jq -n \
   --argjson second_budget "$SECOND_PASS_BUDGET_MS" \
   --arg second_status "$second_pass_status" \
   '{
+    schema_version: 1,
+    generated_at: $generated_at,
+    context: {
+      profile: $profile,
+      platform: $platform,
+      run_id: $run_id,
+      run_attempt: $run_attempt,
+      commit: $commit
+    },
     report_only: true,
     metrics: {
       zsh_startup: {
@@ -93,6 +120,7 @@ display_value() {
 
 {
   printf '## Dotfiles performance budgets\n\n'
+  printf 'Profile: `%s` | Platform: `%s` | Run: `%s`\n\n' "$PROFILE" "$PLATFORM" "$RUN_ID"
   printf 'These budgets are report-only and do not block merges.\n\n'
   printf '| Metric | Observed | Budget | Status |\n'
   printf '|---|---:|---:|---|\n'
