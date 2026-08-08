@@ -17,7 +17,7 @@ env:
 
 jobs:
   native-vm:
-    name: Two-pass install on ephemeral Ubuntu 24.04 VM
+    name: Install, restore, and reapply on ephemeral Ubuntu 24.04 VM
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -39,6 +39,14 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y desktop-file-utils fontconfig
+      - name: Seed native restore fixtures
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/native-vm" "$HOME/.config"
+          printf 'native restore sentinel\n' >"$HOME/.zshrc"
+          chmod 600 "$HOME/.zshrc"
+          printf 'native symlink target\n' >/tmp/dotfiles-native-restore-tmux.conf
+          ln -sfn /tmp/dotfiles-native-restore-tmux.conf "$HOME/.tmux.conf"
+          rm -f "$HOME/.config/starship.toml"
       - name: Run the real installer twice
         run: |
           artifact_dir="$GITHUB_WORKSPACE/artifacts/native-vm"
@@ -55,7 +63,57 @@ jobs:
             ended="$(date +%s%N)"
             printf '%s\t%s\n' "$pass" "$(((ended - started) / 1000000))" \
               >>"$artifact_dir/install-timings.tsv"
+            summary="$(find "$HOME/.local/state/dotfiles/runs" -name summary.json \
+              -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+            cp "$summary" "$artifact_dir/install-pass-$pass-summary.json"
+            if [[ "$pass" == 1 ]]; then
+              backup_id="$(jq -r '.backup_id // empty' "$summary")"
+              [[ -n "$backup_id" ]]
+              printf '%s\n' "$backup_id" >"$artifact_dir/first-backup-id"
+              backup_dir="$HOME/.local/state/dotfiles/backups/$backup_id"
+              cp "$backup_dir/manifest.tsv" "$artifact_dir/first-backup-manifest.tsv"
+              cp "$backup_dir/metadata" "$artifact_dir/first-backup-metadata"
+              awk -F '\t' '$1 == ".zshrc" && $2 == "file" && $3 == "600" { found = 1 } END { exit !found }' \
+                "$backup_dir/manifest.tsv"
+              awk -F '\t' '$1 == ".tmux.conf" && $2 == "symlink" { found = 1 } END { exit !found }' \
+                "$backup_dir/manifest.tsv"
+              awk -F '\t' '$1 == ".config/starship.toml" && $2 == "absent" { found = 1 } END { exit !found }' \
+                "$backup_dir/manifest.tsv"
+            fi
           done
+      - name: Restore first backup and reapply
+        run: |
+          artifact_dir="$GITHUB_WORKSPACE/artifacts/native-vm"
+          backup_id="$(<"$artifact_dir/first-backup-id")"
+          ./scripts/backup.sh restore "$backup_id" --force | tee "$artifact_dir/restore.log"
+
+          [[ "$(<"$HOME/.zshrc")" == 'native restore sentinel' ]]
+          [[ "$(stat -c '%a' "$HOME/.zshrc")" == 600 ]]
+          [[ -L "$HOME/.tmux.conf" ]]
+          [[ "$(readlink "$HOME/.tmux.conf")" == /tmp/dotfiles-native-restore-tmux.conf ]]
+          [[ ! -e "$HOME/.config/starship.toml" ]]
+
+          started="$(date +%s%N)"
+          DOTFILES_LOG_FILE="$artifact_dir/bootstrap-reapply.log" \
+            ./scripts/install.sh \
+              --source "$GITHUB_WORKSPACE" \
+              --profile developer \
+              --with fonts,desktop \
+              --conflict-policy backup \
+              --yes
+          ended="$(date +%s%N)"
+          printf 'reapply\t%s\n' "$(((ended - started) / 1000000))" \
+            >>"$artifact_dir/install-timings.tsv"
+          summary="$(find "$HOME/.local/state/dotfiles/runs" -name summary.json \
+            -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+          cp "$summary" "$artifact_dir/install-reapply-summary.json"
+
+          if grep -Fq 'native restore sentinel' "$HOME/.zshrc"; then
+            printf 'Managed .zshrc still contains the restored fixture\n' >&2
+            exit 1
+          fi
+          [[ -f "$HOME/.tmux.conf" && ! -L "$HOME/.tmux.conf" ]]
+          [[ -f "$HOME/.config/starship.toml" ]]
       - name: Validate host integrations
         run: |
           sections='detect,core,zsh,terminal,languages,history,tmux,neovim,fonts,desktop,system,theme,services'

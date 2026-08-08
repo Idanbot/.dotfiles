@@ -16,6 +16,7 @@ printf '\n== Repository Layout ==\n'
 required=(
   scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
+  scripts/download-cache.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
   scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/classify-ci-run.sh
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
@@ -26,7 +27,7 @@ required=(
   tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
-  tests/test-ci-outcome.sh tests/test-network-faults.sh
+  tests/test-ci-outcome.sh tests/test-network-faults.sh tests/test-download-cache.sh
   tests/test-ci-operations.sh tests/test-system-configuration.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
   tests/test-ssh-access.sh
@@ -42,6 +43,13 @@ required=(
 for path in "${required[@]}"; do
   [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
 done
+
+if grep -Fq 'cache [status|prune]' "$DOTFILES_DIR/dot_local/bin/executable_dot" &&
+  grep -Fq 'scripts/download-cache.sh' "$DOTFILES_DIR/dot_local/bin/executable_dot"; then
+  pass "dot exposes verified download cache maintenance"
+else
+  fail "dot is missing verified download cache maintenance"
+fi
 
 CI_WORKFLOW="$DOTFILES_DIR/.github/workflows/ci.yml"
 if grep -Fq 'name: Version and Checksum Report' "$CI_WORKFLOW" &&

@@ -354,16 +354,66 @@ verify_sha256() {
   log_success "Verified SHA256 for $label"
 }
 
-download_verified() {
-  local url="$1" dest="$2" checksum_spec="$3" checksum_name
-  local expected checksum_file candidate
-  checksum_name="${4:-$(basename "$dest")}"
-  mkdir -p "$(dirname "$dest")"
+sha256_matches() {
+  local file="$1" expected="$2" actual
+  [[ -f "$file" ]] || return 1
+  actual="$(sha256_file "$file")"
+  [[ "${actual,,}" == "${expected,,}" ]]
+}
+
+download_cache_enabled() {
+  local enabled="${DOTFILES_DOWNLOAD_CACHE:-1}"
+  case "${enabled,,}" in
+    0 | false | no | off) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+download_cache_root() {
+  printf '%s\n' \
+    "${DOTFILES_DOWNLOAD_CACHE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/downloads}"
+}
+
+prepare_download_cache() {
+  local root="$1"
+  mkdir -p "$root/sha256" "$root/locks" "$root/tmp" || return 1
+  chmod 700 "$root" "$root/sha256" "$root/locks" "$root/tmp" || return 1
+}
+
+materialize_cached_download() {
+  local cache_file="$1" dest="$2" expected="$3" candidate
+  candidate="$(mktemp "${dest}.verified.XXXXXX")"
+  if ! cp -- "$cache_file" "$candidate"; then
+    rm -f "$candidate"
+    return 1
+  fi
+  chmod 600 "$candidate"
+  if ! sha256_matches "$candidate" "$expected"; then
+    rm -f "$candidate"
+    return 1
+  fi
+  mv -f "$candidate" "$dest"
+}
+
+download_verified_direct() {
+  local url="$1" dest="$2" expected="$3" label="$4" candidate
   candidate="$(mktemp "${dest}.verified.XXXXXX")"
   if ! download "$url" "$candidate"; then
     rm -f "$candidate"
     return 1
   fi
+  if ! verify_sha256 "$candidate" "$expected" "$label"; then
+    rm -f "$candidate"
+    return 1
+  fi
+  mv -f "$candidate" "$dest"
+}
+
+download_verified() {
+  local url="$1" dest="$2" checksum_spec="$3" checksum_name
+  local expected checksum_file cache_root cache_file cache_candidate lock_file cache_lock_fd status
+  checksum_name="${4:-$(basename "$dest")}"
+  mkdir -p "$(dirname "$dest")"
 
   case "$checksum_spec" in
     sha256:*)
@@ -372,7 +422,7 @@ download_verified() {
     https://*)
       checksum_file="$(mktemp)"
       if ! download "$checksum_spec" "$checksum_file"; then
-        rm -f "$checksum_file" "$candidate"
+        rm -f "$checksum_file"
         return 1
       fi
       expected="$(checksum_for_asset "$checksum_file" "$checksum_name")"
@@ -380,21 +430,86 @@ download_verified() {
       ;;
     *)
       log_error "Unverified download blocked: $url"
-      rm -f "$candidate"
       return 1
       ;;
   esac
 
-  if [[ -z "$expected" ]]; then
-    log_error "No checksum found for $checksum_name"
-    rm -f "$candidate"
+  if [[ ! "$expected" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    log_error "Invalid or missing SHA256 declaration for $checksum_name"
     return 1
   fi
-  if ! verify_sha256 "$candidate" "$expected" "$checksum_name"; then
-    rm -f "$candidate"
+  expected="${expected,,}"
+
+  if ! download_cache_enabled || ! command_exists flock; then
+    download_verified_direct "$url" "$dest" "$expected" "$checksum_name"
+    return
+  fi
+
+  cache_root="$(download_cache_root)"
+  if ! prepare_download_cache "$cache_root"; then
+    log_warn "Verified download cache is unavailable at $cache_root; downloading directly"
+    download_verified_direct "$url" "$dest" "$expected" "$checksum_name"
+    return
+  fi
+
+  cache_file="$cache_root/sha256/$expected"
+  lock_file="$cache_root/locks/$expected.lock"
+  if ! { exec {cache_lock_fd}>"$lock_file"; }; then
+    log_warn "Cannot open the verified download cache lock; downloading directly"
+    download_verified_direct "$url" "$dest" "$expected" "$checksum_name"
+    return
+  fi
+  chmod 600 "$lock_file"
+  if ! flock -w "${DOTFILES_DOWNLOAD_CACHE_LOCK_TIMEOUT:-300}" "$cache_lock_fd"; then
+    exec {cache_lock_fd}>&-
+    log_error "Timed out waiting for verified download cache entry $expected"
     return 1
   fi
-  mv -f "$candidate" "$dest"
+
+  if [[ -e "$cache_file" ]] && ! sha256_matches "$cache_file" "$expected"; then
+    log_warn "Discarding corrupt verified download cache entry $expected"
+    rm -f "$cache_file"
+  fi
+
+  if [[ -f "$cache_file" ]]; then
+    touch "$cache_file"
+    if materialize_cached_download "$cache_file" "$dest" "$expected"; then
+      log_success "Verified SHA256 for $checksum_name (cache hit)"
+      status=0
+    else
+      log_error "Failed to materialize cached download for $checksum_name"
+      status=1
+    fi
+    flock -u "$cache_lock_fd"
+    exec {cache_lock_fd}>&-
+    return "$status"
+  fi
+
+  cache_candidate="$(mktemp "$cache_root/tmp/${expected}.XXXXXX")"
+  if ! download "$url" "$cache_candidate"; then
+    rm -f "$cache_candidate"
+    flock -u "$cache_lock_fd"
+    exec {cache_lock_fd}>&-
+    return 1
+  fi
+  if ! verify_sha256 "$cache_candidate" "$expected" "$checksum_name"; then
+    rm -f "$cache_candidate"
+    flock -u "$cache_lock_fd"
+    exec {cache_lock_fd}>&-
+    return 1
+  fi
+  chmod 600 "$cache_candidate"
+  mv -f "$cache_candidate" "$cache_file"
+  log_info "Cached verified download for $checksum_name"
+  if materialize_cached_download "$cache_file" "$dest" "$expected"; then
+    status=0
+  else
+    log_error "Failed to materialize cached download for $checksum_name"
+    status=1
+  fi
+  flock -u "$cache_lock_fd"
+  exec {cache_lock_fd}>&-
+  return "$status"
 }
 
 github_latest_release() {

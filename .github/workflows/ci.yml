@@ -100,6 +100,7 @@ jobs:
           tests/test-performance-history.sh "$PWD"
           tests/test-ci-outcome.sh "$PWD"
           tests/test-network-faults.sh "$PWD"
+          tests/test-download-cache.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
           tests/test-system-configuration.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
@@ -347,7 +348,7 @@ jobs:
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
-                test-network-faults.sh \
+                test-network-faults.sh test-download-cache.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do

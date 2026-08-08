@@ -38,11 +38,13 @@ fi
 
 if grep -Fq 'tests/test-network-faults.sh "$PWD"' "$CI" &&
   grep -Fq 'test-network-faults.sh' "$CI" &&
+  grep -Fq 'tests/test-download-cache.sh "$PWD"' "$CI" &&
+  grep -Fq 'test-download-cache.sh' "$CI" &&
   grep -Fq 'performance-history:' "$CI" &&
   grep -Fq 'name: performance-history' "$CI"; then
-  pass 'network faults and rolling performance history are wired into CI'
+  pass 'network faults, verified cache, and rolling performance history are wired into CI'
 else
-  fail 'network fault or performance history coverage is not wired into CI'
+  fail 'network fault, verified cache, or performance history coverage is not wired into CI'
 fi
 
 if grep -Fq 'cron: "17 4 1 * *"' "$UPGRADES" &&
@@ -67,10 +69,15 @@ fi
 if grep -Fq 'runs-on: ubuntu-24.04' "$NATIVE" &&
   grep -Fq 'for pass in 1 2; do' "$NATIVE" &&
   grep -Fq -- '--with fonts,desktop' "$NATIVE" &&
+  grep -Fq 'Seed native restore fixtures' "$NATIVE" &&
+  grep -Fq 'Restore first backup and reapply' "$NATIVE" &&
+  grep -Fq 'first-backup-manifest.tsv' "$NATIVE" &&
+  grep -Fq './scripts/backup.sh restore "$backup_id" --force' "$NATIVE" &&
+  grep -Fq 'bootstrap-reapply.log' "$NATIVE" &&
   grep -Fq 'DOTFILES_ALLOW_CI_LOGIN_SHELL_MUTATION: "1"' "$NATIVE" &&
   grep -Fq 'desktop-file-validate' "$NATIVE" &&
   grep -Fq 'systemd-analyze verify' "$NATIVE"; then
-  pass 'native VM acceptance covers two-pass and host-only integrations'
+  pass 'native VM acceptance covers two-pass install, restore/reapply, and host integrations'
 else
   fail 'native VM acceptance is missing a required host integration check'
 fi

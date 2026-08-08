@@ -19,8 +19,10 @@ separate diagnosis check. It marks cancellation-only and strong hosted-runner
 outage signatures neutral, but it never changes the original workflow result.
 
 Downloads stage partial files and retry before replacement. Checksum-protected
-downloads replace the destination only after verification. Deterministic fault
-tests cover transient errors, exhausted retries, and corrupt payloads.
+downloads replace the destination only after verification. Verified payloads
+are cached by SHA256 with private permissions, read-time revalidation, and
+per-object locking. Deterministic tests cover transient errors, exhausted
+retries, corrupt payloads, cache recovery, and concurrent callers.
 
 Performance samples include run/profile/platform identity. CI carries one
 rolling 90-day history artifact forward and publishes per-series latest,
@@ -33,8 +35,10 @@ the heavy E2E matrix. Dependabot groups GitHub Actions into one separate monthly
 PR. Neither automation path merges changes.
 
 A monthly GitHub-hosted Ubuntu 24.04 VM runs a developer-plus-desktop install
-twice and validates login shell, Kitty desktop registration, fontconfig,
-systemd unit syntax/runtime when available, doctor acceptance, and Zsh startup.
+twice, restores the first transactional backup, and reapplies the desired
+state. It validates regular-file modes, symlink and absent-path restoration,
+login shell, Kitty desktop registration, fontconfig, systemd unit
+syntax/runtime when available, doctor acceptance, and Zsh startup.
 Real WSL remains a separate self-hosted workflow.
 
 ## Consequences

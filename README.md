@@ -189,6 +189,8 @@ dot profile [name]         read or set the machine profile
 dot logs [run-id]          list or follow bootstrap logs
 dot backup                 list config backups
 dot restore <id>           restore a config backup
+dot cache status           inspect the verified download cache
+dot cache prune [days]     remove verified downloads unused for DAYS
 dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
 dot workspace [directory]  open a backend-aware agent workspace
@@ -364,6 +366,11 @@ separate, opt-in encrypted recovery source. See [Security Model](docs/security-m
 - `docs/tool-inventory.md`: generated readable inventory.
 
 Downloads use upstream checksum manifests or repository-pinned SHA256 values.
+Verified payloads are cached by checksum under
+`~/.cache/dotfiles/downloads`; every cache read is revalidated before use and
+concurrent installs share a per-object lock. Set `DOTFILES_DOWNLOAD_CACHE=0`
+to bypass it or `DOTFILES_DOWNLOAD_CACHE_DIR` to relocate it. Use
+`dot cache status` and `dot cache prune [days]` for maintenance.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
@@ -580,6 +587,8 @@ The container validates Ubuntu package and configuration behavior, but it
 cannot prove native GUI integration, physical-device behavior, or Windows/WSL
 interop. The monthly `Native Ubuntu VM Acceptance` workflow covers login-shell,
 fontconfig, Kitty desktop, and systemd integration on an ephemeral Ubuntu host.
+It also restores the first-pass transactional backup, verifies file, symlink,
+mode, and absent-path semantics, then reapplies the desired configuration.
 Windows interoperability remains the real-WSL workflow's responsibility.
 
 E2E artifacts include redacted text logs, JSONL events, run summaries,

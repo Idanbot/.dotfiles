@@ -10,6 +10,7 @@
 - Every selected profile ends with acceptance checks.
 - A second unchanged run must report no config diff and skip installed tools.
 - Every direct download is integrity-verified before installation.
+- Every cached download is keyed by and revalidated against its SHA256 digest.
 - Every managed install has an ownership record.
 
 ## Failure Handling
@@ -29,7 +30,9 @@ The recovery suite proves that completed stages are skipped and the original
 run summary becomes successful after resume.
 
 Download fault injection separately proves retries, atomic replacement, and
-checksum rejection. A completed-workflow classifier distinguishes actionable
+checksum rejection. Cache tests additionally prove cache hits, corrupt-entry
+recovery, opt-out behavior, concurrent locking, and retention pruning. A
+completed-workflow classifier distinguishes actionable
 job failures from cancellation-only or known hosted-runner interruptions. Its
 diagnostic check never replaces or edits the original CI conclusion.
 
@@ -78,7 +81,8 @@ not automatic.
 3. Release smoke: real checksummed assets, Herdr server/workspace reuse, and all external archives.
 4. Base E2E: clean native and simulated-WSL install, two passes.
 5. Heavy E2E: developer, agent, cloud, and full profiles.
-6. Native VM: real two-pass Ubuntu host integration on a monthly ephemeral VM.
+6. Native VM: real two-pass Ubuntu host integration plus transactional
+   restore/reapply acceptance on a monthly ephemeral VM.
 7. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
 
 The simulated WSL tier must never be described as a real WSL kernel test.

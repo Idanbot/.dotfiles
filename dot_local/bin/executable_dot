@@ -23,6 +23,7 @@ Usage: dot <command> [args]
   logs [run-id]       Show recent runs or tail one run log
   backup              List configuration backups
   restore <id>        Restore a configuration backup
+  cache [status|prune] Inspect or prune verified downloads
   reconcile           Apply changed package-manifest sections
   uninstall <tool>    Remove a tool using the ownership ledger
 USAGE
@@ -98,6 +99,11 @@ case "${1:-}" in
       exit 2
     }
     exec "$SOURCE/scripts/backup.sh" restore "$2"
+    ;;
+  cache)
+    shift
+    (($#)) || set -- status
+    exec "$SOURCE/scripts/download-cache.sh" "$@"
     ;;
   reconcile)
     shift

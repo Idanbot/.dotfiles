@@ -91,6 +91,12 @@ report. A monthly workflow materializes every fully verified candidate into one
 stable canary PR; it never merges. `scripts/update-packages.sh --apply-all` or
 `--apply section.tool@version` remains available for local acceptance.
 
+Checksum-verified payloads use a content-addressed cache rooted at
+`~/.cache/dotfiles/downloads`. The checksum is resolved before the payload is
+requested, each object is stored under its SHA256 digest with private modes,
+and every read is revalidated. Per-object `flock` locking prevents parallel
+profiles from downloading or publishing the same object concurrently.
+
 ## Agent Workspaces
 
 `agents.yaml` is the single command and workspace-order registry. Chezmoi
