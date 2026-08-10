@@ -27,6 +27,11 @@ record_install serena 1.6.1 uv:serena-agent "$HOME/.local/share/uv/tools/serena-
   grep -Fq 'would uv tool uninstall serena-agent'
 forget_install serena
 
+record_install graphify 0.9.38 uv:graphifyy "$HOME/.local/share/uv/tools/graphifyy"
+"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run graphify |
+  grep -Fq 'would uv tool uninstall graphifyy'
+forget_install graphify
+
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run demo | grep -Fq 'would remove'
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" demo >/dev/null
 [[ ! -e "$HOME/.local/bin/demo" ]]

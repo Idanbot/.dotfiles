@@ -273,6 +273,13 @@ project once after enabling Serena. This MCP-only toggle deliberately avoids
 installing persistent hooks or plugins. Neither MCP is authenticated or granted
 extra permissions.
 
+Graphify is installed as a separate, on-demand code knowledge-graph skill for
+OMP through the standard `~/.agents/skills/graphify` location. It does not run
+during bootstrap, index repositories automatically, enable an MCP server, or
+configure an external model backend. In an OMP session, run `/graphify .` for a
+large or unfamiliar repository; generated `graphify-out/` data is ignored in
+this repository.
+
 A concise shared policy lives at `~/.config/agents/AGENTS.md`. Symlinks expose
 it as Codex `~/.codex/AGENTS.md`, Claude `~/.claude/CLAUDE.md`, Antigravity
 `~/.gemini/GEMINI.md`, OpenCode `~/.config/opencode/AGENTS.md`, and OMP

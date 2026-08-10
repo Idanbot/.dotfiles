@@ -80,6 +80,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | ai_tools | omp | 16.4.0 | github | dotfiles-binary | pinned-sha256 |
 | ai_tools | serena | 1.6.1 | uv | uv | pypi |
 | ai_tools | context_mode | 1.0.169 | npm | npm | npm-registry |
+| ai_tools | graphify | 0.9.38 | pypi | uv | pypi |
 | media | yt_dlp | 2026.07.04 | uv | uv | pypi |
 | media | rmpc | 0.11.0 | github | dotfiles-binary | pinned-sha256 |
 | media | cava | distro | apt | apt | apt-signature |

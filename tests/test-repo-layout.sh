@@ -198,10 +198,13 @@ AI_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl
 if grep -Fq 'package_version ai_tools serena' "$AI_INSTALLER" &&
   grep -Fq 'uv tool install --force -p 3.13 "serena-agent==${SERENA_VERSION}"' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools context_mode' "$AI_INSTALLER" &&
-  grep -Fq 'context-mode,better-sqlite3' "$AI_INSTALLER"; then
-  pass "optional MCP runtimes are versioned and installed with explicit build-script approval"
+  grep -Fq 'context-mode,better-sqlite3' "$AI_INSTALLER" &&
+  grep -Fq 'package_version ai_tools graphify' "$AI_INSTALLER" &&
+  grep -Fq 'uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"' "$AI_INSTALLER" &&
+  grep -Fq 'graphify install --platform agents' "$AI_INSTALLER"; then
+  pass "optional agent context tools are versioned and Graphify registers passively"
 else
-  fail "Serena and context-mode installation contracts are incomplete"
+  fail "optional agent context tool installation contracts are incomplete"
 fi
 
 MCP_MANAGER="$DOTFILES_DIR/dot_local/bin/executable_agent-mcp"

@@ -112,6 +112,27 @@ CONTEXT_MODE_VERSION="$(package_version ai_tools context_mode 1.0.169)"
 npm_install_global context-mode "$CONTEXT_MODE_VERSION" context-mode \
   context-mode,better-sqlite3
 
+GRAPHIFY_VERSION="$(package_version ai_tools graphify 0.9.38)"
+if ! is_installed graphify ||
+  ! version_ge "$(graphify --version 2>/dev/null || true)" "$GRAPHIFY_VERSION"; then
+  log_info "Installing optional Graphify skill runtime $GRAPHIFY_VERSION"
+  uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"
+  record_install graphify "$GRAPHIFY_VERSION" uv:graphifyy \
+    "$HOME/.local/share/uv/tools/graphifyy"
+  ((_INSTALLED++)) || true
+  log_success "Graphify $GRAPHIFY_VERSION installed"
+else
+  log_skip "Graphify $GRAPHIFY_VERSION already installed or newer"
+fi
+
+# OMP discovers the standard Agent Skills location. Registration is passive:
+# no repository graph, hook, MCP server, or external backend is configured.
+if graphify install --platform agents >/dev/null; then
+  log_success "Graphify skill registered for OMP"
+else
+  log_error "Graphify skill registration failed"
+fi
+
 for agent in claude codex agy opencode omp; do
   if version_output="$("$agent" --version 2>&1)"; then
     log_success "$agent executable validation passed"
@@ -128,6 +149,7 @@ for mcp_runtime in serena context-mode agent-mcp; do
   fi
 done
 log_info "Optional MCP servers are disabled by default; use 'agent-mcp enable <server>'"
+log_info "Graphify is available on demand in OMP; run '/graphify .' inside an agent session"
 
 if is_installed herdr; then
   log_info "Installing bundled Herdr agent integrations"

@@ -458,6 +458,12 @@ ai_tools:
     package: context-mode
     binary: context-mode
     integrity: npm-registry
+  graphify:
+    source: pypi
+    owner: uv
+    package: graphifyy
+    binary: graphify
+    integrity: pypi
 
 media:
   yt_dlp:

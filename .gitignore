@@ -20,3 +20,4 @@ artifacts/
 .e2e/
 *.orig
 .version-update-report
+graphify-out/

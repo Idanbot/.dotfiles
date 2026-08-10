@@ -293,9 +293,10 @@ fi
 
 if selected ai; then
   doctor_step "Agent CLIs"
-  for command in claude codex agy opencode omp serena context-mode agent-mcp; do
+  for command in claude codex agy opencode omp serena context-mode graphify agent-mcp; do
     check_command "$command" true
   done
+  check_file "$HOME/.agents/skills/graphify/SKILL.md" graphify-skill
   check_file "$HOME/.config/agents/AGENTS.md" agent-instructions
   check_instruction_link "$HOME/.codex/AGENTS.md" codex-instructions
   check_instruction_link "$HOME/.claude/CLAUDE.md" claude-instructions

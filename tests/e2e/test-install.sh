@@ -187,6 +187,9 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   context_mode_manifest="$HOME/.local/share/npm/lib/node_modules/context-mode/package.json"
   [[ -f "$context_mode_manifest" ]]
   [[ "$(gojq -r '.version' "$context_mode_manifest")" == "$(manifest_version ai_tools context_mode)" ]]
+  assert_version_contains Graphify "$(manifest_version ai_tools graphify)" graphify --version
+  [[ -f "$HOME/.agents/skills/graphify/SKILL.md" ]]
+  [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null
   mcp_status="$(agent-mcp status all)"
   if grep -Eq '[[:space:]]enabled$' <<<"$mcp_status"; then

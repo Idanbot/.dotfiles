@@ -541,6 +541,7 @@ run_live_audit() {
   audit_github ai_tools omp can1357/oh-my-pi
   audit_pypi ai_tools serena serena-agent
   audit_npm ai_tools context_mode context-mode
+  audit_pypi ai_tools graphify graphifyy
   audit_pypi terminal tmuxp tmuxp
   audit_github terminal kitty kovidgoyal/kitty
   audit_github terminal herdr ogulcancelik/herdr

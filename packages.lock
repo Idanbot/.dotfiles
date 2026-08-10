@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 9e805f2f4e3503b75b0ec8d87e6c8ae2f01654bf48f8ce6f007363712e2dddb5
-  metadata: a1fc907f3d28a0ba5ad6113374c7e953ccb1c5c86a7aacd308d0414562091a58
+  packages: 7fb7bfadcbe75f4fed701cb7f5c46d4d1accd1191f120e2c39b3320fabe7ccdb
+  metadata: bae74e96723f3a90a838812b52e699515332769b927d6e7f5d4c3bacfd8716ea
 
 tools:
   - section: bootstrap
@@ -582,6 +582,14 @@ tools:
     package: context-mode
     binary: context-mode
     integrity: npm-registry
+  - section: ai_tools
+    name: graphify
+    version: 0.9.38
+    source: pypi
+    owner: uv
+    package: graphifyy
+    binary: graphify
+    integrity: pypi
   - section: media
     name: yt_dlp
     version: 2026.07.04
