@@ -23,14 +23,36 @@ make_mock() {
 
 make_mock ssh '
 if [[ "${1:-}" == -G ]]; then
-  printf "hostname rpi4-ssh.idanbot.uk\n"
-elif [[ -n "${SSH_FAIL_ONCE_FILE:-}" && ! -e "$SSH_FAIL_ONCE_FILE" ]]; then
-  touch "$SSH_FAIL_ONCE_FILE"
+  case "${2:-}" in
+    rpi4) printf "hostname rpi4-ssh.idanbot.uk\n" ;;
+    t420) printf "hostname t420.idanbot.uk\n" ;;
+    *) printf "hostname %s\n" "${2:-}" ;;
+  esac
+  printf "identityfile ~/.ssh/id_ed25519\n"
+elif [[ "${SSH_ALWAYS_FAIL:-0}" == 1 ]]; then
   exit 255
 fi'
 make_mock cloudflared 'exit 0'
 make_mock ssh-copy-id 'exit 0'
 make_mock ssh-add 'exit 0'
+make_mock ssh-key-load 'exit 0'
+make_mock ssh-keygen '
+if [[ "${1:-}" == -y ]]; then
+  printf "ssh-ed25519 fixture-public-key\n"
+  exit 0
+fi
+key=""
+while (($#)); do
+  if [[ "$1" == -f ]]; then
+    key="$2"
+    break
+  fi
+  shift
+done
+[[ -n "$key" ]]
+mkdir -p "$(dirname "$key")"
+printf "fixture-private-key\n" >"$key"
+printf "ssh-ed25519 fixture-public-key\n" >"$key.pub"'
 
 export HOME="$TMP_ROOT/home"
 export PATH="$MOCK_BIN:/usr/bin:/bin"
@@ -48,16 +70,38 @@ grep -Fq $'cloudflared\taccess login https://rpi4-ssh.idanbot.uk' "$CALLS"
 grep -Fq $'cloudflared\taccess ssh --hostname rpi4-ssh.idanbot.uk' "$CALLS"
 
 : >"$CALLS"
-export SSH_FAIL_ONCE_FILE="$TMP_ROOT/ssh-failed-once"
-"$CLOUDFLARE_SSH" connect rpi4 -v
-grep -Fq $'cloudflared\taccess login https://rpi4-ssh.idanbot.uk' "$CALLS"
-[[ "$(grep -Fc $'ssh\trpi4 -v' "$CALLS")" -eq 2 ]]
+if SSH_ALWAYS_FAIL=1 "$CLOUDFLARE_SSH" connect rpi4 -v; then
+  printf 'cloudflare-ssh connect masked an SSH transport failure\n' >&2
+  exit 1
+else
+  [[ "$?" -eq 255 ]]
+fi
+! grep -Fq $'cloudflared\taccess login' "$CALLS"
+[[ "$(grep -Fc $'ssh\trpi4 -v' "$CALLS")" -eq 1 ]]
 
 : >"$CALLS"
-unset SSH_FAIL_ONCE_FILE
 "$CLOUDFLARE_SSH" connect rpi4 -v
 ! grep -Fq $'cloudflared\taccess login' "$CALLS"
 [[ "$(grep -Fc $'ssh\trpi4 -v' "$CALLS")" -eq 1 ]]
+
+: >"$CALLS"
+"$CLOUDFLARE_SSH" setup rpi4 --yes
+grep -Fq $'ssh-key-load\t--key '"$HOME"$'/.ssh/id_ed25519' "$CALLS"
+grep -Fq $'cloudflared\taccess login https://rpi4-ssh.idanbot.uk' "$CALLS"
+grep -Fq $'ssh-copy-id\t-i '"$HOME"$'/.ssh/id_ed25519.pub rpi4' "$CALLS"
+grep -Fq $'ssh\t-o BatchMode=yes -o ConnectTimeout=15 rpi4 true' "$CALLS"
+! grep -Fq $'ssh-keygen\t' "$CALLS"
+
+: >"$CALLS"
+new_key="$HOME/.ssh/fresh_ed25519"
+"$CLOUDFLARE_SSH" setup t420 --key "$new_key" --yes
+grep -Fq $'ssh-keygen\t-t ed25519 -a 100 -f '"$new_key" "$CALLS"
+grep -Fq $'ssh-key-load\t--key '"$new_key" "$CALLS"
+grep -Fq $'cloudflared\taccess login https://t420.idanbot.uk' "$CALLS"
+grep -Fq $'ssh-copy-id\t-i '"$new_key"$'.pub t420' "$CALLS"
+grep -Fq $'ssh\t-o BatchMode=yes -o ConnectTimeout=15 t420 true' "$CALLS"
+[[ "$(stat -c '%a' "$new_key")" == 600 ]]
+[[ "$(stat -c '%a' "$new_key.pub")" == 644 ]]
 
 : >"$CALLS"
 "$CLOUDFLARE_SSH" install-key rpi4

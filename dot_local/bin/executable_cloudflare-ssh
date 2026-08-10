@@ -7,12 +7,14 @@ usage() {
   cat <<'EOF'
 Usage:
   cloudflare-ssh login HOST
+  cloudflare-ssh setup HOST [--key PATH] [--yes]
   cloudflare-ssh connect HOST [SSH_ARGS...]
   cloudflare-ssh install-key HOST [PUBLIC_KEY]
   cloudflare-ssh proxy HOST
 
 login       Authenticate to the host's Cloudflare Access application.
-connect     Open SSH; on transport failure, authenticate and retry once.
+setup       Create/load a key, authenticate, install it, and verify access.
+connect     Open SSH once; the ProxyCommand handles Access authentication.
 install-key Authenticate, then install your public key with ssh-copy-id.
 proxy       Internal SSH ProxyCommand transport; normally not called directly.
 EOF
@@ -44,6 +46,116 @@ access_login() {
   cloudflared access login "https://${hostname}"
 }
 
+expand_key_path() {
+  local path="$1" tilde='~'
+  if [[ "$path" == "$tilde" ]]; then
+    printf '%s\n' "$HOME"
+  elif [[ "${path:0:2}" == "$tilde/" ]]; then
+    printf '%s/%s\n' "$HOME" "${path:2}"
+  elif [[ "$path" == /* ]]; then
+    printf '%s\n' "$path"
+  else
+    printf '%s/%s\n' "$PWD" "$path"
+  fi
+}
+
+resolve_identity_file() {
+  local target="$1" identity
+  identity="$(
+    ssh -G "$target" 2>/dev/null |
+      awk '$1 == "identityfile" { print $2; exit }'
+  )"
+  [[ -n "$identity" ]] || identity="$HOME/.ssh/id_ed25519"
+  expand_key_path "$identity"
+}
+
+ensure_public_key() {
+  local private_key="$1" public_key="${1}.pub" temporary
+  [[ -f "$public_key" ]] && return 0
+  temporary="$(mktemp "${public_key}.XXXXXX")"
+  if ! ssh-keygen -y -f "$private_key" >"$temporary"; then
+    rm -f "$temporary"
+    return 1
+  fi
+  chmod 644 "$temporary"
+  mv "$temporary" "$public_key"
+}
+
+setup_target() {
+  local target="$1" key="" answer public_key
+  local assume_yes=false
+  shift
+  while (($#)); do
+    case "$1" in
+      --key)
+        [[ $# -ge 2 ]] || {
+          printf '%s\n' '--key requires a path' >&2
+          return 2
+        }
+        key="$2"
+        shift 2
+        ;;
+      --yes | -y)
+        assume_yes=true
+        shift
+        ;;
+      *)
+        printf 'Unknown setup option: %s\n' "$1" >&2
+        return 2
+        ;;
+    esac
+  done
+
+  require_command cloudflared
+  require_command ssh
+  require_command ssh-copy-id
+  require_command ssh-keygen
+
+  [[ -n "$key" ]] || key="$(resolve_identity_file "$target")"
+  key="$(expand_key_path "$key")"
+  mkdir -p "$(dirname "$key")"
+  chmod 700 "$(dirname "$key")"
+
+  if [[ ! -f "$key" ]]; then
+    if [[ "$assume_yes" == false ]]; then
+      printf 'SSH private key does not exist: %s\n' "$key"
+      if ! read -r -p "Create a passphrase-protected Ed25519 key? [y/N] " answer; then
+        printf 'Setup cancelled; no input was available. Use --yes to approve key creation.\n' >&2
+        return 1
+      fi
+      [[ "$answer" =~ ^[Yy]$ ]] || {
+        printf 'Setup cancelled; no key was created.\n' >&2
+        return 1
+      }
+    fi
+    printf 'Creating Ed25519 key: %s\n' "$key"
+    ssh-keygen -t ed25519 -a 100 -f "$key"
+  fi
+
+  chmod go-rwx "$key"
+  ensure_public_key "$key" || {
+    printf 'Unable to derive public key from %s\n' "$key" >&2
+    return 1
+  }
+  public_key="${key}.pub"
+  chmod 644 "$public_key"
+
+  if ! command -v ssh-key-load >/dev/null 2>&1 ||
+    ! ssh-key-load --key "$key"; then
+    printf 'SSH agent loading was unavailable; SSH may request the key passphrase directly.\n' >&2
+  fi
+  access_login "$target"
+  printf 'Installing public key on %s; the remote account may request its password.\n' "$target"
+  ssh-copy-id -i "$public_key" "$target"
+
+  printf 'Verifying public-key access to %s...\n' "$target"
+  if ! ssh -o BatchMode=yes -o ConnectTimeout=15 "$target" true; then
+    printf 'Public-key verification failed for %s. The key was not confirmed usable.\n' "$target" >&2
+    return 1
+  fi
+  printf 'Cloudflare SSH setup complete: ssh %s\n' "$target"
+}
+
 [[ $# -ge 1 ]] || {
   usage >&2
   exit 2
@@ -61,6 +173,15 @@ case "$command_name" in
     require_command ssh
     access_login "$1"
     ;;
+  setup)
+    [[ $# -ge 1 ]] || {
+      usage >&2
+      exit 2
+    }
+    target="$1"
+    shift
+    setup_target "$target" "$@"
+    ;;
   connect)
     [[ $# -ge 1 ]] || {
       usage >&2
@@ -70,14 +191,6 @@ case "$command_name" in
     require_command ssh
     target="$1"
     shift
-    if ssh "$target" "$@"; then
-      exit 0
-    else
-      ssh_status=$?
-    fi
-    [[ "$ssh_status" -eq 255 ]] || exit "$ssh_status"
-    printf 'SSH transport failed; refreshing Cloudflare Access and retrying once.\n' >&2
-    access_login "$target"
     exec ssh "$target" "$@"
     ;;
   install-key)

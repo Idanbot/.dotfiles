@@ -319,22 +319,26 @@ ssh-key-load --list
 ssh-key-load --clear
 ```
 
-For a new host, create or restore a private key manually, then install only its
-public half. `install-key` may request the remote account password once:
+For a new host, restore an existing private key manually or run the supervised
+setup flow. It can create a passphrase-protected Ed25519 key, keeps the
+passphrase only in `ssh-agent`, authenticates through Access, installs only the
+public key, and verifies the result. The remote account may request its password
+once while installing the public key:
 
 ```bash
-ssh-keygen -t ed25519 -a 100 -f ~/.ssh/id_ed25519
-ssh-key-load
-cloudflare-ssh login rpi4
-cloudflare-ssh install-key rpi4
+cloudflare-ssh setup rpi4
 ssh rpi4
 ```
 
+Use `cloudflare-ssh setup t420 --key ~/.ssh/id_ed25519` to select a key
+explicitly. `--yes` approves creation when a key is missing, but `ssh-keygen`
+still prompts for its passphrase.
+
 The managed `rpi4` and `t420` targets use `cloudflared access ssh` as their
 OpenSSH transport. Plain `ssh rpi4` lets Cloudflare open authentication when
-its local session is missing or expired. `cloudflare-ssh connect rpi4` uses
-that normal path first, then runs an explicit Access login and retries once
-after an SSH transport failure. Access state under
+its local session is missing or expired. `cloudflare-ssh connect rpi4` is a
+convenience alias for that same single SSH attempt; it does not reinterpret
+generic SSH errors as expired Access authentication. Access state under
 `~/.cloudflared/`, private keys, and `~/.ssh/config.local` remain local and
 untracked. OpenSSH connection multiplexing reuses authenticated connections
 for ten minutes without persisting a password.
