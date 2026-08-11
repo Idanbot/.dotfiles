@@ -62,6 +62,7 @@ EOF
   test -f "$HOME/.config/agents/AGENTS.md"
   test -x "$HOME/.local/bin/agent-mcp"
   test -x "$HOME/.local/bin/cloudflare-ssh"
+  test -x "$HOME/.local/bin/git-credential-dotfiles"
   test -x "$HOME/.local/bin/ssh-key-load"
   test -x "$HOME/.local/bin/tmux-cheat-sheet"
   test -x "$HOME/.local/bin/tmux-kube-status"

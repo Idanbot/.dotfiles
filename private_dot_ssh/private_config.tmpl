@@ -22,19 +22,16 @@ Host *
 Host github.com
     HostName github.com
     User git
-    IdentityFile ~/.ssh/id_ed25519
 
 # GitLab
 Host gitlab.com
     HostName gitlab.com
     User git
-    IdentityFile ~/.ssh/id_ed25519
 
 # Raspberry Pi 4 (Cloudflare Access SSH)
 Host rpi4
     HostName rpi4-ssh.idanbot.uk
     User idan
-    IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
     PreferredAuthentications publickey
     PasswordAuthentication no
@@ -46,7 +43,6 @@ Host rpi4
 Host t420
     HostName t420.idanbot.uk
     User idan
-    IdentityFile ~/.ssh/id_ed25519
     IdentitiesOnly yes
     PreferredAuthentications publickey
     PasswordAuthentication no

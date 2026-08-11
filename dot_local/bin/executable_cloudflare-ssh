@@ -60,13 +60,7 @@ expand_key_path() {
 }
 
 resolve_identity_file() {
-  local target="$1" identity
-  identity="$(
-    ssh -G "$target" 2>/dev/null |
-      awk '$1 == "identityfile" { print $2; exit }'
-  )"
-  [[ -n "$identity" ]] || identity="$HOME/.ssh/id_ed25519"
-  expand_key_path "$identity"
+  printf '%s/.ssh/id_ed25519\n' "$HOME"
 }
 
 ensure_public_key() {
@@ -111,7 +105,7 @@ setup_target() {
   require_command ssh-copy-id
   require_command ssh-keygen
 
-  [[ -n "$key" ]] || key="$(resolve_identity_file "$target")"
+  [[ -n "$key" ]] || key="$(resolve_identity_file)"
   key="$(expand_key_path "$key")"
   mkdir -p "$(dirname "$key")"
   chmod 700 "$(dirname "$key")"

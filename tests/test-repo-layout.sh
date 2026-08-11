@@ -28,12 +28,13 @@ required=(
   tests/test-kitty.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
   tests/test-ci-outcome.sh tests/test-network-faults.sh tests/test-download-cache.sh
-  tests/test-ci-operations.sh tests/test-system-configuration.sh
+  tests/test-ci-operations.sh tests/test-system-configuration.sh tests/test-git-credential.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
   tests/test-ssh-access.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
   .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
+  dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
   dot_config/agents/AGENTS.md dot_codex/symlink_AGENTS.md
@@ -250,8 +251,9 @@ if grep -Fq 'AddKeysToAgent 8h' "$SSH_CONFIG" &&
   grep -Fq 'PasswordAuthentication no' "$SSH_CONFIG" &&
   grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG" &&
   grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG" &&
+  ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG" &&
   ! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"; then
-  pass "SSH persists unlocked keys only in agent memory and delegates Access transport"
+  pass "SSH has clean keyless defaults and delegates Access transport"
 else
   fail "SSH key caching or Cloudflare Access configuration is unsafe or incomplete"
 fi

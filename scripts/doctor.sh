@@ -330,6 +330,7 @@ fi
 if selected system; then
   doctor_step "System"
   check_command git-credential-manager true
+  check_command git-credential-dotfiles true
   check_command ssh-key-load true
   check_file "$HOME/.ssh/config" ssh-config
 fi

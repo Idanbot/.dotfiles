@@ -46,7 +46,6 @@ if ! is_installed git-credential-manager || ! version_ge "$(git-credential-manag
     "$tmpdir/$asset" "sha256:$GCM_SHA" "$asset"
   sudo dpkg -i "$tmpdir/$asset" || apt_env apt-get -f -y install
   rm -rf "$tmpdir"
-  git-credential-manager configure || true
   record_install git-credential-manager "$GCM_VERSION" dpkg gcm
   ((_INSTALLED++)) || true
   log_success "Git Credential Manager $GCM_VERSION installed"

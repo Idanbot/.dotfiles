@@ -127,6 +127,7 @@ grep -Fq 'PreferredAuthentications publickey' "$SSH_CONFIG"
 grep -Fq 'PasswordAuthentication no' "$SSH_CONFIG"
 grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG"
 grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG"
+! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG"
 ! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"
 
 printf 'SSH access test passed\n'

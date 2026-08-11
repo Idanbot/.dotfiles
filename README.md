@@ -326,6 +326,11 @@ ssh-key-load --list
 ssh-key-load --clear
 ```
 
+The managed SSH config intentionally declares no `IdentityFile`. GitHub,
+GitLab, and Cloudflare host mappings are safe to deploy without keys; OpenSSH
+uses standard local identities when they are restored later, while custom
+identity paths belong in the untracked `~/.ssh/config.local` overlay.
+
 For a new host, restore an existing private key manually or run the supervised
 setup flow. It can create a passphrase-protected Ed25519 key, keeps the
 passphrase only in `ssh-agent`, authenticates through Access, installs only the
@@ -349,6 +354,12 @@ generic SSH errors as expired Access authentication. Access state under
 `~/.cloudflared/`, private keys, and `~/.ssh/config.local` remain local and
 untracked. OpenSSH connection multiplexing reuses authenticated connections
 for ten minutes without persisting a password.
+
+HTTPS Git authentication uses `git-credential-dotfiles`, which dispatches to
+Windows Git Credential Manager on WSL when available and otherwise to the
+managed Linux GCM. If neither exists it exits silently, allowing Git's normal
+interactive prompt instead of emitting helper errors. Authentication state is
+still local and must be established manually.
 
 ## Secrets Boundary
 

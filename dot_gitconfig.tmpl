@@ -2,10 +2,10 @@
 	email = {{ .email }}
 	name = {{ .name }}
 [credential]
-{{- if .is_wsl }}
-	helper = !f() { if [ -x '/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe' ]; then '/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe' "$@"; elif command -v git-credential-manager >/dev/null 2>&1; then git-credential-manager "$@"; fi; }; f
-{{- else }}
-	helper = !f() { if command -v git-credential-manager >/dev/null 2>&1; then git-credential-manager "$@"; elif command -v git-credential-manager-core >/dev/null 2>&1; then git-credential-manager-core "$@"; fi; }; f
+	# Reset inherited helpers, then use a real executable instead of fragile shell in config.
+	helper =
+	helper = dotfiles
+{{ if not .is_wsl }}
 	credentialStore = secretservice
 {{- end }}
 [credential "https://dev.azure.com"]

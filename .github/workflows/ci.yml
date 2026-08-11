@@ -104,6 +104,7 @@ jobs:
           tests/test-download-cache.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
           tests/test-system-configuration.sh "$PWD"
+          tests/test-git-credential.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"

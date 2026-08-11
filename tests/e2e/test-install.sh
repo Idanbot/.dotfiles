@@ -250,11 +250,15 @@ else
 fi
 
 if [[ ",$selected_sections," == *,system,* ]]; then
+  command -v git-credential-dotfiles >/dev/null
+  mapfile -t credential_helpers < <(git config --global --get-all credential.helper)
+  [[ "${credential_helpers[*]}" == ' dotfiles' ]]
   command -v ssh-key-load >/dev/null
   ssh-key-load --help >/dev/null
   grep -Fq 'AddKeysToAgent 8h' "$HOME/.ssh/config"
   grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$HOME/.ssh/config"
   grep -Fq 'PreferredAuthentications publickey' "$HOME/.ssh/config"
+  ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$HOME/.ssh/config"
   grep -Fq 'PasswordAuthentication no' "$HOME/.ssh/config"
 fi
 
