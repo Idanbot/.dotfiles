@@ -55,6 +55,42 @@
     sha256: "2411fc416c4475d297f61078d0a03afb3a1f5322fff26a13fdb4f20d7e975570"
   refreshPeriod: 168h
 
+".tmux/plugins/tmux-prefix-highlight":
+  type: archive
+  url: "https://github.com/tmux-plugins/tmux-prefix-highlight/archive/06cbb4ecd3a0a918ce355c70dc56d79debd455c7.tar.gz"
+  exact: true
+  stripComponents: 1
+  checksum:
+    sha256: "51434dfb6c0e8450f620246850eb547437431f48ee6bce50d6df215bc97fafb2"
+  refreshPeriod: 168h
+
+".tmux/plugins/tmux-resurrect":
+  type: archive
+  url: "https://github.com/tmux-plugins/tmux-resurrect/archive/cff343cf9e81983d3da0c8562b01616f12e8d548.tar.gz"
+  exact: true
+  stripComponents: 1
+  checksum:
+    sha256: "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9"
+  refreshPeriod: 168h
+
+".tmux/plugins/tmux-continuum":
+  type: archive
+  url: "https://github.com/tmux-plugins/tmux-continuum/archive/0698e8f4b17d6454c71bf5212895ec055c578da0.tar.gz"
+  exact: true
+  stripComponents: 1
+  checksum:
+    sha256: "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f"
+  refreshPeriod: 168h
+
+".tmux/plugins/tmux-battery":
+  type: archive
+  url: "https://github.com/tmux-plugins/tmux-battery/archive/43832651ede43f54dcf0588727c1957fe648d57d.tar.gz"
+  exact: true
+  stripComponents: 1
+  checksum:
+    sha256: "4c14d0f75b94459d7739635879945c86f34d3216a37b2769dbcd762e76cf3d78"
+  refreshPeriod: 168h
+
 ".fzf":
   type: archive
   url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.74.0"

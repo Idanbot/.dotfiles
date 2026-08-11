@@ -32,6 +32,10 @@ for target in \
   .oh-my-zsh/custom/plugins/fzf-tab/fzf-tab.plugin.zsh \
   .oh-my-zsh/custom/plugins/you-should-use/you-should-use.plugin.zsh \
   .tmux/plugins/tpm/tpm \
+  .tmux/plugins/tmux-prefix-highlight/prefix_highlight.tmux \
+  .tmux/plugins/tmux-resurrect/resurrect.tmux \
+  .tmux/plugins/tmux-continuum/continuum.tmux \
+  .tmux/plugins/tmux-battery/battery.tmux \
   .fzf/install; do
   [[ -f "$TMP_ROOT/destination/$target" ]] || {
     printf 'External target is missing: %s\n' "$target" >&2

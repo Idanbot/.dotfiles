@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+for dependency in jq curl less; do
+  if ! command -v "$dependency" >/dev/null 2>&1; then
+    printf '%s is required\n\nPress enter to close...' "$dependency"
+    read -r _
+    exit 0
+  fi
+done
+
+read -r -p "cht.sh query: " query
+[[ -n "$query" ]] || exit 0
+encoded="$(jq -rn --arg value "$query" '$value | @uri')"
+curl -fsSL "https://cht.sh/$encoded" | less -R

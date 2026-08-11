@@ -87,6 +87,10 @@ update_entry .oh-my-zsh/custom/plugins/zsh-syntax-highlighting zsh-users/zsh-syn
 update_entry .oh-my-zsh/custom/plugins/fzf-tab Aloxaf/fzf-tab release
 update_entry .oh-my-zsh/custom/plugins/you-should-use MichaelAquilina/zsh-you-should-use release
 update_entry .tmux/plugins/tpm tmux-plugins/tpm release
+update_entry .tmux/plugins/tmux-prefix-highlight tmux-plugins/tmux-prefix-highlight commit
+update_entry .tmux/plugins/tmux-resurrect tmux-plugins/tmux-resurrect commit
+update_entry .tmux/plugins/tmux-continuum tmux-plugins/tmux-continuum commit
+update_entry .tmux/plugins/tmux-battery tmux-plugins/tmux-battery commit
 update_entry .fzf junegunn/fzf release
 
 if cmp -s "$SOURCE" "$WORK"; then

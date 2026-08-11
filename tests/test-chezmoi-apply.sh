@@ -63,6 +63,8 @@ EOF
   test -x "$HOME/.local/bin/agent-mcp"
   test -x "$HOME/.local/bin/cloudflare-ssh"
   test -x "$HOME/.local/bin/ssh-key-load"
+  test -x "$HOME/.local/bin/tmux-cheat-sheet"
+  test -x "$HOME/.local/bin/tmux-kube-status"
   grep -Fq 'prefix = "ctrl+s"' "$HOME/.config/herdr/config.toml"
   grep -Fq 'workspace:' "$HOME/.config/dotfiles/agents.yaml"
   for instruction_path in \

@@ -43,11 +43,13 @@ uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp --version
 record_install tmuxp "$TMUXP_VERSION" uvx "$(uv cache dir)/archive-v0"
 log_success "tmuxp $TMUXP_VERSION is available through uvx"
 
-if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
-  log_info "Installing missing TPM plugins"
-  "$HOME/.tmux/plugins/tpm/bin/install_plugins" || log_warn "TPM deferred plugin installation"
-else
-  log_error "Checksum-pinned TPM external is missing"
-fi
+for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-battery; do
+  if [[ -d "$HOME/.tmux/plugins/$plugin" ]]; then
+    log_skip "$plugin is managed by checksum-pinned chezmoi externals"
+  else
+    log_error "Checksum-pinned tmux plugin is missing: $plugin"
+    increment_failed
+  fi
+done
 
 print_summary "Terminal Multiplexers"

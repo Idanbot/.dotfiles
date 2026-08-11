@@ -16,21 +16,19 @@ set -g mouse on
 set -g base-index 1              # Start windows at 1
 setw -g pane-base-index 1        # Start panes at 1
 set -g renumber-windows on       # Re-order windows when one is closed
-set -g set-clipboard on          # Use system clipboard (OSC 52)
+set -g set-clipboard external    # Let tmux, not pane applications, update the clipboard
 set -g status-position top       # Status bar at the top
 set -g history-limit 10000
 set -g detach-on-destroy off     # Don't exit tmux when closing a session
 
 # Performance & Terminal
-{{ if not .is_wsl }}
-set -g default-terminal "xterm-kitty"
-set -ag terminal-overrides ",xterm-kitty:Tc"
-set -g allow-passthrough on      # Allow image previews (requires tmux >= 3.4)
-{{ else }}
 set -g default-terminal "tmux-256color"
-set -ag terminal-overrides ",xterm-256color:Tc"
+set -as terminal-features ",xterm-kitty:RGB"
+set -as terminal-features ",xterm-256color:RGB"
+{{ if not .is_wsl }}
+set -g allow-passthrough on      # Allow image previews (requires tmux >= 3.4)
 {{ end }}
-set -s escape-time 0             # Zero delay for Vim modes
+set -s escape-time 20            # Responsive Vim keys without breaking Alt/Escape sequences
 set -g focus-events on
 
 # Activity (Disabled for visual cleanness)
@@ -72,8 +70,8 @@ bind -r ^ last-window
 
 # Session/Window Management (Popups)
 bind-key -r f run-shell "tmux neww ~/.local/bin/tmux-sessionizer"
-bind-key -r i display-popup -w 80% -h 70% -E 'bash -lc "read -rp \"cht.sh query: \" query; [[ -n $query ]] || exit 0; curl -fsSL \"https://cht.sh/${query// /+}\" | less -R"'
-bind -r M-n display-popup -w 80% -h 80% -E "tmux new-session -A -s scratchpad"
+bind-key -r i display-popup -w 80% -h 70% -E '~/.local/bin/tmux-cheat-sheet'
+bind -r M-n display-popup -w 80% -h 80% -d "#{pane_current_path}" -E 'env -u TMUX tmux -L scratchpad -f /dev/null new-session -A -s scratchpad -c "$PWD"'
 bind-key M-s display-popup -E "tmux list-sessions | less"
 bind-key M-w display-popup -E "tmux list-windows | less"
 bind-key M-g display-popup -w 90% -h 90% -d "#{pane_current_path}" -E 'bash -lc "command -v lazygit >/dev/null && exec lazygit || { printf \"lazygit not found\\n\\nPress enter to close...\"; read -r _; }"'
@@ -81,13 +79,13 @@ bind-key M-d display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc 
 bind-key M-k display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v kubectl >/dev/null || { printf \"kubectl not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; printf \"Contexts:\\n\"; kubectl config get-contexts 2>/dev/null || true; printf \"\\nNamespaces:\\n\"; kubectl get namespaces 2>/dev/null || true; printf \"\\nPress enter to close...\"; read -r _"'
 bind-key M-p display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "test -x ~/.local/bin/tmux-sessionizer && exec ~/.local/bin/tmux-sessionizer || { printf \"tmux-sessionizer not found or not executable\\n\\nPress enter to close...\"; read -r _; }"'
 {{ if not .is_wsl }}
-bind-key M-m display-popup -w 80% -h 80% -E "rmpc"
+bind-key M-m display-popup -w 80% -h 80% -E 'bash -lc "command -v rmpc >/dev/null && exec rmpc || { printf \"rmpc not found\\n\\nPress enter to close...\"; read -r _; }"'
 bind-key M-u display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"Host: %s\\nPath: %s\\nKernel: %s\\n\\n\" \"$(hostname -s)\" \"$PWD\" \"$(uname -srmo)\"; command -v docker >/dev/null && docker context ls 2>/dev/null || true; printf \"\\n\"; command -v kubectl >/dev/null && kubectl config get-contexts 2>/dev/null || true; printf \"\\nPress enter to close...\"; read -r _"'
 {{ else }}
-bind-key M-e display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"WSL distro: %s\\nHost: %s\\nLinux path: %s\\nWindows path: \" \"${WSL_DISTRO_NAME:-unknown}\" \"$(hostname -s)\" \"$PWD\"; command -v wslpath >/dev/null && wslpath -w \"$PWD\" || printf \"n/a\"; printf \"\\n\\nDISPLAY=%s\\nWAYLAND_DISPLAY=%s\\nWSLg=%s\\n\\n\" \"${DISPLAY:-unset}\" \"${WAYLAND_DISPLAY:-unset}\" \"${WSLGd:-unset}\"; command -v explorer.exe >/dev/null && printf \"explorer.exe is available\\n\" || printf \"explorer.exe not found\\n\"; command -v clip.exe >/dev/null && printf \"clip.exe is available\\n\" || printf \"clip.exe not found\\n\"; printf \"\\nPress enter to close...\"; read -r _"'
+bind-key M-e display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"WSL distro: %s\\nHost: %s\\nLinux path: %s\\nWindows path: \" \"${WSL_DISTRO_NAME:-unknown}\" \"$(hostname -s)\" \"$PWD\"; command -v wslpath >/dev/null && wslpath -w \"$PWD\" || printf \"n/a\"; printf \"\\n\\nDISPLAY=%s\\nWAYLAND_DISPLAY=%s\\nWSL_INTEROP=%s\\n\\n\" \"${DISPLAY:-unset}\" \"${WAYLAND_DISPLAY:-unset}\" \"${WSL_INTEROP:-unset}\"; command -v explorer.exe >/dev/null && printf \"explorer.exe is available\\n\" || printf \"explorer.exe not found\\n\"; command -v clip.exe >/dev/null && printf \"clip.exe is available\\n\" || printf \"clip.exe not found\\n\"; printf \"\\nPress enter to close...\"; read -r _"'
 bind-key M-o display-popup -w 70% -h 30% -d "#{pane_current_path}" -E 'bash -lc "command -v explorer.exe >/dev/null && { explorer.exe .; printf \"Opened current directory in Windows Explorer.\"; } || printf \"explorer.exe not found\"; printf \"\\n\\nPress enter to close...\"; read -r _"'
 {{ end }}
-bind-key M-h display-popup -w 80% -h 80% -E "btop"
+bind-key M-h display-popup -w 80% -h 80% -E 'bash -lc "command -v btop >/dev/null && exec btop || { printf \"btop not found\\n\\nPress enter to close...\"; read -r _; }"'
 
 # Sync panes toggle
 bind y setw synchronize-panes \; display-message "synchronize-panes #{?synchronize-panes,on,off}"
@@ -114,7 +112,7 @@ set -g popup-border-style "fg=#6c7086"
 
 # Status line base style
 set -g status on
-set -g status-interval 5
+set -g status-interval 15
 set -g status-justify centre
 set -g status-style "bg=default,fg=#cdd6f4"
 
@@ -150,13 +148,13 @@ set -g @batt_icon_status_charging " "
 
 # RIGHT: kube context, battery, time
 set -g status-right '#[fg=#74c7ec] '\
-' #[fg=#6c7086]#(kubectl config current-context 2>/dev/null | sed "s/-context//" || echo "no-kube")'\
+' #[fg=#6c7086]#(~/.local/bin/tmux-kube-status)'\
 ' #[fg=#6c7086]| #{battery_color_charge_fg}#{battery_icon_charge}#{battery_percentage}#[default]'\
 ' #[fg=#585b70]| %H:%M '
 {{ else }}
 # RIGHT: kube context, time (no battery on WSL)
 set -g status-right '#[fg=#74c7ec] '\
-' #[fg=#6c7086]#(kubectl config current-context 2>/dev/null | sed "s/-context//" || echo "no-kube")'\
+' #[fg=#6c7086]#(~/.local/bin/tmux-kube-status)'\
 ' #[fg=#585b70]| %H:%M '
 {{ end }}
 
@@ -174,13 +172,13 @@ set -g @plugin 'tmux-plugins/tmux-battery'
 
 # Resurrect Settings
 set -g @resurrect-strategy-nvim 'session'
-set -g @resurrect-capture-pane-contents 'on'
+set -g @resurrect-capture-pane-contents 'off'
 
 # Continuum Settings
 set -g @continuum-restore 'off'
 
 # Environment
-set -g update-environment "DISPLAY SSH_ASKPASS SSH_AUTH_SOCK SSH_CONNECTION SSH_TTY TERM LANG LC_ALL KUBECONFIG TERM_PROGRAM"
+set -g update-environment "DISPLAY KRB5CCNAME SSH_ASKPASS SSH_AUTH_SOCK SSH_AGENT_PID SSH_CONNECTION SSH_TTY WINDOWID XAUTHORITY WAYLAND_DISPLAY LANG LC_ALL LC_CTYPE KUBECONFIG TERM_PROGRAM"
 
 # Machine-local additions are deliberately outside chezmoi ownership.
 if-shell '[ -f ~/.config/dotfiles/local.tmux.conf ]' \

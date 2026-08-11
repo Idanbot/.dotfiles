@@ -92,6 +92,7 @@ jobs:
           tests/test-templates.sh "$PWD"
           tests/test-repo-layout.sh "$PWD"
           tests/test-herdr-config.sh "$PWD"
+          tests/test-tmux-config.sh "$PWD"
           tests/test-kitty.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"
           tests/test-cloud-context-starship.sh "$PWD"

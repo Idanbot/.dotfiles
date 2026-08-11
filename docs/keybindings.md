@@ -10,36 +10,36 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 
 | Key | Action |
 |-----|--------|
-| C-s | `send-prefix` |
-| C-b | `send-prefix` |
-| r | `source-file ~/.tmux.conf \; display-message "Config reloaded!"` |
+| prefix+C-s | `send-prefix` |
+| prefix+C-b | `send-prefix` |
+| prefix+r | `source-file ~/.tmux.conf \; display-message "Config reloaded!"` |
 | 'C-h' | `if-shell "$is_vim" 'send-keys C-h'  'select-pane -L'` |
 | 'C-j' | `if-shell "$is_vim" 'send-keys C-j'  'select-pane -D'` |
 | 'C-k' | `if-shell "$is_vim" 'send-keys C-k'  'select-pane -U'` |
 | 'C-l' | `if-shell "$is_vim" 'send-keys C-l'  'select-pane -R'` |
-| C-l | `send-keys 'C-l'` |
-| H | `resize-pane -L 5` |
-| L | `resize-pane -R 5` |
-| J | `resize-pane -D 5` |
-| K | `resize-pane -U 5` |
-| \| | `split-window -h -c "#{pane_current_path}"` |
-| - | `split-window -v -c "#{pane_current_path}"` |
-| ^ | `last-window` |
-| f | `run-shell "tmux neww ~/.local/bin/tmux-sessionizer"` |
-| i | `display-popup -w 80% -h 70% -E 'bash -lc "read -rp \"cht.sh query: \" query; [[ -n $query ]] \|\| exit 0; curl -fsSL \"https://cht.sh/${query// /+}\" \| less -R"'` |
-| M-n | `display-popup -w 80% -h 80% -E "tmux new-session -A -s scratchpad"` |
-| M-s | `display-popup -E "tmux list-sessions \| less"` |
-| M-w | `display-popup -E "tmux list-windows \| less"` |
-| M-g | `display-popup -w 90% -h 90% -d "#{pane_current_path}" -E 'bash -lc "command -v lazygit >/dev/null && exec lazygit \|\| { printf \"lazygit not found\\n\\nPress enter to close...\"; read -r _; }"'` |
-| M-d | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v docker >/dev/null \|\| { printf \"docker not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; docker ps; printf \"\\nImages:\\n\"; docker images \| head -25; printf \"\\nPress enter to close...\"; read -r _"'` |
-| M-k | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v kubectl >/dev/null \|\| { printf \"kubectl not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; printf \"Contexts:\\n\"; kubectl config get-contexts 2>/dev/null \|\| true; printf \"\\nNamespaces:\\n\"; kubectl get namespaces 2>/dev/null \|\| true; printf \"\\nPress enter to close...\"; read -r _"'` |
-| M-p | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "test -x ~/.local/bin/tmux-sessionizer && exec ~/.local/bin/tmux-sessionizer \|\| { printf \"tmux-sessionizer not found or not executable\\n\\nPress enter to close...\"; read -r _; }"'` |
-| M-m | `display-popup -w 80% -h 80% -E "rmpc"` |
-| M-u | `display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"Host: %s\\nPath: %s\\nKernel: %s\\n\\n\" \"$(hostname -s)\" \"$PWD\" \"$(uname -srmo)\"; command -v docker >/dev/null && docker context ls 2>/dev/null \|\| true; printf \"\\n\"; command -v kubectl >/dev/null && kubectl config get-contexts 2>/dev/null \|\| true; printf \"\\nPress enter to close...\"; read -r _"'` |
-| M-e | `display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"WSL distro: %s\\nHost: %s\\nLinux path: %s\\nWindows path: \" \"${WSL_DISTRO_NAME:-unknown}\" \"$(hostname -s)\" \"$PWD\"; command -v wslpath >/dev/null && wslpath -w \"$PWD\" \|\| printf \"n/a\"; printf \"\\n\\nDISPLAY=%s\\nWAYLAND_DISPLAY=%s\\nWSLg=%s\\n\\n\" \"${DISPLAY:-unset}\" \"${WAYLAND_DISPLAY:-unset}\" \"${WSLGd:-unset}\"; command -v explorer.exe >/dev/null && printf \"explorer.exe is available\\n\" \|\| printf \"explorer.exe not found\\n\"; command -v clip.exe >/dev/null && printf \"clip.exe is available\\n\" \|\| printf \"clip.exe not found\\n\"; printf \"\\nPress enter to close...\"; read -r _"'` |
-| M-o | `display-popup -w 70% -h 30% -d "#{pane_current_path}" -E 'bash -lc "command -v explorer.exe >/dev/null && { explorer.exe .; printf \"Opened current directory in Windows Explorer.\"; } \|\| printf \"explorer.exe not found\"; printf \"\\n\\nPress enter to close...\"; read -r _"'` |
-| M-h | `display-popup -w 80% -h 80% -E "btop"` |
-| y | `setw synchronize-panes \; display-message "synchronize-panes #{?synchronize-panes,on,off}"` |
+| prefix+C-l | `send-keys 'C-l'` |
+| prefix+H | `resize-pane -L 5` |
+| prefix+L | `resize-pane -R 5` |
+| prefix+J | `resize-pane -D 5` |
+| prefix+K | `resize-pane -U 5` |
+| prefix+\| | `split-window -h -c "#{pane_current_path}"` |
+| prefix+- | `split-window -v -c "#{pane_current_path}"` |
+| prefix+^ | `last-window` |
+| prefix+f | `run-shell "tmux neww ~/.local/bin/tmux-sessionizer"` |
+| prefix+i | `display-popup -w 80% -h 70% -E '~/.local/bin/tmux-cheat-sheet'` |
+| prefix+M-n | `display-popup -w 80% -h 80% -d "#{pane_current_path}" -E 'env -u TMUX tmux -L scratchpad -f /dev/null new-session -A -s scratchpad -c "$PWD"'` |
+| prefix+M-s | `display-popup -E "tmux list-sessions \| less"` |
+| prefix+M-w | `display-popup -E "tmux list-windows \| less"` |
+| prefix+M-g | `display-popup -w 90% -h 90% -d "#{pane_current_path}" -E 'bash -lc "command -v lazygit >/dev/null && exec lazygit \|\| { printf \"lazygit not found\\n\\nPress enter to close...\"; read -r _; }"'` |
+| prefix+M-d | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v docker >/dev/null \|\| { printf \"docker not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; docker ps; printf \"\\nImages:\\n\"; docker images \| head -25; printf \"\\nPress enter to close...\"; read -r _"'` |
+| prefix+M-k | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "command -v kubectl >/dev/null \|\| { printf \"kubectl not found\\n\\nPress enter to close...\"; read -r _; exit 0; }; printf \"Contexts:\\n\"; kubectl config get-contexts 2>/dev/null \|\| true; printf \"\\nNamespaces:\\n\"; kubectl get namespaces 2>/dev/null \|\| true; printf \"\\nPress enter to close...\"; read -r _"'` |
+| prefix+M-p | `display-popup -w 90% -h 85% -d "#{pane_current_path}" -E 'bash -lc "test -x ~/.local/bin/tmux-sessionizer && exec ~/.local/bin/tmux-sessionizer \|\| { printf \"tmux-sessionizer not found or not executable\\n\\nPress enter to close...\"; read -r _; }"'` |
+| prefix+M-m | `display-popup -w 80% -h 80% -E 'bash -lc "command -v rmpc >/dev/null && exec rmpc \|\| { printf \"rmpc not found\\n\\nPress enter to close...\"; read -r _; }"'` |
+| prefix+M-u | `display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"Host: %s\\nPath: %s\\nKernel: %s\\n\\n\" \"$(hostname -s)\" \"$PWD\" \"$(uname -srmo)\"; command -v docker >/dev/null && docker context ls 2>/dev/null \|\| true; printf \"\\n\"; command -v kubectl >/dev/null && kubectl config get-contexts 2>/dev/null \|\| true; printf \"\\nPress enter to close...\"; read -r _"'` |
+| prefix+M-e | `display-popup -w 80% -h 70% -d "#{pane_current_path}" -E 'bash -lc "printf \"WSL distro: %s\\nHost: %s\\nLinux path: %s\\nWindows path: \" \"${WSL_DISTRO_NAME:-unknown}\" \"$(hostname -s)\" \"$PWD\"; command -v wslpath >/dev/null && wslpath -w \"$PWD\" \|\| printf \"n/a\"; printf \"\\n\\nDISPLAY=%s\\nWAYLAND_DISPLAY=%s\\nWSL_INTEROP=%s\\n\\n\" \"${DISPLAY:-unset}\" \"${WAYLAND_DISPLAY:-unset}\" \"${WSL_INTEROP:-unset}\"; command -v explorer.exe >/dev/null && printf \"explorer.exe is available\\n\" \|\| printf \"explorer.exe not found\\n\"; command -v clip.exe >/dev/null && printf \"clip.exe is available\\n\" \|\| printf \"clip.exe not found\\n\"; printf \"\\nPress enter to close...\"; read -r _"'` |
+| prefix+M-o | `display-popup -w 70% -h 30% -d "#{pane_current_path}" -E 'bash -lc "command -v explorer.exe >/dev/null && { explorer.exe .; printf \"Opened current directory in Windows Explorer.\"; } \|\| printf \"explorer.exe not found\"; printf \"\\n\\nPress enter to close...\"; read -r _"'` |
+| prefix+M-h | `display-popup -w 80% -h 80% -E 'bash -lc "command -v btop >/dev/null && exec btop \|\| { printf \"btop not found\\n\\nPress enter to close...\"; read -r _; }"'` |
+| prefix+y | `setw synchronize-panes \; display-message "synchronize-panes #{?synchronize-panes,on,off}"` |
 
 ## Herdr
 

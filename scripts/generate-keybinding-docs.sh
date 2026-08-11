@@ -28,12 +28,14 @@ mkdir -p "$(dirname "$OUTPUT_FILE")"
     /^[[:space:]]*bind-key/ || /^[[:space:]]*bind / {
       line = $0
       gsub(/\r$/, "", line)
+      global = line ~ /^[[:space:]]*(bind-key|bind)[[:space:]]+-n[[:space:]]+/
       key = line
       sub(/^[[:space:]]*bind-key[[:space:]]+(-[A-Za-z][[:space:]]+)*/, "", key)
       sub(/^[[:space:]]*bind[[:space:]]+(-[A-Za-z][[:space:]]+)*/, "", key)
       action = key
       sub(/[[:space:]].*$/, "", key)
       sub(/^[^[:space:]]+[[:space:]]+/, "", action)
+      if (!global) key = "prefix+" key
       gsub(/\|/, "\\|", key)
       gsub(/\|/, "\\|", action)
       printf "| %s | `%s` |\n", key, action
