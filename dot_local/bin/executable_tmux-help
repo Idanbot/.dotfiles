@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Interactive reference for the custom tmux configuration and useful defaults.
+set -euo pipefail
+
+show_help() {
+  cat <<'EOF'
+TMUX QUICK REFERENCE
+====================
+
+Prefix: Ctrl+S
+Notation: prefix+X means press Ctrl+S, release it, then press X.
+Exit this help with q. Search with /, next match with n, previous with N.
+
+CUSTOM BINDINGS
+---------------
+prefix+Alt+I       Open this reference
+Ctrl+H/J/K/L       Move between tmux and Vim panes without a prefix
+prefix+H/J/K/L     Resize the current pane by 5 cells (repeatable)
+prefix+|           Split left/right in the current directory
+prefix+-           Split top/bottom in the current directory
+prefix+^           Switch to the previously active window
+prefix+F           Open the sessionizer in a new window
+prefix+I           Query cht.sh in a popup
+prefix+Alt+N       Open the persistent isolated scratchpad
+prefix+Alt+S       List sessions in a popup
+prefix+Alt+W       List windows in a popup
+prefix+Alt+G       Open lazygit in the current directory
+prefix+Alt+D       Show Docker containers and images
+prefix+Alt+K       Show Kubernetes contexts and namespaces
+prefix+Alt+P       Open the sessionizer in a popup
+prefix+Alt+H       Open btop
+prefix+Alt+M       Open rmpc (native Ubuntu)
+prefix+Alt+U       Show host and environment details (native Ubuntu)
+prefix+Alt+E       Show WSL and Windows interop details (WSL)
+prefix+Alt+O       Open the current directory in Explorer (WSL)
+prefix+Y           Toggle synchronized input across every pane in the window
+prefix+R           Reload ~/.tmux.conf
+prefix+Ctrl+L      Clear the active pane
+prefix+Ctrl+S      Send the tmux prefix through to a nested client
+prefix+Ctrl+B      Also send the configured prefix to a nested client
+
+SESSIONS AND WINDOWS
+--------------------
+prefix+C           Create a window
+prefix+N / P       Next / previous window
+prefix+0..9        Select a window by number
+prefix+,           Rename the current window
+prefix+&           Kill the current window (asks first)
+prefix+S           Choose a session
+prefix+W           Open the session/window tree
+prefix+D           Detach this client
+prefix+$           Rename the current session
+
+PANES AND LAYOUTS
+-----------------
+prefix+Arrow       Move to the pane in that direction
+prefix+Q           Briefly show pane numbers; press a number to select it
+prefix+Z           Zoom or restore the current pane
+prefix+X           Kill the current pane (asks first)
+prefix+!           Move the current pane into its own window
+prefix+Space       Cycle through preset layouts
+prefix+{ / }       Swap the pane backward / forward
+prefix+O           Select the next pane
+
+COPY MODE AND COMMANDS
+----------------------
+prefix+[           Enter copy/scroll mode; arrows and PageUp/PageDown navigate
+q                  Leave copy mode
+prefix+]           Paste the most recent tmux buffer
+prefix+=           Choose a paste buffer interactively
+prefix+:           Open the tmux command prompt
+prefix+?           Show tmux's complete live key table
+
+USEFUL COMMANDS
+---------------
+tmux ls                         List sessions
+tmux new -s NAME                Create a named session
+tmux attach -t NAME             Attach to a named session
+tmux switch-client -t NAME      Switch this client to another session
+tmux rename-session NAME        Rename the current session
+tmux kill-session -t NAME       Kill one session
+tmux source-file ~/.tmux.conf   Reload configuration from a shell
+
+TRICKS AND TIPS
+---------------
+* Splits and popup tools start in the active pane's working directory.
+* Use prefix+Z to temporarily give one pane the full terminal.
+* Use prefix+Y for commands that must run in several panes; disable it promptly.
+* The Alt+N scratchpad runs on a separate tmux server. Ctrl+B is its prefix.
+  Detach with Ctrl+B then D to preserve it; exit its last shell to destroy it.
+* Hold a repeatable binding (resize keys, previous window) after one prefix press.
+* Run prefix+: then list-keys to inspect bindings or show-options -g for options.
+* Mouse mode is enabled: select panes, resize borders, scroll, and select windows.
+EOF
+}
+
+if command -v less >/dev/null 2>&1 && [[ -t 1 ]]; then
+  show_help | LESS='-R' less
+else
+  show_help
+fi

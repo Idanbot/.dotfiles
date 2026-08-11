@@ -36,6 +36,7 @@ required=(
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
   dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
+  dot_local/bin/executable_tmux-help
   dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
   dot_config/agents/AGENTS.md dot_codex/symlink_AGENTS.md
   dot_claude/symlink_CLAUDE.md dot_config/opencode/symlink_AGENTS.md

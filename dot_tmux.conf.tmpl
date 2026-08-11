@@ -71,6 +71,7 @@ bind -r ^ last-window
 # Session/Window Management (Popups)
 bind-key -r f run-shell "tmux neww ~/.local/bin/tmux-sessionizer"
 bind-key -r i display-popup -w 80% -h 70% -E '~/.local/bin/tmux-cheat-sheet'
+bind-key M-i display-popup -w 90% -h 90% -E '~/.local/bin/tmux-help'
 bind -r M-n display-popup -w 80% -h 80% -d "#{pane_current_path}" -E 'env -u TMUX tmux -L scratchpad -f /dev/null new-session -A -s scratchpad -c "$PWD"'
 bind-key M-s display-popup -E "tmux list-sessions | less"
 bind-key M-w display-popup -E "tmux list-windows | less"

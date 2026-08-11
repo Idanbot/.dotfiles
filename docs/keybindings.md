@@ -27,6 +27,7 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 | prefix+^ | `last-window` |
 | prefix+f | `run-shell "tmux neww ~/.local/bin/tmux-sessionizer"` |
 | prefix+i | `display-popup -w 80% -h 70% -E '~/.local/bin/tmux-cheat-sheet'` |
+| prefix+M-i | `display-popup -w 90% -h 90% -E '~/.local/bin/tmux-help'` |
 | prefix+M-n | `display-popup -w 80% -h 80% -d "#{pane_current_path}" -E 'env -u TMUX tmux -L scratchpad -f /dev/null new-session -A -s scratchpad -c "$PWD"'` |
 | prefix+M-s | `display-popup -E "tmux list-sessions \| less"` |
 | prefix+M-w | `display-popup -E "tmux list-windows \| less"` |

@@ -56,8 +56,12 @@ assert_contains "$TMUX_CONFIG" '${WSL_INTEROP:-unset}' \
 assert_absent "$TMUX_CONFIG" 'WSLGd' 'WSL diagnostics contain no stale variable typo'
 assert_contains "$TMUX_CONFIG" 'tmux-cheat-sheet' \
   'cheat-sheet URL handling is delegated to a testable helper'
+assert_contains "$TMUX_CONFIG" "bind-key M-i display-popup -w 90% -h 90% -E '~/.local/bin/tmux-help'" \
+  'prefix+Alt+I opens the managed tmux reference popup'
 assert_contains "$DOTFILES_DIR/docs/keybindings.md" '| prefix+M-n |' \
   'generated docs identify the scratchpad as prefix-scoped'
+assert_contains "$DOTFILES_DIR/docs/keybindings.md" '| prefix+M-i |' \
+  'generated docs include the tmux reference popup'
 
 printf '\n== tmux helper behavior ==\n'
 mkdir -p "$TEST_TMP/bin"
@@ -99,6 +103,23 @@ if [[ "$cheat_result" == 'cheat-result' ]] &&
 else
   fail 'cheat-sheet queries are URL encoded before download'
 fi
+
+tmux_help="$($DOTFILES_DIR/dot_local/bin/executable_tmux-help)"
+for expected in \
+  'CUSTOM BINDINGS' \
+  'SESSIONS AND WINDOWS' \
+  'PANES AND LAYOUTS' \
+  'COPY MODE AND COMMANDS' \
+  'prefix+Alt+I' \
+  'prefix+Alt+N' \
+  'prefix+Y' \
+  'prefix+?'; do
+  if grep -Fq "$expected" <<<"$tmux_help"; then
+    pass "tmux reference documents $expected"
+  else
+    fail "tmux reference documents $expected"
+  fi
+done
 
 printf '\n== pinned tmux plugins ==\n'
 for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-battery; do
