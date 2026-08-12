@@ -169,7 +169,9 @@ kubecolor --kubecolor-version >/dev/null
 
 [[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 16 ]]
 
-export HERDR_CONFIG_PATH="$DOTFILES_DIR/dot_config/herdr/config.toml"
+HERDR_CONFIG_PATH="$TMP_HOME/herdr-config.toml"
+cp "$DOTFILES_DIR/dot_config/herdr/config.toml" "$HERDR_CONFIG_PATH"
+export HERDR_CONFIG_PATH
 export SHELL=/bin/bash
 herdr server >"$TMP_HOME/herdr-server.out" 2>&1 &
 server_pid=$!
@@ -202,4 +204,5 @@ workspace="$(herdr workspace get "$workspace_id")"
 
 herdr server stop >/dev/null
 wait "$server_pid" 2>/dev/null || true
+[[ ! -e "$DOTFILES_DIR/dot_config/herdr/release-notes.json" ]]
 printf 'GitHub release tool smoke passed\n'
