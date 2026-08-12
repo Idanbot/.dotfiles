@@ -46,6 +46,13 @@ for path in "${required[@]}"; do
   [[ -e "$DOTFILES_DIR/$path" ]] && pass "$path exists" || fail "$path is missing"
 done
 
+if find "$DOTFILES_DIR" -path "$DOTFILES_DIR/.git" -prune -o \
+  -type f \( -name .keep -o -name .gitkeep \) -print | grep -q .; then
+  fail "placeholder files must not materialize empty target directories"
+else
+  pass "no placeholder-managed empty target directories"
+fi
+
 if grep -Fq 'cache [status|prune]' "$DOTFILES_DIR/dot_local/bin/executable_dot" &&
   grep -Fq 'scripts/download-cache.sh' "$DOTFILES_DIR/dot_local/bin/executable_dot"; then
   pass "dot exposes verified download cache maintenance"

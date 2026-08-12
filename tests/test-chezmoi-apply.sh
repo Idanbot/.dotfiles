@@ -67,6 +67,7 @@ EOF
   test -x "$HOME/.local/bin/tmux-cheat-sheet"
   test -x "$HOME/.local/bin/tmux-help"
   test -x "$HOME/.local/bin/tmux-kube-status"
+  test ! -e "$HOME/.ssh/sockets"
   grep -Fq 'prefix = "ctrl+s"' "$HOME/.config/herdr/config.toml"
   grep -Fq 'workspace:' "$HOME/.config/dotfiles/agents.yaml"
   for instruction_path in \
