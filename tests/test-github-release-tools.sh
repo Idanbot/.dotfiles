@@ -91,7 +91,8 @@ KUBECTL_VERSION="$(package_version cloud kubectl 1.36.3)"
 KUBECTL_URL="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${CLOUD_ARCH}/kubectl"
 download_verified "$KUBECTL_URL" "$TMP_HOME/kubectl" "$KUBECTL_URL.sha256" kubectl
 install_managed_binary "$TMP_HOME/kubectl" kubectl "$KUBECTL_VERSION" dl.k8s.io
-"$DOTFILES_BIN_DIR/kubectl" version --client | grep -Fq "v$KUBECTL_VERSION"
+KUBECTL_OUTPUT="$("$DOTFILES_BIN_DIR/kubectl" version --client)"
+grep -Fq "v$KUBECTL_VERSION" <<<"$KUBECTL_OUTPUT"
 
 HELM_VERSION="$(package_version cloud helm 4.2.3)"
 HELM_ASSET="helm-v${HELM_VERSION}-linux-${CLOUD_ARCH}.tar.gz"
@@ -99,7 +100,8 @@ HELM_URL="https://get.helm.sh/$HELM_ASSET"
 download_verified "$HELM_URL" "$TMP_HOME/$HELM_ASSET" "$HELM_URL.sha256sum" "$HELM_ASSET"
 tar -xzf "$TMP_HOME/$HELM_ASSET" -C "$TMP_HOME"
 install_managed_binary "$TMP_HOME/linux-${CLOUD_ARCH}/helm" helm "$HELM_VERSION" get.helm.sh
-"$DOTFILES_BIN_DIR/helm" version --short | grep -Fq "v$HELM_VERSION"
+HELM_OUTPUT="$("$DOTFILES_BIN_DIR/helm" version --short)"
+grep -Fq "v$HELM_VERSION" <<<"$HELM_OUTPUT"
 
 S5CMD_VERSION="$(package_version cloud s5cmd 2.3.0)"
 install_github_archive s5cmd peak/s5cmd "v$S5CMD_VERSION" \
