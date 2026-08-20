@@ -86,6 +86,13 @@ adds `s5cmd`, `kcat`, `stern`, `helmfile`, `kubectx`, `kubens`, and `kubecolor`;
 database utilities
 include `usql`, `iredis`, and `pgloader`.
 
+When `kubecolor` is installed, interactive Bash and Zsh sessions alias `kubectl`
+to it using the upstream-supported integration. Native kubectl completion is
+preserved, and Zsh/Bash completion is also registered for explicit
+`kubecolor` commands. Scripts continue to resolve the real kubectl binary;
+set `DOTFILES_DISABLE_KUBECOLOR=1` before starting a shell to temporarily use
+plain kubectl interactively.
+
 ## Reliability Model
 
 The installer follows one path for local, one-line, CI, native, and WSL runs:

@@ -144,6 +144,14 @@ source $ZSH/oh-my-zsh.sh
 # The fpath cleanup above (before source oh-my-zsh.sh) is sufficient to
 # prevent "no such file or directory" warnings for missing vendor completions.
 
+# kubecolor is the upstream-recommended kubectl integration. The alias is
+# interactive-only, so scripts and automation still resolve the real binary.
+# Set DOTFILES_DISABLE_KUBECOLOR=1 for a plain kubectl shell when debugging.
+if (( $+commands[kubecolor] )) && [[ "${DOTFILES_DISABLE_KUBECOLOR:-0}" != 1 ]]; then
+  alias kubectl='kubecolor'
+  (( $+functions[compdef] )) && compdef kubecolor=kubectl
+fi
+
 setopt NO_BEEP
 
 # --- Completion core ---
