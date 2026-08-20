@@ -124,6 +124,7 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 
 | Alias | Command |
 |-------|---------|
+| kubectl | `kubecolor` |
 | c | `"clear"` |
 | reload | `"source ~/.zshrc"` |
 | reload-bash | `"source ~/.bashrc"` |
