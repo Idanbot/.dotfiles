@@ -201,6 +201,7 @@ dot cache prune [days]     remove verified downloads unused for DAYS
 dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
 dot workspace [directory]  open a backend-aware agent workspace
+dot-agent-status [flags]   show registered agent CLI readiness
 cloud-context [command]    save, load, inspect, or clear cloud CLI contexts
 agent-mcp [command]        enable, disable, or inspect optional MCP servers
 ssh-key-load [flags]       cache an SSH key passphrase in agent memory
@@ -225,6 +226,8 @@ dot workspace
 dot workspace ~/Code/project
 dot workspace . --backend herdr
 dot workspace . --backend tmux
+dot workspace . --agents codex,claude --restart-agents
+dot workspace . --backend tmux --check
 dot-workspace . --name project-agents --print
 ```
 
@@ -238,8 +241,12 @@ Both backends create a main terminal plus Codex, Antigravity, Claude, OpenCode,
 and OMP in the same working directory. Herdr uses one project workspace with a
 tab per agent and reuses an existing workspace with the same name. The tmux
 backend renders a session from the registry and runs pinned tmuxp through
-`uvx`. A missing optional agent leaves a usable login shell instead of failing
-the workspace.
+`uvx`. `--agents` selects a registered subset, `--check` performs a read-only
+preflight, and `--restart-agents` restarts a crashed agent without restarting a
+cleanly exited or interrupted session. `dot-agent-status` shows readiness in
+the terminal and tmux status bar; it never starts agents or MCP servers. A
+missing optional agent leaves a usable login shell instead of failing the
+workspace.
 
 Herdr and tmux both use `Ctrl+S` as their normal prefix. Existing tmux
 `send-prefix` support handles an explicitly nested Herdr. An explicitly nested
@@ -627,7 +634,10 @@ Zsh startup, Starship rendering, and the second installation pass. CI publishes
 the performance table in the job summary. A rolling 90-day artifact adds
 latest/previous deltas and median/range trends by profile and platform;
 regressions are visible but do not block merges until enforcement is explicitly
-enabled. CI runs also publish a separate outcome-classification check so GitHub
+enabled. CI runs also execute Hyperfine benchmarks for installer help, workspace
+help, isolated cloud-context status, agent readiness, and Zsh startup; real
+post-install startup timing uses the same benchmark engine. CI publishes those
+artifacts and a separate outcome-classification check so GitHub
 runner interruptions are distinguishable from actionable failures without
 altering the original workflow conclusion.
 

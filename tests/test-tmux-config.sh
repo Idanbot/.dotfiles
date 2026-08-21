@@ -44,6 +44,8 @@ assert_contains "$TMUX_CONFIG" "set -g @resurrect-capture-pane-contents 'off'" \
   'session recovery does not persist pane output'
 assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-kube-status)' \
   'status delegates Kubernetes context formatting to cloud-context'
+assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-agent-status)' \
+  'status shows compact registered agent readiness'
 assert_absent "$TMUX_CONFIG" 'kubectl config current-context' \
   'status does not poll kubectl directly'
 assert_absent "$TMUX_CONFIG" ' SSH_TTY TERM LANG ' \
@@ -120,6 +122,16 @@ for expected in \
     fail "tmux reference documents $expected"
   fi
 done
+
+mkdir -p "$TEST_TMP/.local/bin"
+printf '#!/usr/bin/env bash\nprintf "agents 2/5\\n"\n' \
+  >"$TEST_TMP/.local/bin/dot-agent-status"
+chmod +x "$TEST_TMP/.local/bin/dot-agent-status"
+if [[ "$(HOME="$TEST_TMP" "$DOTFILES_DIR/dot_local/bin/executable_tmux-agent-status")" == 'agents 2/5' ]]; then
+  pass 'tmux agent status wrapper preserves compact readiness output'
+else
+  fail 'tmux agent status wrapper preserves compact readiness output'
+fi
 
 printf '\n== pinned tmux plugins ==\n'
 for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-battery; do

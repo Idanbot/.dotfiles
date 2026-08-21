@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# Report registered agent CLI availability without starting agents or MCP servers.
+
+set -euo pipefail
+
+registry_override=""
+agents_override=""
+compact=false
+check_only=false
+
+usage() {
+  cat <<'USAGE'
+Usage: dot-agent-status [options]
+
+  --registry PATH       Read a specific agent registry.
+  --agents LIST         Limit output to comma-separated agent IDs.
+  --compact             Print a single status suitable for tmux status bars.
+  --check               Return failure when a required agent CLI is missing.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --registry)
+      registry_override="${2:-}"
+      [[ -n "$registry_override" ]] || {
+        printf '%s\n' '--registry requires a path' >&2
+        exit 2
+      }
+      shift 2
+      ;;
+    --registry=*)
+      registry_override="${1#--registry=}"
+      shift
+      ;;
+    --agents)
+      agents_override="${2:-}"
+      [[ -n "$agents_override" ]] || {
+        printf '%s\n' '--agents requires a comma-separated list' >&2
+        exit 2
+      }
+      shift 2
+      ;;
+    --agents=*)
+      agents_override="${1#--agents=}"
+      shift
+      ;;
+    --compact)
+      compact=true
+      shift
+      ;;
+    --check)
+      check_only=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      printf 'Unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+registry="${registry_override:-${DOTFILES_AGENT_REGISTRY:-$config_root/dotfiles/agents.yaml}}"
+if [[ ! -f "$registry" && -z "$registry_override" && -z "${DOTFILES_AGENT_REGISTRY:-}" ]] &&
+  command -v chezmoi >/dev/null 2>&1; then
+  source_dir="$(chezmoi source-path 2>/dev/null || true)"
+  [[ -f "$source_dir/agents.yaml" ]] && registry="$source_dir/agents.yaml"
+fi
+[[ -f "$registry" ]] || {
+  printf 'Missing agent registry: %s\n' "$registry" >&2
+  exit 1
+}
+command -v yq >/dev/null 2>&1 || {
+  printf 'yq is required to read the agent registry\n' >&2
+  exit 1
+}
+
+declare -a agents=()
+if [[ -n "$agents_override" ]]; then
+  IFS=',' read -r -a agents <<<"$agents_override"
+else
+  mapfile -t agents < <(yq -r '.workspace.agents[]' "$registry")
+fi
+[[ ${#agents[@]} -gt 0 ]] || {
+  printf 'Agent registry contains no workspace agents\n' >&2
+  exit 1
+}
+
+ready=0
+required_missing=0
+for agent in "${agents[@]}"; do
+  [[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
+    printf 'Invalid agent id: %s\n' "$agent" >&2
+    exit 2
+  }
+  command_name="$(yq -r --arg agent "$agent" '.agents[$agent].command // ""' "$registry")"
+  required="$(yq -r --arg agent "$agent" '.agents[$agent].required // false' "$registry")"
+  [[ "$command_name" =~ ^[[:alnum:]_.+-]+$ ]] || {
+    printf 'Unknown agent: %s\n' "$agent" >&2
+    exit 2
+  }
+  if command -v "$command_name" >/dev/null 2>&1; then
+    ((ready += 1))
+    state=ready
+  else
+    state=missing
+    [[ "$required" == true ]] && ((required_missing += 1))
+  fi
+  if [[ "$compact" == false ]]; then
+    if [[ "$state" == ready ]]; then
+      printf '[PASS] %-12s %s\n' "$agent" "$command_name"
+    elif [[ "$required" == true ]]; then
+      printf '[WARN] %-12s %s is not installed (required)\n' "$agent" "$command_name"
+    else
+      printf '[INFO] %-12s %s is not installed (optional)\n' "$agent" "$command_name"
+    fi
+  fi
+done
+
+if [[ "$compact" == true ]]; then
+  printf 'agents %s/%s\n' "$ready" "${#agents[@]}"
+else
+  printf 'Agent readiness: %s/%s available\n' "$ready" "${#agents[@]}"
+fi
+
+if [[ "$check_only" == true && "$required_missing" -gt 0 ]]; then
+  exit 1
+fi

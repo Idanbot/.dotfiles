@@ -12,6 +12,8 @@ cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/ag
 cp "$DOTFILES_DIR/agents.yaml" "$DOTFILES_AGENT_REGISTRY"
 printf '#!/bin/sh\nexit 0\n' >"$HOME/bin/uvx"
 printf '#!/bin/sh\nexit 0\n' >"$HOME/bin/tmux"
+ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" \
+  "$HOME/bin/dot-agent-launch"
 chmod +x "$HOME/bin/uvx" "$HOME/bin/tmux"
 
 WORKSPACE="$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"
@@ -26,6 +28,11 @@ for agent in codex antigravity claude opencode omp; do
   grep -Fq "dot-agent-launch --registry $DOTFILES_AGENT_REGISTRY $agent" <<<"$rendered"
 done
 printf '%s\n' "$rendered" | yq . >/dev/null
+
+subset="$(env -u HERDR_ENV -u TMUX "$WORKSPACE" "$HOME/project with spaces" \
+  --backend tmux --agents codex,claude --restart-agents --print)"
+grep -Fq 'dot-agent-launch --restart --registry' <<<"$subset"
+[[ "$(printf '%s\n' "$subset" | yq -r '.windows | length')" -eq 3 ]]
 
 set +e
 HERDR_ENV=1 "$WORKSPACE" "$HOME/project with spaces" --backend tmux --print \
@@ -60,9 +67,14 @@ grep -Fq 'Refusing to launch Herdr inside tmux' "$HOME/outer.err"
 allowed="$(env -u HERDR_ENV TMUX=/tmp/tmux "$WORKSPACE" "$HOME/project with spaces" \
   --backend herdr --allow-nested --print)"
 [[ "$(jq -r '.backend' <<<"$allowed")" == herdr ]]
+[[ "$(jq -r '.restart_agents' <<<"$allowed")" == false ]]
 
 printf '#!/bin/sh\nprintf "codex-launched\\n"\n' >"$HOME/bin/codex"
 chmod +x "$HOME/bin/codex"
+health="$(env -u HERDR_ENV -u TMUX "$WORKSPACE" "$HOME/project with spaces" \
+  --backend tmux --agents codex --check)"
+grep -Fq '[PASS] codex' <<<"$health"
+"$AGENT_LAUNCH" --registry "$DOTFILES_AGENT_REGISTRY" --check codex >/dev/null
 [[ "$($AGENT_LAUNCH codex)" == codex-launched ]]
 mkdir -p "$HOME/pane-home"
 [[ "$(HOME="$HOME/pane-home" "$AGENT_LAUNCH" --registry "$DOTFILES_AGENT_REGISTRY" \
@@ -72,5 +84,16 @@ set +e
 status=$?
 set -e
 [[ "$status" -eq 2 ]]
+
+printf '#!/bin/sh\nprintf "%%s\\n" restart >>"%s"\nexit 1\n' "$HOME/restarts" >"$HOME/bin/codex"
+chmod +x "$HOME/bin/codex"
+: >"$HOME/restarts"
+set +e
+DOTFILES_AGENT_MAX_RESTARTS=1 DOTFILES_AGENT_RESTART_DELAY=0 \
+  "$AGENT_LAUNCH" --restart --registry "$DOTFILES_AGENT_REGISTRY" codex >/dev/null 2>&1
+status=$?
+set -e
+[[ "$status" -eq 1 ]]
+[[ "$(wc -l <"$HOME/restarts")" -eq 2 ]]
 
 printf 'Agent workspace test passed\n'

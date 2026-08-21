@@ -149,12 +149,14 @@ set -g @batt_icon_status_charging " "
 
 # RIGHT: kube context, battery, time
 set -g status-right '#[fg=#74c7ec] '\
+'#[fg=#a6e3a1]#(~/.local/bin/tmux-agent-status)'\
 ' #[fg=#6c7086]#(~/.local/bin/tmux-kube-status)'\
 ' #[fg=#6c7086]| #{battery_color_charge_fg}#{battery_icon_charge}#{battery_percentage}#[default]'\
 ' #[fg=#585b70]| %H:%M '
 {{ else }}
 # RIGHT: kube context, time (no battery on WSL)
 set -g status-right '#[fg=#74c7ec] '\
+'#[fg=#a6e3a1]#(~/.local/bin/tmux-agent-status)'\
 ' #[fg=#6c7086]#(~/.local/bin/tmux-kube-status)'\
 ' #[fg=#585b70]| %H:%M '
 {{ end }}

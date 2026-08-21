@@ -28,7 +28,11 @@ Herdr uses `Ctrl+B` for that session only.
 Both backends consume the managed copy of `agents.yaml`. Herdr creates one
 project workspace with a terminal tab and one tab per agent. Tmuxp creates one
 session with a terminal window and one window per agent. Existing named
-workspaces/sessions are reused. Missing agent commands leave a login shell.
+workspaces/sessions are reused. `--agents` can select a registered subset,
+`--check` performs a read-only preflight, and `--restart-agents` enables
+crash-only restarts. Missing agent commands leave a login shell. Tmux status
+shows the compact readiness count from `dot-agent-status`; it never starts an
+agent or MCP server.
 
 ## Consequences
 

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Keep the tmux format command free of spaces that tmux parses as arguments.
+
+exec "$HOME/.local/bin/dot-agent-status" --compact 2>/dev/null

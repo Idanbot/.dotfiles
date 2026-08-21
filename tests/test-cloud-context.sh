@@ -111,6 +111,21 @@ grep -Fq $'gcloud_project\tproject-123' "$PROFILE"
 grep -Fq $'aws_profile\twork' "$PROFILE"
 grep -Fq $'azure_subscription\t00000000-0000-0000-0000-000000000001' "$PROFILE"
 ! grep -Eqi 'secret|token|password|credential' "$PROFILE"
+if find "$HOME/.config/dotfiles/cloud-contexts" -type f \
+  -exec grep -Eqi 'secret|token|password|credential|private[_-]?key|access[_-]?token' {} \; \
+  -print -quit | grep -q .; then
+  printf 'Cloud context artifacts contain credential-like data\n' >&2
+  exit 1
+fi
+for forbidden in \
+  "$HOME/.aws/credentials" \
+  "$HOME/.azure/accessTokens.json" \
+  "$HOME/.config/gcloud/credentials.db"; do
+  [[ ! -e "$forbidden" ]] || {
+    printf 'Cloud context test created a credential file: %s\n' "$forbidden" >&2
+    exit 1
+  }
+done
 
 : >"$CALLS"
 "$SCRIPT" --load workstation >/dev/null

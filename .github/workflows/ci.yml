@@ -59,7 +59,7 @@ jobs:
       - name: Install lint tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq gawk
+          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq gawk hyperfine openssh-client
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
           ./scripts/install-chezmoi.sh
           starship_version="$(yq -r '.core.starship' packages.yaml)"
@@ -114,7 +114,9 @@ jobs:
           tests/test-update-packages.sh "$PWD"
           tests/test-npm-global-cli.sh "$PWD"
           tests/test-agent-mcp.sh "$PWD"
+          tests/test-agent-status.sh "$PWD"
           tests/test-ssh-access.sh "$PWD"
+          tests/test-hyperfine-benchmark.sh "$PWD"
           tests/test-static-policy.sh "$PWD"
           tests/test-chezmoi-apply.sh "$PWD"
           tests/test-interactive-startup.sh "$PWD"
@@ -204,6 +206,37 @@ jobs:
         if: github.event_name != 'pull_request'
         run: echo "Dependency review applies to pull requests"
 
+  performance-benchmarks:
+    name: Hyperfine Benchmark Scenarios
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install benchmark tools
+        run: sudo apt-get update -qq && sudo apt-get install -y hyperfine jq yq zsh
+      - name: Run benchmark scenarios
+        env:
+          DOTFILES_HYPERFINE_RUNS: "5"
+          DOTFILES_HYPERFINE_WARMUP_RUNS: "2"
+          BENCHMARK_OUTPUT: ${{ runner.temp }}/dotfiles-hyperfine
+        run: |
+          ./scripts/hyperfine-benchmark.sh --output "$BENCHMARK_OUTPUT"
+          cat "$BENCHMARK_OUTPUT/summary.md" >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: hyperfine-benchmarks
+          path: ${{ runner.temp }}/dotfiles-hyperfine/
+          if-no-files-found: error
+          retention-days: 30
+
   version-report:
     name: Version and Checksum Report
     runs-on: ubuntu-24.04
@@ -257,7 +290,7 @@ jobs:
 
   pre-matrix:
     name: Pre-Matrix Gate
-    needs: [github-release-tools]
+    needs: [github-release-tools, performance-benchmarks]
     runs-on: ubuntu-24.04
     steps:
       - run: echo "All static, security, workflow, and release-smoke gates passed"
@@ -346,7 +379,7 @@ jobs:
             dotfiles-unit bash -lc '
               set -e
               sudo apt-get update -qq
-              sudo apt-get install -y yq zsh tmux
+              sudo apt-get install -y yq zsh tmux openssh-client
               /dotfiles/scripts/install-chezmoi.sh
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
@@ -354,6 +387,8 @@ jobs:
                 test-network-faults.sh test-download-cache.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
+                test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \
+                test-ssh-access.sh test-git-credential.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
                 /dotfiles/tests/$test /dotfiles
               done

@@ -34,18 +34,36 @@ run_zsh() {
 }
 
 run_zsh "$tmp/warmup.out"
-: >"$tmp/times"
-for run in 1 2 3; do
-  started="$(date +%s%N)"
-  run_zsh "$tmp/run-$run.out"
-  ended="$(date +%s%N)"
-  printf '%s\n' "$(((ended - started) / 1000000))" >>"$tmp/times"
-done
+if command -v hyperfine >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+  cat >"$tmp/run-zsh-startup" <<'EOF'
+#!/usr/bin/env bash
+exec env TERM=xterm-256color timeout 10 script -qefc 'zsh -lic exit' "$1" </dev/null >/dev/null
+EOF
+  chmod +x "$tmp/run-zsh-startup"
+  hyperfine_json="$tmp/hyperfine.json"
+  startup_command="$(printf '%q %q' "$tmp/run-zsh-startup" "$tmp/hyperfine.out")"
+  hyperfine --warmup "${DOTFILES_HYPERFINE_WARMUP_RUNS:-1}" \
+    --runs "${DOTFILES_HYPERFINE_RUNS:-3}" \
+    --export-json "$hyperfine_json" \
+    "$startup_command" >/dev/null
+  run_zsh "$tmp/validation.out"
+  median="$(jq -r '.results[0].median * 1000 | round' "$hyperfine_json")"
+  runs="$(jq -r '[.results[0].times[] * 1000 | round] | join(",")' "$hyperfine_json")"
+else
+  : >"$tmp/times"
+  for run in 1 2 3; do
+    started="$(date +%s%N)"
+    run_zsh "$tmp/run-$run.out"
+    ended="$(date +%s%N)"
+    printf '%s\n' "$(((ended - started) / 1000000))" >>"$tmp/times"
+  done
+  median="$(sort -n "$tmp/times" | sed -n '2p')"
+  runs="$(paste -sd, "$tmp/times")"
+fi
 
-median="$(sort -n "$tmp/times" | sed -n '2p')"
 mkdir -p "$(dirname "$ARTIFACT")"
 printf '{"budget_ms":%s,"median_ms":%s,"runs_ms":[%s]}\n' \
-  "$BUDGET_MS" "$median" "$(paste -sd, "$tmp/times")" >"$ARTIFACT"
+  "$BUDGET_MS" "$median" "$runs" >"$ARTIFACT"
 
 if grep -Eaiq \
   'command not found|no such file or directory|can.t change option|plugin: .*not found|compinit:|(^|[^a-z])error:' \

@@ -10,6 +10,9 @@ SESSION_NAME=""
 BACKEND="${DOTFILES_WORKSPACE_BACKEND:-auto}"
 PRINT_ONLY=false
 ALLOW_NESTED=false
+AGENT_SELECTION=""
+RESTART_AGENTS=false
+HEALTH_ONLY=false
 TMUX_RENDERED=""
 
 usage() {
@@ -19,6 +22,9 @@ Usage: dot-workspace [directory] [options]
 Options:
   --backend <auto|herdr|tmux>  Select the workspace backend (default: auto)
   --name <session>             Override the project workspace/session name
+  --agents <list>              Launch a comma-separated subset of registered agents
+  --restart-agents             Restart an agent after a non-zero exit
+  --check                      Validate tools and agent CLIs without launching
   --allow-nested               Permit an explicit cross-multiplexer launch
   --print                      Print the resolved plan without launching it
   -h, --help                   Show this help
@@ -44,6 +50,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --name=*)
       SESSION_NAME="${1#--name=}"
+      shift
+      ;;
+    --agents)
+      AGENT_SELECTION="${2:-}"
+      shift 2
+      ;;
+    --agents=*)
+      AGENT_SELECTION="${1#--agents=}"
+      shift
+      ;;
+    --restart-agents)
+      RESTART_AGENTS=true
+      shift
+      ;;
+    --check | --health)
+      HEALTH_ONLY=true
       shift
       ;;
     --allow-nested)
@@ -105,6 +127,19 @@ mapfile -t AGENTS < <(yq -r '.workspace.agents[]' "$REGISTRY")
   printf 'Agent registry contains no workspace agents\n' >&2
   exit 1
 }
+if [[ -n "$AGENT_SELECTION" ]]; then
+  declare -a selected_agents=()
+  IFS=',' read -r -a selected_agents <<<"$AGENT_SELECTION"
+  AGENTS=()
+  for agent in "${selected_agents[@]}"; do
+    yq -e --arg agent "$agent" '.workspace.agents[] | select(. == $agent)' \
+      "$REGISTRY" >/dev/null || {
+      printf 'Agent is not registered for workspaces: %s\n' "$agent" >&2
+      exit 2
+    }
+    AGENTS+=("$agent")
+  done
+fi
 for agent in "${AGENTS[@]}"; do
   [[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
     printf 'Invalid agent id in registry: %s\n' "$agent" >&2
@@ -133,17 +168,68 @@ if [[ "$BACKEND" == herdr && -n "${TMUX:-}" && "${HERDR_ENV:-}" != 1 && "$ALLOW_
   exit 2
 fi
 
+check_command() {
+  local command_name="$1" required="${2:-true}"
+  if command -v "$command_name" >/dev/null 2>&1; then
+    printf '[PASS] %s\n' "$command_name"
+    return 0
+  fi
+  if [[ "$required" == true ]]; then
+    printf '[FAIL] %s is not installed\n' "$command_name"
+    return 1
+  fi
+  printf '[INFO] %s is not installed (optional)\n' "$command_name"
+}
+
+check_workspace() {
+  local failed=0 command_name required
+  printf 'Workspace preflight\n'
+  printf '  backend: %s\n  directory: %s\n  registry: %s\n' \
+    "$BACKEND" "$WORKDIR" "$REGISTRY"
+  check_command yq || failed=1
+  check_command dot-agent-launch || failed=1
+  case "$BACKEND" in
+    tmux)
+      check_command tmux || failed=1
+      check_command uvx || failed=1
+      ;;
+    herdr)
+      check_command herdr || failed=1
+      check_command jq || failed=1
+      ;;
+  esac
+  for agent in "${AGENTS[@]}"; do
+    command_name="$(yq -r --arg agent "$agent" '.agents[$agent].command // ""' "$REGISTRY")"
+    required="$(yq -r --arg agent "$agent" '.agents[$agent].required // false' "$REGISTRY")"
+    check_command "$command_name" "$required" || failed=1
+  done
+  if command -v agent-mcp >/dev/null 2>&1; then
+    printf '[PASS] agent-mcp manager available (MCP state is unchanged)\n'
+  else
+    printf '[INFO] agent-mcp manager is not installed (optional)\n'
+  fi
+  return "$failed"
+}
+
+if [[ "$HEALTH_ONLY" == true ]]; then
+  if check_workspace; then
+    exit 0
+  fi
+  exit 1
+fi
+
 print_herdr_plan() {
-  python3 - "$SESSION_NAME" "$WORKDIR" "${AGENTS[@]}" <<'PY'
+  python3 - "$SESSION_NAME" "$WORKDIR" "$RESTART_AGENTS" "${AGENTS[@]}" <<'PY'
 import json
 import sys
 
-session, workdir, *agents = sys.argv[1:]
+session, workdir, restart, *agents = sys.argv[1:]
 print(json.dumps({
     "backend": "herdr",
     "workspace": session,
     "directory": workdir,
     "agents": agents,
+    "restart_agents": restart == "true",
 }, indent=2))
 PY
 }
@@ -157,21 +243,26 @@ render_tmux_workspace() {
   }
   [[ "${HERDR_ENV:-}" == 1 ]] && prefix=C-b
 
-  python3 - "$template" "$destination" "$SESSION_NAME" "$WORKDIR" "$prefix" "$REGISTRY" "${AGENTS[@]}" <<'PY'
+  python3 - "$template" "$destination" "$SESSION_NAME" "$WORKDIR" "$prefix" "$REGISTRY" \
+    "$RESTART_AGENTS" "${AGENTS[@]}" <<'PY'
 import json
 import re
 import shlex
 import sys
 from pathlib import Path
 
-source, destination, session, workdir, prefix, registry, *agents = sys.argv[1:]
+source, destination, session, workdir, prefix, registry, restart, *agents = sys.argv[1:]
 for agent in agents:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", agent):
         raise SystemExit(f"invalid agent id: {agent}")
 
 windows = []
 for agent in agents:
-    command = shlex.join(["dot-agent-launch", "--registry", registry, agent])
+    launch = ["dot-agent-launch"]
+    if restart == "true":
+        launch.append("--restart")
+    launch.extend(["--registry", registry, agent])
+    command = shlex.join(launch)
     windows.extend([
         f"  - window_name: {json.dumps(agent)}",
         "    panes:",
@@ -255,6 +346,7 @@ ensure_herdr_server() {
 
 run_herdr_workspace() {
   local list workspace_id created root_tab response tab_id placeholder_pane agent
+  local -a launch_args
   if [[ "$PRINT_ONLY" == true ]]; then
     print_herdr_plan
     return 0
@@ -295,9 +387,12 @@ run_herdr_workspace() {
       fi
       tab_id="$(jq -er '.result.tab.tab_id' <<<"$response")"
       placeholder_pane="$(jq -er '.result.root_pane.pane_id' <<<"$response")"
+      launch_args=(dot-agent-launch)
+      [[ "$RESTART_AGENTS" == true ]] && launch_args+=(--restart)
+      launch_args+=(--registry "$REGISTRY" "$agent")
       if ! herdr agent start "$agent" --workspace "$workspace_id" --tab "$tab_id" \
         --cwd "$WORKDIR" --no-focus --env "DOTFILES_AGENT_REGISTRY=$REGISTRY" -- \
-        dot-agent-launch --registry "$REGISTRY" "$agent" >/dev/null; then
+        "${launch_args[@]}" >/dev/null; then
         herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
         return 1
       fi

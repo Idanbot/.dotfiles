@@ -18,7 +18,7 @@ required=(
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
   scripts/download-cache.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
-  scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/classify-ci-run.sh
+  scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/hyperfine-benchmark.sh scripts/classify-ci-run.sh
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
@@ -29,11 +29,13 @@ required=(
   tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
   tests/test-ci-outcome.sh tests/test-network-faults.sh tests/test-download-cache.sh
   tests/test-ci-operations.sh tests/test-system-configuration.sh tests/test-git-credential.sh
-  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh
+  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-agent-status.sh
+  tests/test-hyperfine-benchmark.sh
   tests/test-ssh-access.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
   .github/workflows/native-vm-e2e.yml
-  dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp
+  dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp dot_local/bin/executable_dot-agent-status
+  dot_local/bin/executable_tmux-agent-status
   dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_local/bin/executable_tmux-help
@@ -71,10 +73,20 @@ fi
 
 if grep -Fq 'tests/test-e2e-report.sh "$PWD"' "$CI_WORKFLOW" &&
   grep -Fq 'tests/test-performance-report.sh "$PWD"' "$CI_WORKFLOW" &&
-  grep -Fq 'name: Publish performance budget report' "$CI_WORKFLOW"; then
-  pass "CI validates structured E2E reports and publishes performance budgets"
+  grep -Fq 'name: Publish performance budget report' "$CI_WORKFLOW" &&
+  grep -Fq 'name: Hyperfine Benchmark Scenarios' "$CI_WORKFLOW" &&
+  grep -Fq 'scripts/hyperfine-benchmark.sh --output' "$CI_WORKFLOW"; then
+  pass "CI validates structured E2E reports and publishes Hyperfine performance budgets"
 else
-  fail "CI is missing E2E report or performance budget coverage"
+  fail "CI is missing E2E report or Hyperfine performance budget coverage"
+fi
+
+if grep -Fq 'test-cloud-context.sh test-cloud-context-starship.sh' "$CI_WORKFLOW" &&
+  grep -Fq 'test-ssh-access.sh test-git-credential.sh' "$CI_WORKFLOW" &&
+  grep -Fq 'test-agent-status.sh' "$CI_WORKFLOW"; then
+  pass "Docker unit CI covers cloud, SSH, and agent readiness fixtures"
+else
+  fail "Docker unit CI is missing cloud, SSH, or agent readiness fixtures"
 fi
 
 CLOUD_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
@@ -280,7 +292,7 @@ else
   fail "workspace nesting policy is incomplete"
 fi
 
-if grep -Fq 'dot-agent-launch --registry "$REGISTRY" "$agent"' \
+if grep -Fq 'launch_args+=(--registry "$REGISTRY" "$agent")' \
   "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
   pass "Herdr agent panes receive the resolved registry path"
 else

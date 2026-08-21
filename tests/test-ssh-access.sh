@@ -129,5 +129,17 @@ grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG"
 grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG"
 ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG"
 ! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"
+[[ ! -e "$HOME/.cloudflared" ]]
+[[ ! -e "$HOME/.ssh/known_hosts" ]]
+if find "$HOME" -type f \
+  -not -path "$HOME/.ssh/id_ed25519" \
+  -not -path "$HOME/.ssh/id_ed25519.pub" \
+  -not -path "$HOME/.ssh/fresh_ed25519" \
+  -not -path "$HOME/.ssh/fresh_ed25519.pub" \
+  -exec grep -Eqi 'private[_-]?key|access[_-]?token|client_secret|password=' {} \; \
+  -print -quit | grep -q .; then
+  printf 'SSH/Cloudflare fixture leaked credential-like content\n' >&2
+  exit 1
+fi
 
 printf 'SSH access test passed\n'

@@ -4,14 +4,48 @@
 set -u
 
 registry_override=""
-if [[ "${1:-}" == --registry ]]; then
-  registry_override="${2:-}"
-  [[ -n "$registry_override" ]] || {
-    printf '%s\n' '--registry requires a path' >&2
-    exit 2
-  }
-  shift 2
-fi
+restart=false
+check_only=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --registry)
+      registry_override="${2:-}"
+      [[ -n "$registry_override" ]] || {
+        printf '%s\n' '--registry requires a path' >&2
+        exit 2
+      }
+      shift 2
+      ;;
+    --registry=*)
+      registry_override="${1#--registry=}"
+      shift
+      ;;
+    --restart)
+      restart=true
+      shift
+      ;;
+    --check)
+      check_only=true
+      shift
+      ;;
+    -h | --help)
+      cat <<'USAGE'
+Usage: dot-agent-launch [--check] [--restart] [--registry PATH] AGENT
+
+  --check     Validate the registered CLI without launching it.
+  --restart   Restart the CLI after a non-zero exit; Ctrl-C and clean exits stop.
+USAGE
+      exit 0
+      ;;
+    -*)
+      printf 'Unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 
 agent="${1:-}"
 [[ "$agent" =~ ^[[:alnum:]_-]+$ ]] || {
@@ -41,8 +75,47 @@ command_name="$(yq -r ".agents[\"$agent\"].command // \"\"" "$registry")"
   exit 2
 }
 
+required="$(yq -r ".agents[\"$agent\"].required // false" "$registry")"
+
+if [[ "$check_only" == true ]]; then
+  if command -v "$command_name" >/dev/null 2>&1; then
+    printf '[PASS] %s -> %s\n' "$agent" "$command_name"
+    exit 0
+  fi
+  printf '[%s] %s -> %s is not installed\n' \
+    "$([[ "$required" == true ]] && printf WARN || printf INFO)" \
+    "$agent" "$command_name"
+  [[ "$required" == true ]] && exit 1
+  exit 0
+fi
+
 if command -v "$command_name" >/dev/null 2>&1; then
-  exec "$command_name"
+  if [[ "$restart" == false ]]; then
+    exec "$command_name"
+  fi
+
+  delay="${DOTFILES_AGENT_RESTART_DELAY:-2}"
+  max_restarts="${DOTFILES_AGENT_MAX_RESTARTS:-0}"
+  [[ "$delay" =~ ^[0-9]+([.][0-9]+)?$ ]] || delay=2
+  [[ "$max_restarts" =~ ^[0-9]+$ ]] || max_restarts=0
+  attempts=0
+  while :; do
+    set +e
+    "$command_name"
+    status=$?
+    set -e
+    if [[ "$status" -eq 0 || "$status" -eq 130 || "$status" -eq 143 ]]; then
+      exit "$status"
+    fi
+    ((attempts += 1))
+    if ((max_restarts > 0 && attempts > max_restarts)); then
+      printf '%s exited %s after %s restart(s)\n' "$command_name" "$status" "$max_restarts" >&2
+      exit "$status"
+    fi
+    printf '%s exited %s; restarting in %ss (attempt %s)\n' \
+      "$command_name" "$status" "$delay" "$attempts" >&2
+    sleep "$delay"
+  done
 fi
 
 printf '%s is not installed. This window remains in %s.\n' "$command_name" "$PWD"
