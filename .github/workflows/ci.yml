@@ -106,6 +106,7 @@ jobs:
           tests/test-ci-operations.sh "$PWD"
           tests/test-system-configuration.sh "$PWD"
           tests/test-git-credential.sh "$PWD"
+          tests/test-conflict-resolution.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
@@ -389,6 +390,7 @@ jobs:
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \
                 test-ssh-access.sh test-git-credential.sh \
+                test-conflict-resolution.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
                 /dotfiles/tests/$test /dotfiles
               done

@@ -120,9 +120,32 @@ Default conflict policy is `backup`. Other policies are explicit:
   and continue the selected tool sections.
 - `abort`: stop when any managed config change is pending.
 
-The bootstrap uses `chezmoi apply --force` only after policy handling, so it
-does not enter chezmoi's per-file prompt. When running raw `chezmoi apply`, the
-prompt choices mean:
+With the default `backup` policy in a terminal, the installer creates the
+transactional backup first, shows a redacted bounded diff for each existing
+modified destination, and asks for a decision:
+
+- `skip` / do nothing: preserve this destination and continue.
+- `replace`: apply the managed version for this destination.
+- `merge` / append: for regular shell, SSH, Git, and similar text config,
+  apply the managed content first and retain the current local content after a
+  marked block. Repeating the merge does not duplicate the local block, and
+  local content is recoverable through the backup.
+  The destination remains locally modified by design, so later runs can show
+  managed updates and let you merge again or skip the file.
+- `all replace`: replace this and later conflicts.
+- `keep all`: preserve this and later conflicts.
+- `diff`: show the bounded redacted diff again.
+- `quit`: cancel configuration apply; the backup remains available for restore.
+
+Press `--yes` for deterministic noninteractive replacement after backup. When
+stdin and `/dev/tty` are both unavailable, the installer also replaces after
+backup so CI and piped bootstrap runs cannot hang. Set `DOTFILES_DIFF_LINES` to
+change the preview limit; the default is 160 lines. JSON and other unsupported
+formats intentionally do not offer append merge.
+
+The bootstrap uses target-specific `chezmoi apply` calls after per-file choices,
+so a skipped child cannot be reapplied accidentally through a parent directory.
+When running raw `chezmoi apply`, the separate chezmoi prompt choices mean:
 
 - `diff`: display the proposed change; nothing is written yet.
 - `overwrite`: replace this destination with the managed version.

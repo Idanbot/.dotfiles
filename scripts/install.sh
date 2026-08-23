@@ -10,6 +10,9 @@ DOTFILES_LOG="${DOTFILES_LOG:-1}"
 DOTFILES_LOG_RETENTION="${DOTFILES_LOG_RETENTION:-20}"
 DOTFILES_CONFLICT_POLICY="${DOTFILES_CONFLICT_POLICY:-backup}"
 DOTFILES_ROLLBACK_ON_ERROR="${DOTFILES_ROLLBACK_ON_ERROR:-1}"
+CONFLICT_AUTO_APPROVE=false
+CONFLICT_DIFF_LINES="${DOTFILES_DIFF_LINES:-160}"
+export CONFLICT_AUTO_APPROVE CONFLICT_DIFF_LINES
 
 SCRIPT_DIR=""
 LOCAL_SOURCE="${DOTFILES_SOURCE_OVERRIDE:-}"
@@ -135,6 +138,10 @@ Reliability:
   --source <path>           Use a local source checkout
   --only <section>          Run one section from a local checkout
   --no-doctor               Skip the final acceptance check
+
+Interactive backup conflicts show a redacted diff and offer skip, replace,
+append-merge, all-replace, all-skip, diff, or quit. Use --yes to replace all
+pending destinations after the backup without prompting.
 
 Inspection:
   --list-options            Print profiles and sections
@@ -431,6 +438,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -y | --yes)
       AUTO_APPROVE=true
+      CONFLICT_AUTO_APPROVE=true
       shift
       ;;
     --resume)
@@ -827,7 +835,7 @@ stage_apply() {
   fi
 
   log_info "Applying dotfiles with scripts delegated to the observable orchestrator"
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force; then
+  if ! dotfiles_apply_selected_conflicts; then
     if [[ "$DOTFILES_ROLLBACK_ON_ERROR" == 1 && -n "$BACKUP_ID" ]]; then
       log_warn "Chezmoi apply failed; restoring backup $BACKUP_ID"
       "$CHEZMOI_SOURCE/scripts/backup.sh" restore "$BACKUP_ID" --force
@@ -933,6 +941,8 @@ run_stage source stage_source
 # From this point all platform behavior comes from one shared implementation.
 # shellcheck source=scripts/environment.sh
 source "$CHEZMOI_SOURCE/scripts/environment.sh"
+# shellcheck source=scripts/conflicts.sh
+source "$CHEZMOI_SOURCE/scripts/conflicts.sh"
 if ! assert_supported_platform; then
   log_error "Unsupported platform $(get_platform); this repository supports Ubuntu 24.04 native and WSL"
   exit 1

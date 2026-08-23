@@ -10,5 +10,6 @@ DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 "$DOTFILES_DIR/tests/test-environment.sh" "$DOTFILES_DIR"
 "$DOTFILES_DIR/tests/test-version-helpers.sh" "$DOTFILES_DIR"
 "$DOTFILES_DIR/tests/test-bootstrap-safety.sh" "$DOTFILES_DIR"
+"$DOTFILES_DIR/tests/test-conflict-resolution.sh" "$DOTFILES_DIR"
 
 printf 'Fast bootstrap contract passed; live installation is covered by Docker E2E\n'

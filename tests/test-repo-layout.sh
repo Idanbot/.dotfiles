@@ -14,7 +14,7 @@ fail() {
 printf '\n== Repository Layout ==\n'
 
 required=(
-  scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh
+  scripts/install.sh scripts/lib.sh scripts/environment.sh scripts/backup.sh scripts/conflicts.sh
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
   scripts/download-cache.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
@@ -32,6 +32,7 @@ required=(
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-agent-status.sh
   tests/test-hyperfine-benchmark.sh
   tests/test-ssh-access.sh
+  tests/test-conflict-resolution.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
   .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp dot_local/bin/executable_dot-agent-status
@@ -105,6 +106,7 @@ else
 fi
 
 INSTALL="$DOTFILES_DIR/scripts/install.sh"
+CONFLICTS="$DOTFILES_DIR/scripts/conflicts.sh"
 for expected in \
   'run_stage "section-$section"' \
   'DOTFILES_FAIL_AT' \
@@ -112,7 +114,7 @@ for expected in \
   'chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
   'orchestrator=explicit'; do
-  grep -Fq "$expected" "$INSTALL" && pass "installer contract: $expected" || fail "installer missing: $expected"
+  grep -Fq "$expected" "$INSTALL" "$CONFLICTS" && pass "installer contract: $expected" || fail "installer missing: $expected"
 done
 
 if grep -R -E 'curl[^|]*(\||[[:space:]])[[:space:]]*(ba)?sh|wget[^|]*\|[[:space:]]*(ba)?sh' \
