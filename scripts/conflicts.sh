@@ -32,7 +32,9 @@ dotfiles_conflict_diff() {
     ((count++)) || true
     ((count <= limit)) || break
     line="$(printf '%s\n' "$line" | sed -E \
-      -e 's/((token|password|secret|api[_-]?key|authorization|bearer)[=:][[:space:]]*)[^[:space:]]+/\1[REDACTED]/Ig')"
+      -e 's/((token|password|secret|api[_-]?key)[[:space:]]*[=:][[:space:]]*)[^[:space:]]+/\1[REDACTED]/Ig' \
+      -e 's/((authorization)[[:space:]]*[=:][[:space:]]*(bearer[[:space:]]+)?)[^[:space:]]+/\1[REDACTED]/Ig' \
+      -e 's/(bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig')"
     printf '%s\n' "$line"
   done <<<"$output"
   if ((total > limit)); then
@@ -82,10 +84,10 @@ dotfiles_conflict_merge_append() {
   if grep -Fq '# >>> dotfiles merged local content sha256=' "$target" &&
     grep -Fqx "$end_marker" "$target"; then
     awk '
-      /^# >>> dotfiles merged local content sha256=/ { inside = 1; next }
-      /^# <<< dotfiles merged local content <<</ { inside = 0; found = 1; next }
-      inside { print }
-      END { if (!found) exit 1 }
+      /^# >>> dotfiles merged local content sha256=/ { inside = 1; found_start = 1; next }
+      /^# <<< dotfiles merged local content <<</ { inside = 0; found_end = 1; next }
+      inside || found_end { print }
+      END { if (!found_start || !found_end) exit 1 }
     ' "$target" >"$local_file"
   else
     cp -p -- "$target" "$local_file"
