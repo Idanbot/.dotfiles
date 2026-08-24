@@ -189,6 +189,7 @@ github_asset_spec() {
     core.eza) printf '%s\n' 'eza-community/eza|v{version}|eza_{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     core.lazygit) printf '%s\n' 'jesseduffield/lazygit|v{version}|lazygit_{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
     core.starship) printf '%s\n' 'starship/starship|v{version}|starship-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
+    core.github_cli) printf '%s\n' 'cli/cli|v{version}|gh_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
     core.sops) printf '%s\n' 'getsops/sops|v{version}|sops-v{version}.linux.{arch}|amd64|arm64' ;;
     core.lazydocker) printf '%s\n' 'jesseduffield/lazydocker|v{version}|lazydocker_{version}_Linux_{arch}.tar.gz|x86_64|arm64' ;;
     core.tealdeer) printf '%s\n' 'dbrgn/tealdeer|v{version}|tealdeer-linux-{arch}-musl|x86_64|aarch64' ;;
@@ -465,6 +466,7 @@ run_live_audit() {
   audit_github core eza eza-community/eza
   audit_github core lazygit jesseduffield/lazygit
   audit_github core starship starship/starship
+  audit_github core github_cli cli/cli
   audit_github core sops getsops/sops
   audit_github core lazydocker jesseduffield/lazydocker
   audit_github core tealdeer dbrgn/tealdeer

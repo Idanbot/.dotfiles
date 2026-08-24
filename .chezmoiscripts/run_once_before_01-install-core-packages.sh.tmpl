@@ -54,4 +54,13 @@ apt_install \
   hyperfine \
   duf
 
+GH_VERSION="$(package_version core github_cli 2.98.0)"
+GH_SHA="$(package_metadata core github_cli "sha256_$(get_arch)")"
+install_github_archive \
+  gh cli/cli "v${GH_VERSION#v}" \
+  "gh_{version}_linux_{arch}.tar.gz" \
+  "gh_{version}_linux_{arch}/bin/gh" \
+  "sha256:$GH_SHA" \
+  'gh --version'
+
 print_summary "Core Packages"

@@ -392,11 +392,15 @@ generic SSH errors as expired Access authentication. Access state under
 untracked. OpenSSH connection multiplexing reuses authenticated connections
 for ten minutes without persisting a password.
 
-HTTPS Git authentication uses `git-credential-dotfiles`, which dispatches to
-Windows Git Credential Manager on WSL when available and otherwise to the
-managed Linux GCM. If neither exists it exits silently, allowing Git's normal
-interactive prompt instead of emitting helper errors. Authentication state is
-still local and must be established manually.
+HTTPS Git authentication for `github.com` and `gist.github.com` uses GitHub CLI
+as the primary and exclusive host-specific helper. Run `gh auth login` after a
+fresh bootstrap; switching the active account with `gh auth switch` also
+switches credentials used by Git. Other HTTPS Git hosts use
+`git-credential-dotfiles`, which dispatches to Windows Git Credential Manager
+on WSL when available and otherwise to the managed Linux GCM. If no GCM exists,
+the dispatcher exits silently so Git can use its normal interactive prompt.
+Bootstrap configures these helpers but never logs in or copies authentication
+state.
 
 ## Secrets Boundary
 

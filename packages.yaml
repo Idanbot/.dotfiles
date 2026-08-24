@@ -13,6 +13,7 @@ core:
   lazygit: "0.63.0"
   btop: "1.4.7"
   starship: "1.26.0"
+  github_cli: "2.98.0"
   jq: distro
   gojq: distro
   yq: distro

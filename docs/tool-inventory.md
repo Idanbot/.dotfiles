@@ -17,6 +17,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | lazygit | 0.63.0 | github | dotfiles-binary | upstream-checksum |
 | core | btop | 1.4.7 | apt | apt | apt-signature |
 | core | starship | 1.26.0 | github | dotfiles-binary | upstream-checksum |
+| core | github_cli | 2.98.0 | github | dotfiles-binary | pinned-sha256 |
 | core | jq | distro | apt | apt | apt-signature |
 | core | gojq | distro | apt | apt | apt-signature |
 | core | yq | distro | apt | apt | apt-signature |

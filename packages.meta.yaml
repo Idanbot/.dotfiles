@@ -58,6 +58,14 @@ core:
     repo: starship/starship
     binary: starship
     integrity: upstream-checksum
+  github_cli:
+    source: github
+    owner: dotfiles-binary
+    repo: cli/cli
+    binary: gh
+    integrity: pinned-sha256
+    sha256_amd64: 3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
+    sha256_arm64: cf689084f3a3618f7eae4a2420d335d74626d65f5e594b9828d125d69f800d86
   jq:
     source: apt
     owner: apt

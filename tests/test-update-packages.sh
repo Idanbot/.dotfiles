@@ -35,6 +35,10 @@ old_antigravity_sha=ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9
 new_antigravity_sha=9999999999999999999999999999999999999999999999999999999999999999
 old_fzf_sha=55ab5f2256edd8890f81d407b63d3a3e81cffe10e318cd196031dc85efdeb079
 new_fzf_sha=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+old_gh_amd64=3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
+old_gh_arm64=cf689084f3a3618f7eae4a2420d335d74626d65f5e594b9828d125d69f800d86
+new_gh_amd64=1111111111111111111111111111111111111111111111111111111111111111
+new_gh_arm64=2222222222222222222222222222222222222222222222222222222222222222
 
 fixture="$TMP_ROOT/upgrades.tsv"
 cat >"$fixture" <<EOF
@@ -44,6 +48,7 @@ ai_tools.claude_cli	2.1.207	npm:sha512-old	npm:sha512-new
 ai_tools.codex_cli	standalone	sha256:$old_codex_sha	sha256:$new_codex_sha	true
 ai_tools.antigravity_cli	standalone	sha256:$old_antigravity_sha	sha256:$new_antigravity_sha	true
 core.fzf	0.75.0	sha256:$old_fzf_sha	sha256:$new_fzf_sha
+core.github_cli	2.99.0	amd64:$old_gh_amd64;arm64:$old_gh_arm64	amd64:$new_gh_amd64;arm64:$new_gh_arm64
 EOF
 
 printf '\n== Package Upgrade Interface ==\n'
@@ -57,6 +62,7 @@ DOTFILES_SOURCE_DIR="$check_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
   --report "$check_repo/upgrade-report.md" >/dev/null
 
 grep -Fq '`terminal.herdr`' "$check_repo/upgrade-report.md" || fail "report omits Herdr"
+grep -Fq '`core.github_cli`' "$check_repo/upgrade-report.md" || fail "report omits GitHub CLI"
 grep -Fq '`0.7.4` -> `0.7.5`' "$check_repo/upgrade-report.md" || fail "report omits version delta"
 grep -Fq "$old_herdr_amd64 -> $new_herdr_amd64" "$check_repo/upgrade-report.md" ||
   fail "report omits amd64 checksum delta"
@@ -89,6 +95,8 @@ grep -Fq "    sha256_arm64: $new_herdr_arm64" "$selective_repo/packages.meta.yam
   fail "selective apply did not update arm64 checksum"
 grep -Fq '  claude_cli: "2.1.206"' "$selective_repo/packages.yaml" ||
   fail "selective apply changed an unselected tool"
+grep -Fq '  github_cli: "2.98.0"' "$selective_repo/packages.yaml" ||
+  fail "selective apply changed unselected GitHub CLI"
 if (
   export DOTFILES_SOURCE_DIR="$selective_repo"
   # shellcheck source=scripts/lib.sh
@@ -118,6 +126,11 @@ grep -Fq "    sha256: $new_codex_sha" "$all_repo/packages.meta.yaml" ||
 grep -Fq "    sha256: $new_antigravity_sha" "$all_repo/packages.meta.yaml" ||
   fail "apply-all omitted Antigravity installer checksum"
 grep -Fq '  fzf: "0.75.0"' "$all_repo/packages.yaml" || fail "apply-all omitted external version"
+grep -Fq '  github_cli: "2.99.0"' "$all_repo/packages.yaml" || fail "apply-all omitted GitHub CLI"
+grep -Fq "    sha256_amd64: $new_gh_amd64" "$all_repo/packages.meta.yaml" ||
+  fail "apply-all omitted GitHub CLI amd64 checksum"
+grep -Fq "    sha256_arm64: $new_gh_arm64" "$all_repo/packages.meta.yaml" ||
+  fail "apply-all omitted GitHub CLI arm64 checksum"
 grep -Fq 'url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.75.0"' \
   "$all_repo/.chezmoiexternal.yaml" || fail "apply-all omitted external URL"
 grep -Fq "sha256: \"$new_fzf_sha\"" "$all_repo/.chezmoiexternal.yaml" ||

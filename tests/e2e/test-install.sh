@@ -135,6 +135,10 @@ assert_version_contains() {
   }
 }
 
+if [[ ",$selected_sections," == *,core,* ]]; then
+  assert_version_contains GitHub-CLI "$(manifest_version core github_cli)" gh --version
+fi
+
 if [[ ",$selected_sections," == *,terminal,* ]]; then
   assert_version_contains curlie "$(manifest_version core curlie)" curlie version
   assert_version_contains ast-grep "$(manifest_version core ast_grep)" ast-grep --version
@@ -253,6 +257,14 @@ if [[ ",$selected_sections," == *,system,* ]]; then
   command -v git-credential-dotfiles >/dev/null
   mapfile -t credential_helpers < <(git config --global --get-all credential.helper)
   [[ "${credential_helpers[*]}" == ' dotfiles' ]]
+  mapfile -t github_credential_helpers < <(
+    git config --global --get-all credential.https://github.com.helper
+  )
+  [[ "${github_credential_helpers[*]}" == ' !gh auth git-credential' ]]
+  mapfile -t gist_credential_helpers < <(
+    git config --global --get-all credential.https://gist.github.com.helper
+  )
+  [[ "${gist_credential_helpers[*]}" == ' !gh auth git-credential' ]]
   command -v ssh-key-load >/dev/null
   ssh-key-load --help >/dev/null
   grep -Fq 'AddKeysToAgent 8h' "$HOME/.ssh/config"

@@ -191,7 +191,7 @@ check_command chezmoi true
 
 if selected core; then
   doctor_step "Core"
-  for command in git curl wget jq yq make unzip rg fdfind batcat btop zoxide direnv delta hyperfine duf; do
+  for command in git gh curl wget jq yq make unzip rg fdfind batcat btop zoxide direnv delta hyperfine duf; do
     check_command "$command" true
   done
 fi
@@ -331,6 +331,12 @@ if selected system; then
   doctor_step "System"
   check_command git-credential-manager true
   check_command git-credential-dotfiles true
+  if gh auth status --active --hostname github.com >/dev/null 2>&1; then
+    result pass github-auth "GitHub CLI has an active github.com account"
+  else
+    result warn github-auth "GitHub authentication is intentionally pending" \
+      "run: gh auth login --hostname github.com --git-protocol https"
+  fi
   check_command ssh-key-load true
   check_file "$HOME/.ssh/config" ssh-config
 fi

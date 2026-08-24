@@ -2,12 +2,19 @@
 	email = {{ .email }}
 	name = {{ .name }}
 [credential]
-	# Reset inherited helpers, then use a real executable instead of fragile shell in config.
+	# Reset inherited helpers, then use the managed GCM dispatcher by default.
 	helper =
 	helper = dotfiles
 {{ if not .is_wsl }}
 	credentialStore = secretservice
 {{- end }}
+[credential "https://github.com"]
+	# GitHub CLI owns GitHub credentials and follows the active `gh auth` account.
+	helper =
+	helper = !gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !gh auth git-credential
 [credential "https://dev.azure.com"]
 	useHttpPath = true
 [push]
