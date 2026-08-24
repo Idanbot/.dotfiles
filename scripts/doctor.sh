@@ -293,9 +293,14 @@ fi
 
 if selected ai; then
   doctor_step "Agent CLIs"
-  for command in claude codex agy opencode omp serena context-mode graphify agent-mcp; do
+  for command in claude codex agy opencode omp serena context-mode graphify rtk agent-mcp dot-privacy; do
     check_command "$command" true
   done
+  if "$HOME/.local/bin/dot-privacy" >/dev/null 2>&1; then
+    result pass telemetry-policy "managed telemetry controls are active"
+  else
+    result fail telemetry-policy "run 'dot privacy' for details"
+  fi
   check_file "$HOME/.agents/skills/graphify/SKILL.md" graphify-skill
   check_file "$HOME/.config/agents/AGENTS.md" agent-instructions
   check_instruction_link "$HOME/.codex/AGENTS.md" codex-instructions

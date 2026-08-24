@@ -18,6 +18,7 @@ Usage: dot <command> [args]
   diff                Preview destination changes
   sync [install args] Pull fast-forward updates and run the reliable installer
   doctor [args]       Run the post-install acceptance checks
+  privacy             Audit managed telemetry and nonessential traffic controls
   workspace [args]    Open the current project agent workspace
   profile [name]      Show or set the local machine profile (mode 0600)
   logs [run-id]       Show recent runs or tail one run log
@@ -64,6 +65,7 @@ case "${1:-}" in
     fi
     exec "$SOURCE/scripts/doctor.sh" "$@"
     ;;
+  privacy) exec dot-privacy ;;
   workspace)
     shift
     exec dot-workspace "$@"

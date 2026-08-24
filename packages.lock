@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 3697bd0507d368a39ee02feb865cf89cc5a54ece5bac3c19585895a845fef595
-  metadata: df23d1562143b054129e2d42cf98c92546c2557584885ce87c7a126067301c92
+  packages: 4e8b3cdd15caf621334a60699f66e0177796286de05835b28e0c4ebb0220fe92
+  metadata: 578970bef4a9423bafe0520606e8fb4872b6cf35eb156a99c769e82e6a6be311
 
 tools:
   - section: bootstrap
@@ -600,6 +600,16 @@ tools:
     package: graphifyy
     binary: graphify
     integrity: pypi
+  - section: ai_tools
+    name: rtk
+    version: 0.45.0
+    source: github
+    owner: dotfiles-binary
+    repo: rtk-ai/rtk
+    binary: rtk
+    sha256_amd64: c4c036fbf181fc55ef329786c8c17e0d427972b053b825944d968a6aafef1ba4
+    sha256_arm64: 80a746dd305ef944ff50ef011ae4ce3878dd5ba88dfe35d859d05498191637c3
+    integrity: pinned-sha256
   - section: media
     name: yt_dlp
     version: 2026.07.04

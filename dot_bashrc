@@ -1,5 +1,7 @@
 # ~/.bashrc: executed by bash(1) for non-login shells.
 
+[ -r "$HOME/.config/dotfiles/privacy.sh" ] && . "$HOME/.config/dotfiles/privacy.sh"
+
 # If not running interactively, don't do anything
 case $- in
 *i*) ;;

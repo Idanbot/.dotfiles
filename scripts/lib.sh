@@ -691,6 +691,26 @@ package_metadata() {
   ' "$metadata"
 }
 
+set_json_boolean_preserving() {
+  local target="$1" key="$2" value="$3" directory tmp
+  [[ "$value" == true || "$value" == false ]] || return 2
+  [[ ! -L "$target" ]] || return 1
+  [[ ! -e "$target" || -f "$target" ]] || return 1
+  [[ ! -s "$target" ]] || jq empty "$target" >/dev/null 2>&1 || return 1
+
+  directory="$(dirname "$target")"
+  ensure_private_directory "$directory"
+  tmp="$(mktemp "${target}.XXXXXX")"
+  if [[ -s "$target" ]]; then
+    jq --arg key "$key" --argjson value "$value" '.[$key] = $value' \
+      "$target" >"$tmp"
+  else
+    jq -n --arg key "$key" --argjson value "$value" '{($key): $value}' >"$tmp"
+  fi
+  chmod 600 "$tmp"
+  mv "$tmp" "$target"
+}
+
 managed_state_root() {
   printf '%s\n' "${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
 }

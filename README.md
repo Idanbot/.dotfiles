@@ -215,6 +215,7 @@ dot status                 repository, chezmoi, run, and ledger status
 dot diff                   preview managed changes
 dot sync [install flags]   fast-forward pull and reliable install
 dot doctor [flags]         health and acceptance checks
+dot privacy                audit telemetry and nonessential traffic controls
 dot profile [name]         read or set the machine profile
 dot logs [run-id]          list or follow bootstrap logs
 dot backup                 list config backups
@@ -316,6 +317,20 @@ during bootstrap, index repositories automatically, enable an MCP server, or
 configure an external model backend. In an OMP session, run `/graphify .` for a
 large or unfamiliar repository; generated `graphify-out/` data is ignored in
 this repository.
+
+RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
+optional shell-output optimizer. Bootstrap does not install its agent hooks;
+run the appropriate `rtk init` command only after reviewing the integration.
+RTK telemetry is disabled in both its managed config and the shared shell
+privacy policy, while local token-savings tracking and failure-only raw output
+retention remain enabled.
+
+`dot privacy` audits the enforced RTK and Claude controls, Antigravity's
+preserved `enableTelemetry` setting, Codex analytics/OTEL settings, and general
+`DO_NOT_TRACK`/OpenTelemetry/HashiCorp controls. Codex's existing user config is
+never overwritten; the audit reports the documented settings when an explicit
+opt-out is still needed. OpenCode sharing and OMP issue submission remain
+explicit user actions rather than passive uploads.
 
 A concise shared policy lives at `~/.config/agents/AGENTS.md`. Symlinks expose
 it as Codex `~/.codex/AGENTS.md`, Claude `~/.claude/CLAUDE.md`, Antigravity
@@ -442,7 +457,7 @@ to the stable `automation/grouped-tool-upgrades` branch and creates or refreshes
 one review PR; it never merges automatically. Dependabot likewise groups GitHub
 Actions updates into one monthly PR. The report
 covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`, `stern`, `helmfile`,
-`kubectx`, `kubens`, and `kubecolor`, plus Serena, context-mode, npm packages, Rust, Python, Java,
+`kubectx`, `kubens`, and `kubecolor`, plus RTK, Serena, context-mode, npm packages, Rust, Python, Java,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.

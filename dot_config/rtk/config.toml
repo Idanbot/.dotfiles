@@ -1,0 +1,11 @@
+[tracking]
+enabled = true
+history_days = 30
+
+[tee]
+enabled = true
+mode = "failures"
+max_files = 20
+
+[telemetry]
+enabled = false

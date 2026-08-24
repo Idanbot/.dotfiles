@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Audit the privacy controls that can be enforced without replacing user config.
+
+set -euo pipefail
+
+failures=0
+warnings=0
+
+pass() { printf '[PASS] %s\n' "$*"; }
+warn() {
+  printf '[WARN] %s\n' "$*"
+  ((warnings++)) || true
+}
+fail() {
+  printf '[FAIL] %s\n' "$*"
+  ((failures++)) || true
+}
+
+env_is() {
+  local name="$1" expected="$2"
+  [[ "${!name:-}" == "$expected" ]]
+}
+
+printf 'Telemetry and privacy controls\n\n'
+
+if env_is RTK_TELEMETRY_DISABLED 1 &&
+  grep -A2 '^\[telemetry\]' "$HOME/.config/rtk/config.toml" 2>/dev/null |
+  grep -Eq '^enabled[[:space:]]*=[[:space:]]*false$'; then
+  pass 'RTK telemetry is disabled by environment and config'
+else
+  fail 'RTK telemetry controls are incomplete'
+fi
+
+if env_is CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC 1 &&
+  env_is DISABLE_TELEMETRY 1 && env_is DISABLE_ERROR_REPORTING 1 &&
+  env_is DISABLE_BUG_COMMAND 1; then
+  pass 'Claude Code telemetry, error reporting, and bug submission are disabled'
+else
+  fail 'Claude Code nonessential traffic controls are incomplete'
+fi
+
+agy_settings="$HOME/.gemini/antigravity-cli/settings.json"
+if [[ -f "$agy_settings" ]] &&
+  [[ "$(jq -r 'has("enableTelemetry") and .enableTelemetry == false' \
+    "$agy_settings" 2>/dev/null)" == true ]]; then
+  pass 'Antigravity telemetry is disabled'
+else
+  warn 'Antigravity telemetry is not yet verifiable; run the AI installer or disable it in /config'
+fi
+
+codex_config="$HOME/.codex/config.toml"
+if [[ -f "$codex_config" ]] && python3 - "$codex_config" <<'PY' >/dev/null 2>&1; then
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as handle:
+    config = tomllib.load(handle)
+assert config.get("analytics", {}).get("enabled") is False
+otel = config.get("otel", {})
+assert otel.get("exporter", "none") == "none"
+assert otel.get("trace_exporter", "none") == "none"
+assert otel.get("metrics_exporter", "none") == "none"
+assert otel.get("log_user_prompt", False) is False
+PY
+  pass 'Codex analytics and OpenTelemetry export are disabled'
+else
+  warn 'Codex user config is preserved; set analytics.enabled=false and OTEL exporters to none to opt out'
+fi
+
+if env_is DO_NOT_TRACK 1 && env_is OTEL_SDK_DISABLED true &&
+  env_is CHECKPOINT_DISABLE 1; then
+  pass 'Shared Do Not Track, OpenTelemetry SDK, and HashiCorp checkpoint controls are active'
+else
+  fail 'Shared tool privacy controls are incomplete'
+fi
+
+atuin_config="$HOME/.config/atuin/config.toml"
+if [[ -f "$atuin_config" ]] && grep -Eq '^auto_sync[[:space:]]*=[[:space:]]*false$' "$atuin_config"; then
+  pass 'Atuin cloud sync remains opt-in'
+else
+  warn 'Atuin sync policy is not installed yet'
+fi
+
+printf '\nOpenCode does not upload code/context unless sharing is explicitly used.\n'
+printf 'OMP issue reporting is explicit; its install ID is local until a report is submitted.\n'
+printf 'Serena and context-mode operate locally; Graphify uses no backend until configured.\n'
+printf '\nSummary: %d failure(s), %d warning(s)\n' "$failures" "$warnings"
+((failures == 0))

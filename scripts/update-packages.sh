@@ -215,6 +215,7 @@ github_asset_spec() {
     terminal.herdr) printf '%s\n' 'ogulcancelik/herdr|v{version}|herdr-linux-{arch}|x86_64|aarch64' ;;
     system.git_credential_manager) printf '%s\n' 'git-ecosystem/git-credential-manager|v{version}|gcm-linux-{arch}-{version}.deb|x64|arm64' ;;
     ai_tools.omp) printf '%s\n' 'can1357/oh-my-pi|v{version}|omp-linux-{arch}|x64|arm64' ;;
+    ai_tools.rtk) printf '%s\n' 'rtk-ai/rtk|v{version}|rtk-{arch}.tar.gz|x86_64-unknown-linux-musl|aarch64-unknown-linux-gnu' ;;
     media.rmpc) printf '%s\n' 'mierak/rmpc|v{version}|rmpc-v{version}-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     *) return 1 ;;
   esac
@@ -544,6 +545,7 @@ run_live_audit() {
   audit_pypi ai_tools serena serena-agent
   audit_npm ai_tools context_mode context-mode
   audit_pypi ai_tools graphify graphifyy
+  audit_github ai_tools rtk rtk-ai/rtk
   audit_pypi terminal tmuxp tmuxp
   audit_github terminal kitty kovidgoyal/kitty
   audit_github terminal herdr ogulcancelik/herdr

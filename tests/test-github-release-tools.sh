@@ -27,6 +27,7 @@ case "$ARCH" in
     S5CMD_ARCH=64bit
     OMP_ARCH=x64
     HERDR_ARCH=x86_64
+    RTK_ARCH=x86_64-unknown-linux-musl
     ;;
   arm64)
     RELEASE_ARCH=aarch64
@@ -36,6 +37,7 @@ case "$ARCH" in
     S5CMD_ARCH=arm64
     OMP_ARCH=arm64
     HERDR_ARCH=aarch64
+    RTK_ARCH=aarch64-unknown-linux-gnu
     ;;
   *)
     printf 'Unsupported smoke architecture: %s\n' "$ARCH" >&2
@@ -44,6 +46,7 @@ case "$ARCH" in
 esac
 EZA_SHA="$(package_metadata core eza "sha256_$ARCH")"
 OMP_SHA="$(package_metadata ai_tools omp "sha256_$ARCH")"
+RTK_SHA="$(package_metadata ai_tools rtk "sha256_$ARCH")"
 HERDR_SHA="$(package_metadata terminal herdr "sha256_$ARCH")"
 
 EZA_VERSION="$(package_version core eza 0.23.4)"
@@ -143,6 +146,10 @@ OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "omp-linux-$OMP_ARCH" omp \
   "sha256:$OMP_SHA" 'omp --version'
 
+RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
+install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" \
+  "rtk-${RTK_ARCH}.tar.gz" rtk "sha256:$RTK_SHA" 'rtk --version'
+
 HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
 install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
   "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
@@ -161,13 +168,13 @@ install_github_archive gitleaks gitleaks/gitleaks "v$GITLEAKS_VERSION" \
 
 for binary in \
   eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
-  omp herdr ast-grep gitleaks; do
+  omp rtk herdr ast-grep gitleaks; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
 kubecolor --kubecolor-version >/dev/null
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 16 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 17 ]]
 
 HERDR_CONFIG_PATH="$TMP_HOME/herdr-config.toml"
 cp "$DOTFILES_DIR/dot_config/herdr/config.toml" "$HERDR_CONFIG_PATH"

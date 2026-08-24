@@ -116,6 +116,7 @@ jobs:
           tests/test-npm-global-cli.sh "$PWD"
           tests/test-agent-mcp.sh "$PWD"
           tests/test-agent-status.sh "$PWD"
+          tests/test-telemetry-policy.sh "$PWD"
           tests/test-ssh-access.sh "$PWD"
           tests/test-hyperfine-benchmark.sh "$PWD"
           tests/test-static-policy.sh "$PWD"
@@ -380,7 +381,7 @@ jobs:
             dotfiles-unit bash -lc '
               set -e
               sudo apt-get update -qq
-              sudo apt-get install -y yq zsh tmux openssh-client
+              sudo apt-get install -y python3 yq zsh tmux openssh-client
               /dotfiles/scripts/install-chezmoi.sh
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
@@ -389,6 +390,7 @@ jobs:
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \
+                test-telemetry-policy.sh \
                 test-ssh-access.sh test-git-credential.sh \
                 test-conflict-resolution.sh \
                 test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do

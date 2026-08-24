@@ -31,11 +31,13 @@ required=(
   tests/test-ci-operations.sh tests/test-system-configuration.sh tests/test-git-credential.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-agent-status.sh
   tests/test-hyperfine-benchmark.sh
+  tests/test-telemetry-policy.sh
   tests/test-ssh-access.sh
   tests/test-conflict-resolution.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
   .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp dot_local/bin/executable_dot-agent-status
+  dot_local/bin/executable_dot-privacy dot_config/dotfiles/privacy.sh dot_config/rtk/config.toml
   dot_local/bin/executable_tmux-agent-status
   dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
@@ -224,7 +226,9 @@ if grep -Fq 'package_version ai_tools serena' "$AI_INSTALLER" &&
   grep -Fq 'context-mode,better-sqlite3' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools graphify' "$AI_INSTALLER" &&
   grep -Fq 'uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"' "$AI_INSTALLER" &&
-  grep -Fq 'graphify install --platform agents' "$AI_INSTALLER"; then
+  grep -Fq 'graphify install --platform agents' "$AI_INSTALLER" &&
+  grep -Fq 'package_version ai_tools rtk' "$AI_INSTALLER" &&
+  grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER"; then
   pass "optional agent context tools are versioned and Graphify registers passively"
 else
   fail "optional agent context tool installation contracts are incomplete"

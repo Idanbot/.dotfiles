@@ -192,6 +192,15 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   [[ -f "$context_mode_manifest" ]]
   [[ "$(gojq -r '.version' "$context_mode_manifest")" == "$(manifest_version ai_tools context_mode)" ]]
   assert_version_contains Graphify "$(manifest_version ai_tools graphify)" graphify --version
+  assert_version_contains RTK "$(manifest_version ai_tools rtk)" rtk --version
+  grep -A2 '^\[telemetry\]' "$HOME/.config/rtk/config.toml" |
+    grep -Eq '^enabled[[:space:]]*=[[:space:]]*false$'
+  [[ "$(jq -r '.enableTelemetry' "$HOME/.gemini/antigravity-cli/settings.json")" == false ]]
+  [[ ! -e "$HOME/.claude/settings.json" ]] ||
+    ! grep -Fq 'rtk-hook' "$HOME/.claude/settings.json"
+  RTK_TELEMETRY_DISABLED=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+    DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 DISABLE_BUG_COMMAND=1 \
+    DO_NOT_TRACK=1 OTEL_SDK_DISABLED=true CHECKPOINT_DISABLE=1 dot-privacy >/dev/null
   [[ -f "$HOME/.agents/skills/graphify/SKILL.md" ]]
   [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null
