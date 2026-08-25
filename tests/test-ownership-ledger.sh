@@ -32,6 +32,18 @@ record_install graphify 0.9.38 uv:graphifyy "$HOME/.local/share/uv/tools/graphif
   grep -Fq 'would uv tool uninstall graphifyy'
 forget_install graphify
 
+mkdir -p "$HOME/.agents/skills/ponytail"
+record_install ponytail 4.9.0 agent-skill:DietrichGebert/ponytail "$HOME/.agents/skills/ponytail"
+"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run ponytail |
+  grep -Fq "would remove $HOME/.agents/skills/ponytail"
+forget_install ponytail
+
+record_install pix-optimizer 1.1.26 omp:@xynogen/pix-optimizer \
+  "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer"
+"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run pix-optimizer |
+  grep -Fq 'would omp plugin uninstall @xynogen/pix-optimizer'
+forget_install pix-optimizer
+
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run demo | grep -Fq 'would remove'
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" demo >/dev/null
 [[ ! -e "$HOME/.local/bin/demo" ]]

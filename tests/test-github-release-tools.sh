@@ -142,9 +142,28 @@ install_github_archive stern stern/stern "v$STERN_VERSION" \
   'https://github.com/stern/stern/releases/download/{tag}/checksums.txt' \
   'stern --version'
 
-OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
+OMP_VERSION="$(package_version ai_tools omp 18.0.5)"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "omp-linux-$OMP_ARCH" omp \
   "sha256:$OMP_SHA" 'omp --version'
+
+BUN_VERSION="$(package_version ai_tools bun 1.4.0)"
+case "$ARCH" in
+  amd64) BUN_ARCH=x64-baseline ;;
+  arm64) BUN_ARCH=aarch64 ;;
+esac
+install_github_archive bun oven-sh/bun "bun-v$BUN_VERSION" \
+  "bun-linux-$BUN_ARCH.zip" "bun-linux-$BUN_ARCH/bun" \
+  "sha256:$(package_metadata ai_tools bun "sha256_$ARCH")" 'bun --version'
+
+PONYTAIL_VERSION="$(package_version ai_tools ponytail 4.9.0)"
+install_github_agent_skill ponytail DietrichGebert/ponytail "$PONYTAIL_VERSION" \
+  "$(package_metadata ai_tools ponytail sha256)"
+
+PIX_OPTIMIZER_VERSION="$(package_version ai_tools pix_optimizer 1.1.26)"
+omp_install_package @xynogen/pix-optimizer "$PIX_OPTIMIZER_VERSION" pix-optimizer
+initialize_pix_optimizer_state
+[[ "$(jq -r .version "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json")" == "$PIX_OPTIMIZER_VERSION" ]]
+[[ "$(jq -r .rtk "$HOME/.omp/agent/optimizer.json")" == off ]]
 
 RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
 install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" \
@@ -168,13 +187,13 @@ install_github_archive gitleaks gitleaks/gitleaks "v$GITLEAKS_VERSION" \
 
 for binary in \
   eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
-  omp rtk herdr ast-grep gitleaks; do
+  omp bun rtk herdr ast-grep gitleaks; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
 kubecolor --kubecolor-version >/dev/null
 
-[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 17 ]]
+[[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 20 ]]
 
 HERDR_CONFIG_PATH="$TMP_HOME/herdr-config.toml"
 cp "$DOTFILES_DIR/dot_config/herdr/config.toml" "$HERDR_CONFIG_PATH"

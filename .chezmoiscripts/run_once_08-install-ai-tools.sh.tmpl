@@ -85,7 +85,7 @@ fi
 OPENCODE_VERSION="$(package_version ai_tools opencode 1.17.18)"
 npm_install_global opencode-ai "$OPENCODE_VERSION" opencode opencode-ai
 
-OMP_VERSION="$(package_version ai_tools omp 16.4.0)"
+OMP_VERSION="$(package_version ai_tools omp 18.0.5)"
 case "$(get_arch)" in
   amd64)
     OMP_ASSET=omp-linux-x64
@@ -97,6 +97,20 @@ esac
 OMP_SHA256="$(package_metadata ai_tools omp "sha256_$(get_arch)")"
 install_github_binary omp can1357/oh-my-pi "v$OMP_VERSION" "$OMP_ASSET" omp \
   "sha256:$OMP_SHA256" 'omp --version'
+
+BUN_VERSION="$(package_version ai_tools bun 1.4.0)"
+case "$(get_arch)" in
+  amd64)
+    BUN_ARCH=x64-baseline
+    ;;
+  arm64)
+    BUN_ARCH=aarch64
+    ;;
+esac
+BUN_SHA256="$(package_metadata ai_tools bun "sha256_$(get_arch)")"
+install_github_archive bun oven-sh/bun "bun-v$BUN_VERSION" \
+  "bun-linux-$BUN_ARCH.zip" "bun-linux-$BUN_ARCH/bun" \
+  "sha256:$BUN_SHA256" 'bun --version'
 
 SERENA_VERSION="$(package_version ai_tools serena 1.6.1)"
 if ! is_installed serena ||
@@ -142,6 +156,15 @@ install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" "$RTK_ASSET" rtk \
 # RTK is installed as an opt-in optimizer. Agent hooks remain untouched until
 # the user explicitly runs the appropriate `rtk init` command.
 
+PONYTAIL_VERSION="$(package_version ai_tools ponytail 4.9.0)"
+PONYTAIL_SHA256="$(package_metadata ai_tools ponytail sha256)"
+install_github_agent_skill ponytail DietrichGebert/ponytail \
+  "$PONYTAIL_VERSION" "$PONYTAIL_SHA256"
+
+PIX_OPTIMIZER_VERSION="$(package_version ai_tools pix_optimizer 1.1.26)"
+omp_install_package @xynogen/pix-optimizer "$PIX_OPTIMIZER_VERSION" pix-optimizer
+initialize_pix_optimizer_state
+
 # OMP discovers the standard Agent Skills location. Registration is passive:
 # no repository graph, hook, MCP server, or external backend is configured.
 if graphify install --platform agents >/dev/null; then
@@ -168,6 +191,8 @@ done
 log_info "Optional MCP servers are disabled by default; use 'agent-mcp enable <server>'"
 log_info "Graphify is available on demand in OMP; run '/graphify .' inside an agent session"
 log_info "RTK is installed without hooks; its telemetry is disabled by policy"
+log_info "Ponytail is available as an on-demand shared skill"
+log_info "Pix Optimizer is available in OMP; run '/optimizer' to choose modes"
 
 if is_installed herdr; then
   log_info "Installing bundled Herdr agent integrations"

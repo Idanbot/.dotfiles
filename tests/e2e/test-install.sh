@@ -187,6 +187,7 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
     command -v "$agent" >/dev/null
     "$agent" --version >/dev/null
   done
+  assert_version_contains Bun "$(manifest_version ai_tools bun)" bun --version
   assert_version_contains Serena "$(manifest_version ai_tools serena)" serena --version
   context_mode_manifest="$HOME/.local/share/npm/lib/node_modules/context-mode/package.json"
   [[ -f "$context_mode_manifest" ]]
@@ -202,6 +203,12 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
     DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 DISABLE_BUG_COMMAND=1 \
     DO_NOT_TRACK=1 OTEL_SDK_DISABLED=true CHECKPOINT_DISABLE=1 dot-privacy >/dev/null
   [[ -f "$HOME/.agents/skills/graphify/SKILL.md" ]]
+  [[ -f "$HOME/.agents/skills/ponytail/SKILL.md" ]]
+  pix_manifest="$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json"
+  [[ -f "$pix_manifest" ]]
+  [[ "$(gojq -r '.version' "$pix_manifest")" == "$(manifest_version ai_tools pix_optimizer)" ]]
+  gojq -e '.caveman == "off" and .rtk == "off" and .ponytail == "off"' \
+    "$HOME/.omp/agent/optimizer.json" >/dev/null
   [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null
   mcp_status="$(agent-mcp status all)"

@@ -29,7 +29,7 @@ required=(
   tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
   tests/test-ci-outcome.sh tests/test-network-faults.sh tests/test-download-cache.sh
   tests/test-ci-operations.sh tests/test-system-configuration.sh tests/test-git-credential.sh
-  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-agent-status.sh
+  tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-ai-optimization.sh tests/test-agent-status.sh
   tests/test-hyperfine-benchmark.sh
   tests/test-telemetry-policy.sh
   tests/test-ssh-access.sh
@@ -228,10 +228,13 @@ if grep -Fq 'package_version ai_tools serena' "$AI_INSTALLER" &&
   grep -Fq 'uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"' "$AI_INSTALLER" &&
   grep -Fq 'graphify install --platform agents' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools rtk' "$AI_INSTALLER" &&
-  grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER"; then
-  pass "optional agent context tools are versioned and Graphify registers passively"
+  grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER" &&
+  grep -Fq 'install_github_archive bun oven-sh/bun' "$AI_INSTALLER" &&
+  grep -Fq 'install_github_agent_skill ponytail DietrichGebert/ponytail' "$AI_INSTALLER" &&
+  grep -Fq 'omp_install_package @xynogen/pix-optimizer' "$AI_INSTALLER"; then
+  pass "optional agent context and optimization tools are versioned and registered deliberately"
 else
-  fail "optional agent context tool installation contracts are incomplete"
+  fail "optional agent context or optimization tool installation contracts are incomplete"
 fi
 
 MCP_MANAGER="$DOTFILES_DIR/dot_local/bin/executable_agent-mcp"

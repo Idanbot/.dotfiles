@@ -215,6 +215,7 @@ github_asset_spec() {
     terminal.herdr) printf '%s\n' 'ogulcancelik/herdr|v{version}|herdr-linux-{arch}|x86_64|aarch64' ;;
     system.git_credential_manager) printf '%s\n' 'git-ecosystem/git-credential-manager|v{version}|gcm-linux-{arch}-{version}.deb|x64|arm64' ;;
     ai_tools.omp) printf '%s\n' 'can1357/oh-my-pi|v{version}|omp-linux-{arch}|x64|arm64' ;;
+    ai_tools.bun) printf '%s\n' 'oven-sh/bun|bun-v{version}|bun-linux-{arch}.zip|x64-baseline|aarch64' ;;
     ai_tools.rtk) printf '%s\n' 'rtk-ai/rtk|v{version}|rtk-{arch}.tar.gz|x86_64-unknown-linux-musl|aarch64-unknown-linux-gnu' ;;
     media.rmpc) printf '%s\n' 'mierak/rmpc|v{version}|rmpc-v{version}-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
     *) return 1 ;;
@@ -336,6 +337,16 @@ integrity_pair() {
       old=unresolved
     fi
     if new="$(external_archive_checksum junegunn/fzf "v$latest")"; then
+      new="sha256:$new"
+    else
+      new=unresolved
+    fi
+    printf '%s\t%s\n' "$old" "$new"
+    return 0
+  fi
+  if [[ "$id" == ai_tools.ponytail ]]; then
+    old="$(pinned_metadata_checksums "$section" "$key")" || old=unresolved
+    if new="$(external_archive_checksum DietrichGebert/ponytail "v$latest")"; then
       new="sha256:$new"
     else
       new=unresolved
@@ -542,10 +553,18 @@ run_live_audit() {
   audit_mutable_url ai_tools antigravity_cli https://antigravity.google/cli/install.sh
   audit_npm ai_tools opencode opencode-ai
   audit_github ai_tools omp can1357/oh-my-pi
+  if wanted ai_tools.bun; then
+    latest="$(curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
+      https://api.github.com/repos/oven-sh/bun/releases/latest 2>/dev/null |
+      jq -r '.tag_name // empty' | sed 's/^bun-v//' || true)"
+    add_candidate ai_tools bun "$latest"
+  fi
   audit_pypi ai_tools serena serena-agent
   audit_npm ai_tools context_mode context-mode
   audit_pypi ai_tools graphify graphifyy
   audit_github ai_tools rtk rtk-ai/rtk
+  audit_github ai_tools ponytail DietrichGebert/ponytail
+  audit_npm ai_tools pix_optimizer @xynogen/pix-optimizer
   audit_pypi terminal tmuxp tmuxp
   audit_github terminal kitty kovidgoyal/kitty
   audit_github terminal herdr ogulcancelik/herdr

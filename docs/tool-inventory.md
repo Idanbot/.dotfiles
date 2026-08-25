@@ -78,11 +78,14 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | ai_tools | codex_cli | standalone | install_script | vendor-installer | pinned-sha256 |
 | ai_tools | antigravity_cli | standalone | install_script | vendor-installer | pinned-sha256 |
 | ai_tools | opencode | 1.17.18 | npm | npm | npm-registry |
-| ai_tools | omp | 16.4.0 | github | dotfiles-binary | pinned-sha256 |
+| ai_tools | omp | 18.0.5 | github | dotfiles-binary | pinned-sha256 |
+| ai_tools | bun | 1.4.0 | github | dotfiles-binary | pinned-sha256 |
 | ai_tools | serena | 1.6.1 | uv | uv | pypi |
 | ai_tools | context_mode | 1.0.169 | npm | npm | npm-registry |
 | ai_tools | graphify | 0.9.38 | pypi | uv | pypi |
 | ai_tools | rtk | 0.45.0 | github | dotfiles-binary | pinned-sha256 |
+| ai_tools | ponytail | 4.9.0 | github | agent-skill | pinned-sha256 |
+| ai_tools | pix_optimizer | 1.1.26 | npm | omp-plugin | npm-registry |
 | media | yt_dlp | 2026.07.04 | uv | uv | pypi |
 | media | rmpc | 0.11.0 | github | dotfiles-binary | pinned-sha256 |
 | media | cava | distro | apt | apt | apt-signature |

@@ -451,8 +451,17 @@ ai_tools:
     repo: can1357/oh-my-pi
     binary: omp
     asset_template: omp-linux-{release_arch}
-    sha256_amd64: c7a2fa328c965131c0d0ef62a07a4fe63306ed1b7a90fbbb924c75605c68d38a
-    sha256_arm64: 6bb8d76fa25ebea08b2ce87a79387c1dd0bcbff5564ef5bc79f2595a870a3a68
+    sha256_amd64: d5a322af241cebe2662b3b792ff29d3ea6e61364328e916c9429065f346391ed
+    sha256_arm64: 9fa632da09cc6f2b625bb79aa291d52985f936a10408d278d550983f91460785
+    integrity: pinned-sha256
+  bun:
+    source: github
+    owner: dotfiles-binary
+    repo: oven-sh/bun
+    binary: bun
+    asset_template: bun-linux-{release_arch}.zip
+    sha256_amd64: 184fb4595f0d401a217cf7c78c1bc430ba83314dab7a8b94805babbf7fa7097f
+    sha256_arm64: 4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e
     integrity: pinned-sha256
   serena:
     source: uv
@@ -482,6 +491,17 @@ ai_tools:
     sha256_amd64: c4c036fbf181fc55ef329786c8c17e0d427972b053b825944d968a6aafef1ba4
     sha256_arm64: 80a746dd305ef944ff50ef011ae4ce3878dd5ba88dfe35d859d05498191637c3
     integrity: pinned-sha256
+  ponytail:
+    source: github
+    owner: agent-skill
+    repo: DietrichGebert/ponytail
+    integrity: pinned-sha256
+    sha256: 7f45b3fab0b92ae5ff95c4608acda9f6ee2f0374b0122cba046289167d0cd256
+  pix_optimizer:
+    source: npm
+    owner: omp-plugin
+    package: "@xynogen/pix-optimizer"
+    integrity: npm-registry
 
 media:
   yt_dlp:

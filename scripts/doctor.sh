@@ -293,7 +293,7 @@ fi
 
 if selected ai; then
   doctor_step "Agent CLIs"
-  for command in claude codex agy opencode omp serena context-mode graphify rtk agent-mcp dot-privacy; do
+  for command in claude codex agy opencode omp bun serena context-mode graphify rtk agent-mcp dot-privacy; do
     check_command "$command" true
   done
   if "$HOME/.local/bin/dot-privacy" >/dev/null 2>&1; then
@@ -302,6 +302,8 @@ if selected ai; then
     result fail telemetry-policy "run 'dot privacy' for details"
   fi
   check_file "$HOME/.agents/skills/graphify/SKILL.md" graphify-skill
+  check_file "$HOME/.agents/skills/ponytail/SKILL.md" ponytail-skill
+  check_file "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json" pix-optimizer
   check_file "$HOME/.config/agents/AGENTS.md" agent-instructions
   check_instruction_link "$HOME/.codex/AGENTS.md" codex-instructions
   check_instruction_link "$HOME/.claude/CLAUDE.md" claude-instructions

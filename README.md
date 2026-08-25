@@ -318,6 +318,13 @@ configure an external model backend. In an OMP session, run `/graphify .` for a
 large or unfamiliar repository; generated `graphify-out/` data is ignored in
 this repository.
 
+The AI profile also installs the canonical Ponytail skill into
+`~/.agents/skills/ponytail` only when that skill is missing, preserving any
+existing local copy. OMP receives the pinned Pix Optimizer plugin; use
+`/optimizer` inside OMP to select Caveman, RTK, and Ponytail modes. These modes
+remain user-controlled rather than being enabled by bootstrap. A verified Bun
+runtime is installed alongside OMP because OMP uses it for plugin management.
+
 RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
 optional shell-output optimizer. Bootstrap does not install its agent hooks;
 run the appropriate `rtk init` command only after reviewing the integration.

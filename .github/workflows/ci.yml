@@ -115,6 +115,7 @@ jobs:
           tests/test-update-packages.sh "$PWD"
           tests/test-npm-global-cli.sh "$PWD"
           tests/test-agent-mcp.sh "$PWD"
+          tests/test-ai-optimization.sh "$PWD"
           tests/test-agent-status.sh "$PWD"
           tests/test-telemetry-policy.sh "$PWD"
           tests/test-ssh-access.sh "$PWD"
@@ -390,6 +391,7 @@ jobs:
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \
+                test-ai-optimization.sh \
                 test-telemetry-policy.sh \
                 test-ssh-access.sh test-git-credential.sh \
                 test-conflict-resolution.sh \

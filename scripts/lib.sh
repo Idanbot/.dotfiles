@@ -820,6 +820,87 @@ npm_install_global() {
   ((_INSTALLED++)) || true
 }
 
+omp_install_package() {
+  local package="$1" version="$2" tool="$3"
+  local root manifest installed_version="" spec
+  root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
+  manifest="$root/node_modules/$package/package.json"
+  spec="${package}@${version}"
+
+  if [[ -f "$manifest" ]]; then
+    installed_version="$(jq -r '.version // empty' "$manifest" 2>/dev/null || true)"
+  fi
+  if version_equals "$installed_version" "$version"; then
+    log_skip "$tool $version already installed in OMP"
+    return 0
+  fi
+
+  log_info "Installing $tool $version for OMP"
+  omp plugin install "$spec"
+  [[ -f "$manifest" ]] || {
+    log_error "$tool package manifest was not created at $manifest"
+    return 1
+  }
+  installed_version="$(jq -r '.version // empty' "$manifest")"
+  version_equals "$installed_version" "$version" || {
+    log_error "$tool expected version $version, found ${installed_version:-unknown}"
+    return 1
+  }
+  record_install "$tool" "$version" "omp:$package" "$root/node_modules/$package"
+  ((_INSTALLED++)) || true
+  log_success "$tool $version installed for OMP"
+}
+
+initialize_pix_optimizer_state() {
+  local state="$HOME/.omp/agent/optimizer.json" tmp
+  if [[ -e "$state" ]]; then
+    jq empty "$state" >/dev/null 2>&1 ||
+      log_warn "Existing Pix Optimizer state is invalid and was preserved: $state"
+    return 0
+  fi
+  ensure_private_directory "$(dirname "$state")"
+  tmp="$(mktemp "${state}.XXXXXX")"
+  jq -n '{caveman: "off", rtk: "off", ponytail: "off"}' >"$tmp"
+  chmod 600 "$tmp"
+  mv "$tmp" "$state"
+  log_success "Pix Optimizer initialized with all modes off"
+}
+
+install_github_agent_skill() {
+  local skill="$1" repo="$2" version="$3" expected_sha="$4"
+  local destination="$HOME/.agents/skills/$skill" tmpdir archive source
+  if [[ -f "$destination/SKILL.md" ]]; then
+    log_skip "$skill agent skill already exists"
+    return 0
+  fi
+
+  tmpdir="$(mktemp -d)"
+  archive="$tmpdir/source.tar.gz"
+  log_info "Installing $skill agent skill $version"
+  download_verified \
+    "https://codeload.github.com/$repo/tar.gz/refs/tags/v$version" \
+    "$archive" "sha256:$expected_sha" "$skill-v$version.tar.gz"
+  mkdir -p "$tmpdir/source"
+  tar -xzf "$archive" -C "$tmpdir/source" --strip-components=1
+  source="$tmpdir/source/skills/$skill"
+  [[ -f "$source/SKILL.md" ]] || {
+    rm -rf "$tmpdir"
+    log_error "$skill archive does not contain skills/$skill/SKILL.md"
+    return 1
+  }
+  [[ ! -e "$destination" || -d "$destination" ]] || {
+    rm -rf "$tmpdir"
+    log_error "$skill destination exists and is not a directory: $destination"
+    return 1
+  }
+  mkdir -p "$destination"
+  cp -a "$source/." "$destination/"
+  rm -rf "$tmpdir"
+  record_install "$skill" "$version" "agent-skill:$repo" "$destination"
+  ((_INSTALLED++)) || true
+  log_success "$skill agent skill $version installed"
+}
+
 section_manifest_hash() {
   local section="$1"
   awk -v section="$section" '

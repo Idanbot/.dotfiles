@@ -73,6 +73,17 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
       [[ "$package" == uv ]] && package="$tool"
       [[ "$DRY_RUN" == true ]] && printf 'would uv tool uninstall %s\n' "$package" || uv tool uninstall "$package"
       ;;
+    omp:*)
+      package="${owner#omp:}"
+      [[ "$DRY_RUN" == true ]] && printf 'would omp plugin uninstall %s\n' "$package" || omp plugin uninstall "$package"
+      ;;
+    agent-skill:*)
+      [[ "$target" == "$HOME/.agents/skills/$tool" ]] || {
+        printf 'Refusing unsafe agent skill path: %s\n' "$target" >&2
+        exit 1
+      }
+      [[ "$DRY_RUN" == true ]] && printf 'would remove %s\n' "$target" || rm -rf -- "$target"
+      ;;
     dpkg)
       if [[ "$INCLUDE_PACKAGES" == true ]]; then
         [[ "$DRY_RUN" == true ]] && printf 'would apt remove %s\n' "$target" || sudo apt-get remove -y "$target"
