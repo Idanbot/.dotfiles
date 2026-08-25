@@ -48,7 +48,7 @@ for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-batte
     log_skip "$plugin is managed by checksum-pinned chezmoi externals"
   else
     log_error "Checksum-pinned tmux plugin is missing: $plugin"
-    increment_failed
+    ((_FAILED++)) || true
   fi
 done
 

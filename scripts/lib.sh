@@ -513,11 +513,16 @@ download_verified() {
 }
 
 github_latest_release() {
-  local repo="$1"
-  curl --proto '=https' --tlsv1.2 --retry 3 -fsSL \
+  local repo="$1" auth_header=() tag
+  local token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  [[ -n "$token" ]] && auth_header=(-H "Authorization: Bearer $token")
+  tag=$(curl --proto '=https' --tlsv1.2 --retry 3 -fsSL \
+    "${auth_header[@]}" \
     "https://api.github.com/repos/${repo}/releases/latest" |
     sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' |
-    head -1
+    head -1)
+  [[ -n "$tag" ]] || { log_error "Failed to resolve latest release for $repo (API rate limit?)"; return 1; }
+  printf '%s\n' "$tag"
 }
 
 resolve_tool_version() {

@@ -1,10 +1,5 @@
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
+# Privacy and telemetry opt-outs (must load before any tool hooks)
 [[ -r "$HOME/.config/dotfiles/privacy.sh" ]] && source "$HOME/.config/dotfiles/privacy.sh"
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
 
 export GOPATH=$HOME/go
 _dotfiles_ssh_agent_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
@@ -357,9 +352,7 @@ if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook zsh)"
 fi
 
-if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
-fi
+
 
 if [[ "${DOTFILES_ENABLE_ATUIN:-0}" == "1" ]] && command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init zsh)"
@@ -368,23 +361,21 @@ fi
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
-export GOPATH=$HOME/go
 export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
 [[ -d "$JAVA_HOME/bin" ]] && path=("$JAVA_HOME/bin" $path)
 export CARGO_HOME=$HOME/.cargo
 
 export BAT_THEME=ansi
 
-# Deduplicate PATH
-typeset -U path PATH
-
 export FPATH="$HOME/Scripts/eza/completions/zsh:$FPATH"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-export PATH=$HOME/bin:$PATH
+# Deduplicate PATH (must be after all PATH modifications)
+typeset -U path PATH
 
 # Compile .zshrc to byte-code (.zwc) in the background if it changes
+# Uses atomic rename to prevent corruption from concurrent shells
 if [[ ~/.zshrc -nt ~/.zshrc.zwc ]]; then
-  (zcompile ~/.zshrc &) 2>/dev/null
+  (zcompile ~/.zshrc.tmp.$$ && mv -f ~/.zshrc.tmp.$$.zwc ~/.zshrc.zwc &) 2>/dev/null
 fi

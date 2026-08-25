@@ -1,5 +1,11 @@
 # SOPS & Age Secrets Management Guide
 
+> [!IMPORTANT]
+> **Reference Pattern — Not Currently Active.** This repository follows a
+> [secret-free bootstrap design](adr/0001-secret-free-bootstrap.md) where no
+> encrypted secrets, age identities, or SOPS configuration exist in the repo.
+> This document is provided as a reference for future adoption if needed.
+
 This guide explains how to manage encrypted secrets, host overlays, and environment variables in your dotfiles using **SOPS** (Secrets OCP Service) and **age** (modern encryption tool).
 
 ---

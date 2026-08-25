@@ -865,16 +865,16 @@ declare -A SECTION_SCRIPTS=(
 )
 
 declare -A SECTION_MANIFESTS=(
-  [terminal]=core
+  [terminal]=terminal
   [languages]=languages
   [history]=history
-  [cloud]=cloud
+  [cloud]="cloud database"
   [tmux]=terminal
   [neovim]=editor
   [ai]=ai_tools
   [media]=media
   [fonts]=fonts
-  [desktop]=terminal
+  [desktop]=desktop
   [system]=system
 )
 
@@ -899,12 +899,16 @@ run_install_section() {
   [[ -n "$manifest_section" ]] || return 0
   hash_dir="$STATE_ROOT/package-sections"
   mkdir -p "$hash_dir"
-  awk -v section="$manifest_section" '
-    $0 ~ "^" section ":[[:space:]]*$" { inside = 1 }
-    inside && $0 ~ "^[^[:space:]#].*:[[:space:]]*$" && $0 !~ "^" section ":" { exit }
-    inside { print }
-  ' "$CHEZMOI_SOURCE/packages.yaml" | sha256sum | awk '{print $1}' >"$hash_dir/$manifest_section.sha256"
-  chmod 600 "$hash_dir/$manifest_section.sha256"
+  local ms combined_hash=""
+  for ms in $manifest_section; do
+    combined_hash+=$(awk -v section="$ms" '
+      $0 ~ "^" section ":[[:space:]]*$" { inside = 1 }
+      inside && $0 ~ "^[^[:space:]#].*:[[:space:]]*$" && $0 !~ "^" section ":" { exit }
+      inside { print }
+    ' "$CHEZMOI_SOURCE/packages.yaml")
+  done
+  printf '%s' "$combined_hash" | sha256sum | awk '{print $1}' >"$hash_dir/${section}.sha256"
+  chmod 600 "$hash_dir/${section}.sha256"
 }
 
 stage_doctor() {
