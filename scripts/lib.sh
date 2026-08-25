@@ -521,7 +521,10 @@ github_latest_release() {
     "https://api.github.com/repos/${repo}/releases/latest" |
     sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' |
     head -1)
-  [[ -n "$tag" ]] || { log_error "Failed to resolve latest release for $repo (API rate limit?)"; return 1; }
+  [[ -n "$tag" ]] || {
+    log_error "Failed to resolve latest release for $repo (API rate limit?)"
+    return 1
+  }
   printf '%s\n' "$tag"
 }
 
