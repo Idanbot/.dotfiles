@@ -38,7 +38,7 @@ run_id="$(<"$STATE_ROOT/runs/latest")"
 [[ ! -f "$STATE_ROOT/runs/$run_id/checkpoints/apply.done" ]]
 
 DOTFILES_LOG_FILE="$ARTIFACT_DIR/resumed.log" \
-  "$DOTFILES_DIR/scripts/install.sh" --resume="$run_id" --no-doctor \
+  "$DOTFILES_DIR/scripts/install.sh" --resume="$run_id" --yes --no-doctor \
   >"$ARTIFACT_DIR/resumed-console.log" 2>&1
 
 grep -Fq 'prerequisites already completed' "$ARTIFACT_DIR/resumed-console.log"
