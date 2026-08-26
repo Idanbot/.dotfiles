@@ -56,6 +56,7 @@ RESUME_REQUEST=""
 RUN_DOCTOR=true
 CHEZMOI_SOURCE=""
 CHEZMOI_STATUS_OUTPUT=""
+HAS_CONTROLLING_TTY=false
 BACKUP_ID=""
 CURRENT_STAGE="startup"
 RUN_STARTED_EPOCH="$(date +%s)"
@@ -217,16 +218,30 @@ select_profile() {
   SELECTION_MODE="profile"
 }
 
+interactive_tty_available() {
+  [[ -t 0 || -t 1 ]]
+}
+
 read_user() {
   local prompt="$1" destination="$2" value
-  if [[ -t 0 ]]; then
-    read -r -p "$prompt" value
-  elif [[ -t 1 && -r /dev/tty ]]; then
-    read -r -p "$prompt" value </dev/tty
+  if [[ "${READ_USER_ALLOW_STDIN:-false}" == true || -t 0 ]]; then
+    read -r -p "$prompt" value || return 1
+  elif [[ "$HAS_CONTROLLING_TTY" == true ]]; then
+    read -r -p "$prompt" value </dev/tty || return 1
   else
-    read -r -p "$prompt" value
+    log_error "Interactive input requires a controlling terminal; use --yes or --conflict-policy skip|abort"
+    return 1
   fi
   printf -v "$destination" '%s' "$value"
+}
+
+read_menu_user() {
+  READ_USER_ALLOW_STDIN=true
+  if ! read_user "$@"; then
+    READ_USER_ALLOW_STDIN=false
+    return 1
+  fi
+  READ_USER_ALLOW_STDIN=false
 }
 
 show_menu() {
@@ -239,7 +254,7 @@ show_menu() {
   printf '  5. Agent       Developer plus AI coding harnesses\n'
   printf '  6. Cloud       Developer plus containers and cloud CLIs\n'
   printf '  7. Custom      Exact comma-separated section list\n\n'
-  read_user 'Choose install profile [1]: ' choice
+  read_menu_user 'Choose install profile [1]: ' choice
   case "${choice:-1}" in
     1) select_profile full ;;
     2) select_profile minimal ;;
@@ -249,7 +264,7 @@ show_menu() {
     6) select_profile cloud ;;
     7)
       printf 'Sections: %s\n' "$(join_by_comma "${SECTION_ORDER[@]}")"
-      read_user 'Sections: ' extras
+      read_menu_user 'Sections: ' extras
       SELECTED_SECTIONS=()
       parse_csv_sections "$extras" SELECTED_SECTIONS
       PROFILE_NAME=custom
@@ -326,7 +341,8 @@ resolve_selection() {
       select_profile full
     elif load_machine_profile; then
       :
-    elif [[ "$MENU_REQUESTED" == true || ("$AUTO_APPROVE" == false && (-t 0 || (-t 1 && -r /dev/tty))) ]]; then
+    elif [[ "$MENU_REQUESTED" == true ]] ||
+      { [[ "$AUTO_APPROVE" == false ]] && interactive_tty_available; }; then
       show_menu
     else
       select_profile full
@@ -569,6 +585,12 @@ else
   DOTFILES_RUN_ID="$(date -u '+%Y%m%dT%H%M%SZ')-$$"
 fi
 export DOTFILES_RUN_ID
+
+# Logging redirects stdout through tee. Preserve whether the bootstrap started
+# with a terminal so conflict prompts can still read from /dev/tty afterward.
+if interactive_tty_available; then
+  HAS_CONTROLLING_TTY=true
+fi
 RUN_DIR="$STATE_ROOT/runs/$DOTFILES_RUN_ID"
 CHECKPOINT_DIR="$RUN_DIR/checkpoints"
 LOG_DIR="$STATE_ROOT/logs"
@@ -802,6 +824,29 @@ print_dry_run_summary() {
   [[ "$total" -le 12 ]] || log_info "  ... $((total - 12)) more; run 'chezmoi diff' for the full diff"
 }
 
+ensure_managed_entrypoint() {
+  local name="$1" target="$HOME/.local/bin/$1"
+  if [[ -x "$target" ]]; then
+    return 0
+  fi
+  if [[ -e "$target" || -L "$target" ]]; then
+    log_error "Managed command $name exists but is not executable: $target"
+    log_info "Resolve the conflict explicitly, then rerun the installer"
+    return 1
+  fi
+
+  log_warn "Managed command $name is missing; repairing it through chezmoi"
+  mkdir -p "$HOME/.local/bin"
+  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$target"; then
+    log_error "Unable to repair managed command $name"
+    return 1
+  fi
+  [[ -x "$target" ]] || {
+    log_error "Managed command $name is still missing after repair"
+    return 1
+  }
+}
+
 stage_apply() {
   local status_file backup_output
   print_dry_run_summary
@@ -810,7 +855,7 @@ stage_apply() {
       skip)
         log_warn "Conflict policy is skip; preserving current destination files"
         log_info "Applying verified externals without overwriting managed config"
-        chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force
+        chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty
         return 0
         ;;
       abort)
@@ -842,6 +887,8 @@ stage_apply() {
     fi
     return 1
   fi
+  ensure_managed_entrypoint dot
+  ensure_managed_entrypoint dot-privacy
 }
 
 declare -A SECTION_SCRIPTS=(
@@ -912,6 +959,8 @@ run_install_section() {
 }
 
 stage_doctor() {
+  ensure_managed_entrypoint dot
+  ensure_managed_entrypoint dot-privacy
   "$CHEZMOI_SOURCE/scripts/doctor.sh" \
     --acceptance \
     --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")"

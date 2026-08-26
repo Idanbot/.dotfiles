@@ -114,9 +114,13 @@ for expected in \
   'DOTFILES_FAIL_AT' \
   'scripts/backup.sh create' \
   'chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
+  '--no-tty' \
+  'HAS_CONTROLLING_TTY' \
+  'read_menu_user' \
+  'ensure_managed_entrypoint dot-privacy' \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
   'orchestrator=explicit'; do
-  grep -Fq "$expected" "$INSTALL" "$CONFLICTS" && pass "installer contract: $expected" || fail "installer missing: $expected"
+  grep -Fq -- "$expected" "$INSTALL" "$CONFLICTS" && pass "installer contract: $expected" || fail "installer missing: $expected"
 done
 
 if grep -R -E 'curl[^|]*(\||[[:space:]])[[:space:]]*(ba)?sh|wget[^|]*\|[[:space:]]*(ba)?sh' \

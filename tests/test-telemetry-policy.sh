@@ -67,4 +67,13 @@ grep -Fq 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1' \
   "$DOTFILES_DIR/dot_config/dotfiles/privacy.sh"
 grep -Fq 'analytics.enabled=false' "$DOTFILES_DIR/dot_local/bin/executable_dot-privacy"
 
+# The lifecycle wrapper remains usable before a shell restart exposes the
+# newly materialized ~/.local/bin entrypoint.
+fallback_output="$(
+  PATH=/usr/bin:/bin \
+    DOTFILES_SOURCE_DIR="$DOTFILES_DIR" \
+    "$DOTFILES_DIR/dot_local/bin/executable_dot" privacy
+)"
+grep -Fq 'Summary: 0 failure(s)' <<<"$fallback_output"
+
 printf 'Telemetry policy test passed\n'

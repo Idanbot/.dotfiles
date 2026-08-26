@@ -31,6 +31,7 @@ CHOICE=""
 CHOICE_QUEUE=()
 read_user() {
   local _prompt="$1" destination="$2" selected_choice
+  [[ "${READ_FAILURE:-false}" == true ]] && return 1
   if [[ ${#CHOICE_QUEUE[@]} -gt 0 ]]; then
     selected_choice="${CHOICE_QUEUE[0]}"
     CHOICE_QUEUE=("${CHOICE_QUEUE[@]:1}")
@@ -80,6 +81,11 @@ dotfiles_conflict_prompt "$TMP_ROOT/source" .zshrc
 CONFLICT_AUTO_APPROVE=true
 dotfiles_conflict_prompt "$TMP_ROOT/source" .zshrc
 [[ "$DOTFILES_CONFLICT_ACTION" == replace ]]
+CONFLICT_AUTO_APPROVE=false
+READ_FAILURE=true
+dotfiles_conflict_prompt "$TMP_ROOT/source" .zshrc
+[[ "$DOTFILES_CONFLICT_ACTION" == quit ]]
+unset READ_FAILURE
 
 CONFLICT_AUTO_APPROVE=false
 printf '%s\n' 'export LOCAL=1' >"$HOME/.zshrc"
@@ -146,9 +152,9 @@ export CHEZMOI_SOURCE="$TMP_ROOT/source"
 export CHEZMOI_STATUS_OUTPUT=$'MM .zshrc\nMM .config\n M .config/other.conf'
 CONFLICT_AUTO_APPROVE=true
 dotfiles_apply_selected_conflicts
-grep -Fq -- '--force .zshrc .config/other.conf' "$APPLY_LOG"
+grep -Fq -- '--force --no-tty .zshrc .config/other.conf' "$APPLY_LOG"
 ! grep -Fq -- '--force .config' "$APPLY_LOG"
-grep -Fq -- '--include=dirs,externals --force' "$APPLY_LOG"
+grep -Fq -- '--include=dirs,externals --force --no-tty' "$APPLY_LOG"
 
 export APPLY_FAILURE=true
 if dotfiles_apply_selected_conflicts; then

@@ -137,11 +137,13 @@ modified destination, and asks for a decision:
 - `diff`: show the bounded redacted diff again.
 - `quit`: cancel configuration apply; the backup remains available for restore.
 
-Press `--yes` for deterministic noninteractive replacement after backup. When
-stdin and `/dev/tty` are both unavailable, the installer also replaces after
-backup so CI and piped bootstrap runs cannot hang. Set `DOTFILES_DIFF_LINES` to
-change the preview limit; the default is 160 lines. JSON and other unsupported
-formats intentionally do not offer append merge.
+Press `--yes` for deterministic noninteractive replacement after backup. In a
+piped bootstrap, interactive choices are read from the controlling terminal
+even though output is being logged through `tee`. If no controlling terminal is
+available, the installer cancels configuration apply safely and tells you to
+use `--yes` or an explicit conflict policy. Set `DOTFILES_DIFF_LINES` to change
+the preview limit; the default is 160 lines. JSON and other unsupported formats
+intentionally do not offer append merge.
 
 The bootstrap uses target-specific `chezmoi apply` calls after per-file choices,
 so a skipped child cannot be reapplied accidentally through a parent directory.

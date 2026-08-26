@@ -7,6 +7,8 @@
 - Existing config is backed up before overwrite by default.
 - Interactive conflicts show a bounded redacted diff and support per-file
   skip, replace, append-merge, all-replace, all-skip, and quit decisions.
+- Interactive choices use the controlling terminal when output is piped; a
+  missing terminal cancels configuration apply instead of choosing silently.
 - Existing shell history, completion state, and local overlays are preserved.
 - A stage checkpoint is written only after the stage succeeds.
 - Every selected profile ends with acceptance checks.

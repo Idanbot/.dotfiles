@@ -127,17 +127,16 @@ dotfiles_conflict_prompt() {
     DOTFILES_CONFLICT_ACTION=replace
     return 0
   fi
-  if [[ ! -t 0 && ! -r /dev/tty ]]; then
-    log_warn "No terminal available for conflict choice; replacing after backup"
-    DOTFILES_CONFLICT_ACTION=replace
-    return 0
-  fi
-
   while :; do
     printf '\nConflict: ~/%s differs from the managed version\n' "$rel" >&2
     printf '  [s]kip/do nothing  [r]eplace  [m]erge/append  [a]ll replace\n' >&2
     printf '  [k]eep all  [d]iff again  [q]uit\n' >&2
-    read_user 'Choice [s]: ' choice
+    if ! read_user 'Choice [s]: ' choice; then
+      log_error "Conflict resolution cancelled: no usable terminal input"
+      log_info "Rerun with --yes to replace after backup, or --conflict-policy skip|abort"
+      DOTFILES_CONFLICT_ACTION=quit
+      return 0
+    fi
     case "${choice:-s}" in
       s | skip | nothing | do-nothing)
         DOTFILES_CONFLICT_ACTION=skip
@@ -252,7 +251,7 @@ dotfiles_apply_selected_conflicts() {
   done <<<"$CHEZMOI_STATUS_OUTPUT"
 
   if [[ "$had_conflict" == false ]]; then
-    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force; then
+    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty; then
       return 1
     fi
     return 0
@@ -260,7 +259,7 @@ dotfiles_apply_selected_conflicts() {
 
   if [[ ${#apply_targets[@]} -gt 0 ]]; then
     log_info "Applying ${#apply_targets[@]} selected managed file(s)"
-    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force "${apply_targets[@]}"; then
+    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "${apply_targets[@]}"; then
       return 1
     fi
   else
@@ -268,7 +267,7 @@ dotfiles_apply_selected_conflicts() {
   fi
   # Keep directory creation and verified externals convergent without touching
   # any file that the user explicitly skipped or merged.
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force; then
+  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty; then
     return 1
   fi
 }

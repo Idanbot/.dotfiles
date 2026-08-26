@@ -65,7 +65,17 @@ case "${1:-}" in
     fi
     exec "$SOURCE/scripts/doctor.sh" "$@"
     ;;
-  privacy) exec dot-privacy ;;
+  privacy)
+    if command -v dot-privacy >/dev/null 2>&1; then
+      exec dot-privacy
+    fi
+    fallback="$SOURCE/dot_local/bin/executable_dot-privacy"
+    if [[ -x "$fallback" ]]; then
+      exec "$fallback"
+    fi
+    printf 'dot privacy is unavailable; rerun the AI section or chezmoi apply\n' >&2
+    exit 1
+    ;;
   workspace)
     shift
     exec dot-workspace "$@"
