@@ -161,12 +161,20 @@ Recovery commands:
 ./scripts/install.sh --resume
 ./scripts/install.sh --resume=<run-id>
 dot backup
+dot backup verify <id>
 dot restore <backup-id>
 ```
 
 Backups record files, directories, symlinks, modes, checksums, and paths that
 were previously absent. Restoring therefore also removes files created by a
-failed apply.
+failed apply. Every restore first validates the complete manifest and all
+backed-up checksums before changing a destination; inspect a snapshot without
+restoring it with `scripts/backup.sh verify <backup-id>`.
+
+Stateful bootstrap runs are serialized with `~/.local/state/dotfiles/bootstrap.lock`
+so two terminals cannot race on checkpoints, backups, or the latest-run pointer.
+The default is fail-fast; use `--lock-timeout <seconds>` when a scheduled or
+supervised invocation should wait for an active run.
 
 ## Logs and Diagnostics
 
@@ -174,6 +182,7 @@ Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
 
 ```text
 ~/.local/state/dotfiles/
+|-- bootstrap.lock
 |-- logs/
 |   |-- bootstrap-<run-id>.log
 |   `-- bootstrap-<run-id>.jsonl
@@ -187,7 +196,8 @@ Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
 On-machine logs and state use mode `0600`. Persisted text logs have ANSI
 sequences removed and common secret assignments redacted. JSONL events include
 UTC time, run ID, section/stage, level, and message. The newest 20 log pairs are
-retained by default.
+retained by default. JSONL fields escape quotes, backslashes, and control
+characters so error messages cannot corrupt the event stream.
 
 Console color is enabled for a capable TTY and Windows Terminal on WSL. Control
 it with `DOTFILES_COLOR=always|never|auto` or the standard `NO_COLOR` variable.

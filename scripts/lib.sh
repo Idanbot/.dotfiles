@@ -40,9 +40,13 @@ json_escape() {
   local value="${1:-}"
   value=${value//\\/\\\\}
   value=${value//\"/\\\"}
+  value=${value//$'\b'/\\b}
+  value=${value//$'\f'/\\f}
   value=${value//$'\n'/\\n}
   value=${value//$'\r'/\\r}
   value=${value//$'\t'/\\t}
+  value=${value//$'\v'/\\u000b}
+  value=${value//$'\a'/\\u0007}
   printf '%s' "$value"
 }
 
@@ -53,7 +57,7 @@ emit_event() {
   umask 077
   mkdir -p "$(dirname "$DOTFILES_EVENT_LOG")"
   printf '{"time":"%s","run_id":"%s","section":"%s","level":"%s","message":"%s"}\n' \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+    "$(json_escape "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")" \
     "$(json_escape "${DOTFILES_RUN_ID:-unknown}")" \
     "$(json_escape "${DOTFILES_SECTION:-bootstrap}")" \
     "$(json_escape "$level")" \

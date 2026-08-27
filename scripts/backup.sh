@@ -11,6 +11,7 @@ usage() {
 Usage:
   scripts/backup.sh create --status-file <file> [--run-id <id>]
   scripts/backup.sh list
+  scripts/backup.sh verify <backup-id|latest>
   scripts/backup.sh restore <backup-id|latest> [--force]
   scripts/backup.sh prune [count]
 
@@ -21,7 +22,9 @@ USAGE
 
 safe_relative_path() {
   local path="$1"
-  [[ -n "$path" && "$path" != /* && "$path" != .. && "$path" != ../* && "$path" != *'/../'* ]]
+  [[ -n "$path" && "$path" != /* && "$path" != .. && "$path" != ../* ]] || return 1
+  [[ "$path" != */../* && "$path" != */.. ]] || return 1
+  [[ "$path" != . && "$path" != ./* && "$path" != */./* && "$path" != */. ]]
 }
 
 status_path() {
@@ -104,17 +107,140 @@ create_backup() {
 }
 
 resolve_backup_id() {
-  local requested="$1"
+  local requested="$1" id
   if [[ "$requested" == latest ]]; then
     [[ -L "$BACKUP_ROOT/latest" ]] || return 1
-    readlink "$BACKUP_ROOT/latest"
+    id="$(readlink -- "$BACKUP_ROOT/latest")"
   else
-    printf '%s\n' "$requested"
+    id="$requested"
   fi
+  [[ "$id" != . && "$id" != .. && "$id" =~ ^[A-Za-z0-9._-]+$ ]] || return 1
+  printf '%s\n' "$id"
+}
+
+verify_backup_id() {
+  local id="$1" dir="$BACKUP_ROOT/$1" manifest="$BACKUP_ROOT/$1/manifest.tsv"
+  local files_root header rel type mode hash extra source parent_real files_real actual
+  declare -A seen=()
+
+  [[ -d "$dir" && ! -L "$dir" && -f "$manifest" ]] || {
+    printf 'Invalid backup: %s\n' "$id" >&2
+    return 1
+  }
+  IFS= read -r header <"$manifest" || {
+    printf 'Invalid backup manifest: %s\n' "$id" >&2
+    return 1
+  }
+  [[ "$header" == $'path\ttype\tmode\tsha256' ]] || {
+    printf 'Invalid backup manifest header: %s\n' "$id" >&2
+    return 1
+  }
+  files_root="$dir/files"
+  [[ -d "$files_root" && ! -L "$files_root" ]] || {
+    printf 'Invalid backup files directory: %s\n' "$id" >&2
+    return 1
+  }
+  files_real="$(realpath -e -- "$files_root")" || {
+    printf 'Cannot resolve backup files directory: %s\n' "$id" >&2
+    return 1
+  }
+
+  while IFS=$'\t' read -r rel type mode hash extra; do
+    [[ -n "$rel" && -n "$type" && -n "$mode" && -n "$hash" && -z "$extra" ]] || {
+      printf 'Invalid backup manifest row: %s\n' "$id" >&2
+      return 1
+    }
+    safe_relative_path "$rel" || {
+      printf 'Unsafe backup path: %s\n' "$rel" >&2
+      return 1
+    }
+    [[ -z "${seen[$rel]+present}" ]] || {
+      printf 'Duplicate backup path: %s\n' "$rel" >&2
+      return 1
+    }
+    seen["$rel"]=1
+
+    case "$type" in
+      absent)
+        [[ "$mode" == - && "$hash" == - ]] || {
+          printf 'Invalid absent entry: %s\n' "$rel" >&2
+          return 1
+        }
+        ;;
+      directory)
+        [[ "$mode" =~ ^[0-7]{3,4}$ && "$hash" == - ]] || {
+          printf 'Invalid directory entry: %s\n' "$rel" >&2
+          return 1
+        }
+        ;;
+      file | symlink)
+        [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || {
+          printf 'Invalid checksum entry: %s\n' "$rel" >&2
+          return 1
+        }
+        if [[ "$type" == file ]]; then
+          [[ "$mode" =~ ^[0-7]{3,4}$ && -f "$files_root/$rel" && ! -L "$files_root/$rel" ]] || {
+            printf 'Missing or invalid backup file: %s\n' "$rel" >&2
+            return 1
+          }
+        else
+          [[ "$mode" == - && -L "$files_root/$rel" ]] || {
+            printf 'Missing or invalid backup symlink: %s\n' "$rel" >&2
+            return 1
+          }
+        fi
+        source="$files_root/$rel"
+        parent_real="$(realpath -e -- "$(dirname "$source")")" || {
+          printf 'Invalid backup parent: %s\n' "$rel" >&2
+          return 1
+        }
+        [[ "$parent_real" == "$files_real" || "$parent_real" == "$files_real/"* ]] || {
+          printf 'Backup path escapes files directory: %s\n' "$rel" >&2
+          return 1
+        }
+        if [[ "$type" == file ]]; then
+          actual="$(sha256sum -- "$source" | awk '{print $1}')"
+        else
+          actual="$(readlink -- "$source" | sha256sum | awk '{print $1}')"
+        fi
+        [[ "$actual" == "$hash" ]] || {
+          printf 'Backup checksum failed: %s\n' "$rel" >&2
+          return 1
+        }
+        ;;
+      *)
+        printf 'Invalid backup entry type: %s\n' "$type" >&2
+        return 1
+        ;;
+    esac
+  done < <(tail -n +2 "$manifest")
+}
+
+verify_backup() {
+  [[ $# -ge 2 ]] || {
+    usage >&2
+    exit 2
+  }
+  local requested="$2" id
+  shift 2
+  [[ $# -eq 0 && -n "$requested" ]] || {
+    usage >&2
+    exit 2
+  }
+  id="$(resolve_backup_id "$requested")" || {
+    printf 'No backup found\n' >&2
+    exit 2
+  }
+  verify_backup_id "$id"
+  printf 'Backup verified: %s\n' "$id"
 }
 
 restore_backup() {
-  local requested="${2:-}" force=false id dir manifest rel type mode hash target source actual
+  [[ $# -ge 2 ]] || {
+    usage >&2
+    exit 2
+  }
+  local requested="$2" force=false id dir manifest rel type mode hash target source actual
   shift 2
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -138,9 +264,9 @@ restore_backup() {
   }
   dir="$BACKUP_ROOT/$id"
   manifest="$dir/manifest.tsv"
-  [[ -f "$manifest" ]] || {
-    printf 'Invalid backup: %s\n' "$id" >&2
-    exit 2
+  verify_backup_id "$id" || {
+    printf 'Backup verification failed: %s\n' "$id" >&2
+    return 1
   }
 
   if [[ "$force" == false ]]; then
@@ -148,10 +274,10 @@ restore_backup() {
     [[ "$answer" =~ ^[Yy]$ ]] || exit 0
   fi
 
-  tail -n +2 "$manifest" | while IFS=$'\t' read -r rel type mode hash; do
+  while IFS=$'\t' read -r rel type mode hash; do
     safe_relative_path "$rel" || {
       printf 'Unsafe backup path: %s\n' "$rel" >&2
-      exit 1
+      return 1
     }
     target="$HOME/$rel"
     source="$dir/files/$rel"
@@ -171,17 +297,23 @@ restore_backup() {
     fi
     rm -rf -- "$target"
     mkdir -p "$(dirname "$target")"
-    cp -a "$source" "$target"
+    cp -a -- "$source" "$target"
     if [[ "$type" == file ]]; then
-      actual="$(sha256sum "$target" | awk '{print $1}')"
+      actual="$(sha256sum -- "$target" | awk '{print $1}')"
       [[ "$actual" == "$hash" ]] || {
         printf 'Restore checksum failed: %s\n' "$rel" >&2
-        exit 1
+        return 1
       }
       chmod "$mode" "$target"
+    elif [[ "$type" == symlink ]]; then
+      actual="$(readlink -- "$target" | sha256sum | awk '{print $1}')"
+      [[ "$actual" == "$hash" ]] || {
+        printf 'Restore symlink checksum failed: %s\n' "$rel" >&2
+        return 1
+      }
     fi
     printf 'restored ~/%s\n' "$rel"
-  done
+  done < <(tail -n +2 "$manifest")
 }
 
 list_backups() {
@@ -210,6 +342,7 @@ prune_backups() {
 
 case "${1:-}" in
   create) create_backup "$@" ;;
+  verify) verify_backup "$@" ;;
   restore) restore_backup "$@" ;;
   list) list_backups ;;
   prune) prune_backups "$@" ;;

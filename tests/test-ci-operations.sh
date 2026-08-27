@@ -47,6 +47,14 @@ else
   fail 'network fault, verified cache, or performance history coverage is not wired into CI'
 fi
 
+if grep -Fq 'tests/test-bootstrap-lock.sh "$PWD"' "$CI" &&
+  grep -Fq 'tests/test-json-escape.sh "$PWD"' "$CI" &&
+  grep -Fq 'test-bootstrap-lock.sh test-json-escape.sh' "$CI"; then
+  pass 'Docker and contract CI cover bootstrap locking and JSONL escaping'
+else
+  fail 'bootstrap locking or JSONL escaping tests are not wired into CI'
+fi
+
 if grep -Fq 'cron: "17 4 1 * *"' "$UPGRADES" &&
   grep -Fq './scripts/update-packages.sh --apply-all' "$UPGRADES" &&
   grep -Fq 'branch=automation/grouped-tool-upgrades' "$UPGRADES" &&

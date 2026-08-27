@@ -24,7 +24,7 @@ OMP_CALLS="$TMP_ROOT/omp-calls"
 omp() {
   printf '%s\n' "$*" >>"$OMP_CALLS"
   [[ "$1 $2" == 'plugin install' ]]
-  local spec="$3" package="${3%@*}" version="${3##*@}" manifest
+  local package="${3%@*}" version="${3##*@}" manifest
   manifest="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$package/package.json"
   mkdir -p "$(dirname "$manifest")"
   jq -n --arg name "$package" --arg version "$version" \
