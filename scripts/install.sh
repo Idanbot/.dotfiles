@@ -62,7 +62,10 @@ BACKUP_ID=""
 CURRENT_STAGE="startup"
 RUN_STARTED_EPOCH="$(date +%s)"
 _HANDLING_ERROR=false
-BOOTSTRAP_LOCK_FD=""
+LOCK_HELPER_PID=""
+LOCK_READY_FILE=""
+LOCK_ERROR_FILE=""
+LOCK_RELEASE_FIFO=""
 
 join_by_comma() {
   local IFS=,
@@ -600,7 +603,7 @@ if [[ "$PRINT_PLAN" == true ]]; then
 fi
 
 acquire_bootstrap_lock() {
-  local lock_file="$STATE_ROOT/bootstrap.lock"
+  local lock_file="$STATE_ROOT/bootstrap.lock" token deadline reason
   umask 077
   mkdir -p "$STATE_ROOT"
   chmod 700 "$STATE_ROOT"
@@ -609,23 +612,72 @@ acquire_bootstrap_lock() {
     return 1
   }
 
-  exec {BOOTSTRAP_LOCK_FD}>"$lock_file"
-  chmod 600 "$lock_file"
-  if [[ "$DOTFILES_LOCK_TIMEOUT" == 0 ]]; then
-    flock -n "$BOOTSTRAP_LOCK_FD" || {
-      printf 'Another dotfiles bootstrap is already running (lock: %s)\n' "$lock_file" >&2
+  token="${BASHPID:-$$}"
+  LOCK_READY_FILE="$STATE_ROOT/.bootstrap-lock-ready-$token"
+  LOCK_ERROR_FILE="$STATE_ROOT/.bootstrap-lock-error-$token"
+  LOCK_RELEASE_FIFO="$STATE_ROOT/.bootstrap-lock-release-$token"
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+  mkfifo "$LOCK_RELEASE_FIFO"
+
+  # Keep the lock FD out of tee, sed, chezmoi, and installer child processes.
+  (
+    exec 9>>"$lock_file"
+    chmod 600 "$lock_file"
+    if [[ "$DOTFILES_LOCK_TIMEOUT" == 0 ]]; then
+      if ! flock -n 9; then
+        printf 'busy\n' >"$LOCK_ERROR_FILE"
+        exit 75
+      fi
+    elif ! flock -w "$DOTFILES_LOCK_TIMEOUT" 9; then
+      printf 'timeout\n' >"$LOCK_ERROR_FILE"
+      exit 75
+    fi
+    printf 'ready\n' >"$LOCK_READY_FILE"
+    IFS= read -r _ <"$LOCK_RELEASE_FIFO" || true
+  ) &
+  LOCK_HELPER_PID=$!
+
+  deadline=$((SECONDS + DOTFILES_LOCK_TIMEOUT + 5))
+  while ((SECONDS <= deadline)); do
+    [[ -f "$LOCK_READY_FILE" ]] && return 0
+    if [[ -f "$LOCK_ERROR_FILE" ]]; then
+      reason="$(<"$LOCK_ERROR_FILE")"
+      if [[ "$reason" == busy ]]; then
+        printf 'Another dotfiles bootstrap is already running (lock: %s)\n' "$lock_file" >&2
+      else
+        printf 'Timed out after %ss waiting for another dotfiles bootstrap (lock: %s)\n' \
+          "$DOTFILES_LOCK_TIMEOUT" "$lock_file" >&2
+      fi
+      wait "$LOCK_HELPER_PID" 2>/dev/null || true
+      rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+      LOCK_HELPER_PID=""
       return 1
-    }
-  else
-    flock -w "$DOTFILES_LOCK_TIMEOUT" "$BOOTSTRAP_LOCK_FD" || {
-      printf 'Timed out after %ss waiting for another dotfiles bootstrap (lock: %s)\n' \
-        "$DOTFILES_LOCK_TIMEOUT" "$lock_file" >&2
-      return 1
-    }
+    fi
+    sleep 0.05
+  done
+
+  kill "$LOCK_HELPER_PID" 2>/dev/null || true
+  wait "$LOCK_HELPER_PID" 2>/dev/null || true
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+  LOCK_HELPER_PID=""
+  printf 'Timed out waiting for bootstrap lock (lock: %s)\n' "$lock_file" >&2
+  return 1
+}
+
+release_bootstrap_lock() {
+  if [[ -n "$LOCK_HELPER_PID" ]]; then
+    kill "$LOCK_HELPER_PID" 2>/dev/null || true
+    wait "$LOCK_HELPER_PID" 2>/dev/null || true
   fi
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO" 2>/dev/null || true
+  LOCK_HELPER_PID=""
+  LOCK_READY_FILE=""
+  LOCK_ERROR_FILE=""
+  LOCK_RELEASE_FIFO=""
 }
 
 acquire_bootstrap_lock || exit 1
+trap 'release_bootstrap_lock' EXIT
 
 if [[ -n "$RESUME_REQUEST" ]]; then
   DOTFILES_RUN_ID="$RESOLVED_RESUME_ID"
@@ -711,6 +763,7 @@ on_error() {
   if [[ -n "${CHEZMOI_SOURCE:-}" ]]; then
     write_run_summary failure 2>/dev/null || true
   fi
+  release_bootstrap_lock
   exit "$status"
 }
 
