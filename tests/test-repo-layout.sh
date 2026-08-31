@@ -34,6 +34,7 @@ required=(
   tests/test-telemetry-policy.sh
   tests/test-ssh-access.sh
   tests/test-conflict-resolution.sh
+  tests/test-bootstrap-lock.sh tests/test-json-escape.sh
   .github/workflows/ci-outcome.yml .github/workflows/grouped-upgrades.yml
   .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp dot_local/bin/executable_dot-agent-status
@@ -119,6 +120,9 @@ for expected in \
   'read_menu_user' \
   'ensure_managed_entrypoint dot-privacy' \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
+  'acquire_bootstrap_lock' \
+  'DOTFILES_LOCK_TIMEOUT' \
+  'json_escape' \
   'orchestrator=explicit'; do
   grep -Fq -- "$expected" "$INSTALL" "$CONFLICTS" && pass "installer contract: $expected" || fail "installer missing: $expected"
 done

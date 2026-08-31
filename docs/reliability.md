@@ -5,6 +5,8 @@
 - Supported platform is checked before managed config sections run.
 - One orchestrator determines section order.
 - Existing config is backed up before overwrite by default.
+- Concurrent bootstrap runs are serialized by a private state lock; a second
+  run fails clearly unless `--lock-timeout` is supplied.
 - Interactive conflicts show a bounded redacted diff and support per-file
   skip, replace, append-merge, all-replace, all-skip, and quit decisions.
 - Interactive choices use the controlling terminal when output is piped; a
@@ -16,6 +18,8 @@
 - Every direct download is integrity-verified before installation.
 - Every cached download is keyed by and revalidated against its SHA256 digest.
 - Every managed install has an ownership record.
+- Backup restore preflights the complete manifest and verifies every stored
+  checksum before prompting or mutating a destination.
 
 ## Failure Handling
 
@@ -44,7 +48,9 @@ diagnostic check never replaces or edits the original CI conclusion.
 
 Console output uses timestamps, stable levels, section banners, durations, and
 terminal-aware color. Persisted logs are plain text. JSONL events make stages
-queryable without parsing decorated console output.
+queryable without parsing decorated console output. Installer and section
+events escape JSON control characters, so multi-line or unusual failure text
+cannot split or invalidate the event stream.
 
 On failure, E2E bundles retain:
 
@@ -73,7 +79,8 @@ already completed.
 the same installer. Manifest changes route only to affected sections through
 `scripts/reconcile-packages.sh`.
 
-Configuration rollback uses `dot restore <id>`. Tool rollback uses the install
+Use `scripts/backup.sh verify <id>` to validate a snapshot without changing the
+home directory. Configuration rollback uses `dot restore <id>`. Tool rollback uses the install
 ledger through `dot uninstall <tool>`. Distro package removal is deliberately
 not automatic.
 

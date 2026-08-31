@@ -10,6 +10,7 @@ DOTFILES_LOG="${DOTFILES_LOG:-1}"
 DOTFILES_LOG_RETENTION="${DOTFILES_LOG_RETENTION:-20}"
 DOTFILES_CONFLICT_POLICY="${DOTFILES_CONFLICT_POLICY:-backup}"
 DOTFILES_ROLLBACK_ON_ERROR="${DOTFILES_ROLLBACK_ON_ERROR:-1}"
+DOTFILES_LOCK_TIMEOUT="${DOTFILES_LOCK_TIMEOUT:-0}"
 CONFLICT_AUTO_APPROVE=false
 CONFLICT_DIFF_LINES="${DOTFILES_DIFF_LINES:-160}"
 export CONFLICT_AUTO_APPROVE CONFLICT_DIFF_LINES
@@ -61,6 +62,10 @@ BACKUP_ID=""
 CURRENT_STAGE="startup"
 RUN_STARTED_EPOCH="$(date +%s)"
 _HANDLING_ERROR=false
+LOCK_HELPER_PID=""
+LOCK_READY_FILE=""
+LOCK_ERROR_FILE=""
+LOCK_RELEASE_FIFO=""
 
 join_by_comma() {
   local IFS=,
@@ -136,6 +141,7 @@ Profiles and selectors:
 Reliability:
   --resume[=<run-id>]       Resume the latest or named interrupted run
   --conflict-policy <mode>  backup (default), skip, or abort
+  --lock-timeout <seconds>  Wait for another bootstrap (default: 0, fail fast)
   --source <path>           Use a local source checkout
   --only <section>          Run one section from a local checkout
   --no-doctor               Skip the final acceptance check
@@ -479,6 +485,18 @@ while [[ $# -gt 0 ]]; do
       DOTFILES_CONFLICT_POLICY="${1#--conflict-policy=}"
       shift
       ;;
+    --lock-timeout)
+      [[ -n "${2:-}" ]] || {
+        printf '%s\n' '--lock-timeout requires seconds' >&2
+        exit 2
+      }
+      DOTFILES_LOCK_TIMEOUT="$2"
+      shift 2
+      ;;
+    --lock-timeout=*)
+      DOTFILES_LOCK_TIMEOUT="${1#--lock-timeout=}"
+      shift
+      ;;
     --source)
       [[ -n "${2:-}" ]] || {
         printf '%s\n' '--source requires a path' >&2
@@ -534,6 +552,11 @@ case "$DOTFILES_CONFLICT_POLICY" in
     ;;
 esac
 
+[[ "$DOTFILES_LOCK_TIMEOUT" =~ ^[0-9]+$ ]] || {
+  printf 'Invalid lock timeout: %s (expected non-negative seconds)\n' "$DOTFILES_LOCK_TIMEOUT" >&2
+  exit 2
+}
+
 if [[ -n "$ONLY_SECTION" ]]; then
   contains_section "$ONLY_SECTION" || {
     printf 'Unknown section: %s\n' "$ONLY_SECTION" >&2
@@ -578,6 +601,83 @@ if [[ "$PRINT_PLAN" == true ]]; then
   print_plan
   exit 0
 fi
+
+acquire_bootstrap_lock() {
+  local lock_file="$STATE_ROOT/bootstrap.lock" token deadline reason
+  umask 077
+  mkdir -p "$STATE_ROOT"
+  chmod 700 "$STATE_ROOT"
+  command -v flock >/dev/null 2>&1 || {
+    printf 'Required command not found: flock\n' >&2
+    return 1
+  }
+
+  token="${BASHPID:-$$}"
+  LOCK_READY_FILE="$STATE_ROOT/.bootstrap-lock-ready-$token"
+  LOCK_ERROR_FILE="$STATE_ROOT/.bootstrap-lock-error-$token"
+  LOCK_RELEASE_FIFO="$STATE_ROOT/.bootstrap-lock-release-$token"
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+  mkfifo "$LOCK_RELEASE_FIFO"
+
+  # Keep the lock FD out of tee, sed, chezmoi, and installer child processes.
+  (
+    exec 9>>"$lock_file"
+    chmod 600 "$lock_file"
+    if [[ "$DOTFILES_LOCK_TIMEOUT" == 0 ]]; then
+      if ! flock -n 9; then
+        printf 'busy\n' >"$LOCK_ERROR_FILE"
+        exit 75
+      fi
+    elif ! flock -w "$DOTFILES_LOCK_TIMEOUT" 9; then
+      printf 'timeout\n' >"$LOCK_ERROR_FILE"
+      exit 75
+    fi
+    printf 'ready\n' >"$LOCK_READY_FILE"
+    IFS= read -r _ <"$LOCK_RELEASE_FIFO" || true
+  ) &
+  LOCK_HELPER_PID=$!
+
+  deadline=$((SECONDS + DOTFILES_LOCK_TIMEOUT + 5))
+  while ((SECONDS <= deadline)); do
+    [[ -f "$LOCK_READY_FILE" ]] && return 0
+    if [[ -f "$LOCK_ERROR_FILE" ]]; then
+      reason="$(<"$LOCK_ERROR_FILE")"
+      if [[ "$reason" == busy ]]; then
+        printf 'Another dotfiles bootstrap is already running (lock: %s)\n' "$lock_file" >&2
+      else
+        printf 'Timed out after %ss waiting for another dotfiles bootstrap (lock: %s)\n' \
+          "$DOTFILES_LOCK_TIMEOUT" "$lock_file" >&2
+      fi
+      wait "$LOCK_HELPER_PID" 2>/dev/null || true
+      rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+      LOCK_HELPER_PID=""
+      return 1
+    fi
+    sleep 0.05
+  done
+
+  kill "$LOCK_HELPER_PID" 2>/dev/null || true
+  wait "$LOCK_HELPER_PID" 2>/dev/null || true
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
+  LOCK_HELPER_PID=""
+  printf 'Timed out waiting for bootstrap lock (lock: %s)\n' "$lock_file" >&2
+  return 1
+}
+
+release_bootstrap_lock() {
+  if [[ -n "$LOCK_HELPER_PID" ]]; then
+    kill "$LOCK_HELPER_PID" 2>/dev/null || true
+    wait "$LOCK_HELPER_PID" 2>/dev/null || true
+  fi
+  rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO" 2>/dev/null || true
+  LOCK_HELPER_PID=""
+  LOCK_READY_FILE=""
+  LOCK_ERROR_FILE=""
+  LOCK_RELEASE_FIFO=""
+}
+
+acquire_bootstrap_lock || exit 1
+trap 'release_bootstrap_lock' EXIT
 
 if [[ -n "$RESUME_REQUEST" ]]; then
   DOTFILES_RUN_ID="$RESOLVED_RESUME_ID"
@@ -626,13 +726,29 @@ setup_run_state() {
     xargs -r rm -f
 }
 
+json_escape() {
+  local value="${1:-}"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\b'/\\b}
+  value=${value//$'\f'/\\f}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  value=${value//$'\v'/\\u000b}
+  value=${value//$'\a'/\\u0007}
+  printf '%s' "$value"
+}
+
 write_event() {
   local level="$1"
   shift
-  local message="${*//\\/\\\\}"
-  message="${message//\"/\\\"}"
   printf '{"time":"%s","run_id":"%s","stage":"%s","level":"%s","message":"%s"}\n' \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$DOTFILES_RUN_ID" "$CURRENT_STAGE" "$level" "$message" >>"$EVENT_LOG"
+    "$(json_escape "$(date -u '+%Y-%m-%dT%H:%M:%SZ')")" \
+    "$(json_escape "$DOTFILES_RUN_ID")" \
+    "$(json_escape "$CURRENT_STAGE")" \
+    "$(json_escape "$level")" \
+    "$(json_escape "$*")" >>"$EVENT_LOG"
 }
 
 on_error() {
@@ -647,6 +763,7 @@ on_error() {
   if [[ -n "${CHEZMOI_SOURCE:-}" ]]; then
     write_run_summary failure 2>/dev/null || true
   fi
+  release_bootstrap_lock
   exit "$status"
 }
 

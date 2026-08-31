@@ -56,9 +56,10 @@ does not, so maintainers can isolate a section during diagnosis.
 All bootstrap state is rooted at `~/.local/state/dotfiles` and is private by
 default:
 
+- `bootstrap.lock`: advisory lock serializing stateful bootstrap runs.
 - `logs/`: plain text and JSONL event streams.
 - `runs/<id>/`: selected profile, source, checkpoints, status, and summary.
-- `backups/`: transactional destination snapshots and manifests.
+- `backups/`: transactional destination snapshots and manifests, verified before restore.
 - `package-sections/`: hashes used for targeted reconciliation.
 - `installed.tsv`: ownership ledger for non-chezmoi installs.
 

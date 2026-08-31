@@ -21,11 +21,21 @@ for expected in \
   'Resume after fixing the cause' \
   'sed -u -E' \
   'chmod 700 "$STATE_ROOT"' \
-  'chmod 600 "$LOG_FILE" "$EVENT_LOG"'; do
+  'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
+  'acquire_bootstrap_lock' \
+  'DOTFILES_LOCK_TIMEOUT' \
+  'json_escape'; do
   grep -Fq "$expected" "$INSTALL" && pass "$expected" || fail "installer missing $expected"
 done
 
-for expected in 'type=absent' 'sha256sum "$target"' 'rm -rf -- "$target"' 'chmod -R go-rwx'; do
+for expected in \
+  'type=absent' \
+  'sha256sum "$target"' \
+  'rm -rf -- "$target"' \
+  'chmod -R go-rwx' \
+  'verify_backup_id' \
+  'Backup verified:' \
+  'scripts/backup.sh verify'; do
   grep -Fq "$expected" "$BACKUP" && pass "backup contract: $expected" || fail "backup missing $expected"
 done
 

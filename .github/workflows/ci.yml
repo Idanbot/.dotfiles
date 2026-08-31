@@ -110,6 +110,8 @@ jobs:
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
+          tests/test-bootstrap-lock.sh "$PWD"
+          tests/test-json-escape.sh "$PWD"
           tests/test-e2e-shell.sh "$PWD"
           tests/test-package-metadata.sh "$PWD"
           tests/test-update-packages.sh "$PWD"
@@ -395,7 +397,8 @@ jobs:
                 test-telemetry-policy.sh \
                 test-ssh-access.sh test-git-credential.sh \
                 test-conflict-resolution.sh \
-                test-ownership-ledger.sh test-update-routing.sh test-recovery.sh; do
+                test-ownership-ledger.sh test-update-routing.sh test-recovery.sh \
+                test-bootstrap-lock.sh test-json-escape.sh; do
                 /dotfiles/tests/$test /dotfiles
               done
             '

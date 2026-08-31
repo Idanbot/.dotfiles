@@ -22,7 +22,7 @@ Usage: dot <command> [args]
   workspace [args]    Open the current project agent workspace
   profile [name]      Show or set the local machine profile (mode 0600)
   logs [run-id]       Show recent runs or tail one run log
-  backup              List configuration backups
+  backup [verify <id>] List or verify configuration backups
   restore <id>        Restore a configuration backup
   cache [status|prune] Inspect or prune verified downloads
   reconcile           Apply changed package-manifest sections
@@ -104,7 +104,22 @@ case "${1:-}" in
     find "$STATE_ROOT/logs" -maxdepth 1 -type f -name '*.log' -printf '%TY-%Tm-%Td %TH:%TM %f\n' 2>/dev/null |
       sort -r | head -20
     ;;
-  backup) exec "$SOURCE/scripts/backup.sh" list ;;
+  backup)
+    case "${2:-}" in
+      '') exec "$SOURCE/scripts/backup.sh" list ;;
+      verify)
+        [[ -n "${3:-}" ]] || {
+          printf 'backup verify requires a backup id\n' >&2
+          exit 2
+        }
+        exec "$SOURCE/scripts/backup.sh" verify "$3"
+        ;;
+      *)
+        printf 'unknown backup command: %s\n' "$2" >&2
+        exit 2
+        ;;
+    esac
+    ;;
   restore)
     [[ -n "${2:-}" ]] || {
       printf 'restore requires a backup id\n' >&2
