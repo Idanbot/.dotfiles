@@ -26,7 +26,11 @@ retries, corrupt payloads, cache recovery, and concurrent callers.
 
 Performance samples include run/profile/platform identity. CI carries one
 rolling 90-day history artifact forward and publishes per-series latest,
-previous, delta, median, and range values. These trends remain report-only.
+previous, delta, median, and range values. Raw millisecond values are retained
+for comparisons, normalized seconds are available in JSON, and reports use a
+shared human formatter that switches to minute/second notation for long runs.
+E2E samples include first and second install passes, with the full profile's
+first pass recorded as the full-install metric. These trends remain report-only.
 
 The weekly audit remains read-only. Once per month, one trusted workflow applies
 all fully resolved version/checksum candidates transactionally, validates the

@@ -51,6 +51,9 @@ jobs:
         run: |
           artifact_dir="$GITHUB_WORKSPACE/artifacts/native-vm"
           mkdir -p "$artifact_dir"
+          source ./scripts/performance-format.sh
+          printf 'phase\telapsed_ms\telapsed_seconds\telapsed_human\n' \
+            >"$artifact_dir/install-timings.tsv"
           for pass in 1 2; do
             started="$(date +%s%N)"
             DOTFILES_LOG_FILE="$artifact_dir/bootstrap-pass-$pass.log" \
@@ -61,7 +64,10 @@ jobs:
                 --conflict-policy backup \
                 --yes
             ended="$(date +%s%N)"
-            printf '%s\t%s\n' "$pass" "$(((ended - started) / 1000000))" \
+            elapsed_ms="$(((ended - started) / 1000000))"
+            printf '%s\t%s\t%s\t%s\n' "$pass" "$elapsed_ms" \
+              "$(duration_ms_to_seconds "$elapsed_ms")" \
+              "$(format_duration_ms "$elapsed_ms")" \
               >>"$artifact_dir/install-timings.tsv"
             summary="$(find "$HOME/.local/state/dotfiles/runs" -name summary.json \
               -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
@@ -102,7 +108,10 @@ jobs:
               --conflict-policy backup \
               --yes
           ended="$(date +%s%N)"
-          printf 'reapply\t%s\n' "$(((ended - started) / 1000000))" \
+          elapsed_ms="$(((ended - started) / 1000000))"
+          printf 'reapply\t%s\t%s\t%s\n' "$elapsed_ms" \
+            "$(duration_ms_to_seconds "$elapsed_ms")" \
+            "$(format_duration_ms "$elapsed_ms")" \
             >>"$artifact_dir/install-timings.tsv"
           summary="$(find "$HOME/.local/state/dotfiles/runs" -name summary.json \
             -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"

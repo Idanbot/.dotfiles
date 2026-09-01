@@ -33,15 +33,19 @@ for artifact in hyperfine.json hyperfine.md summary.json summary.md; do
 done
 
 jq -e '
-  .schema_version == 1 and
+  .schema_version == 2 and
   .tool == "hyperfine" and
   .runs == 2 and
   .warmup_runs == 0 and
   (.scenarios | length) == 5 and
   ([.scenarios[].name] | index("zsh startup (minimal fixture)")) != null and
-  ([.scenarios[].median_ms] | all(. >= 0))
+  ([.scenarios[].median_ms] | all(. >= 0)) and
+  ([.scenarios[].median_seconds] | all(. >= 0)) and
+  ([.scenarios[].median_human] | all(type == "string" and length > 0)) and
+  ([.scenarios[].samples_human] | all(length == 2))
 ' "$OUTPUT_DIR/summary.json" >/dev/null
 grep -Fq 'zsh startup (minimal fixture)' "$OUTPUT_DIR/summary.md"
+grep -Fq '| Scenario | Median | Mean | Minimum | Maximum |' "$OUTPUT_DIR/summary.md"
 grep -Fq 'agent readiness (isolated)' "$OUTPUT_DIR/hyperfine.md"
 
 printf 'Hyperfine benchmark test passed\n'

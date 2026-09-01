@@ -3,6 +3,9 @@
 
 set -Eeuo pipefail
 
+# shellcheck source=/dotfiles/scripts/performance-format.sh
+source /dotfiles/scripts/performance-format.sh
+
 PROFILE="${E2E_PROFILE:-base}"
 PASSES="${E2E_PASSES:-2}"
 ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}"
@@ -68,6 +71,7 @@ trap finalize_e2e EXIT
 
 printf 'profile=%s\nwsl=%s\npasses=%s\n' "$PROFILE" "${DOTFILES_WSL:-auto}" "$PASSES" >"$ARTIFACT_DIR/context.txt"
 env | sed -E 's/((TOKEN|PASSWORD|SECRET|KEY)=).*/\1[REDACTED]/I' | sort >"$ARTIFACT_DIR/environment.txt"
+printf 'phase\telapsed_ms\telapsed_seconds\telapsed_human\n' >"$ARTIFACT_DIR/install-timings.tsv"
 
 for pass in $(seq 1 "$PASSES"); do
   CURRENT_PASS="$pass"
@@ -80,13 +84,23 @@ for pass in $(seq 1 "$PASSES"); do
     --conflict-policy backup \
     --yes
   pass_ended="$(date +%s%N)"
-  printf '%s\t%s\n' "$pass" "$(((pass_ended - pass_started) / 1000000))" \
+  pass_elapsed_ms="$(((pass_ended - pass_started) / 1000000))"
+  printf '%s\t%s\t%s\t%s\n' "$pass" "$pass_elapsed_ms" \
+    "$(duration_ms_to_seconds "$pass_elapsed_ms")" \
+    "$(format_duration_ms "$pass_elapsed_ms")" \
     >>"$ARTIFACT_DIR/install-timings.tsv"
+  printf '[E2E] %s pass %s completed in %s\n' "$PROFILE" "$pass" \
+    "$(format_duration_ms "$pass_elapsed_ms")"
   jq empty "$STATE_DIR/runs"/*/summary.json
 done
 
 latest_summary="$(find "$STATE_DIR/runs" -name summary.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
-jq -e '.status == "success" and .duration_seconds >= 0' "$latest_summary" >/dev/null
+jq -e '
+  .status == "success" and
+  .duration_seconds >= 0 and
+  .duration_ms >= 0 and
+  (.duration_human | (type == "string" and length > 0))
+' "$latest_summary" >/dev/null
 
 ledger="$STATE_DIR/installed.tsv"
 [[ -f "$ledger" ]] || {

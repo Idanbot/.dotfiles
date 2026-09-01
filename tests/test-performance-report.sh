@@ -27,12 +27,13 @@ PATH="$MOCK_BIN:$PATH" \
   GITHUB_SHA=abc123 \
   DOTFILES_ZSH_REPORT_BUDGET_MS=1 \
   DOTFILES_STARSHIP_BUDGET_MS=1 \
+  DOTFILES_FIRST_PASS_BUDGET_MS=1 \
   DOTFILES_SECOND_PASS_BUDGET_MS=1 \
   "$DOTFILES_DIR/scripts/performance-report.sh" "$ARTIFACT_DIR" >/dev/null
 
 jq -e '
   .report_only == true and
-  .schema_version == 1 and
+  .schema_version == 2 and
   .context.profile == "developer" and
   .context.platform == "wsl-simulated" and
   .context.run_id == "1234" and
@@ -40,17 +41,41 @@ jq -e '
   .context.commit == "abc123" and
   .metrics.zsh_startup.status == "regression" and
   .metrics.starship_render.status == "regression" and
+  .metrics.first_install_pass.status == "regression" and
   .metrics.second_install_pass.status == "regression" and
-  .metrics.second_install_pass.value_ms == 34
+  .metrics.second_install_pass.value_ms == 34 and
+  .metrics.first_install_pass.value_seconds == 0.1 and
+  .metrics.first_install_pass.value_human == "100 ms (0.100 s)" and
+  .metrics.full_install.value_ms == null and
+  .metrics.full_install.status == "unavailable"
 ' "$ARTIFACT_DIR/performance.json" >/dev/null
 grep -Fq 'These budgets are report-only and do not block merges.' \
   "$ARTIFACT_DIR/performance.md"
 grep -Fq 'Profile: `developer` | Platform: `wsl-simulated` | Run: `1234`' \
   "$ARTIFACT_DIR/performance.md"
+grep -Fq 'First install pass | 100 ms (0.100 s)' "$ARTIFACT_DIR/performance.md"
+grep -Fq 'Second install pass | 34 ms (0.034 s)' "$ARTIFACT_DIR/performance.md"
+
+printf 'phase\telapsed_ms\telapsed_seconds\telapsed_human\n1\t65000\t65.000\t1m 05.000s (65.000 s / 65000 ms)\n2\t34\t0.034\t34 ms (0.034 s)\n' \
+  >"$ARTIFACT_DIR/install-timings.tsv"
+PATH="$MOCK_BIN:$PATH" \
+  E2E_PROFILE=full \
+  DOTFILES_FIRST_PASS_BUDGET_MS=1 \
+  DOTFILES_FULL_INSTALL_BUDGET_MS=60000 \
+  "$DOTFILES_DIR/scripts/performance-report.sh" "$ARTIFACT_DIR" >/dev/null
+jq -e '
+  .metrics.full_install.value_ms == 65000 and
+  .metrics.full_install.value_seconds == 65 and
+  .metrics.full_install.value_human == "1m 05.000s (65.000 s / 65000 ms)" and
+  .metrics.full_install.status == "regression"
+' "$ARTIFACT_DIR/performance.json" >/dev/null
+grep -Fq 'Full install (pass 1) | 1m 05.000s (65.000 s / 65000 ms)' \
+  "$ARTIFACT_DIR/performance.md"
 
 if PATH="$MOCK_BIN:$PATH" \
   DOTFILES_ZSH_REPORT_BUDGET_MS=1 \
   DOTFILES_STARSHIP_BUDGET_MS=1 \
+  DOTFILES_FIRST_PASS_BUDGET_MS=1 \
   DOTFILES_SECOND_PASS_BUDGET_MS=1 \
   DOTFILES_PERFORMANCE_ENFORCE=1 \
   "$DOTFILES_DIR/scripts/performance-report.sh" "$ARTIFACT_DIR" >/dev/null; then

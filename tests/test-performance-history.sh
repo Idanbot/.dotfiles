@@ -46,6 +46,7 @@ write_report "$TMP_ROOT/input/current/performance.json" \
   "$TMP_ROOT/input" "$TMP_ROOT/output" >/dev/null
 
 jq -e '
+  .schema_version == 2 and
   .sample_count == 2 and
   (.samples | length) == 2 and
   (.series | length) == 1 and
@@ -53,13 +54,17 @@ jq -e '
   .series[0].platform == "native" and
   .series[0].metric == "zsh_startup" and
   .series[0].latest_ms == 50 and
+  .series[0].latest_seconds == 0.05 and
+  .series[0].latest_human == "50 ms (0.050 s)" and
   .series[0].previous_ms == 30 and
   .series[0].delta_ms == 20 and
+  .series[0].delta_seconds == 0.02 and
   .series[0].median_ms == 40 and
   .series[0].min_ms == 30 and
-  .series[0].max_ms == 50
+  .series[0].max_ms == 50 and
+  .series[0].median_human == "40 ms (0.040 s)"
 ' "$TMP_ROOT/output/performance-history.json" >/dev/null
-grep -Fq '| `base` | `native` | `zsh_startup` | 50 ms | 30 ms | 20 ms |' \
+grep -Fq '| `base` | `native` | `zsh_startup` | 50 ms (0.050 s) | 30 ms (0.030 s) | 20 ms (0.020 s) |' \
   "$TMP_ROOT/output/performance-history.md"
 
 printf 'Performance history test passed\n'

@@ -98,6 +98,7 @@ jobs:
           tests/test-cloud-context.sh "$PWD"
           tests/test-cloud-context-starship.sh "$PWD"
           tests/test-e2e-report.sh "$PWD"
+          tests/test-performance-format.sh "$PWD"
           tests/test-performance-report.sh "$PWD"
           tests/test-performance-history.sh "$PWD"
           tests/test-ci-outcome.sh "$PWD"

@@ -26,11 +26,13 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 
 # Create test user with sudo
-RUN useradd -m -s /bin/bash testuser && \
+RUN groupadd --gid 10000 testuser && \
+    useradd --uid 10000 --gid 10000 --create-home --shell /bin/bash testuser && \
     echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-USER testuser
+USER 10000:10000
 WORKDIR /home/testuser
+ENV HOME="/home/testuser"
 
 # Ensure ~/.local/bin is on PATH
 ENV PATH="/home/testuser/.local/bin:${PATH}"

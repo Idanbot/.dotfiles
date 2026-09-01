@@ -63,6 +63,11 @@ On failure, E2E bundles retain:
 
 Performance samples are aggregated into a rolling artifact with latest,
 previous, median, minimum, and maximum values per profile/platform metric.
+Machine-readable artifacts retain millisecond values and normalized seconds;
+human reports format short durations as seconds and long durations as
+minute/second values while retaining the precise millisecond value in
+parentheses. E2E samples include first and second install passes, and the full
+profile explicitly exposes its first pass as the full-install duration.
 Trends remain report-only until a budget is deliberately promoted to a gate.
 
 ## Idempotency Definition

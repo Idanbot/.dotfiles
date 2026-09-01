@@ -691,9 +691,12 @@ Windows interoperability remains the real-WSL workflow's responsibility.
 E2E artifacts include redacted text logs, JSONL events, run summaries,
 checkpoints, the install ledger, environment context, process/memory/disk data,
 a concise failure report, JUnit XML, and report-only performance budgets for
-Zsh startup, Starship rendering, and the second installation pass. CI publishes
-the performance table in the job summary. A rolling 90-day artifact adds
-latest/previous deltas and median/range trends by profile and platform;
+Zsh startup, Starship rendering, the first and second installation passes, and
+the full profile's first-pass install. Performance JSON keeps raw millisecond
+values plus seconds, while Markdown and log reports show readable milliseconds,
+seconds, and minute/second forms. CI publishes the formatted performance table
+in the job summary. A rolling 90-day artifact adds latest/previous deltas and
+median/range trends by profile and platform;
 regressions are visible but do not block merges until enforcement is explicitly
 enabled. CI runs also execute Hyperfine benchmarks for installer help, workspace
 help, isolated cloud-context status, agent readiness, and Zsh startup; real

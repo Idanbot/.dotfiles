@@ -4,6 +4,7 @@
 set -euo pipefail
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${DOTFILES_BENCHMARK_OUTPUT:-/tmp/dotfiles-hyperfine}"
 RUNS="${DOTFILES_HYPERFINE_RUNS:-5}"
 WARMUP="${DOTFILES_HYPERFINE_WARMUP_RUNS:-1}"
@@ -125,12 +126,13 @@ hyperfine_args=(
 )
 hyperfine "${hyperfine_args[@]}"
 
-jq --arg generated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+jq -L "$SCRIPT_DIR" --arg generated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   --arg commit "${GITHUB_SHA:-local}" \
   --arg runs "$RUNS" \
   --arg warmup "$WARMUP" \
-  '{
-    schema_version: 1,
+  'include "performance-format";
+  {
+    schema_version: 2,
     tool: "hyperfine",
     generated_at: $generated_at,
     commit: $commit,
@@ -139,10 +141,21 @@ jq --arg generated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
     scenarios: [.results[] | {
       name: .command,
       mean_ms: (.mean * 1000 | round),
+      mean_seconds: .mean,
+      mean_human: (.mean * 1000 | round | duration_human),
       median_ms: (.median * 1000 | round),
+      median_seconds: .median,
+      median_human: (.median * 1000 | round | duration_human),
       min_ms: (.min * 1000 | round),
+      min_seconds: .min,
+      min_human: (.min * 1000 | round | duration_human),
       max_ms: (.max * 1000 | round),
-      samples: ([.times[] * 1000 | round])
+      max_seconds: .max,
+      max_human: (.max * 1000 | round | duration_human),
+      samples: ([.times[] * 1000 | round]),
+      samples_ms: ([.times[] * 1000 | round]),
+      samples_seconds: [.times[]],
+      samples_human: ([.times[] * 1000 | round | duration_human])
     }]
   }' "$OUTPUT_DIR/hyperfine.json" >"$OUTPUT_DIR/summary.json"
 
@@ -150,8 +163,8 @@ jq --arg generated_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   printf '## Hyperfine benchmark scenarios\n\n'
   printf 'Runs: `%s` | Warmups: `%s` | Commit: `%s`\n\n' \
     "$RUNS" "$WARMUP" "${GITHUB_SHA:-local}"
-  printf '| Scenario | Median | Mean | Range |\n|---|---:|---:|---:|\n'
-  jq -r '.scenarios[] | "| `\(.name)` | \(.median_ms) ms | \(.mean_ms) ms | \(.min_ms)-\(.max_ms) ms |"' \
+  printf '| Scenario | Median | Mean | Minimum | Maximum |\n|---|---:|---:|---:|---:|\n'
+  jq -r '.scenarios[] | "| `\(.name)` | \(.median_human) | \(.mean_human) | \(.min_human) | \(.max_human) |"' \
     "$OUTPUT_DIR/summary.json"
 } >"$OUTPUT_DIR/summary.md"
 

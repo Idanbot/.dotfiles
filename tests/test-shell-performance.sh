@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts" && pwd)"
+# shellcheck source=../scripts/performance-format.sh
+source "$SCRIPT_DIR/performance-format.sh"
+
 BUDGET_MS="${DOTFILES_ZSH_STARTUP_BUDGET_MS:-3000}"
 REPORT_ONLY="${DOTFILES_PERFORMANCE_REPORT_ONLY:-false}"
 ARTIFACT="${1:-/tmp/zsh-startup.json}"
@@ -62,8 +66,31 @@ else
 fi
 
 mkdir -p "$(dirname "$ARTIFACT")"
-printf '{"budget_ms":%s,"median_ms":%s,"runs_ms":[%s]}\n' \
-  "$BUDGET_MS" "$median" "$runs" >"$ARTIFACT"
+budget_seconds="$(duration_ms_to_seconds "$BUDGET_MS")"
+median_seconds="$(duration_ms_to_seconds "$median")"
+budget_human="$(format_duration_ms "$BUDGET_MS")"
+median_human="$(format_duration_ms "$median")"
+jq -L "$SCRIPT_DIR" -n \
+  --argjson budget_ms "$BUDGET_MS" \
+  --argjson budget_seconds "$budget_seconds" \
+  --arg budget_human "$budget_human" \
+  --argjson median_ms "$median" \
+  --argjson median_seconds "$median_seconds" \
+  --arg median_human "$median_human" \
+  --argjson runs_ms "[$runs]" \
+  'include "performance-format";
+  {
+    schema_version: 2,
+    budget_ms: $budget_ms,
+    budget_seconds: $budget_seconds,
+    budget_human: $budget_human,
+    median_ms: $median_ms,
+    median_seconds: $median_seconds,
+    median_human: $median_human,
+    runs_ms: $runs_ms,
+    runs_seconds: [$runs_ms[] | . / 1000],
+    runs_human: [$runs_ms[] | duration_human]
+  }' >"$ARTIFACT"
 
 if grep -Eaiq \
   'command not found|no such file or directory|can.t change option|plugin: .*not found|compinit:|(^|[^a-z])error:' \
@@ -73,7 +100,8 @@ if grep -Eaiq \
   exit 1
 fi
 if [[ "$median" -gt "$BUDGET_MS" ]]; then
-  printf 'zsh startup median %sms exceeded %sms budget\n' "$median" "$BUDGET_MS" >&2
+  printf 'zsh startup median %s exceeded %s budget\n' \
+    "$median_human" "$budget_human" >&2
   [[ "$REPORT_ONLY" == true ]] || exit 1
 fi
-printf 'zsh startup median: %sms (budget %sms)\n' "$median" "$BUDGET_MS"
+printf 'zsh startup median: %s (budget %s)\n' "$median_human" "$budget_human"

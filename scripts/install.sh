@@ -60,7 +60,7 @@ CHEZMOI_STATUS_OUTPUT=""
 HAS_CONTROLLING_TTY=false
 BACKUP_ID=""
 CURRENT_STAGE="startup"
-RUN_STARTED_EPOCH="$(date +%s)"
+RUN_STARTED_NANOS="$(date +%s%N)"
 _HANDLING_ERROR=false
 LOCK_HELPER_PID=""
 LOCK_READY_FILE=""
@@ -112,6 +112,30 @@ fi
 export DOTFILES_COLOR_ACTIVE
 
 timestamp() { date '+%H:%M:%S'; }
+format_bootstrap_duration_ms() {
+  local milliseconds="$1" minutes remaining seconds
+  if ((milliseconds >= 60000)); then
+    minutes=$((milliseconds / 60000))
+    remaining=$((milliseconds % 60000))
+    seconds=$((remaining / 1000))
+    milliseconds=$((remaining % 1000))
+    printf '%dm %02d.%03ds (%d.%03d s / %d ms)' \
+      "$minutes" "$seconds" "$milliseconds" \
+      "$((minutes * 60 + seconds))" "$milliseconds" \
+      "$((minutes * 60000 + seconds * 1000 + milliseconds))"
+  elif ((milliseconds >= 1000)); then
+    seconds=$((milliseconds / 1000))
+    milliseconds=$((milliseconds % 1000))
+    printf '%d.%03d s (%d ms)' "$seconds" "$milliseconds" \
+      "$((seconds * 1000 + milliseconds))"
+  else
+    printf '%d ms (0.%03d s)' "$milliseconds" "$milliseconds"
+  fi
+}
+format_bootstrap_duration_seconds() {
+  local seconds="$1"
+  format_bootstrap_duration_ms "$((seconds * 1000))"
+}
 log_info() { printf '%s %b[INFO]%b  %s\n' "$(timestamp)" "$BLUE" "$NC" "$*"; }
 log_success() { printf '%s %b[OK]%b    %s\n' "$(timestamp)" "$GREEN" "$NC" "$*"; }
 log_warn() { printf '%s %b[WARN]%b  %s\n' "$(timestamp)" "$YELLOW" "$NC" "$*"; }
@@ -806,8 +830,8 @@ run_stage() {
   elapsed=$(($(date +%s) - started))
   printf '%s\n' "$elapsed" >"$checkpoint"
   chmod 600 "$checkpoint"
-  log_success "$stage completed in ${elapsed}s"
-  write_event success "duration_seconds=$elapsed"
+  log_success "$stage completed in $(format_bootstrap_duration_seconds "$elapsed")"
+  write_event success "duration_seconds=$elapsed duration_human=$(format_bootstrap_duration_seconds "$elapsed")"
   if stage_injection_matches after; then
     log_error "Injected failure after $stage"
     return 98
@@ -1090,17 +1114,20 @@ stage_doctor() {
 }
 
 write_run_summary() {
-  local status="$1" ended duration summary
-  ended="$(date +%s)"
-  duration=$((ended - RUN_STARTED_EPOCH))
+  local status="$1" duration duration_ms duration_human summary
+  duration_ms=$((($(date +%s%N) - RUN_STARTED_NANOS) / 1000000))
+  ((duration_ms >= 0)) || duration_ms=0
+  duration=$((duration_ms / 1000))
+  duration_human="$(format_bootstrap_duration_ms "$duration_ms")"
   summary="$RUN_DIR/summary.json"
-  printf '{\n  "run_id": "%s",\n  "status": "%s",\n  "profile": "%s",\n  "platform": "%s",\n  "sections": "%s",\n  "duration_seconds": %s,\n  "backup_id": "%s",\n  "log": "%s"\n}\n' \
+  printf '{\n  "run_id": "%s",\n  "status": "%s",\n  "profile": "%s",\n  "platform": "%s",\n  "sections": "%s",\n  "duration_seconds": %s,\n  "duration_ms": %s,\n  "duration_human": "%s",\n  "backup_id": "%s",\n  "log": "%s"\n}\n' \
     "$DOTFILES_RUN_ID" "$status" "${PROFILE_NAME:-custom}" \
     "$(
       source "$CHEZMOI_SOURCE/scripts/environment.sh"
       get_platform
     )" \
-    "$(join_by_comma "${SELECTED_SECTIONS[@]}")" "$duration" "$BACKUP_ID" "$LOG_FILE" >"$summary"
+    "$(join_by_comma "${SELECTED_SECTIONS[@]}")" "$duration" "$duration_ms" \
+    "$duration_human" "$BACKUP_ID" "$LOG_FILE" >"$summary"
   chmod 600 "$summary"
 }
 

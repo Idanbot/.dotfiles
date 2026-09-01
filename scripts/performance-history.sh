@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=performance-format.sh
+source "$SCRIPT_DIR/performance-format.sh"
+
 INPUT_DIR="${1:-}"
 OUTPUT_DIR="${2:-}"
 
@@ -25,11 +29,19 @@ MARKDOWN_REPORT="$OUTPUT_DIR/performance-history.md"
 
 while IFS= read -r -d '' report; do
   if [[ "$(basename "$report")" == performance-history.json ]]; then
-    jq -c '.samples[]?' "$report" >>"$SAMPLES"
+    jq -L "$SCRIPT_DIR" -c '
+      include "performance-format";
+      .samples[]? |
+      .value_seconds = (.value_seconds // (.value_ms | duration_seconds)) |
+      .value_human = (.value_human // (.value_ms | duration_human)) |
+      .budget_seconds = (.budget_seconds // (.budget_ms | duration_seconds)) |
+      .budget_human = (.budget_human // (.budget_ms | duration_human))
+    ' "$report" >>"$SAMPLES"
     continue
   fi
 
-  jq -c --arg source "$report" '
+  jq -L "$SCRIPT_DIR" -c --arg source "$report" '
+    include "performance-format";
     . as $report |
     ($report.context // {}) as $context |
     ($report.metrics // {} | to_entries[]) |
@@ -51,7 +63,11 @@ while IFS= read -r -d '' report; do
       platform: ($context.platform // "unknown"),
       metric: .key,
       value_ms: .value.value_ms,
+      value_seconds: (.value.value_seconds // (.value.value_ms | duration_seconds)),
+      value_human: (.value.value_human // (.value.value_ms | duration_human)),
       budget_ms: .value.budget_ms,
+      budget_seconds: (.value.budget_seconds // (.value.budget_ms | duration_seconds)),
+      budget_human: (.value.budget_human // (.value.budget_ms | duration_human)),
       status: .value.status
     }
   ' "$report" >>"$SAMPLES"
@@ -62,7 +78,8 @@ done < <(
 )
 
 if [[ -s "$SAMPLES" ]]; then
-  jq -s '
+  jq -L "$SCRIPT_DIR" -s '
+    include "performance-format";
     def median:
       sort as $values |
       ($values | length) as $count |
@@ -73,7 +90,7 @@ if [[ -s "$SAMPLES" ]]; then
     unique_by(.id) |
     sort_by(.generated_at, .run_id, .profile, .platform, .metric) as $samples |
     {
-      schema_version: 1,
+      schema_version: 2,
       generated_at: (now | todateiso8601),
       sample_count: ($samples | length),
       samples: $samples,
@@ -101,6 +118,28 @@ if [[ -s "$SAMPLES" ]]; then
             min_ms: ([$items[].value_ms] | min),
             max_ms: ([$items[].value_ms] | max),
             budget_ms: $latest.budget_ms,
+            latest_seconds: ($latest.value_ms | duration_seconds),
+            previous_seconds: ($previous.value_ms | duration_seconds),
+            delta_seconds: (
+              if $previous == null then null
+              else ($latest.value_ms - $previous.value_ms) / 1000
+              end
+            ),
+            median_seconds: (([$items[].value_ms] | median) / 1000),
+            min_seconds: (([$items[].value_ms] | min) / 1000),
+            max_seconds: (([$items[].value_ms] | max) / 1000),
+            budget_seconds: ($latest.budget_ms | duration_seconds),
+            latest_human: ($latest.value_ms | duration_human),
+            previous_human: ($previous.value_ms | duration_human),
+            delta_human: (
+              if $previous == null then "n/a"
+              else (($latest.value_ms - $previous.value_ms) | duration_human)
+              end
+            ),
+            median_human: (([$items[].value_ms] | median) | duration_human),
+            min_human: (([$items[].value_ms] | min) | duration_human),
+            max_human: (([$items[].value_ms] | max) | duration_human),
+            budget_human: ($latest.budget_ms | duration_human),
             status: $latest.status,
             latest_run_id: $latest.run_id,
             latest_generated_at: $latest.generated_at
@@ -110,18 +149,14 @@ if [[ -s "$SAMPLES" ]]; then
     }
   ' "$SAMPLES" >"$JSON_REPORT"
 else
-  jq -n '{
-    schema_version: 1,
+  jq -L "$SCRIPT_DIR" -n '{
+    schema_version: 2,
     generated_at: (now | todateiso8601),
     sample_count: 0,
     samples: [],
     series: []
   }' >"$JSON_REPORT"
 fi
-
-display_ms() {
-  [[ "$1" == null ]] && printf 'n/a' || printf '%s ms' "$1"
-}
 
 {
   printf '## Performance history\n\n'
@@ -133,10 +168,12 @@ display_ms() {
     printf '| Profile | Platform | Metric | Latest | Previous | Delta | Median | Range | Budget | Status |\n'
     printf '|---|---|---|---:|---:|---:|---:|---:|---:|---|\n'
     while IFS=$'\t' read -r profile platform metric latest previous delta median minimum maximum budget status; do
-      printf '| `%s` | `%s` | `%s` | %s | %s | %s | %s | %s-%s ms | %s | %s |\n' \
+      printf '| `%s` | `%s` | `%s` | %s | %s | %s | %s | %s to %s | %s | %s |\n' \
         "$profile" "$platform" "$metric" \
-        "$(display_ms "$latest")" "$(display_ms "$previous")" "$(display_ms "$delta")" \
-        "$(display_ms "$median")" "$minimum" "$maximum" "$(display_ms "$budget")" "$status"
+        "$(format_duration_ms "$latest")" "$(format_duration_ms "$previous")" \
+        "$(format_duration_ms "$delta")" "$(format_duration_ms "$median")" \
+        "$(format_duration_ms "$minimum")" "$(format_duration_ms "$maximum")" \
+        "$(format_duration_ms "$budget")" "$status"
     done < <(
       jq -r '.series[] | [
         .profile, .platform, .metric, .latest_ms, .previous_ms,

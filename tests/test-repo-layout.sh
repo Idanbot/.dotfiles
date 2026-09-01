@@ -18,7 +18,7 @@ required=(
   scripts/reconcile-packages.sh scripts/doctor.sh scripts/validate-neovim.sh
   scripts/download-cache.sh
   scripts/e2e-shell.sh scripts/update-packages.sh scripts/install-kitty.sh
-  scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/hyperfine-benchmark.sh scripts/classify-ci-run.sh
+  scripts/e2e-report.sh scripts/performance-report.sh scripts/performance-history.sh scripts/hyperfine-benchmark.sh scripts/performance-format.sh scripts/performance-format.jq scripts/classify-ci-run.sh
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
@@ -26,7 +26,7 @@ required=(
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-tmux-config.sh tests/test-update-packages.sh
   tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-kubecolor.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
-  tests/test-e2e-report.sh tests/test-performance-report.sh tests/test-performance-history.sh
+  tests/test-e2e-report.sh tests/test-performance-format.sh tests/test-performance-report.sh tests/test-performance-history.sh
   tests/test-ci-outcome.sh tests/test-network-faults.sh tests/test-download-cache.sh
   tests/test-ci-operations.sh tests/test-system-configuration.sh tests/test-git-credential.sh
   tests/test-npm-global-cli.sh tests/test-ubuntu-package-tools.sh tests/test-agent-mcp.sh tests/test-ai-optimization.sh tests/test-agent-status.sh
@@ -83,6 +83,26 @@ if grep -Fq 'tests/test-e2e-report.sh "$PWD"' "$CI_WORKFLOW" &&
   pass "CI validates structured E2E reports and publishes Hyperfine performance budgets"
 else
   fail "CI is missing E2E report or Hyperfine performance budget coverage"
+fi
+
+PERFORMANCE_REPORT="$DOTFILES_DIR/scripts/performance-report.sh"
+if grep -Fq 'full_install:' "$PERFORMANCE_REPORT" &&
+  grep -Fq 'value_seconds:' "$PERFORMANCE_REPORT" &&
+  grep -Fq 'value_human:' "$PERFORMANCE_REPORT" &&
+  grep -Fq 'format_duration_ms' "$PERFORMANCE_REPORT" &&
+  grep -Fq 'include "performance-format"' "$DOTFILES_DIR/scripts/performance-history.sh"; then
+  pass "performance reports include full-install timing and human duration formats"
+else
+  fail "performance reports are missing full-install or human duration metrics"
+fi
+
+DOCKERFILE="$DOTFILES_DIR/.github/workflows/Dockerfile.ubuntu-24.04"
+if grep -Fq 'USER 10000:10000' "$DOCKERFILE" &&
+  grep -Fq 'ENV HOME="/home/testuser"' "$DOCKERFILE" &&
+  ! grep -Fq 'USER testuser' "$DOCKERFILE"; then
+  pass "Docker test image uses a resolvable numeric user identity"
+else
+  fail "Docker test image still uses a non-numeric USER"
 fi
 
 if grep -Fq 'test-cloud-context.sh test-cloud-context-starship.sh' "$CI_WORKFLOW" &&

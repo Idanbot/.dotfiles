@@ -23,6 +23,8 @@ Installing cloud tools
 API_KEY=do-not-publish
 apt dependency resolution failed
 EOF
+printf 'phase\telapsed_ms\telapsed_seconds\telapsed_human\n1\t1234\t1.234\t1.234 s (1234 ms)\n2\t65000\t65.000\t1m 05.000s (65.000 s / 65000 ms)\n' \
+  >"$ARTIFACT_DIR/install-timings.tsv"
 
 "$DOTFILES_DIR/scripts/e2e-report.sh" \
   --artifacts "$ARTIFACT_DIR" \
@@ -41,6 +43,9 @@ grep -Fq "/dotfiles/scripts/install.sh --resume=$RUN_ID" "$ARTIFACT_DIR/e2e-repo
 grep -Fq 'API_KEY=[REDACTED]' "$ARTIFACT_DIR/e2e-report.txt"
 ! grep -Fq 'do-not-publish' "$ARTIFACT_DIR/e2e-report.txt"
 ! grep -Fq 'do-not-publish' "$ARTIFACT_DIR/e2e-results.xml"
+grep -Fq 'Installer run duration: 12.000 s (12000 ms)' "$ARTIFACT_DIR/e2e-report.txt"
+grep -Fq 'Install pass 1: 1.234 s (1234 ms)' "$ARTIFACT_DIR/e2e-report.txt"
+grep -Fq 'Install pass 2: 1m 05.000s (65.000 s / 65000 ms)' "$ARTIFACT_DIR/e2e-report.txt"
 grep -Fq '<testsuite name="dotfiles-e2e" tests="1" failures="1"' \
   "$ARTIFACT_DIR/e2e-results.xml"
 grep -Fq 'classname="bootstrap.cloud"' "$ARTIFACT_DIR/e2e-results.xml"
@@ -56,5 +61,15 @@ grep -Fq 'classname="bootstrap.cloud"' "$ARTIFACT_DIR/e2e-results.xml"
 grep -Fq 'E2E result: PASS' "$ARTIFACT_DIR/e2e-report.txt"
 grep -Fq '<testsuite name="dotfiles-e2e" tests="1" failures="0"' \
   "$ARTIFACT_DIR/e2e-results.xml"
+
+"$DOTFILES_DIR/scripts/e2e-report.sh" \
+  --artifacts "$ARTIFACT_DIR" \
+  --state "$STATE_DIR" \
+  --status 0 \
+  --profile full \
+  --platform native \
+  --passes 2 \
+  --current-pass 2 >/dev/null
+grep -Fq 'Full install (pass 1): 1.234 s (1234 ms)' "$ARTIFACT_DIR/e2e-report.txt"
 
 printf 'E2E report test passed\n'

@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=performance-format.sh
+source "$SCRIPT_DIR/performance-format.sh"
+
 ARTIFACT_DIR=""
 STATE_DIR=""
 STATUS=""
@@ -154,6 +158,44 @@ duration=0
 if [[ -n "$latest_summary" ]]; then
   duration="$(jq -r '.duration_seconds // 0' "$latest_summary" 2>/dev/null || printf 0)"
 fi
+summary_duration_ms="$(
+  if [[ -n "$latest_summary" ]]; then
+    jq -r '
+      if (.duration_ms | type) == "number" then .duration_ms
+      elif (.duration_seconds | type) == "number" then (.duration_seconds * 1000 | round)
+      else empty
+      end
+    ' "$latest_summary" 2>/dev/null || true
+  fi
+)"
+if [[ ! "$summary_duration_ms" =~ ^[0-9]+$ ]]; then
+  summary_duration_ms=""
+fi
+
+{
+  if [[ -n "$summary_duration_ms" ]]; then
+    printf '\nInstaller run duration: %s\n' "$(format_duration_ms "$summary_duration_ms")"
+  fi
+  if [[ -r "$ARTIFACT_DIR/install-timings.tsv" ]]; then
+    printf '\nInstallation timings:\n'
+    while IFS=$'\t' read -r phase elapsed_ms _; do
+      [[ "$elapsed_ms" =~ ^[0-9]+([.][0-9]+)?$ ]] || continue
+      case "$phase" in
+        1)
+          if [[ "$PROFILE" == full ]]; then
+            label='Full install (pass 1)'
+          else
+            label='Install pass 1'
+          fi
+          ;;
+        2) label='Install pass 2' ;;
+        reapply) label='Restore reapply' ;;
+        *) label="Install $phase" ;;
+      esac
+      printf '  %s: %s\n' "$label" "$(format_duration_ms "$elapsed_ms")"
+    done <"$ARTIFACT_DIR/install-timings.tsv"
+  fi
+} >>"$REPORT"
 
 {
   printf '<?xml version="1.0" encoding="UTF-8"?>\n'
