@@ -69,7 +69,12 @@ make_mock aws '
 case "$*" in
   "configure get region --profile work") printf "eu-west-1\n" ;;
   "configure get region --profile personal") printf "us-east-2\n" ;;
-  "configure list-profiles") printf "work\npersonal\n" ;;
+  "configure list-profiles")
+    printf "work\npersonal\n"
+    for i in $(seq 1 10000); do
+      printf "profile-%s\n" "$i"
+    done
+    ;;
   "sts get-caller-identity --query Account --output text") printf "123456789012\n" ;;
 esac'
 make_mock az '

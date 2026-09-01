@@ -434,7 +434,8 @@ validate_profile_contexts() {
     if ! have kubectl; then
       warn "kubectl is required to load context '$kube'"
       failed=true
-    elif ! kubectl config get-contexts "$kube" -o name 2>/dev/null | grep -Fxq "$kube"; then
+    elif ! kubectl config get-contexts "$kube" -o name 2>/dev/null |
+      grep -Fx "$kube" >/dev/null; then
       warn "kubectl context '$kube' does not exist locally"
       failed=true
     fi
@@ -444,7 +445,8 @@ validate_profile_contexts() {
       warn "gcloud is required to load configuration '$gconfig'"
       failed=true
     elif ! gcloud config configurations describe "$gconfig" \
-      --format='value(name)' 2>/dev/null | grep -Fxq "$gconfig"; then
+      --format='value(name)' 2>/dev/null |
+      grep -Fx "$gconfig" >/dev/null; then
       warn "gcloud configuration '$gconfig' does not exist locally"
       failed=true
     fi
@@ -453,7 +455,8 @@ validate_profile_contexts() {
     if ! have aws; then
       warn "AWS CLI is required to load profile '$aprofile'"
       failed=true
-    elif ! aws configure list-profiles 2>/dev/null | grep -Fxq "$aprofile"; then
+    elif ! aws configure list-profiles 2>/dev/null |
+      grep -Fx "$aprofile" >/dev/null; then
       warn "AWS profile '$aprofile' does not exist locally"
       failed=true
     fi
@@ -463,7 +466,7 @@ validate_profile_contexts() {
       warn "Azure CLI is required to load subscription '$azure'"
       failed=true
     elif ! az account list --query "[?id=='$azure'].id" -o tsv 2>/dev/null |
-      grep -Fxq "$azure"; then
+      grep -Fx "$azure" >/dev/null; then
       warn "Azure subscription '$azure' is not available in the local account cache"
       failed=true
     fi
