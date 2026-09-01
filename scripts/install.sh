@@ -136,6 +136,12 @@ format_bootstrap_duration_seconds() {
   local seconds="$1"
   format_bootstrap_duration_ms "$((seconds * 1000))"
 }
+bootstrap_elapsed_ms() {
+  local elapsed_ms
+  elapsed_ms=$((($(date +%s%N) - RUN_STARTED_NANOS) / 1000000))
+  ((elapsed_ms >= 0)) || elapsed_ms=0
+  printf '%s\n' "$elapsed_ms"
+}
 log_info() { printf '%s %b[INFO]%b  %s\n' "$(timestamp)" "$BLUE" "$NC" "$*"; }
 log_success() { printf '%s %b[OK]%b    %s\n' "$(timestamp)" "$GREEN" "$NC" "$*"; }
 log_warn() { printf '%s %b[WARN]%b  %s\n' "$(timestamp)" "$YELLOW" "$NC" "$*"; }
@@ -1115,8 +1121,7 @@ stage_doctor() {
 
 write_run_summary() {
   local status="$1" duration duration_ms duration_human summary
-  duration_ms=$((($(date +%s%N) - RUN_STARTED_NANOS) / 1000000))
-  ((duration_ms >= 0)) || duration_ms=0
+  duration_ms="$(bootstrap_elapsed_ms)"
   duration=$((duration_ms / 1000))
   duration_human="$(format_bootstrap_duration_ms "$duration_ms")"
   summary="$RUN_DIR/summary.json"
@@ -1165,7 +1170,7 @@ rm -f "$STATE_ROOT/runs/latest"
 
 printf '\n'
 log_banner "Bootstrap Complete"
-log_success "Completed in $(($(date +%s) - RUN_STARTED_EPOCH))s"
+log_success "Completed in $(format_bootstrap_duration_ms "$(bootstrap_elapsed_ms)")"
 log_info "Run summary: $RUN_DIR/summary.json"
 log_info "Restore configs: $CHEZMOI_SOURCE/scripts/backup.sh restore ${BACKUP_ID:-<backup-id>}"
 log_info "Authentication remains manual; run 'dot doctor' after signing in to selected tools"

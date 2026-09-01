@@ -24,9 +24,17 @@ for expected in \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
   'acquire_bootstrap_lock' \
   'DOTFILES_LOCK_TIMEOUT' \
-  'json_escape'; do
+  'json_escape' \
+  'RUN_STARTED_NANOS' \
+  'bootstrap_elapsed_ms'; do
   grep -Fq "$expected" "$INSTALL" && pass "$expected" || fail "installer missing $expected"
 done
+
+if grep -Fq 'RUN_STARTED_EPOCH' "$INSTALL"; then
+  fail "installer still references the removed RUN_STARTED_EPOCH timer"
+else
+  pass "installer uses one nanosecond-based elapsed timer"
+fi
 
 for expected in \
   'type=absent' \
