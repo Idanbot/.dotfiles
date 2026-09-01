@@ -26,6 +26,7 @@ chmod 755 "$TMP_ROOT/bin/chezmoi"
 log_info() { printf 'INFO %s\n' "$*"; }
 log_warn() { printf 'WARN %s\n' "$*"; }
 log_error() { printf 'ERROR %s\n' "$*" >&2; }
+log_skip() { printf 'SKIP %s\n' "$*"; }
 
 CHOICE=""
 CHOICE_QUEUE=()
@@ -45,6 +46,7 @@ read_user() {
 source "$DOTFILES_DIR/scripts/conflicts.sh"
 
 [[ "$(dotfiles_conflict_status_path 'MM .zshrc')" == .zshrc ]]
+[[ "$(dotfiles_conflict_status_path $'MM .zshrc\r')" == .zshrc ]]
 touch "$HOME/.zshrc"
 dotfiles_conflict_destination_modified 'MM .zshrc'
 
@@ -164,5 +166,15 @@ else
   [[ "$?" -eq 1 ]]
 fi
 unset APPLY_FAILURE
+
+read_user() {
+  local _prompt="$1" destination="$2" selected_choice
+  IFS= read -r selected_choice || return 1
+  printf -v "$destination" '%s' "$selected_choice"
+}
+printf 's\ns\n' >"$TMP_ROOT/conflict-input"
+export CHEZMOI_STATUS_OUTPUT=$'MM .zshrc\nMM .zshrc'
+CONFLICT_AUTO_APPROVE=false
+dotfiles_apply_selected_conflicts <"$TMP_ROOT/conflict-input"
 
 printf 'Conflict resolution test passed\n'

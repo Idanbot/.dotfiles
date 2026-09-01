@@ -136,6 +136,13 @@ install_github_archive kubecolor kubecolor/kubecolor "v$KUBECOLOR_VERSION" \
   'https://github.com/kubecolor/kubecolor/releases/download/{tag}/checksums.txt' \
   'kubecolor --kubecolor-version'
 
+RADAR_SHA="$(package_metadata cloud radar "sha256_$ARCH")"
+RADAR_VERSION="$(package_version cloud radar 1.12.2)"
+install_github_archive kubectl-radar skyhook-io/radar "v$RADAR_VERSION" \
+  "radar_v{version}_linux_$CLOUD_ARCH.tar.gz" kubectl-radar \
+  "sha256:$RADAR_SHA" 'kubectl-radar --version'
+managed_link "$DOTFILES_BIN_DIR/kubectl-radar" "$DOTFILES_BIN_DIR/radar" radar "$RADAR_VERSION"
+
 STERN_VERSION="$(package_version cloud stern 1.34.0)"
 install_github_archive stern stern/stern "v$STERN_VERSION" \
   "stern_${STERN_VERSION}_linux_${ARCH}.tar.gz" stern \
@@ -187,11 +194,12 @@ install_github_archive gitleaks gitleaks/gitleaks "v$GITLEAKS_VERSION" \
 
 for binary in \
   eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
-  omp bun rtk herdr ast-grep gitleaks; do
+  kubectl-radar omp bun rtk herdr ast-grep gitleaks; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
 kubecolor --kubecolor-version >/dev/null
+"$DOTFILES_BIN_DIR/radar" --version >/dev/null
 
 [[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 20 ]]
 

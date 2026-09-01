@@ -108,6 +108,14 @@ else
   pass "no root-level shell entrypoints"
 fi
 
+if grep -Fq 'repo: skyhook-io/radar' "$DOTFILES_DIR/packages.meta.yaml" &&
+  grep -Fq 'kubectl-radar skyhook-io/radar' "$CLOUD_INSTALLER" &&
+  grep -Fq 'managed_link "$HOME/.local/bin/kubectl-radar"' "$CLOUD_INSTALLER"; then
+  pass "Radar is checksum-pinned and installed as a kubectl plugin with shorthand"
+else
+  fail "Radar installation contract is incomplete"
+fi
+
 INSTALL="$DOTFILES_DIR/scripts/install.sh"
 CONFLICTS="$DOTFILES_DIR/scripts/conflicts.sh"
 for expected in \
@@ -117,7 +125,9 @@ for expected in \
   'chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
   '--no-tty' \
   'HAS_CONTROLLING_TTY' \
+  'done 3<<<"$CHEZMOI_STATUS_OUTPUT"' \
   'read_menu_user' \
+  'rel=".local/bin/$name"' \
   'ensure_managed_entrypoint dot-privacy' \
   'chmod 600 "$LOG_FILE" "$EVENT_LOG"' \
   'acquire_bootstrap_lock' \

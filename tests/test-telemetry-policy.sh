@@ -66,6 +66,8 @@ grep -Fq 'RTK_TELEMETRY_DISABLED=1' "$DOTFILES_DIR/dot_config/dotfiles/privacy.s
 grep -Fq 'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1' \
   "$DOTFILES_DIR/dot_config/dotfiles/privacy.sh"
 grep -Fq 'analytics.enabled=false' "$DOTFILES_DIR/dot_local/bin/executable_dot-privacy"
+grep -Fq 'run_privacy_audit' "$DOTFILES_DIR/scripts/doctor.sh"
+grep -Fq 'source "$privacy_config"' "$DOTFILES_DIR/scripts/doctor.sh"
 
 # The lifecycle wrapper remains usable before a shell restart exposes the
 # newly materialized ~/.local/bin entrypoint.

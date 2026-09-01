@@ -73,6 +73,7 @@ cloud:
   kubectx: "0.11.0"
   kubens: "0.11.0"
   kubecolor: "0.6.0"
+  radar: "1.12.2"
 
 
 terminal:

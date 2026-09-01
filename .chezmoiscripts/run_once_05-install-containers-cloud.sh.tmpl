@@ -235,6 +235,30 @@ install_github_archive \
   "https://github.com/kubecolor/kubecolor/releases/download/{tag}/checksums.txt" \
   'kubecolor --kubecolor-version'
 
+RADAR_VERSION="$(package_version cloud radar 1.12.2)"
+RADAR_SHA="$(package_metadata cloud radar "sha256_$(get_arch)")"
+install_github_archive \
+  kubectl-radar skyhook-io/radar "v${RADAR_VERSION#v}" \
+  "radar_v{version}_linux_${RELEASE_ARCH}.tar.gz" kubectl-radar \
+  "sha256:$RADAR_SHA" 'kubectl-radar --version'
+
+# Radar's release binary is the kubectl plugin. Add the documented shorthand
+# only when it is absent or already managed; never replace an unrelated file.
+RADAR_LINK="$HOME/.local/bin/radar"
+if [[ ! -e "$RADAR_LINK" && ! -L "$RADAR_LINK" ]]; then
+  managed_link "$HOME/.local/bin/kubectl-radar" "$RADAR_LINK" radar "$RADAR_VERSION"
+  log_success "radar shorthand linked to kubectl-radar"
+elif [[ -L "$RADAR_LINK" ]] &&
+  [[ "$(readlink -f "$RADAR_LINK")" == "$HOME/.local/bin/kubectl-radar" ]]; then
+  log_skip "radar shorthand already points to kubectl-radar"
+elif [[ -L "$RADAR_LINK" ]]; then
+  ln -sfn "$HOME/.local/bin/kubectl-radar" "$RADAR_LINK"
+  record_install radar "$RADAR_VERSION" symlink "$RADAR_LINK"
+  log_success "radar shorthand updated"
+else
+  log_warn "Preserving existing non-symlink $RADAR_LINK; use kubectl-radar"
+fi
+
 USQL_SHA="$(package_metadata database usql "sha256_$ARCH")"
 USQL_VERSION="$(package_version database usql 0.21.4)"
 install_github_archive \

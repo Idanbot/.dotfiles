@@ -342,6 +342,14 @@ cloud:
     repo: kubecolor/kubecolor
     binary: kubecolor
     integrity: upstream-checksum
+  radar:
+    source: github
+    owner: dotfiles-binary
+    repo: skyhook-io/radar
+    binary: kubectl-radar
+    integrity: pinned-sha256
+    sha256_amd64: 5606aa34ad9c2e13c5100c60fe1765265dbfe9b6af7d0ce6a3f5dad6f85d049c
+    sha256_arm64: 6b893a11c933a56e5a24bf199a64039c71f5dbfbfb0684bd9b97507bae2fb946
 
 database:
   usql:

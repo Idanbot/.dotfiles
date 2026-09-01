@@ -6,6 +6,7 @@
 
 dotfiles_conflict_status_path() {
   local line="$1" path
+  line="${line%$'\r'}"
   path="${line:3}"
   path="${path#"${path%%[![:space:]]*}"}"
   printf '%s\n' "$path"
@@ -186,7 +187,8 @@ dotfiles_apply_selected_conflicts() {
     log_info "Non-interactive conflict mode: replacing pending destinations after backup"
   fi
 
-  while IFS= read -r line; do
+  while IFS= read -r line <&3; do
+    line="${line%$'\r'}"
     [[ -n "$line" ]] || continue
     rel="$(dotfiles_conflict_status_path "$line")"
     [[ -n "$rel" ]] || continue
@@ -248,7 +250,7 @@ dotfiles_apply_selected_conflicts() {
         return 2
         ;;
     esac
-  done <<<"$CHEZMOI_STATUS_OUTPUT"
+  done 3<<<"$CHEZMOI_STATUS_OUTPUT"
 
   if [[ "$had_conflict" == false ]]; then
     if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty; then

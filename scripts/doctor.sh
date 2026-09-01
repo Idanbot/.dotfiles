@@ -121,6 +121,16 @@ check_command() {
   fi
 }
 
+run_privacy_audit() {
+  local privacy_config="$HOME/.config/dotfiles/privacy.sh"
+  [[ -r "$privacy_config" ]] || return 1
+  (
+    # shellcheck source=/dev/null
+    source "$privacy_config"
+    "$HOME/.local/bin/dot-privacy"
+  )
+}
+
 check_stable_command() {
   local command="$1" expected="$HOME/.local/bin/$1" actual
   actual="$(command -v "$command" 2>/dev/null || true)"
@@ -235,11 +245,10 @@ fi
 
 if selected cloud; then
   doctor_step "Cloud"
-  for command in \
-    docker kubectl helm terraform ansible k9s aws gcloud az cloud-context \
-    s5cmd kcat stern helmfile kubectx kubens kubecolor pgloader cloudflare-ssh; do
+  for command in docker kubectl helm terraform ansible k9s aws gcloud az cloud-context s5cmd kcat stern helmfile kubectx kubens kubecolor pgloader cloudflare-ssh kubectl-radar; do
     check_command "$command" true
   done
+  check_command radar false
 fi
 
 if selected tmux; then
@@ -296,7 +305,7 @@ if selected ai; then
   for command in claude codex agy opencode omp bun serena context-mode graphify rtk agent-mcp dot-privacy; do
     check_command "$command" true
   done
-  if "$HOME/.local/bin/dot-privacy" >/dev/null 2>&1; then
+  if run_privacy_audit >/dev/null 2>&1; then
     result pass telemetry-policy "managed telemetry controls are active"
   else
     result fail telemetry-policy "run 'dot privacy' for details"

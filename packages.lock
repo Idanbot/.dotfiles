@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 4d999127fb2c2450b7966a2cbdfd0bca3fe803c13a5a950dc3cd79b2b2b62320
-  metadata: a25b24e044f4865db1511c7029473409f31b9bf58f069163bebb9ca038209c1e
+  packages: 750e639399bee6dc866209dc08cc518586c2e35a68db4a09fa9e4cf0e95484bf
+  metadata: 704b5f83dc3bd00f95d3531761a765801d699195c91ecae4e1261f9ccc43a74c
 
 tools:
   - section: bootstrap
@@ -471,6 +471,16 @@ tools:
     repo: kubecolor/kubecolor
     binary: kubecolor
     integrity: upstream-checksum
+  - section: cloud
+    name: radar
+    version: 1.12.2
+    source: github
+    owner: dotfiles-binary
+    repo: skyhook-io/radar
+    binary: kubectl-radar
+    sha256_amd64: 5606aa34ad9c2e13c5100c60fe1765265dbfe9b6af7d0ce6a3f5dad6f85d049c
+    sha256_arm64: 6b893a11c933a56e5a24bf199a64039c71f5dbfbfb0684bd9b97507bae2fb946
+    integrity: pinned-sha256
   - section: terminal
     name: kitty
     version: 0.48.1

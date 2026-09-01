@@ -19,6 +19,16 @@ copy_repo() {
   mkdir -p "$target"
   cp -a "$DOTFILES_DIR/." "$target/"
   rm -rf "$target/.git"
+  # The grouped-upgrade workflow tests an already-mutated checkout. Reset the
+  # fixture's covered tools to a known baseline so the test remains meaningful
+  # after a real update set has been applied.
+  sed -i \
+    -e 's/^  fzf: .*/  fzf: "0.74.0"/' \
+    -e 's/^  github_cli: .*/  github_cli: "2.98.0"/' \
+    -e 's/^  herdr: .*/  herdr: "0.7.4"/' \
+    -e 's/^  kitty: .*/  kitty: "0.48.1"/' \
+    -e 's/^  claude_cli: .*/  claude_cli: "2.1.206"/' \
+    "$target/packages.yaml"
 }
 
 old_herdr_amd64=bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059

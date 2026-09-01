@@ -228,12 +228,16 @@ interactive_tty_available() {
   [[ -t 0 || -t 1 ]]
 }
 
+if interactive_tty_available && [[ -r /dev/tty ]]; then
+  HAS_CONTROLLING_TTY=true
+fi
+
 read_user() {
   local prompt="$1" destination="$2" value
-  if [[ "${READ_USER_ALLOW_STDIN:-false}" == true || -t 0 ]]; then
-    read -r -p "$prompt" value || return 1
-  elif [[ "$HAS_CONTROLLING_TTY" == true ]]; then
+  if [[ "$HAS_CONTROLLING_TTY" == true && -r /dev/tty ]]; then
     read -r -p "$prompt" value </dev/tty || return 1
+  elif [[ "${READ_USER_ALLOW_STDIN:-false}" == true || -t 0 ]]; then
+    read -r -p "$prompt" value || return 1
   else
     log_error "Interactive input requires a controlling terminal; use --yes or --conflict-policy skip|abort"
     return 1
@@ -688,7 +692,7 @@ export DOTFILES_RUN_ID
 
 # Logging redirects stdout through tee. Preserve whether the bootstrap started
 # with a terminal so conflict prompts can still read from /dev/tty afterward.
-if interactive_tty_available; then
+if interactive_tty_available && [[ -r /dev/tty ]]; then
   HAS_CONTROLLING_TTY=true
 fi
 RUN_DIR="$STATE_ROOT/runs/$DOTFILES_RUN_ID"
@@ -942,7 +946,9 @@ print_dry_run_summary() {
 }
 
 ensure_managed_entrypoint() {
-  local name="$1" target="$HOME/.local/bin/$1"
+  local name="$1" rel target
+  rel=".local/bin/$name"
+  target="$HOME/$rel"
   if [[ -x "$target" ]]; then
     return 0
   fi
@@ -954,7 +960,7 @@ ensure_managed_entrypoint() {
 
   log_warn "Managed command $name is missing; repairing it through chezmoi"
   mkdir -p "$HOME/.local/bin"
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$target"; then
+  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$rel"; then
     log_error "Unable to repair managed command $name"
     return 1
   fi

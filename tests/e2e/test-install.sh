@@ -174,6 +174,9 @@ if [[ ",$selected_sections," == *,cloud,* ]]; then
   assert_version_contains kubectx "$(manifest_version cloud kubectx)" kubectx --version
   assert_version_contains kubens "$(manifest_version cloud kubens)" kubens --version
   assert_version_contains kubecolor "$(manifest_version cloud kubecolor)" kubecolor --kubecolor-version
+  assert_version_contains Radar "$(manifest_version cloud radar)" kubectl-radar --version
+  command -v radar >/dev/null
+  radar --version >/dev/null
   pgloader --version >/dev/null
   command -v gcloud >/dev/null
   command -v az >/dev/null
