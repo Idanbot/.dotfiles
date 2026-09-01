@@ -2,20 +2,20 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 750e639399bee6dc866209dc08cc518586c2e35a68db4a09fa9e4cf0e95484bf
-  metadata: 704b5f83dc3bd00f95d3531761a765801d699195c91ecae4e1261f9ccc43a74c
+  packages: ebf48677ca10559c4712d3a9f903306a2322f7d30cd86ddb9b202e4057d8530a
+  metadata: 859e34f0ed4ebd31fc1cf73c1f5a79a02af321cd5d924ed731712b563c3bfde4
 
 tools:
   - section: bootstrap
     name: chezmoi
-    version: 2.71.0
+    version: 2.72.1
     source: apt_or_github
     owner: bootstrap
     repo: twpayne/chezmoi
     integrity: upstream-checksum
   - section: core
     name: fzf
-    version: 0.74.0
+    version: 0.74.3
     source: external
     owner: chezmoi-external
     repo: junegunn/fzf
@@ -46,17 +46,17 @@ tools:
     integrity: apt-signature
   - section: core
     name: eza
-    version: 0.23.4
+    version: 0.23.5
     source: github
     owner: dotfiles-binary
     repo: eza-community/eza
     binary: eza
-    sha256_amd64: 0c38665440226cd8bef5d1d4f3bc6ff77c927fb0d68b752739105db7ab5b358d
-    sha256_arm64: 366e8430225f9955c3dc659b452150c169894833ccfef455e01765e265a3edda
+    sha256_amd64: 35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4
+    sha256_arm64: 40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec
     integrity: pinned-sha256
   - section: core
     name: lazygit
-    version: 0.63.0
+    version: 0.64.1
     source: github
     owner: dotfiles-binary
     repo: jesseduffield/lazygit
@@ -172,7 +172,7 @@ tools:
     integrity: apt-signature
   - section: core
     name: sops
-    version: 3.13.2
+    version: 3.13.3
     source: github
     owner: dotfiles-binary
     repo: getsops/sops
@@ -188,7 +188,7 @@ tools:
     integrity: upstream-checksum
   - section: core
     name: tealdeer
-    version: 1.8.1
+    version: 1.9.0
     source: github
     owner: dotfiles-binary
     repo: dbrgn/tealdeer
@@ -214,13 +214,13 @@ tools:
     integrity: pinned-sha256
   - section: core
     name: ast_grep
-    version: 0.45.0
+    version: 0.45.3
     source: github
     owner: dotfiles-binary
     repo: ast-grep/ast-grep
     binary: ast-grep
-    sha256_amd64: 78931ae35ebac33d9a72b3aecea3e3d62d6e5b0b718ac8bbedfbe69d68421e41
-    sha256_arm64: 62b60892dafacfa76d6de87157659f880bbf85ff38bdab52db12f1f14ec60f94
+    sha256_amd64: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
+    sha256_arm64: b39cfbc58da4b869a88b8a4bc57bd5deb0d24541e704cf7c257da7b53ec81c8f
     integrity: pinned-sha256
   - section: core
     name: gitleaks
@@ -234,7 +234,7 @@ tools:
     integrity: pinned-sha256
   - section: languages
     name: go
-    version: 1.26.5
+    version: 1.27.0
     source: direct
     owner: dotfiles-runtime
     checksum_template: "https://go.dev/dl/?mode=json&include=all"
@@ -253,13 +253,13 @@ tools:
     integrity: rustup
   - section: languages
     name: node
-    version: 26.5.0
+    version: 26.8.1
     source: node-dist
     owner: dotfiles-runtime
     integrity: upstream-checksum
   - section: languages
     name: npm
-    version: 12.0.1
+    version: 12.0.2
     source: npm
     owner: node-runtime
     package: npm
@@ -275,23 +275,23 @@ tools:
     integrity: npm-registry
   - section: languages
     name: python
-    version: 3.14.6
+    version: 3.14.7
     source: uv
     owner: uv
     integrity: uv-managed
   - section: languages
     name: java
-    version: "25.0.3+9"
+    version: "25.0.4.1+1"
     source: github
     owner: dotfiles-runtime
     repo: adoptium/temurin25-binaries
     binary: java
-    sha256_amd64: 69264a7a211bf5029830d07bc3370f879769d62ebc5b5488e90c9343a2da0e1f
-    sha256_arm64: 3e4287cb98870ba824ed698854bdc27cff984254caf66dd12cc291e7bfdde26b
+    sha256_amd64: dbb698396d478e7fa2b1e50f4103324b2a99b90569ee27c33f2261f9215cf41e
+    sha256_arm64: 69df11a02cfa3ef7d7ca645e03edce6778ec090e100f6ae2b42097865730ac52
     integrity: pinned-sha256
   - section: languages
     name: uv
-    version: 0.11.28
+    version: 0.12.8
     source: github
     owner: dotfiles-binary
     repo: astral-sh/uv
@@ -299,7 +299,7 @@ tools:
     integrity: upstream-checksum
   - section: history
     name: atuin
-    version: 18.17.0
+    version: 18.21.0
     source: github
     owner: dotfiles-binary
     repo: atuinsh/atuin
@@ -307,13 +307,13 @@ tools:
     integrity: upstream-checksum
   - section: editor
     name: neovim
-    version: 0.12.4
+    version: 0.12.5
     source: github
     owner: dotfiles-runtime
     repo: neovim/neovim
     binary: nvim
-    sha256_amd64: 012bf3fcac5ade43914df3f174668bf64d05e049a4f032a388c027b1ebd78628
-    sha256_arm64: ceb7e88c6b681f0515d135dcdfad54f5eb4373b25ce6172197cd9a69c758063f
+    sha256_amd64: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
+    sha256_arm64: 1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725
     integrity: pinned-sha256
   - section: database
     name: usql
@@ -327,7 +327,7 @@ tools:
     integrity: pinned-sha256
   - section: database
     name: iredis
-    version: 1.15.0
+    version: 1.16.1
     source: pypi
     owner: uv
     package: iredis
@@ -349,14 +349,14 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: kubectl
-    version: 1.36.3
+    version: 1.37.0
     source: direct
     owner: dotfiles-binary
     binary: kubectl
     integrity: upstream-checksum
   - section: cloud
     name: helm
-    version: 4.2.3
+    version: 4.2.4
     source: github
     owner: dotfiles-binary
     repo: helm/helm
@@ -364,7 +364,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: terraform
-    version: 1.15.8
+    version: 1.16.0
     source: direct
     owner: dotfiles-binary
     binary: terraform
@@ -386,12 +386,12 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: aws_cli
-    version: 2.36.7
+    version: 2.36.36
     source: direct
     owner: vendor-installer
     binary: aws
-    sha256_amd64: d641283d37f1a2168457a9f26a20d4e29167652e9ab1719b37114ef1ebe859f4
-    sha256_arm64: 85826b67912b44bb45d1e46c6e66f383c14405ee0b2f4686f73bdf949c93bd61
+    sha256_amd64: ac07f6cb7beffd1e8af3b373de5b192062ca6c486596203e6961d01e6de14b0e
+    sha256_arm64: c2f5060dca1d279325a84f1501e08a7ed7c69604cdde9f765b54625cb6bfab15
     integrity: pinned-sha256
   - section: cloud
     name: gcloud
@@ -407,13 +407,13 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: cloudflared
-    version: 2026.7.3
+    version: 2026.8.3
     source: github
     owner: vendor-installer
     repo: cloudflare/cloudflared
     binary: cloudflared
-    sha256_amd64: 049777d30f9bf93da6df8bbe31383460eb2aa51a832c6551824d56f9fcc55974
-    sha256_arm64: d3ea7d22dd337b465da33d6bc1c4b3cfd381407447a2a7d29542c19783430db3
+    sha256_amd64: 660b348d473bba81997445b534e7eaefaf4c4e16331866922326c338a7013dd9
+    sha256_arm64: 2c0d991ed6061e55d2e0148b794d86f594ddb473c1db43cf0647278b62e326ab
     integrity: pinned-sha256
   - section: cloud
     name: s5cmd
@@ -441,7 +441,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: helmfile
-    version: 1.7.1
+    version: 1.7.4
     source: github
     owner: dotfiles-binary
     repo: helmfile/helmfile
@@ -465,7 +465,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: kubecolor
-    version: 0.6.0
+    version: 0.7.1
     source: github
     owner: dotfiles-binary
     repo: kubecolor/kubecolor
@@ -483,13 +483,13 @@ tools:
     integrity: pinned-sha256
   - section: terminal
     name: kitty
-    version: 0.48.1
+    version: 0.48.2
     source: github
     owner: dotfiles-binary
     repo: kovidgoyal/kitty
     binary: kitty
-    sha256_amd64: ab7d4978b146a3f4799d74fdd6fddf322e5cf93601494e3fcbed925141611963
-    sha256_arm64: 6b0d8fe0af20ba03348e97e303f3c6084b5338bb4abd52737d8e2ffd2dba3d33
+    sha256_amd64: 967a1958e7fc67b495d279c0963bcd1a0482097151817ce6506fabc822689af7
+    sha256_arm64: 534b214d407a05e4603da75ef02fffa592ec1bbec20a413c5e0cd3f853c928cb
     integrity: pinned-sha256
   - section: terminal
     name: tmux
@@ -508,24 +508,24 @@ tools:
     integrity: pypi
   - section: terminal
     name: herdr
-    version: 0.7.4
+    version: 0.8.2
     source: github
     owner: dotfiles-binary
     repo: ogulcancelik/herdr
     binary: herdr
     asset_template: "herdr-linux-{release_arch}"
-    sha256_amd64: bc0fc02d4ba500f9cac2353a43e67fe036785ecca6eb55378e050fac3c103059
-    sha256_arm64: 544e0002de42806d1ab64ccdef3a7e7414f24717b0b6b022bc9e57d2eefd26a2
+    sha256_amd64: 976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4
+    sha256_arm64: f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d
     integrity: pinned-sha256
   - section: system
     name: git_credential_manager
-    version: 2.8.0
+    version: 2.9.1
     source: github
     owner: dpkg
     repo: git-ecosystem/git-credential-manager
     binary: git-credential-manager
-    sha256_amd64: c7bbf9785c3e8166ceedb66a7e0bfb40e6655ef504af5ca7977b516c5497aff6
-    sha256_arm64: e5bbc12c31e97a7409585ef60aa5d53138c7661d9a3abc9227d9b0f68959e836
+    sha256_amd64: a0c59d2ea873a930fd1c41031a25cb31055d31baaf80c10726847e1c1f7aa951
+    sha256_arm64: 8dd4cee6f5820516d1d1982bc8d68ce1c3e221cd2bf0629b10f0f2c059af9543
     integrity: pinned-sha256
   - section: fonts
     name: nerd_font
@@ -536,14 +536,14 @@ tools:
     integrity: upstream-checksum
   - section: fonts
     name: nerd_font_version
-    version: 3.4.0
+    version: 3.5.1
     source: github
     owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
     integrity: upstream-checksum
   - section: ai_tools
     name: claude_cli
-    version: 2.1.206
+    version: 2.1.252
     source: npm
     owner: npm
     package: "@anthropic-ai/claude-code"
@@ -569,7 +569,7 @@ tools:
     integrity: pinned-sha256
   - section: ai_tools
     name: opencode
-    version: 1.17.18
+    version: 1.18.25
     source: npm
     owner: npm
     package: opencode-ai
@@ -577,14 +577,14 @@ tools:
     integrity: npm-registry
   - section: ai_tools
     name: omp
-    version: 18.0.5
+    version: 18.1.1
     source: github
     owner: dotfiles-binary
     repo: can1357/oh-my-pi
     binary: omp
     asset_template: "omp-linux-{release_arch}"
-    sha256_amd64: d5a322af241cebe2662b3b792ff29d3ea6e61364328e916c9429065f346391ed
-    sha256_arm64: 9fa632da09cc6f2b625bb79aa291d52985f936a10408d278d550983f91460785
+    sha256_amd64: 04780b41fb33b658ca6e8449353911babc8c90332ac444e7e6562d041d3eae52
+    sha256_arm64: a8bf4dcc47dcf3284a0f6c43ffeb94adc0a2f031dcd7f8ab8ed92d0215c89a9d
     integrity: pinned-sha256
   - section: ai_tools
     name: bun
@@ -599,7 +599,7 @@ tools:
     integrity: pinned-sha256
   - section: ai_tools
     name: serena
-    version: 1.6.1
+    version: 1.7.0
     source: uv
     owner: uv
     package: serena-agent
@@ -615,7 +615,7 @@ tools:
     integrity: npm-registry
   - section: ai_tools
     name: graphify
-    version: 0.9.38
+    version: 0.9.53
     source: pypi
     owner: uv
     package: graphifyy
@@ -623,13 +623,13 @@ tools:
     integrity: pypi
   - section: ai_tools
     name: rtk
-    version: 0.45.0
+    version: 0.46.0
     source: github
     owner: dotfiles-binary
     repo: rtk-ai/rtk
     binary: rtk
-    sha256_amd64: c4c036fbf181fc55ef329786c8c17e0d427972b053b825944d968a6aafef1ba4
-    sha256_arm64: 80a746dd305ef944ff50ef011ae4ce3878dd5ba88dfe35d859d05498191637c3
+    sha256_amd64: 79aa5b89c69566bbfeceb66c8a27cfbe52237fc7ee3e683115f43745a3262d21
+    sha256_arm64: e8c2e1787f46017ea7c5a711b2bc6a7f7cf61c7ad69385b4c1e4daff1135dcd1
     integrity: pinned-sha256
   - section: ai_tools
     name: ponytail
@@ -641,14 +641,14 @@ tools:
     integrity: pinned-sha256
   - section: ai_tools
     name: pix_optimizer
-    version: 1.1.26
+    version: 1.1.28
     source: npm
     owner: omp-plugin
     package: "@xynogen/pix-optimizer"
     integrity: npm-registry
   - section: media
     name: yt_dlp
-    version: 2026.07.04
+    version: 2026.08.19
     source: uv
     owner: uv
     package: yt-dlp
