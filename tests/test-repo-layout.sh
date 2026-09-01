@@ -313,7 +313,10 @@ else
 fi
 
 if grep -Fq 'allow_nested = false' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
-  grep -Fq -- '--allow-nested' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
+  grep -Fq -- '--allow-nested' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" &&
+  grep -Fq -- 'herdr pane run' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" &&
+  ! grep -Fq -- 'herdr agent start "$agent" --workspace' \
+    "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
   pass "workspace nesting is guarded and explicitly opt-in"
 else
   fail "workspace nesting policy is incomplete"

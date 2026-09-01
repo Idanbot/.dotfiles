@@ -345,7 +345,7 @@ ensure_herdr_server() {
 }
 
 run_herdr_workspace() {
-  local list workspace_id created root_tab response tab_id placeholder_pane agent
+  local list workspace_id created root_tab response placeholder_pane agent
   local -a launch_args
   if [[ "$PRINT_ONLY" == true ]]; then
     print_herdr_plan
@@ -385,18 +385,15 @@ run_herdr_workspace() {
         herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
         return 1
       fi
-      tab_id="$(jq -er '.result.tab.tab_id' <<<"$response")"
       placeholder_pane="$(jq -er '.result.root_pane.pane_id' <<<"$response")"
       launch_args=(dot-agent-launch)
       [[ "$RESTART_AGENTS" == true ]] && launch_args+=(--restart)
       launch_args+=(--registry "$REGISTRY" "$agent")
-      if ! herdr agent start "$agent" --workspace "$workspace_id" --tab "$tab_id" \
-        --cwd "$WORKDIR" --no-focus --env "DOTFILES_AGENT_REGISTRY=$REGISTRY" -- \
-        "${launch_args[@]}" >/dev/null; then
-        herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
-        return 1
-      fi
-      if ! herdr pane close "$placeholder_pane" >/dev/null; then
+      launch_command=""
+      printf -v launch_command '%q ' "${launch_args[@]}"
+      launch_command="${launch_command% }"
+      launch_command="DOTFILES_AGENT_REGISTRY=$(printf '%q' "$REGISTRY") $launch_command"
+      if ! herdr pane run "$placeholder_pane" "$launch_command" >/dev/null; then
         herdr workspace close "$workspace_id" >/dev/null 2>&1 || true
         return 1
       fi

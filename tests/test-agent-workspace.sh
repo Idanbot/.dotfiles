@@ -19,6 +19,9 @@ chmod +x "$HOME/bin/uvx" "$HOME/bin/tmux"
 WORKSPACE="$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"
 AGENT_LAUNCH="$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch"
 
+grep -Fq 'herdr pane run' "$WORKSPACE"
+! grep -Fq 'herdr agent start "$agent" --workspace' "$WORKSPACE"
+
 rendered="$(env -u HERDR_ENV -u TMUX "$WORKSPACE" "$HOME/project with spaces" \
   --backend tmux --name test-agents --print)"
 grep -Fq 'session_name: "test-agents"' <<<"$rendered"
