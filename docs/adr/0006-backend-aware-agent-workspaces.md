@@ -41,4 +41,9 @@ remains available for terminal-first and recovery workflows without requiring
 Herdr. Backend behavior is deterministic and testable through `--print`.
 
 The launcher still does not create worktrees, coordinate concurrent writers,
-commit, merge, push, authenticate agents, or manage agent session data.
+commit, merge, push, authenticate agents, or manage agent session data. The
+Docker workspace harness keeps these boundaries testable without credentials:
+it uses synthetic agent commands and a Herdr API fixture to verify both backend
+contracts, MCP state transitions, current-directory propagation, and degraded
+missing/crashing agent behavior. Release smoke remains responsible for testing
+the real Herdr binary and downloaded assets.

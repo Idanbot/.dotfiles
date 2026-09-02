@@ -618,6 +618,7 @@ Verification is tiered so a green result has a precise meaning:
 | Tier | Trigger | Coverage |
 | --- | --- | --- |
 | Push/PR CI | Every change | Security and policy checks, selector matrices, native/WSL-simulated units, two-pass base install, recovery/restore/resume |
+| Agent workspace Docker E2E | Every push/PR | Both workspace backends, all registered agent launchers, MCP toggles, working-directory propagation, and failure recovery fixtures |
 | Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, and `full` profile installations |
 | Real WSL2 | Manual, private self-hosted Windows runner | Actual WSL kernel, Windows interop, and target-machine acceptance |
 
@@ -643,6 +644,7 @@ docker compose -f .github/e2e/compose.yaml --profile selectors run --rm selector
 docker compose -f .github/e2e/compose.yaml --profile base up --build --abort-on-container-exit
 docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
 docker compose -f .github/e2e/compose.yaml --profile agent run --rm agent
+docker compose -f .github/e2e/compose.yaml --profile workspace run --rm agent-workspace
 ```
 
 For manual validation, the wrapper runs a complete native Ubuntu installation,
@@ -704,6 +706,14 @@ post-install startup timing uses the same benchmark engine. CI publishes those
 artifacts and a separate outcome-classification check so GitHub
 runner interruptions are distinguishable from actionable failures without
 altering the original workflow conclusion.
+
+The workspace Docker harness uses synthetic agent commands and a mocked Herdr
+API, so it never authenticates or starts a real agent session. It still invokes
+the managed launchers, renders the actual tmuxp YAML contract, checks the
+resolved Herdr `--cwd` values, toggles both MCP servers across all five agents,
+and records missing-agent and crash/restart behavior. Its artifacts include
+`summary.json`, `summary.md`, `workspace.log`, JSONL case events, backend traces,
+and an agent launch trace.
 
 ## Repository Map
 

@@ -117,12 +117,15 @@ to a login shell in either backend. See ADR 0006.
 ## Test Architecture
 
 Fast contracts validate parsing, templates, policies, workspace routing,
-Herdr configuration, ownership,
-recovery, selectors, and generated files. Network release smoke tests execute
-real downloaded binaries, create a real Herdr workspace twice, and apply all
-chezmoi externals. Docker E2E executes the same installer path as users, twice,
-on native and WSL-simulated modes. A monthly ephemeral Ubuntu VM separately
-validates login-shell, desktop, fontconfig, and systemd host integration.
+Herdr configuration, ownership, recovery, selectors, and generated files.
+The Docker workspace harness invokes both backend paths with synthetic agent
+CLIs, validates MCP toggles, working-directory propagation, and crash/missing
+agent behavior while retaining structured artifacts. Network release smoke
+tests execute real downloaded binaries, create a real Herdr workspace twice,
+and apply all chezmoi externals. Docker E2E executes the same installer path as
+users, twice, on native and WSL-simulated modes. A monthly ephemeral Ubuntu VM
+separately validates login-shell, desktop, fontconfig, and systemd host
+integration.
 
 Simulation verifies platform branches; it does not claim to emulate the WSL
 kernel or Windows interoperability. `.github/workflows/wsl-e2e.yml` remains the

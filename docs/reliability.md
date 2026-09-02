@@ -95,10 +95,12 @@ not automatic.
 2. Unit/fixture: versions, environment, profiles, routing, ledger, workspaces,
    backup/restore, failure/resume.
 3. Release smoke: real checksummed assets, Herdr server/workspace reuse, and all external archives.
-4. Base E2E: clean native and simulated-WSL install, two passes.
-5. Heavy E2E: developer, agent, cloud, and full profiles.
-6. Native VM: real two-pass Ubuntu host integration plus transactional
+4. Workspace Docker E2E: both backend launch contracts, all registered agent
+   commands, MCP toggles, directory propagation, and mocked failures.
+5. Base E2E: clean native and simulated-WSL install, two passes.
+6. Heavy E2E: developer, agent, cloud, and full profiles.
+7. Native VM: real two-pass Ubuntu host integration plus transactional
    restore/reapply acceptance on a monthly ephemeral VM.
-7. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
+8. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
 
 The simulated WSL tier must never be described as a real WSL kernel test.

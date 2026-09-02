@@ -22,7 +22,7 @@ required=(
   scripts/update-kitty.sh dot_local/bin/executable_update-kitty
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
-  .github/e2e/compose.yaml tests/e2e/test-install.sh tests/test-e2e-shell.sh
+  .github/e2e/compose.yaml tests/e2e/test-install.sh tests/e2e/test-agent-workspace.sh tests/test-e2e-shell.sh
   tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-tmux-config.sh tests/test-update-packages.sh
   tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-kubecolor.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
@@ -83,6 +83,17 @@ if grep -Fq 'tests/test-e2e-report.sh "$PWD"' "$CI_WORKFLOW" &&
   pass "CI validates structured E2E reports and publishes Hyperfine performance budgets"
 else
   fail "CI is missing E2E report or Hyperfine performance budget coverage"
+fi
+
+if grep -Fq 'agent-workspace-e2e:' "$CI_WORKFLOW" &&
+  grep -Fq 'agent-workspace-e2e' "$CI_WORKFLOW" &&
+  grep -Fq 'agent-workspace:' "$DOTFILES_DIR/.github/e2e/compose.yaml" &&
+  grep -Fq 'profiles: [workspace]' "$DOTFILES_DIR/.github/e2e/compose.yaml" &&
+  grep -Fq 'tests/e2e/test-agent-workspace.sh /dotfiles' \
+    "$DOTFILES_DIR/.github/e2e/compose.yaml"; then
+  pass "Docker validates both agent workspace backends and publishes diagnostics"
+else
+  fail "agent workspace Docker E2E harness is not wired into CI"
 fi
 
 PERFORMANCE_REPORT="$DOTFILES_DIR/scripts/performance-report.sh"

@@ -294,12 +294,45 @@ jobs:
           tests/test-external-tools.sh "$PWD"
           tests/test-ubuntu-package-tools.sh
 
+  agent-workspace-e2e:
+    name: Agent Workspace Docker E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare artifact volume
+        run: mkdir -p artifacts/agent-workspace && chmod 0777 artifacts/agent-workspace
+      - name: Run workspace backend harness in Docker
+        run: |
+          docker compose -f .github/e2e/compose.yaml --profile workspace \
+            up --build --abort-on-container-exit \
+            --exit-code-from agent-workspace agent-workspace
+      - name: Publish workspace summary
+        if: always()
+        run: |
+          cat artifacts/agent-workspace/summary.md >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Upload workspace observability bundle
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: agent-workspace-e2e
+          path: artifacts/agent-workspace/
+          if-no-files-found: warn
+          retention-days: 14
+
   pre-matrix:
     name: Pre-Matrix Gate
-    needs: [github-release-tools, performance-benchmarks]
+    needs: [github-release-tools, performance-benchmarks, agent-workspace-e2e]
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "All static, security, workflow, and release-smoke gates passed"
+      - run: echo "All static, security, workflow, release-smoke, and workspace gates passed"
 
   selectors:
     name: Selector (${{ matrix.name }})

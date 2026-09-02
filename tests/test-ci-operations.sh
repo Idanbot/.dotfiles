@@ -55,6 +55,15 @@ else
   fail 'bootstrap locking or JSONL escaping tests are not wired into CI'
 fi
 
+if grep -Fq 'agent-workspace-e2e:' "$CI" &&
+  grep -Fq 'docker compose -f .github/e2e/compose.yaml --profile workspace' "$CI" &&
+  grep -Fq 'needs: [github-release-tools, performance-benchmarks, agent-workspace-e2e]' "$CI" &&
+  grep -Fq 'Upload workspace observability bundle' "$CI"; then
+  pass 'Docker agent workspace backend E2E gates the pre-matrix checks'
+else
+  fail 'agent workspace backend E2E is missing from CI pre-matrix gating'
+fi
+
 if grep -Fq 'cron: "17 4 1 * *"' "$UPGRADES" &&
   grep -Fq './scripts/update-packages.sh --apply-all' "$UPGRADES" &&
   grep -Fq 'branch=automation/grouped-tool-upgrades' "$UPGRADES" &&

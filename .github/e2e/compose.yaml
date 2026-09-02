@@ -79,6 +79,20 @@ services:
       E2E_PASSES: "2"
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
+  agent-workspace:
+    <<: *e2e-base
+    profiles: [workspace]
+    environment:
+      <<: *e2e-env
+      DOTFILES_E2E_ARTIFACT_DIR: /artifacts/agent-workspace
+    command:
+      - bash
+      - -lc
+      - |
+        sudo apt-get update -qq
+        sudo apt-get install -y python3 tmux yq gojq
+        /dotfiles/tests/e2e/test-agent-workspace.sh /dotfiles
+
   recovery:
     <<: *e2e-base
     profiles: [recovery]
