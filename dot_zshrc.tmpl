@@ -23,8 +23,19 @@ fi
 unset _dotfiles_ssh_agent_socket _dotfiles_ssh_agent_status
 
 # If you come from bash you might have to change your $PATH.
-export PATH="$HOME/.fzf/bin:$HOME/.local/bin:$HOME/.local/share/npm/bin:$HOME/bin:$HOME/.cargo/bin:$PATH"
-export PATH="$PATH:/usr/local/go/bin:$GOPATH/bin"
+# Tool homes
+export BUN_INSTALL="$HOME/.bun"
+export CARGO_HOME="$HOME/.cargo"
+export GOPATH="$HOME/go"
+
+# PATH components
+FZF_BIN="$HOME/.fzf/bin"
+LOCAL_BIN="$HOME/.local/bin"
+NPM_BIN="$HOME/.local/share/npm/bin"
+USER_BIN="$HOME/bin"
+GO_BIN="/usr/local/go/bin"
+
+export PATH="$BUN_INSTALL/bin:$FZF_BIN:$LOCAL_BIN:$NPM_BIN:$USER_BIN:$CARGO_HOME/bin:$PATH:$GO_BIN:$GOPATH/bin"
 
 {{- if .is_wsl }}
 # Clean Windows paths to speed up shell startup and autocomplete
