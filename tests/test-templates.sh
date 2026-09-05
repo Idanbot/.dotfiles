@@ -85,11 +85,15 @@ for profile in native wsl; do
         ;;
       dot_tmux.conf.tmpl)
         if command -v tmux >/dev/null 2>&1; then
-          if tmux -L "dotfiles-template-${profile}" -f "$rendered" start-server \; source-file "$rendered" \; kill-server; then
+          socket="$TMP_DIR/tmux-$profile.sock"
+          # Parse only: a syntax test must not start installed TPM plugins.
+          tmux -S "$socket" -f /dev/null new-session -d -s syntax 'sleep 60'
+          if tmux -S "$socket" source-file -n "$rendered"; then
             pass "$rel renders as valid tmux config"
           else
             fail "$rel renders with tmux syntax errors"
           fi
+          tmux -S "$socket" kill-server
         else
           skip "tmux not installed; skipped rendered tmux parse"
         fi

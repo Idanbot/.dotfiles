@@ -15,6 +15,7 @@ fail() {
 CI="$DOTFILES_DIR/.github/workflows/ci.yml"
 OUTCOME="$DOTFILES_DIR/.github/workflows/ci-outcome.yml"
 UPGRADES="$DOTFILES_DIR/.github/workflows/grouped-upgrades.yml"
+CANARY="$DOTFILES_DIR/scripts/grouped-upgrade-canary.py"
 NATIVE="$DOTFILES_DIR/.github/workflows/native-vm-e2e.yml"
 DEPENDABOT="$DOTFILES_DIR/.github/dependabot.yml"
 
@@ -68,11 +69,33 @@ if grep -Fq 'cron: "17 4 1 * *"' "$UPGRADES" &&
   grep -Fq './scripts/update-packages.sh --apply-all' "$UPGRADES" &&
   grep -Fq 'branch=automation/grouped-tool-upgrades' "$UPGRADES" &&
   grep -Fq 'Validate generated update set in Docker' "$UPGRADES" &&
-  [[ "$(grep -Fc 'gh pr create' "$UPGRADES")" == 1 ]] &&
+  grep -Fq 'actions: write' "$UPGRADES" &&
+  grep -Fq 'python3 scripts/grouped-upgrade-canary.py' "$UPGRADES" &&
+  grep -Fq -- '--changed true --sha "$(git rev-parse HEAD)"' "$UPGRADES" &&
+  grep -Fq 'inputs[run_heavy_e2e]=true' "$CANARY" &&
+  grep -Fq 'workflow_run_id' "$CANARY" &&
+  grep -Fq 'run["head_sha"] != args.sha' "$CANARY" &&
+  ! grep -Fq 'PR CI automatically enables' "$UPGRADES" &&
   grep -Fq "github.head_ref == 'automation/grouped-tool-upgrades'" "$CI"; then
   pass 'monthly tool upgrades converge on one canary PR with heavy E2E'
 else
   fail 'grouped upgrade workflow can create fragmented or under-tested PRs'
+fi
+
+if yq -e '.jobs.update.steps |
+  map(select(.run // "" | contains("python3 scripts/grouped-upgrade-canary.py"))) |
+  length == 1 and .[0].if == "steps.upgrades.outputs.changed == '\''true'\''"' \
+  "$UPGRADES" >/dev/null; then
+  pass 'canary invocation is guarded by a verified source update'
+else
+  fail 'canary could be dispatched on unchanged source'
+fi
+
+if grep -Fq 'python3 /dotfiles/tests/test-workspace-harness.py /dotfiles' "$CI" &&
+  grep -Fq 'python3 /dotfiles/tests/test-grouped-upgrade-canary.py /dotfiles' "$CI"; then
+  pass 'Docker CI exercises workspace mutations and mocked grouped canary outcomes'
+else
+  fail 'harness mutations or mocked canary tests are missing from Docker CI'
 fi
 
 if grep -Fq 'interval: "monthly"' "$DEPENDABOT" &&

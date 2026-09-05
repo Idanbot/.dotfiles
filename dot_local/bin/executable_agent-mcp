@@ -63,14 +63,17 @@ json_update() {
   shift 2
   ensure_runtime gojq
   ensure_json_file "$path"
+  [[ -w "$path" ]] || die "$path is read-only"
   mode="$(stat -c '%a' "$path" 2>/dev/null || printf 600)"
   tmp="$(mktemp "${path}.tmp.XXXXXX")"
   if ! gojq "$@" "$filter" "$path" >"$tmp"; then
     rm -f "$tmp"
     die "failed to update $path"
   fi
-  chmod "$mode" "$tmp"
-  mv "$tmp" "$path"
+  if ! chmod "$mode" "$tmp" || ! mv "$tmp" "$path"; then
+    rm -f "$tmp"
+    return 1
+  fi
 }
 
 enable_native() {
@@ -181,16 +184,46 @@ enable_json() {
   esac
 }
 
+native_absent() {
+  local agent="$1" server="$2" listing line seen=false
+  if [[ "$agent" == codex ]]; then
+    listing="$(codex mcp list --json)" || return 1
+    gojq -e --arg name "$server" \
+      'type == "array" and all(.[]; (.name | type == "string") and .name != $name)' \
+      <<<"$listing" >/dev/null
+  else
+    # Claude supports a text list, not Codex's --json flag. Unknown output
+    # cannot establish absence and must fail closed.
+    listing="$(claude mcp list)" || return 1
+    while IFS= read -r line; do
+      case "$line" in
+        '' | 'Checking MCP server health...') continue ;;
+        'No MCP servers configured.'*) seen=true ;;
+        *)
+          [[ "$line" =~ ^([[:alnum:]_.-]+):\ .+ ]] || return 1
+          [[ "${BASH_REMATCH[1]}" != "$server" ]] || return 1
+          seen=true
+          ;;
+      esac
+    done <<<"$listing"
+    [[ "$seen" == true ]]
+  fi
+}
+
 disable_server() {
   local agent="$1" server="$2" path
   case "$agent" in
     codex)
       ensure_runtime codex
-      codex mcp remove "$server" >/dev/null 2>&1 || true
+      native_absent "$agent" "$server" && return 0
+      codex mcp remove "$server" || return $?
+      native_absent "$agent" "$server"
       ;;
     claude)
       ensure_runtime claude
-      claude mcp remove "$server" --scope user >/dev/null 2>&1 || true
+      native_absent "$agent" "$server" && return 0
+      claude mcp remove "$server" --scope user || return $?
+      native_absent "$agent" "$server"
       ;;
     agy)
       path="$HOME/.gemini/config/mcp_config.json"
@@ -316,6 +349,7 @@ if [[ "$action" == enable ]]; then
   done
 fi
 
+failed=0
 for server in "${servers[@]}"; do
   for agent in "${agents[@]}"; do
     case "$action" in
@@ -327,8 +361,13 @@ for server in "${servers[@]}"; do
         printf 'enabled  %-12s %s\n' "$server" "$agent"
         ;;
       disable)
-        disable_server "$agent" "$server"
-        printf 'disabled %-12s %s\n' "$server" "$agent"
+        # Isolate die() per target so other requested agents still get handled.
+        if (disable_server "$agent" "$server"); then
+          printf 'disabled %-12s %s\n' "$server" "$agent"
+        else
+          printf 'failed   %-12s %s: disable could not be verified\n' "$server" "$agent" >&2
+          failed=1
+        fi
         ;;
       status)
         state=disabled
@@ -338,3 +377,4 @@ for server in "${servers[@]}"; do
     esac
   done
 done
+exit "$failed"

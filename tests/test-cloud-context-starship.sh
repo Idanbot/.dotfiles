@@ -222,6 +222,14 @@ load_context --clear
 [[ -z "$(render_module azure)" ]]
 
 load_context --test all --yes
+cp -a "$XDG_STATE_HOME" "$TMP_ROOT/state-before-rejection"
+if AWS_ACCESS_KEY_ID=credential-sentinel-do-not-leak load_context --test aws --yes \
+  >"$TMP_ROOT/rejection" 2>&1; then
+  echo 'Fake AWS accepted a credential override' >&2
+  exit 1
+fi
+diff -r "$TMP_ROOT/state-before-rejection" "$XDG_STATE_HOME"
+! grep -Rq 'credential-sentinel-do-not-leak' "$HOME" "$TMP_ROOT/rejection" || exit 1
 [[ "$(render_module custom.kubernetes_context)" == *cloud-context-test* ]]
 [[ "$(render_module custom.kubernetes_context)" == *test* ]]
 [[ "$(render_module gcloud)" == *cloud-context-test* ]]

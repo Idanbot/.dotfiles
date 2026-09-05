@@ -126,12 +126,17 @@ modified destination, and asks for a decision:
 
 - `skip` / do nothing: preserve this destination and continue.
 - `replace`: apply the managed version for this destination.
-- `merge` / append: for regular shell, SSH, Git, and similar text config,
+- `merge` / append: for regular shell config only,
   apply the managed content first and retain the current local content after a
   marked block. Repeating the merge does not duplicate the local block, and
   local content is recoverable through the backup.
   The destination remains locally modified by design, so later runs can show
   managed updates and let you merge again or skip the file.
+- `edit` / reviewed merge: open a temporary candidate and managed reference in
+  `$VISUAL` or `$EDITOR` (default `vi`). SSH, Git, and shell candidates must
+  validate and receive confirmation before replacement. SSH/Git do not support
+  append because their precedence rules differ. Use `~/.ssh/config.local` for
+  deliberate local SSH overrides; review effective settings for your hosts.
 - `all replace`: replace this and later conflicts.
 - `keep all`: preserve this and later conflicts.
 - `diff`: show the bounded redacted diff again.
@@ -170,6 +175,28 @@ were previously absent. Restoring therefore also removes files created by a
 failed apply. Every restore first validates the complete manifest and all
 backed-up checksums before changing a destination; inspect a snapshot without
 restoring it with `scripts/backup.sh verify <backup-id>`.
+Restore also rejects changed ancestor symlinks and unsafe file-type changes
+before any writes. Previously absent directories are removed only when empty;
+unrelated files added later are preserved.
+
+Resume validates the saved source fingerprint and effective options. Changed
+inputs or legacy runs without a plan require a new bootstrap, including conflict
+review; their backups remain available. Final doctor checks run again, while
+unchanged completed stages are skipped. Each attempt keeps its own summary under
+`runs/<id>/attempts/`, and resumed summaries retain the apply backup ID.
+
+Bootstrap and targeted updates share `scripts/sections.json` and canonical
+fingerprints covering manifest values, checksum metadata, and implementation
+files. Reconciliation respects the saved section selection; use
+`scripts/reconcile-packages.sh --dry-run` to inspect pending work or
+`--sections languages,cloud` for an explicit scope. Targeted installs use the
+same logging, locking, and doctor path as bootstrap.
+
+Managed binary/runtime replacements are staged and smoke-tested before switching
+paths. Existing unowned or locally modified destinations are preserved with an
+error: review and move them aside deliberately before retrying. Older installs
+without ownership fingerprints are not silently assumed safe to replace.
+Go now installs into a versioned user-local directory without deleting system Go.
 
 Stateful bootstrap runs are serialized with `~/.local/state/dotfiles/bootstrap.lock`
 so two terminals cannot race on checkpoints, backups, or the latest-run pointer.

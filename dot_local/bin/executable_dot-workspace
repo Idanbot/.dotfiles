@@ -100,7 +100,8 @@ esac
 
 WORKDIR="$(cd "$WORKDIR" && pwd -P)"
 if [[ -z "$SESSION_NAME" ]]; then
-  SESSION_NAME="$(printf '%s' "$(basename "$WORKDIR")" | tr -cs '[:alnum:]_-' '_')-agents"
+  path_hash="$(printf '%s' "$WORKDIR" | sha256sum)"
+  SESSION_NAME="$(printf '%s' "$(basename "$WORKDIR")" | tr -cs '[:alnum:]_-' '_')-agents-${path_hash:0:12}"
 fi
 [[ "$SESSION_NAME" =~ ^[[:alnum:]_-]+$ ]] || {
   printf 'Session name may contain only letters, numbers, underscore, and dash\n' >&2
@@ -295,12 +296,37 @@ run_tmux_workspace() {
     printf 'tmux is required; install the tmux profile\n' >&2
     return 1
   }
+  local sessions existing
+  # A failed listing with a live server is not evidence of absence.
+  if tmux has-session 2>/dev/null; then
+    sessions="$(tmux list-sessions -F '#{session_name}')" || return 1
+    if grep -Fxq -- "$SESSION_NAME" <<<"$sessions"; then
+      existing="$(tmux display-message -p -t "=$SESSION_NAME" '#{session_path}')" || return 1
+      verify_workspace_directory "$existing" || return 1
+      if [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "=$SESSION_NAME"
+      else
+        tmux attach-session -t "=$SESSION_NAME"
+      fi
+      return
+    fi
+  fi
   export TMUXP_PROGRESS=0
   set +e
   uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp load -y "$TMUX_RENDERED"
   status=$?
   set -e
   return "$status"
+}
+
+verify_workspace_directory() {
+  local existing="$1" canonical
+  canonical="$(cd -- "$existing" 2>/dev/null && pwd -P)" || canonical=""
+  if [[ -z "$existing" || "$canonical" != "$WORKDIR" ]]; then
+    printf 'Workspace name collision: %s\nExisting directory: %s\nRequested directory: %s\n' \
+      "$SESSION_NAME" "${existing:-unknown}" "$WORKDIR" >&2
+    return 1
+  fi
 }
 
 run_herdr_json() {
@@ -368,6 +394,9 @@ run_herdr_workspace() {
   workspace_id="$(jq -r --arg label "$SESSION_NAME" \
     'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty' <<<"$list")"
   if [[ -n "$workspace_id" ]]; then
+    existing_directory="$(jq -r --arg id "$workspace_id" \
+      '.result.workspaces[] | select(.workspace_id == $id) | .cwd // empty' <<<"$list")"
+    verify_workspace_directory "$existing_directory"
     herdr workspace focus "$workspace_id" >/dev/null
     printf 'Focused existing Herdr workspace: %s\n' "$SESSION_NAME"
   else

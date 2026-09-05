@@ -84,6 +84,8 @@ mkdir -p "$lifecycle_home" "$lifecycle_state" \
 cp "$DOTFILES_DIR/.chezmoi.yaml.tmpl" "$lifecycle_source/.chezmoi.yaml.tmpl"
 cp "$DOTFILES_DIR/scripts/environment.sh" "$lifecycle_source/scripts/environment.sh"
 cp "$DOTFILES_DIR/scripts/conflicts.sh" "$lifecycle_source/scripts/conflicts.sh"
+cp "$DOTFILES_DIR/scripts/run-plan.py" "$DOTFILES_DIR/scripts/section-state.py" "$DOTFILES_DIR/scripts/sections.json" "$lifecycle_source/scripts/"
+cp "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" "$lifecycle_source/"
 printf '%s\n' 'bootstrap lock lifecycle fixture' >"$lifecycle_source/dot_bootstrap-lock-fixture"
 printf '%s\n' '#!/usr/bin/env bash' \
   'printf "lock lifecycle section executed\\n"' \
@@ -139,6 +141,8 @@ set -e
 }
 grep -Fq 'Injected failure before section-detect' <<<"$failure_output"
 assert_no_lock_ipc "$failure_state"
+failed_run_id="$(<"$failure_state/runs/latest")"
+[[ -f "$failure_state/runs/$failed_run_id/plan.json" ]]
 
 set +e
 recovery_output="$(
@@ -149,7 +153,7 @@ recovery_output="$(
     DOTFILES_LOG=1 \
     DOTFILES_CONFLICT_POLICY=skip \
     DOTFILES_LOG_FILE="$failure_home/bootstrap-recovered.log" \
-    "$INSTALL" --source "$lifecycle_source" --sections detect --yes --no-doctor 2>&1
+    "$INSTALL" --resume="$failed_run_id" --yes 2>&1
 )"
 recovery_status=$?
 set -e
@@ -159,6 +163,51 @@ set -e
   exit 1
 }
 grep -Fq 'Bootstrap Complete' <<<"$recovery_output"
+grep -Fq 'apply already completed' <<<"$recovery_output"
+[[ "$(find "$failure_state/runs/$failed_run_id/attempts" -name '*.json' | wc -l)" -eq 2 ]]
+jq -e '.status == "success"' "$failure_state/runs/$failed_run_id/summary.json" >/dev/null
 assert_no_lock_ipc "$failure_state"
+
+printf 'changed input\n' >>"$lifecycle_source/dot_bootstrap-lock-fixture"
+if changed_output="$(HOME="$failure_home" DOTFILES_STATE_DIR="$failure_state" \
+  DOTFILES_LOG=0 "$INSTALL" --resume="$failed_run_id" --yes 2>&1)"; then
+  printf 'resume accepted changed source\n' >&2
+  exit 1
+fi
+grep -Fq 'Resume inputs changed' <<<"$changed_output"
+[[ "$(find "$failure_state/runs/$failed_run_id/attempts" -name '*.json' | wc -l)" -eq 3 ]]
+
+# A completed doctor checkpoint must not suppress fresh health validation.
+cp "$DOTFILES_DIR/scripts/backup.sh" "$lifecycle_source/scripts/backup.sh"
+printf '%s\n' '#!/usr/bin/env bash' 'printf "checked\n" >>"$HOME/doctor-calls"' \
+  >"$lifecycle_source/scripts/doctor.sh"
+chmod +x "$lifecycle_source/scripts/doctor.sh"
+mkdir -p "$failure_home/.local/bin"
+for helper in dot dot-privacy; do
+  printf '#!/bin/sh\nexit 0\n' >"$failure_home/.local/bin/$helper"
+  chmod +x "$failure_home/.local/bin/$helper"
+done
+set +e
+doctor_output="$(HOME="$failure_home" DOTFILES_STATE_DIR="$failure_state" \
+  DOTFILES_LOG=0 DOTFILES_FAIL_AT=doctor:after \
+  "$INSTALL" --source "$lifecycle_source" --sections detect --yes 2>&1)"
+doctor_status=$?
+set -e
+[[ "$doctor_status" -eq 98 ]] || {
+  printf '%s\n' "$doctor_output"
+  exit 1
+}
+doctor_run="$(<"$failure_state/runs/latest")"
+backup_id="$(<"$failure_state/runs/$doctor_run/backup-id")"
+[[ -n "$backup_id" && -f "$failure_state/runs/$doctor_run/checkpoints/doctor.done" ]]
+HOME="$failure_home" DOTFILES_STATE_DIR="$failure_state" DOTFILES_LOG=0 \
+  "$INSTALL" --resume="$doctor_run" --yes >"$failure_home/doctor-resume.log" 2>&1 || {
+  cat "$failure_home/doctor-resume.log"
+  exit 1
+}
+[[ "$(wc -l <"$failure_home/doctor-calls")" -eq 2 ]]
+jq -e --arg backup "$backup_id" '.status == "success" and .backup_id == $backup' \
+  "$failure_state/runs/$doctor_run/summary.json" >/dev/null
+[[ "$(find "$failure_state/runs/$doctor_run/attempts" -name '*.json' | wc -l)" -eq 2 ]]
 
 printf 'Bootstrap lock test passed\n'

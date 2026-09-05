@@ -15,6 +15,7 @@ fi
 mkdir -p "$TMP_SOURCE"
 tar -C "$DOTFILES_DIR" \
   --exclude=.git \
+  --exclude=artifacts \
   --exclude=.chezmoiexternal.yaml \
   -cf - . | tar -C "$TMP_SOURCE" -xf -
 

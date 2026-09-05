@@ -234,13 +234,60 @@ expected_short="..${long_context: -26}"
 [[ "${#short_context}" -eq 28 ]]
 [[ "$("$SCRIPT" --list)" == workstation ]]
 
+if AWS_ACCESS_KEY_ID=credential-sentinel-do-not-leak XDG_STATE_HOME="$TMP_ROOT/pristine" \
+  "$SCRIPT" --test aws --yes >"$TMP_ROOT/pristine-rejection" 2>&1; then
+  echo 'Fresh fake AWS accepted credentials' >&2
+  exit 1
+fi
+[[ ! -e "$TMP_ROOT/pristine" ]]
+! grep -Fq 'credential-sentinel-do-not-leak' "$TMP_ROOT/pristine-rejection" || exit 1
 "$SCRIPT" --test aws --yes >/dev/null
+cp -a "$HOME" "$TMP_ROOT/before-rejection"
+for variable in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN \
+  AWS_WEB_IDENTITY_TOKEN_FILE AWS_ROLE_ARN AWS_CONTAINER_CREDENTIALS_RELATIVE_URI \
+  AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_AUTHORIZATION_TOKEN \
+  AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE GOOGLE_APPLICATION_CREDENTIALS \
+  GOOGLE_OAUTH_ACCESS_TOKEN CLOUDSDK_AUTH_ACCESS_TOKEN CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE \
+  CLOUDSDK_AUTH_ACCESS_TOKEN_FILE CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT \
+  AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_CLIENT_CERTIFICATE_PATH AZURE_FEDERATED_TOKEN_FILE \
+  AZURE_USERNAME AZURE_PASSWORD AZURE_ACCESS_TOKEN; do
+  if env "$variable=credential-sentinel-do-not-leak" "$SCRIPT" --test all --yes \
+    >"$TMP_ROOT/rejection" 2>&1; then
+    printf 'Accepted credential override: %s\n' "$variable" >&2
+    exit 1
+  fi
+  grep -Fq "$variable" "$TMP_ROOT/rejection"
+  ! grep -Rq 'credential-sentinel-do-not-leak' "$HOME" "$TMP_ROOT/rejection" || exit 1
+  diff -r "$TMP_ROOT/before-rejection" "$HOME"
+done
 if "$SCRIPT" --test gcloud </dev/null >/dev/null 2>&1; then
   echo "Non-interactive test reset proceeded without --yes" >&2
   exit 1
 fi
 [[ -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-aws" ]]
 [[ ! -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-gcloud" ]]
+python3 - "$SCRIPT" <<'PY'
+import os
+import pty
+import subprocess
+import sys
+
+for answer, succeeds in [(b"n\n", False), (b"yes\n", True)]:
+    master, slave = pty.openpty()
+    try:
+        process = subprocess.Popen(
+            [sys.argv[1], "--test", "gcloud"], stdin=slave,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        os.write(master, answer)
+        stdout, stderr = process.communicate(timeout=10)
+        assert b"[y/N]" in stderr, (stdout, stderr)
+        assert (process.returncode == 0) == succeeds, (stdout, stderr)
+    finally:
+        os.close(master)
+        os.close(slave)
+PY
+[[ -e "$XDG_STATE_HOME/dotfiles/cloud-context-test/enabled-gcloud" ]]
 
 for provider in kubectl gcloud aws azure; do
   "$SCRIPT" --test "$provider" --yes >/dev/null

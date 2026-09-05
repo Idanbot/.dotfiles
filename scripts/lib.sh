@@ -584,14 +584,113 @@ github_asset_name() {
   printf '%s\n' "$template"
 }
 
-install_managed_binary() {
-  local src="$1" binary="$2" version="${3:-unknown}" owner="${4:-managed-binary}"
-  local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest
-  mkdir -p "$bin_dir"
-  dest="$bin_dir/$binary"
-  install -m 0755 "$src" "$dest"
-  record_install "$binary" "$version" "$owner" "$dest"
+managed_operation_lock() {
+  local root
+  root="$(managed_state_root)"
+  ensure_private_directory "$root"
+  exec {MANAGED_OPERATION_FD}>"$root/ownership.lock"
+  chmod 600 "$root/ownership.lock"
+  flock -x "$MANAGED_OPERATION_FD"
 }
+
+managed_target_digest() {
+  local target="$1"
+  if [[ -L "$target" ]]; then
+    printf 'symlink:%s\n' "$(readlink -- "$target")" | sha256sum | awk '{print $1}'
+  elif [[ -f "$target" ]]; then
+    {
+      stat -c '%a' "$target"
+      sha256sum <"$target"
+    } | sha256sum | awk '{print $1}'
+  elif [[ -d "$target" ]]; then
+    (
+      cd "$target" || exit 1
+      find . -printf '%p %y %m %l\0' | sort -z
+      find . -type f -print0 | sort -z | xargs -0 -r sha256sum --
+    ) | sha256sum | awk '{print $1}'
+  else
+    printf 'absent\n'
+  fi
+}
+
+ownership_stamp() {
+  printf '%s/ownership/%s.sha256\n' "$(managed_state_root)" "$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
+}
+
+assert_owned_target() {
+  local target="$1" stamp
+  if [[ "$(realpath -m -- "$(dirname "$target")")" != "$(dirname "$target")" ]]; then
+    log_error "Preserving path with redirected or noncanonical ancestors: $target"
+    return 1
+  fi
+  [[ -e "$target" || -L "$target" ]] || return 0
+  stamp="$(ownership_stamp "$target")"
+  if [[ ! -f "$stamp" || "$(<"$stamp")" != "$(managed_target_digest "$target")" ]] ||
+    ! awk -F '\t' -v target="$target" '$4 == target { found = 1 } END { exit !found }' \
+      "$(managed_state_root)/installed.tsv" 2>/dev/null; then
+    log_error "Preserving unowned or locally modified path: $target; review and move it aside before retrying"
+    return 1
+  fi
+}
+
+install_managed_binary() (
+  local src="$1" binary="$2" version="${3:-unknown}" owner="${4:-managed-binary}"
+  local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest temporary
+  local -a smoke
+  managed_operation_lock || return 1
+  mkdir -p "$bin_dir" || return 1
+  dest="$bin_dir/$binary"
+  if [[ -f "$dest" && -x "$dest" && ! -L "$dest" ]] && cmp -s "$src" "$dest"; then
+    record_install "$binary" "$version" "$owner" "$dest"
+    return
+  fi
+  assert_owned_target "$dest" || return 1
+  temporary="$(mktemp -d "$bin_dir/.dotfiles-binary.XXXXXX")" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  install -m 0755 "$src" "$temporary/new" || return 1
+  [[ -s "$temporary/new" ]] || return 1
+  if [[ -n "${5:-}" ]]; then
+    read -r -a smoke <<<"$5"
+    smoke[0]="$temporary/new"
+    "${smoke[@]}" >/dev/null 2>&1 || return 1
+  fi
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    cp -a -- "$dest" "$temporary/previous" || return 1
+  fi
+  mv -Tf -- "$temporary/new" "$dest" || return 1
+  if ! record_install "$binary" "$version" "$owner" "$dest"; then
+    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
+      mv -Tf -- "$temporary/previous" "$dest"
+    else
+      rm -f -- "$dest"
+    fi
+    return 1
+  fi
+)
+
+install_managed_tree() (
+  local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6" temporary
+  shift 6
+  managed_operation_lock || return 1
+  assert_owned_target "$destination" || return 1
+  mkdir -p "$(dirname "$destination")" || return 1
+  temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-tree.XXXXXX")" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  cp -a -- "$source" "$temporary/new" || return 1
+  "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
+  if [[ -e "$destination" || -L "$destination" ]]; then
+    mv -T -- "$destination" "$temporary/previous" || return 1
+  fi
+  if ! mv -T -- "$temporary/new" "$destination"; then
+    [[ ! -e "$temporary/previous" ]] || mv -T -- "$temporary/previous" "$destination"
+    return 1
+  fi
+  if ! record_install "$tool" "$version" "$owner" "$destination"; then
+    rm -rf -- "$destination"
+    [[ ! -e "$temporary/previous" ]] || mv -T -- "$temporary/previous" "$destination"
+    return 1
+  fi
+)
 
 install_github_archive() {
   local binary="$1" repo="$2" requested_version="$3" asset_template="$4" member="$5" checksum_template="$6"
@@ -622,7 +721,7 @@ install_github_archive() {
       tar -xf "$archive" -C "$tmpdir" "$member_path"
       ;;
   esac
-  install_managed_binary "$tmpdir/$member_path" "$binary" "${tag#v}" "github:$repo"
+  install_managed_binary "$tmpdir/$member_path" "$binary" "${tag#v}" "github:$repo" "$version_command"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"
   ((_INSTALLED++)) || true
@@ -648,7 +747,7 @@ install_github_binary() {
   download_verified \
     "https://github.com/${repo}/releases/download/${tag}/${asset}" \
     "$dest" "$checksum_url" "$asset"
-  install_managed_binary "$dest" "$binary" "${tag#v}" "github:$repo"
+  install_managed_binary "$dest" "$binary" "${tag#v}" "github:$repo" "$version_command"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"
   ((_INSTALLED++)) || true
@@ -748,37 +847,90 @@ nerd_font_registered() {
     fc-list 2>/dev/null | grep -Fi "${name} Nerd Font" >/dev/null
 }
 
-record_install() {
+record_install() (
   local tool="$1" version="$2" owner="$3" target="$4"
-  local ledger root
+  local ledger root temporary stamp signature ledger_fd stamp_tmp="" old_stamp=""
   root="$(managed_state_root)"
   ledger="$root/installed.tsv"
   ensure_private_directory "$root"
+  exec {ledger_fd}>"$root/ledger.lock"
+  chmod 600 "$root/ledger.lock"
+  flock -x "$ledger_fd" || return 1
+  temporary="$(mktemp "$root/.installed.XXXXXX")" || return 1
+  trap 'rm -f -- "$temporary"; [[ -z "$stamp_tmp" ]] || rm -f -- "$stamp_tmp"; [[ -z "$old_stamp" ]] || rm -f -- "$old_stamp"' EXIT
   touch "$ledger"
   awk -F '\t' -v tool="$tool" -v target="$target" \
-    '!( $1 == tool && $4 == target )' "$ledger" >"$ledger.tmp"
+    '!( $1 == tool && $4 == target )' "$ledger" >"$temporary" || return 1
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$tool" "$version" "$owner" "$target" "${DOTFILES_SECTION:-unknown}" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >>"$ledger.tmp"
-  mv "$ledger.tmp" "$ledger"
-  chmod 600 "$ledger"
-}
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >>"$temporary" || return 1
+  if [[ "$target" == /* && (-e "$target" || -L "$target") ]]; then
+    stamp="$(ownership_stamp "$target")"
+    mkdir -p "$(dirname "$stamp")" || return 1
+    chmod 700 "$(dirname "$stamp")" || return 1
+    signature="$(managed_target_digest "$target")" || return 1
+    stamp_tmp="$(mktemp "${stamp}.XXXXXX")" || return 1
+    printf '%s\n' "$signature" >"$stamp_tmp" || return 1
+    if [[ -f "$stamp" ]]; then
+      old_stamp="$(mktemp "${stamp}.previous.XXXXXX")" || return 1
+      cp -p -- "$stamp" "$old_stamp" || return 1
+    fi
+    mv -Tf -- "$stamp_tmp" "$stamp" || return 1
+  fi
+  if ! mv -Tf -- "$temporary" "$ledger"; then
+    if [[ -n "$old_stamp" ]]; then
+      mv -Tf -- "$old_stamp" "$stamp"
+    elif [[ -n "$stamp_tmp" ]]; then
+      rm -f -- "$stamp"
+    fi
+    return 1
+  fi
+)
 
-forget_install() {
-  local tool="$1" ledger
+forget_install() (
+  local tool="$1" ledger temporary ledger_fd root
+  root="$(managed_state_root)"
   ledger="$(managed_state_root)/installed.tsv"
   [[ -f "$ledger" ]] || return 0
-  awk -F '\t' -v tool="$tool" '$1 != tool' "$ledger" >"$ledger.tmp"
-  mv "$ledger.tmp" "$ledger"
+  exec {ledger_fd}>"$root/ledger.lock"
+  flock -x "$ledger_fd" || return 1
+  temporary="$(mktemp "$root/.installed.XXXXXX")" || return 1
+  trap 'rm -f -- "$temporary"' EXIT
+  awk -F '\t' -v tool="$tool" -v target="${2:-}" '$1 != tool || (target != "" && $4 != target)' "$ledger" >"$temporary" || return 1
+  mv "$temporary" "$ledger" || return 1
   chmod 600 "$ledger"
-}
+)
 
-managed_link() {
+managed_link() (
   local target="$1" link="$2" tool="$3" version="$4"
-  mkdir -p "$(dirname "$link")"
-  ln -sfn "$target" "$link"
-  record_install "$tool" "$version" symlink "$link"
-}
+  local temporary
+  managed_operation_lock || return 1
+  if [[ -f "$link" && -x "$link" && ! -L "$link" && "$(realpath -m -- "$target")" == "$(realpath -m -- "$link")" ]]; then
+    log_skip "Preserving existing executable at $link; no self-link needed"
+    return 0
+  fi
+  if [[ -L "$link" && "$(readlink "$link")" == "$target" ]]; then
+    record_install "$tool" "$version" symlink "$link"
+    return
+  fi
+  assert_owned_target "$link" || return 1
+  mkdir -p "$(dirname "$link")" || return 1
+  temporary="$(mktemp -d "$(dirname "$link")/.dotfiles-link.XXXXXX")" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  ln -s -- "$target" "$temporary/new" || return 1
+  if [[ -e "$link" || -L "$link" ]]; then
+    cp -a -- "$link" "$temporary/previous" || return 1
+  fi
+  mv -Tf -- "$temporary/new" "$link" || return 1
+  if ! record_install "$tool" "$version" symlink "$link"; then
+    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
+      mv -Tf -- "$temporary/previous" "$link"
+    else
+      rm -f -- "$link"
+    fi
+    return 1
+  fi
+)
 
 npm_global_prefix() {
   printf '%s\n' "${DOTFILES_NPM_PREFIX:-$HOME/.local/share/npm}"

@@ -59,6 +59,9 @@ CHEZMOI_SOURCE=""
 CHEZMOI_STATUS_OUTPUT=""
 HAS_CONTROLLING_TTY=false
 BACKUP_ID=""
+ATTEMPT_ID="$(date -u '+%Y%m%dT%H%M%S%NZ')"
+CONFLICT_POLICY_SET=false
+DOCTOR_SET=false
 CURRENT_STAGE="startup"
 RUN_STARTED_NANOS="$(date +%s%N)"
 _HANDLING_ERROR=false
@@ -508,6 +511,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --conflict-policy)
+      CONFLICT_POLICY_SET=true
       [[ -n "${2:-}" ]] || {
         printf '%s\n' '--conflict-policy requires a value' >&2
         exit 2
@@ -516,6 +520,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --conflict-policy=*)
+      CONFLICT_POLICY_SET=true
       DOTFILES_CONFLICT_POLICY="${1#--conflict-policy=}"
       shift
       ;;
@@ -554,6 +559,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --no-doctor)
+      DOCTOR_SET=true
       RUN_DOCTOR=false
       shift
       ;;
@@ -600,7 +606,9 @@ if [[ -n "$ONLY_SECTION" ]]; then
     printf '%s\n' '--only requires a local checkout' >&2
     exit 2
   }
-  exec "$LOCAL_SOURCE/scripts/run-section.sh" "$ONLY_SECTION"
+  SELECTED_SECTIONS=("$ONLY_SECTION")
+  PROFILE_NAME=custom
+  SELECTION_MODE=only
 fi
 
 STATE_ROOT="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
@@ -614,6 +622,10 @@ if [[ -n "$RESUME_REQUEST" ]]; then
   else
     RESOLVED_RESUME_ID="$RESUME_REQUEST"
   fi
+  [[ "$RESOLVED_RESUME_ID" =~ ^[A-Za-z0-9._-]+$ && "$RESOLVED_RESUME_ID" != . && "$RESOLVED_RESUME_ID" != .. ]] || {
+    printf 'Invalid resume ID\n' >&2
+    exit 2
+  }
   [[ -d "$STATE_ROOT/runs/$RESOLVED_RESUME_ID" ]] || {
     printf 'Unknown run id: %s\n' "$RESOLVED_RESUME_ID" >&2
     exit 2
@@ -624,9 +636,23 @@ if [[ -n "$RESUME_REQUEST" ]]; then
     PROFILE_NAME="$(<"$STATE_ROOT/runs/$RESOLVED_RESUME_ID/profile")"
     SELECTION_MODE=resume
   fi
+  if [[ -f "$STATE_ROOT/runs/$RESOLVED_RESUME_ID/plan.json" ]]; then
+    resume_source="$(<"$STATE_ROOT/runs/$RESOLVED_RESUME_ID/source")"
+    resume_options="$(python3 "$resume_source/scripts/run-plan.py" options --run-dir "$STATE_ROOT/runs/$RESOLVED_RESUME_ID")"
+    while IFS=$'\t' read -r option value; do
+      case "$option" in
+        conflict_policy) [[ "$CONFLICT_POLICY_SET" == true ]] || DOTFILES_CONFLICT_POLICY="$value" ;;
+        doctor) [[ "$DOCTOR_SET" == true ]] || RUN_DOCTOR="$value" ;;
+        only) ONLY_SECTION="$value" ;;
+      esac
+    done <<<"$resume_options"
+  fi
 fi
 
 resolve_selection
+if [[ -n "$ONLY_SECTION" ]]; then
+  SELECTED_SECTIONS=("$ONLY_SECTION")
+fi
 if [[ "$LIST_OPTIONS" == true ]]; then
   print_options
   exit 0
@@ -740,6 +766,11 @@ setup_run_state() {
   printf '%s\n' "${PROFILE_NAME:-custom}" >"$RUN_DIR/profile"
   printf '%s\n' "$(join_by_comma "${SELECTED_SECTIONS[@]}")" >"$RUN_DIR/sections"
   chmod 600 "$STATE_ROOT/runs/latest" "$RUN_DIR/profile" "$RUN_DIR/sections"
+  mkdir -p "$RUN_DIR/attempts"
+  chmod 700 "$RUN_DIR/attempts"
+  if [[ -f "$RUN_DIR/backup-id" ]]; then
+    BACKUP_ID="$(<"$RUN_DIR/backup-id")"
+  fi
 
   if [[ "$DOTFILES_LOG" != 0 ]]; then
     touch "$LOG_FILE" "$EVENT_LOG"
@@ -819,7 +850,7 @@ run_stage() {
   shift
   local checkpoint="$CHECKPOINT_DIR/$stage.done" started elapsed
   CURRENT_STAGE="$stage"
-  if [[ -n "$RESUME_REQUEST" && -f "$checkpoint" ]]; then
+  if [[ -n "$RESUME_REQUEST" && -f "$checkpoint" && "$stage" != doctor ]]; then
     log_skip "Resuming: $stage already completed"
     write_event skip "checkpoint hit"
     return 0
@@ -888,7 +919,7 @@ stage_prerequisites() {
     apt-get -o Acquire::Retries=3 -qq update
   "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
     apt-get -o Acquire::Retries=3 -o Dpkg::Options::=--force-confold \
-    -y --no-install-recommends install git curl ca-certificates
+    -y --no-install-recommends install git curl ca-certificates python3 python3-yaml
 
   if ! command -v chezmoi >/dev/null 2>&1; then
     if "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
@@ -902,6 +933,16 @@ stage_prerequisites() {
   else
     log_skip "chezmoi already installed"
   fi
+}
+
+prepare_run_plan() {
+  local -a args=()
+  [[ -z "$RESUME_REQUEST" ]] || args+=(--resume)
+  python3 "$CHEZMOI_SOURCE/scripts/run-plan.py" prepare \
+    --run-dir "$RUN_DIR" --source "$CHEZMOI_SOURCE" \
+    --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
+    --profile "$PROFILE_NAME" --conflict-policy "$DOTFILES_CONFLICT_POLICY" \
+    --doctor "$RUN_DOCTOR" --only "$ONLY_SECTION" "${args[@]}"
 }
 
 stage_source() {
@@ -949,6 +990,7 @@ stage_source() {
     log_error "Embedded profile '$PROFILE_NAME' drifted from profiles/$PROFILE_NAME.conf"
     return 1
   fi
+  prepare_run_plan
 }
 
 collect_chezmoi_status() {
@@ -1028,6 +1070,8 @@ stage_apply() {
       return 1
     }
     log_success "Backed up pending destinations as $BACKUP_ID"
+    printf '%s\n' "$BACKUP_ID" >"$RUN_DIR/backup-id"
+    chmod 600 "$RUN_DIR/backup-id"
   else
     log_info "Applying managed config and verified externals to confirm convergence"
   fi
@@ -1044,43 +1088,9 @@ stage_apply() {
   ensure_managed_entrypoint dot-privacy
 }
 
-declare -A SECTION_SCRIPTS=(
-  [detect]=".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl"
-  [core]=".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl"
-  [zsh]=".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl"
-  [terminal]=".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
-  [languages]=".chezmoiscripts/run_once_04-install-languages.sh.tmpl"
-  [history]=".chezmoiscripts/run_once_04b-install-history.sh.tmpl"
-  [cloud]=".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
-  [tmux]=".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl"
-  [neovim]=".chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
-  [ai]=".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
-  [media]=".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl"
-  [fonts]=".chezmoiscripts/run_once_10-install-fonts.sh.tmpl"
-  [desktop]=".chezmoiscripts/run_once_11-install-desktop.sh.tmpl"
-  [system]=".chezmoiscripts/run_once_12-configure-system.sh.tmpl"
-  [theme]=".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl"
-  [vscode]=".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl"
-  [services]=".chezmoiscripts/run_once_after_enable-services.sh.tmpl"
-)
-
-declare -A SECTION_MANIFESTS=(
-  [terminal]=terminal
-  [languages]=languages
-  [history]=history
-  [cloud]="cloud database"
-  [tmux]=terminal
-  [neovim]=editor
-  [ai]=ai_tools
-  [media]=media
-  [fonts]=fonts
-  [desktop]=desktop
-  [system]=system
-)
-
 run_install_section() {
-  local section="$1" script_path hash_dir manifest_section
-  script_path="${SECTION_SCRIPTS[$section]:-}"
+  local section="$1" script_path
+  script_path="$(python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" script "$section")"
   [[ -n "$script_path" && -f "$CHEZMOI_SOURCE/$script_path" ]] || {
     log_error "Missing section implementation for $section"
     return 1
@@ -1095,20 +1105,7 @@ run_install_section() {
       DOTFILES_COLOR_ACTIVE="$DOTFILES_COLOR_ACTIVE" \
       bash
 
-  manifest_section="${SECTION_MANIFESTS[$section]:-}"
-  [[ -n "$manifest_section" ]] || return 0
-  hash_dir="$STATE_ROOT/package-sections"
-  mkdir -p "$hash_dir"
-  local ms combined_hash=""
-  for ms in $manifest_section; do
-    combined_hash+=$(awk -v section="$ms" '
-      $0 ~ "^" section ":[[:space:]]*$" { inside = 1 }
-      inside && $0 ~ "^[^[:space:]#].*:[[:space:]]*$" && $0 !~ "^" section ":" { exit }
-      inside { print }
-    ' "$CHEZMOI_SOURCE/packages.yaml")
-  done
-  printf '%s' "$combined_hash" | sha256sum | awk '{print $1}' >"$hash_dir/${section}.sha256"
-  chmod 600 "$hash_dir/${section}.sha256"
+  python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" --state "$STATE_ROOT" record "$section"
 }
 
 stage_doctor() {
@@ -1126,14 +1123,15 @@ write_run_summary() {
   duration_human="$(format_bootstrap_duration_ms "$duration_ms")"
   summary="$RUN_DIR/summary.json"
   printf '{\n  "run_id": "%s",\n  "status": "%s",\n  "profile": "%s",\n  "platform": "%s",\n  "sections": "%s",\n  "duration_seconds": %s,\n  "duration_ms": %s,\n  "duration_human": "%s",\n  "backup_id": "%s",\n  "log": "%s"\n}\n' \
-    "$DOTFILES_RUN_ID" "$status" "${PROFILE_NAME:-custom}" \
+    "$(json_escape "$DOTFILES_RUN_ID")" "$status" "$(json_escape "${PROFILE_NAME:-custom}")" \
     "$(
       source "$CHEZMOI_SOURCE/scripts/environment.sh"
       get_platform
     )" \
     "$(join_by_comma "${SELECTED_SECTIONS[@]}")" "$duration" "$duration_ms" \
-    "$duration_human" "$BACKUP_ID" "$LOG_FILE" >"$summary"
+    "$(json_escape "$duration_human")" "$(json_escape "$BACKUP_ID")" "$(json_escape "$LOG_FILE")" >"$summary"
   chmod 600 "$summary"
+  cp -p "$summary" "$RUN_DIR/attempts/$ATTEMPT_ID.json"
 }
 
 log_banner "Dotfiles Bootstrap - Idan Botbol"
@@ -1145,6 +1143,7 @@ log_info "Log: $LOG_FILE"
 
 run_stage prerequisites stage_prerequisites
 run_stage source stage_source
+prepare_run_plan
 
 # From this point all platform behavior comes from one shared implementation.
 # shellcheck source=scripts/environment.sh
@@ -1157,7 +1156,9 @@ if ! assert_supported_platform; then
 fi
 log_info "Platform: $(get_platform) ($(get_arch))"
 
-run_stage apply stage_apply
+if [[ -z "$ONLY_SECTION" ]]; then
+  run_stage apply stage_apply
+fi
 for section in "${SELECTED_SECTIONS[@]}"; do
   run_stage "section-$section" run_install_section "$section"
 done
@@ -1166,6 +1167,10 @@ if [[ "$RUN_DOCTOR" == true ]]; then
 fi
 
 write_run_summary success
+if [[ -z "$ONLY_SECTION" ]]; then
+  printf '%s\n' "$(join_by_comma "${SELECTED_SECTIONS[@]}")" >"$STATE_ROOT/selected-sections"
+  chmod 600 "$STATE_ROOT/selected-sections"
+fi
 rm -f "$STATE_ROOT/runs/latest"
 
 printf '\n'

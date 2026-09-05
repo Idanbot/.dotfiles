@@ -36,6 +36,7 @@ run_id="$(<"$STATE_ROOT/runs/latest")"
 [[ -f "$STATE_ROOT/runs/$run_id/checkpoints/prerequisites.done" ]]
 [[ -f "$STATE_ROOT/runs/$run_id/checkpoints/source.done" ]]
 [[ ! -f "$STATE_ROOT/runs/$run_id/checkpoints/apply.done" ]]
+[[ -f "$STATE_ROOT/runs/$run_id/plan.json" ]]
 
 DOTFILES_LOG_FILE="$ARTIFACT_DIR/resumed.log" \
   "$DOTFILES_DIR/scripts/install.sh" --resume="$run_id" --yes --no-doctor \
@@ -44,6 +45,8 @@ DOTFILES_LOG_FILE="$ARTIFACT_DIR/resumed.log" \
 grep -Fq 'prerequisites already completed' "$ARTIFACT_DIR/resumed-console.log"
 grep -Fq 'source already completed' "$ARTIFACT_DIR/resumed-console.log"
 jq -e '.status == "success"' "$STATE_ROOT/runs/$run_id/summary.json" >/dev/null
+[[ "$(find "$STATE_ROOT/runs/$run_id/attempts" -name '*.json' | wc -l)" -eq 2 ]]
+[[ "$(stat -c '%a' "$STATE_ROOT/runs/$run_id/plan.json")" == 600 ]]
 [[ ! -f "$STATE_ROOT/runs/latest" ]]
 cp "$STATE_ROOT/runs/$run_id/summary.json" "$ARTIFACT_DIR/summary.json"
 cp -a "$STATE_ROOT/runs/$run_id/checkpoints" "$ARTIFACT_DIR/checkpoints"

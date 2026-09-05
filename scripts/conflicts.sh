@@ -49,13 +49,46 @@ dotfiles_conflict_is_mergeable() {
   target="$HOME/$rel"
   [[ -f "$target" && ! -L "$target" ]] || return 1
   case "$rel" in
-    .bash_aliases | .bashrc | .gitconfig | .profile | .tmux.conf | .zshrc | .ssh/config | .ssh/config.local | .config/git/* | *.conf | *.ini | *.sh | *.zsh) ;;
+    .bash_aliases | .bashrc | .profile | .zshrc | *.sh | *.zsh) ;;
     *)
       return 1
       ;;
   esac
   [[ ! -s "$target" ]] || LC_ALL=C grep -Iq . "$target"
 }
+
+dotfiles_conflict_validate() {
+  local rel="$1" candidate="$2"
+  case "$rel" in
+    .ssh/config | .ssh/config.local)
+      ssh -T -G -F "$candidate" review-validation.invalid >/dev/null
+      ;;
+    .gitconfig | .config/git/config) git config --file "$candidate" --list >/dev/null ;;
+    .zshrc | *.zsh) zsh -n "$candidate" ;;
+    .bash_aliases | .bashrc | .profile | *.sh) bash -n "$candidate" ;;
+    *) return 2 ;;
+  esac
+}
+
+# Edit a copy, with the managed version as a reference; never change source state.
+dotfiles_conflict_review_merge() (
+  local source="$1" rel="$2" target temporary answer
+  local -a editor
+  target="$HOME/$rel"
+  [[ -f "$target" && ! -L "$target" ]] || return 2
+  temporary="$(mktemp -d "$(dirname "$target")/.dotfiles-review.XXXXXX")" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  cp -p -- "$target" "$temporary/candidate" || return 1
+  chezmoi cat --source="$source" "$rel" >"$temporary/managed-reference" || return 1
+  read -r -a editor <<<"${VISUAL:-${EDITOR:-vi}}"
+  log_info 'Review the candidate against managed-reference; only the candidate will be applied'
+  "${editor[@]}" "$temporary/candidate" "$temporary/managed-reference" || return 1
+  dotfiles_conflict_validate "$rel" "$temporary/candidate" || return 1
+  read_user 'Apply reviewed candidate? [y/N]: ' answer || return 1
+  [[ "$answer" == y || "$answer" == Y ]] || return 3
+  chmod --reference="$target" "$temporary/candidate" || return 1
+  mv -Tf -- "$temporary/candidate" "$target" || return 1
+)
 
 dotfiles_conflict_merge_append() {
   local source="$1" rel="$2" target
@@ -64,9 +97,15 @@ dotfiles_conflict_merge_append() {
 
   dotfiles_conflict_is_mergeable "$rel" || return 2
 
-  managed_file="$(mktemp)"
-  local_file="$(mktemp)"
-  merged_file="$(mktemp "$(dirname "$target")/.dotfiles-merge.XXXXXX")"
+  managed_file="$(mktemp)" || return 1
+  local_file="$(mktemp)" || {
+    rm -f "$managed_file"
+    return 1
+  }
+  merged_file="$(mktemp "$(dirname "$target")/.dotfiles-merge.XXXXXX")" || {
+    rm -f "$managed_file" "$local_file"
+    return 1
+  }
   trap 'rm -f "$managed_file" "$local_file" "$merged_file"' RETURN
 
   if ! chezmoi cat --source="$source" "$rel" >"$managed_file"; then
@@ -89,25 +128,26 @@ dotfiles_conflict_merge_append() {
       /^# <<< dotfiles merged local content <<</ { inside = 0; found_end = 1; next }
       inside || found_end { print }
       END { if (!found_start || !found_end) exit 1 }
-    ' "$target" >"$local_file"
+    ' "$target" >"$local_file" || return 1
   else
-    cp -p -- "$target" "$local_file"
+    cp -p -- "$target" "$local_file" || return 1
   fi
 
-  cat "$managed_file" >"$merged_file"
+  cat "$managed_file" >"$merged_file" || return 1
   if [[ -s "$managed_file" ]] &&
     [[ "$(tail -c 1 "$managed_file" | od -An -t x1 | tr -d '[:space:]')" != 0a ]]; then
-    printf '\n' >>"$merged_file"
+    printf '\n' >>"$merged_file" || return 1
   fi
-  printf '%s\n' "$start_marker" >>"$merged_file"
-  cat "$local_file" >>"$merged_file"
+  printf '%s\n' "$start_marker" >>"$merged_file" || return 1
+  cat "$local_file" >>"$merged_file" || return 1
   if [[ -s "$local_file" ]] &&
     [[ "$(tail -c 1 "$local_file" | od -An -t x1 | tr -d '[:space:]')" != 0a ]]; then
-    printf '\n' >>"$merged_file"
+    printf '\n' >>"$merged_file" || return 1
   fi
-  printf '%s\n' "$end_marker" >>"$merged_file"
-  chmod --reference="$target" "$merged_file"
-  mv -f -- "$merged_file" "$target"
+  printf '%s\n' "$end_marker" >>"$merged_file" || return 1
+  dotfiles_conflict_validate "$rel" "$merged_file" || return 1
+  chmod --reference="$target" "$merged_file" || return 1
+  mv -Tf -- "$merged_file" "$target" || return 1
   rm -f "$managed_file" "$local_file"
   trap - RETURN
 }
@@ -131,7 +171,7 @@ dotfiles_conflict_prompt() {
   while :; do
     printf '\nConflict: ~/%s differs from the managed version\n' "$rel" >&2
     printf '  [s]kip/do nothing  [r]eplace  [m]erge/append  [a]ll replace\n' >&2
-    printf '  [k]eep all  [d]iff again  [q]uit\n' >&2
+    printf '  [e]dit/review merge  [k]eep all  [d]iff again  [q]uit\n' >&2
     if ! read_user 'Choice [s]: ' choice; then
       log_error "Conflict resolution cancelled: no usable terminal input"
       log_info "Rerun with --yes to replace after backup, or --conflict-policy skip|abort"
@@ -153,7 +193,11 @@ dotfiles_conflict_prompt() {
           DOTFILES_CONFLICT_ACTION=merge
           return 0
         fi
-        log_warn "Append merge is supported only for regular text configuration files"
+        log_warn "Append is limited to shell files; use edit/review for SSH or Git configuration"
+        ;;
+      e | edit | review)
+        DOTFILES_CONFLICT_ACTION=review
+        return 0
         ;;
       a | all | all-replace | all-overwrite)
         DOTFILES_CONFLICT_ACTION=replace-all
@@ -228,15 +272,17 @@ dotfiles_apply_selected_conflicts() {
         all_action=skip
         log_skip "Preserving ~/$rel and later conflicts"
         ;;
-      merge)
-        if dotfiles_conflict_merge_append "$CHEZMOI_SOURCE" "$rel"; then
-          log_success "Merged managed content into ~/$rel (local content preserved after it)"
+      merge | review)
+        local merge_function=dotfiles_conflict_merge_append
+        [[ "$action" == review ]] && merge_function=dotfiles_conflict_review_merge
+        if "$merge_function" "$CHEZMOI_SOURCE" "$rel"; then
+          log_success "Validated merge applied to ~/$rel"
         else
           merge_status=$?
           if [[ "$merge_status" -eq 3 ]]; then
-            log_skip "$HOME/$rel already contains the current merged managed content"
+            log_skip "Preserved $HOME/$rel (unchanged merge or review declined)"
           else
-            log_error "Unable to append-merge ~/$rel"
+            log_error "Unable to validate or apply merge for ~/$rel"
             return 1
           fi
         fi

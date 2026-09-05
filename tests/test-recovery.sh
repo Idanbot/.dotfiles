@@ -44,6 +44,41 @@ grep -Fxq 'keep me' "$HOME/.local/share/unmanaged"
 [[ "$(stat -c '%a' "$HOME/.zshrc")" == 600 ]]
 "$BACKUP" verify "$backup_id" >/dev/null
 "$BACKUP" verify latest >/dev/null
+
+# A snapshot's absent directory is not ownership of later user files.
+printf ' A .config/added\n A .config/added/managed\n' >"$HOME/added-status"
+added_id="$($BACKUP create --status-file "$HOME/added-status" --run-id added | sed -n 's/^backup_id=//p')"
+mkdir -p "$HOME/.config/added"
+printf 'created\n' >"$HOME/.config/added/managed"
+printf 'unrelated\n' >"$HOME/.config/added/notes"
+"$BACKUP" restore "$added_id" --force >/dev/null
+[[ ! -e "$HOME/.config/added/managed" ]]
+grep -Fxq unrelated "$HOME/.config/added/notes"
+
+# Reject the entire plan before restoring an earlier safe entry.
+mkdir -p "$HOME/.config/ancestor"
+printf 'original\n' >"$HOME/.config/ancestor/file"
+printf 'MM .zshrc\nMM .config/ancestor/file\n' >"$HOME/ancestor-status"
+ancestor_id="$($BACKUP create --status-file "$HOME/ancestor-status" --run-id ancestor | sed -n 's/^backup_id=//p')"
+mv "$HOME/.config/ancestor" "$HOME/outside"
+ln -s "$HOME/outside" "$HOME/.config/ancestor"
+printf 'untouched\n' >"$HOME/outside/file"
+printf 'also untouched\n' >"$HOME/.zshrc"
+if "$BACKUP" restore "$ancestor_id" --force >/dev/null 2>&1; then
+  printf 'restore accepted a symlink ancestor\n' >&2
+  exit 1
+fi
+grep -Fxq untouched "$HOME/outside/file"
+grep -Fxq 'also untouched' "$HOME/.zshrc"
+rm "$HOME/.config/ancestor"
+mv "$HOME/outside" "$HOME/.config/ancestor"
+rm "$HOME/.config/ancestor/file"
+mkdir "$HOME/.config/ancestor/file"
+if "$BACKUP" restore "$ancestor_id" --force >/dev/null 2>&1; then
+  printf 'restore accepted a file-to-directory substitution\n' >&2
+  exit 1
+fi
+grep -Fxq 'also untouched' "$HOME/.zshrc"
 if "$BACKUP" verify ../outside >/dev/null 2>&1; then
   printf 'unsafe backup id was accepted\n' >&2
   exit 1

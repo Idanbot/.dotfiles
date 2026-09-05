@@ -10,6 +10,7 @@ require_sudo
 ARCH="$(get_arch)"
 
 GO_VERSION="$(package_version languages go 1.26.5)"
+GO_ROOT="$HOME/.local/share/dotfiles/tools/go/$GO_VERSION"
 if ! is_installed go || ! version_ge "$(go version 2>/dev/null || true)" "$GO_VERSION"; then
   tmpdir="$(mktemp -d)"
   asset="go${GO_VERSION}.linux-${ARCH}.tar.gz"
@@ -18,17 +19,16 @@ if ! is_installed go || ! version_ge "$(go version 2>/dev/null || true)" "$GO_VE
   download_verified \
     "https://go.dev/dl/$asset" "$tmpdir/$asset" \
     "sha256:$go_sha256" "$asset"
-  sudo rm -rf /usr/local/go
-  sudo tar -C /usr/local -xzf "$tmpdir/$asset"
+  tar -C "$tmpdir" -xzf "$tmpdir/$asset"
+  install_managed_tree "$tmpdir/go" "$GO_ROOT" go "$GO_VERSION" go-dist bin/go version
+  export PATH="$GO_ROOT/bin:$PATH"
   rm -rf "$tmpdir"
-  record_install go "$GO_VERSION" go-dist /usr/local/go
   ((_INSTALLED++)) || true
   log_success "Go $GO_VERSION installed"
 else
   log_skip "Go $GO_VERSION already installed or newer"
 fi
-export PATH="/usr/local/go/bin:$PATH"
-GO_BIN_DIR="$(dirname "$(command -v go)")"
+GO_BIN_DIR="$(dirname "$(readlink -f "$(command -v go)")")"
 for binary in go gofmt; do
   [[ -x "$GO_BIN_DIR/$binary" ]] &&
     managed_link "$GO_BIN_DIR/$binary" "$HOME/.local/bin/$binary" go "$GO_VERSION"
@@ -82,11 +82,10 @@ if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$($NODE_ROOT/bin/node --ver
   download_verified \
     "https://nodejs.org/dist/v${NODE_VERSION}/${NODE_ASSET}" "$tmpdir/$NODE_ASSET" \
     "https://nodejs.org/dist/v${NODE_VERSION}/SHASUMS256.txt" "$NODE_ASSET"
-  rm -rf "$NODE_ROOT"
-  mkdir -p "$NODE_ROOT"
-  tar -xJf "$tmpdir/$NODE_ASSET" -C "$NODE_ROOT" --strip-components=1
+  mkdir -p "$tmpdir/runtime"
+  tar -xJf "$tmpdir/$NODE_ASSET" -C "$tmpdir/runtime" --strip-components=1
+  install_managed_tree "$tmpdir/runtime" "$NODE_ROOT" node "$NODE_VERSION" node-dist bin/node --version
   rm -rf "$tmpdir"
-  record_install node "$NODE_VERSION" node-dist "$NODE_ROOT"
   ((_INSTALLED++)) || true
   log_success "Node.js $NODE_VERSION installed"
 else
@@ -97,7 +96,14 @@ activate_node_paths
 NPM_VERSION="$(package_version languages npm 12.0.1)"
 if [[ "$("$NODE_ROOT/bin/npm" --version 2>/dev/null || true)" != "$NPM_VERSION" ]]; then
   log_info "Installing npm $NPM_VERSION into the managed Node.js runtime"
-  "$NODE_ROOT/bin/npm" install --global --prefix "$NODE_ROOT" --no-audit --no-fund "npm@$NPM_VERSION"
+  assert_owned_target "$NODE_ROOT"
+  tmpdir="$(mktemp -d)"
+  cp -a "$NODE_ROOT" "$tmpdir/runtime"
+  PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" \
+    install --global --prefix "$tmpdir/runtime" --no-audit --no-fund "npm@$NPM_VERSION"
+  [[ "$(PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" --version)" == "$NPM_VERSION" ]]
+  install_managed_tree "$tmpdir/runtime" "$NODE_ROOT" node "$NODE_VERSION" node-dist bin/node --version
+  rm -rf "$tmpdir"
   record_install npm "$NPM_VERSION" npm "$NODE_ROOT/lib/node_modules/npm"
   ((_INSTALLED++)) || true
   log_success "npm $NPM_VERSION installed"
@@ -145,7 +151,7 @@ if uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
 else
   log_info "Installing Python $PYTHON_VERSION with uv"
   uv python install "$PYTHON_VERSION"
-  record_install python "$PYTHON_VERSION" uv "$(uv python find "$PYTHON_VERSION")"
+  record_install python "$PYTHON_VERSION" uv-python "$PYTHON_VERSION"
   ((_INSTALLED++)) || true
   log_success "Python $PYTHON_VERSION installed"
 fi
@@ -169,17 +175,16 @@ if [[ ! -x "$JAVA_ROOT/bin/java" ]] ||
   download_verified \
     "https://github.com/adoptium/temurin${JAVA_MAJOR}-binaries/releases/download/jdk-${JAVA_VERSION/+/%2B}/$asset" \
     "$tmpdir/$asset" "sha256:$JAVA_SHA" "$asset"
-  rm -rf "$JAVA_ROOT"
-  mkdir -p "$JAVA_ROOT"
-  tar -xzf "$tmpdir/$asset" -C "$JAVA_ROOT" --strip-components=1
+  mkdir -p "$tmpdir/runtime"
+  tar -xzf "$tmpdir/$asset" -C "$tmpdir/runtime" --strip-components=1
+  install_managed_tree "$tmpdir/runtime" "$JAVA_ROOT" java "$JAVA_VERSION" adoptium bin/java -version
   rm -rf "$tmpdir"
-  record_install java "$JAVA_VERSION" adoptium "$JAVA_ROOT"
   ((_INSTALLED++)) || true
   log_success "Eclipse Temurin JDK $JAVA_VERSION installed"
 else
   log_skip "Eclipse Temurin JDK $JAVA_VERSION already installed"
 fi
-ln -sfn "$JAVA_ROOT" "$JAVA_CURRENT"
+managed_link "$JAVA_ROOT" "$JAVA_CURRENT" java "$JAVA_VERSION"
 for binary in java javac jar jshell javadoc; do
   [[ -x "$JAVA_CURRENT/bin/$binary" ]] &&
     managed_link "$JAVA_CURRENT/bin/$binary" "$HOME/.local/bin/$binary" java "$JAVA_VERSION"

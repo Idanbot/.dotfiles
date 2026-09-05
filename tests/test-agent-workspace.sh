@@ -57,7 +57,7 @@ herdr_plan="$(HERDR_ENV=1 "$WORKSPACE" "$HOME/project with spaces" \
 
 tmux_plan="$(env -u HERDR_ENV TMUX=/tmp/tmux "$WORKSPACE" "$HOME/project with spaces" --print)"
 [[ "$(yq -r '.options.prefix' <<<"$tmux_plan")" == C-s ]]
-[[ "$(yq -r '.session_name' <<<"$tmux_plan")" == project_with_spaces-agents ]]
+[[ "$(yq -r '.session_name' <<<"$tmux_plan")" == project_with_spaces-agents-* ]]
 
 set +e
 env -u HERDR_ENV TMUX=/tmp/tmux "$WORKSPACE" "$HOME/project with spaces" \
@@ -98,5 +98,113 @@ status=$?
 set -e
 [[ "$status" -eq 1 ]]
 [[ "$(wc -l <"$HOME/restarts")" -eq 2 ]]
+
+mkdir -p "$HOME/one/api" "$HOME/two/api" "$HOME/a.b" "$HOME/a b"
+ln -s "$HOME/one/api" "$HOME/api-link"
+for backend in tmux herdr; do
+  plan_name() {
+    env -u HERDR_ENV -u TMUX "$WORKSPACE" "$1" --backend "$backend" --print |
+      yq -r '.session_name // .workspace'
+  }
+  [[ "$(plan_name "$HOME/one/api")" != "$(plan_name "$HOME/two/api")" ]]
+  [[ "$(plan_name "$HOME/a.b")" != "$(plan_name "$HOME/a b")" ]]
+  [[ "$(plan_name "$HOME/one/api")" == "$(plan_name "$HOME/api-link")" ]]
+done
+cat >"$HOME/bin/herdr" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  'workspace list') jq -n --arg cwd "$EXISTING_CWD" '{result:{workspaces:[{workspace_id:"w1",label:"shared",cwd:$cwd}]}}' ;;
+  'workspace focus w1') touch "$HOME/focused" ;;
+  *) exit 90 ;;
+esac
+EOF
+cat >"$HOME/bin/tmux" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  has-session) exit 0 ;;
+  list-sessions) printf 'shared\n' ;;
+  display-message) printf '%s\n' "$EXISTING_CWD" ;;
+  attach-session | switch-client) touch "$HOME/focused" ;;
+  *) exit 90 ;;
+esac
+EOF
+chmod +x "$HOME/bin/herdr" "$HOME/bin/tmux"
+export EXISTING_CWD="$HOME/one/api"
+for backend in tmux herdr; do
+  nesting=TMUX
+  [[ "$backend" != herdr ]] || nesting=HERDR_ENV
+  env -u TMUX -u HERDR_ENV "$nesting=1" "$WORKSPACE" "$HOME/api-link" \
+    --backend "$backend" --name shared >/dev/null
+  [[ -f "$HOME/focused" ]]
+  rm "$HOME/focused"
+  if env -u TMUX -u HERDR_ENV "$nesting=1" "$WORKSPACE" "$HOME/two/api" \
+    --backend "$backend" --name shared >"$HOME/collision" 2>&1; then
+    echo 'Workspace collision accepted' >&2
+    exit 1
+  fi
+  [[ ! -e "$HOME/focused" ]]
+  grep -Fq "$HOME/one/api" "$HOME/collision"
+  grep -Fq "$HOME/two/api" "$HOME/collision"
+done
+
+export WORKSPACE_STATE="$HOME/workspace-state"
+mkdir -p "$WORKSPACE_STATE"
+cat >"$HOME/bin/herdr" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1 $2" in
+  'workspace list')
+    for file in "$WORKSPACE_STATE"/*.cwd; do
+      [[ -f "$file" ]] || continue
+      name="${file##*/}"; name="${name%.cwd}"
+      jq -n --arg cwd "$(<"$file")" --arg name "$name" \
+        '{workspace_id:$name,label:$name,cwd:$cwd}'
+    done | jq -s '{result:{workspaces:.}}' ;;
+  'workspace create')
+    [[ "$3" == --cwd && "$5" == --label ]] || exit 90
+    printf '%s\n' "$4" >"$WORKSPACE_STATE/$6.cwd"
+    printf 'create\n' >>"$WORKSPACE_STATE/creates"
+    jq -n --arg id "$6" '{result:{workspace:{workspace_id:$id},tab:{tab_id:"root"}}}' ;;
+  'tab create') printf '{"result":{"root_pane":{"pane_id":"pane"}}}\n' ;;
+  'workspace focus' | 'tab rename' | 'tab focus' | 'pane run') exit 0 ;;
+  *) exit 90 ;;
+esac
+EOF
+cat >"$HOME/bin/tmux" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$1" in
+  has-session) compgen -G "$WORKSPACE_STATE/*.cwd" >/dev/null ;;
+  list-sessions)
+    for file in "$WORKSPACE_STATE"/*.cwd; do
+      name="${file##*/}"; printf '%s\n' "${name%.cwd}"
+    done ;;
+  display-message) cat "$WORKSPACE_STATE/${4#=}.cwd" ;;
+  attach-session | switch-client) exit 0 ;;
+  *) exit 90 ;;
+esac
+EOF
+cat >"$HOME/bin/uvx" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+plan="${!#}"
+name="$(yq -r '.session_name' "$plan")"
+yq -r '.start_directory' "$plan" >"$WORKSPACE_STATE/$name.cwd"
+printf 'create\n' >>"$WORKSPACE_STATE/creates"
+EOF
+chmod +x "$HOME/bin/herdr" "$HOME/bin/tmux" "$HOME/bin/uvx"
+for backend in tmux herdr; do
+  rm -f "$WORKSPACE_STATE"/*
+  nesting=TMUX
+  [[ "$backend" != herdr ]] || nesting=HERDR_ENV
+  for directory in "$HOME/one/api" "$HOME/two/api" "$HOME/a.b" "$HOME/a b" \
+    "$HOME/api-link" "$HOME/one/api"; do
+    env -u TMUX -u HERDR_ENV "$nesting=1" "$WORKSPACE" "$directory" \
+      --backend "$backend" --agents codex >/dev/null
+  done
+  [[ "$(wc -l <"$WORKSPACE_STATE/creates")" -eq 4 ]]
+done
 
 printf 'Agent workspace test passed\n'

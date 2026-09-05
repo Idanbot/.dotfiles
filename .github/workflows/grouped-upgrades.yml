@@ -20,8 +20,9 @@ jobs:
     permissions:
       contents: write  # zizmor: ignore[excessive-permissions] push one automation branch
       pull-requests: write  # zizmor: ignore[excessive-permissions] create or refresh one PR
+      actions: write  # dispatch and track the explicit heavy canary
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 240
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
@@ -92,29 +93,16 @@ jobs:
             git push origin "HEAD:refs/heads/$branch"
           fi
 
-          body="$RUNNER_TEMP/grouped-upgrades-pr.md"
-          {
-            printf 'This monthly PR aggregates every fully verified tool update into one review.\n\n'
-            printf 'The PR CI automatically enables the heavy developer, agent, cloud, and full E2E matrix.\n\n'
-            cat "$UPGRADE_REPORT"
-          } >"$body"
-          pr_number="$(gh pr list --state open --head "$branch" --json number --jq '.[0].number // empty')"
-          if [[ -n "$pr_number" ]]; then
-            gh pr edit "$pr_number" \
-              --title 'chore: grouped monthly tool upgrades' \
-              --body-file "$body"
-          else
-            gh pr create \
-              --base main \
-              --head "$branch" \
-              --title 'chore: grouped monthly tool upgrades' \
-              --body-file "$body"
-          fi
+          python3 scripts/grouped-upgrade-canary.py \
+            --changed true --sha "$(git rev-parse HEAD)" \
+            --report "$UPGRADE_REPORT" --output "$RUNNER_TEMP/grouped-canary"
       - name: Upload upgrade report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: grouped-monthly-upgrade-report
-          path: ${{ runner.temp }}/grouped-upgrades.md
+          path: |
+            ${{ runner.temp }}/grouped-upgrades.md
+            ${{ runner.temp }}/grouped-canary/
           if-no-files-found: warn
           retention-days: 90

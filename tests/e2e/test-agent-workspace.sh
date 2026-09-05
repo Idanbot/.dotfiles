@@ -108,7 +108,13 @@ run_case() {
   started_nanos="$(date +%s%N)"
   event "$name" start 0
   set +e
-  "$@"
+  # Do not invoke this subshell from an if/!/|| context: Bash disables errexit
+  # throughout functions in those contexts, even after an explicit set -e.
+  (
+    set -Eeuo pipefail
+    trap 'status=$?; if [[ $- == *e* ]]; then printf "[ERROR] case=%s line=%s command=%s exit=%s\n" "$name" "$LINENO" "$BASH_COMMAND" "$status" >&2; fi' ERR
+    "$@"
+  )
   status=$?
   set -e
   ended_nanos="$(date +%s%N)"
@@ -123,7 +129,9 @@ run_case() {
     printf '[FAIL] %s (%s, exit %s)\n' "$name" "$(format_duration_ms "$elapsed_ms")" "$status"
     event "$name" fail "$elapsed_ms"
   fi
-  return "$status"
+  # Cases share filesystem fixtures, but their shell state is isolated. Collect
+  # every result and let the suite exit nonzero after recording all cases.
+  return 0
 }
 
 write_executable() {
@@ -141,6 +149,20 @@ write_executable "$HOME/bin/mock-agent" \
   'mkdir -p "$state_root/$agent"' \
   'if [[ "${1:-}" == mcp ]]; then' \
   '  action="${2:-}"' \
+  '  if [[ "$action" == list ]]; then' \
+  '    names=()' \
+  '    for candidate in serena context-mode; do' \
+  '      [[ ! -e "$state_root/$agent/$candidate" ]] || names+=("$candidate")' \
+  '    done' \
+  '    if [[ "$agent" == codex ]]; then' \
+  '      printf "%s\n" "${names[@]}" | jq -Rn "[inputs | select(length > 0) | {name: .}]"' \
+  '    elif ((${#names[@]})); then' \
+  '      printf "%s: fixture\n" "${names[@]}"' \
+  '    else' \
+  '      printf "No MCP servers configured.\n"' \
+  '    fi' \
+  '    exit 0' \
+  '  fi' \
   '  server=""' \
   '  case "$action" in' \
   '    remove | get) server="${3:-}" ;;' \
@@ -213,7 +235,7 @@ test_agent_preflight() {
 test_mcp_toggles() {
   local status_output enabled_count
   status_output="$(agent-mcp status all)"
-  ! grep -Eq '[[:space:]]enabled$' <<<"$status_output"
+  if grep -Eq '[[:space:]]enabled$' <<<"$status_output"; then return 1; fi
   agent-mcp enable all --agent codex,claude,agy,opencode,omp >/dev/null
   status_output="$(agent-mcp status all)"
   enabled_count="$(grep -Ec '[[:space:]]enabled$' <<<"$status_output" || true)"
@@ -226,7 +248,7 @@ test_mcp_toggles() {
     "$HOME/.omp/agent/mcp.json" >/dev/null
   agent-mcp disable all --agent codex,claude,agy,opencode,omp >/dev/null
   status_output="$(agent-mcp status all)"
-  ! grep -Eq '[[:space:]]enabled$' <<<"$status_output"
+  if grep -Eq '[[:space:]]enabled$' <<<"$status_output"; then return 1; fi
 }
 
 test_tmuxp_backend() {
@@ -374,4 +396,5 @@ run_case 'tmuxp backend execution' test_tmuxp_backend
 run_case 'Herdr backend execution and reuse' test_herdr_backend
 run_case 'working-directory propagation' test_directory_propagation
 run_case 'missing and crashing agent handling' test_mocked_failures
-printf '\nAgent workspace E2E passed: %s/%s cases\n' "$PASSED" "$TOTAL"
+printf '\nAgent workspace E2E: %s/%s passed, %s failed\n' "$PASSED" "$TOTAL" "$FAILED"
+[[ "$FAILED" -eq 0 ]]

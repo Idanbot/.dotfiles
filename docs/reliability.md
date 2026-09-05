@@ -8,7 +8,8 @@
 - Concurrent bootstrap runs are serialized by a private state lock; a second
   run fails clearly unless `--lock-timeout` is supplied.
 - Interactive conflicts show a bounded redacted diff and support per-file
-  skip, replace, append-merge, all-replace, all-skip, and quit decisions.
+  skip, replace, shell-only append, reviewed SSH/Git/shell merge, all-replace,
+  all-skip, and quit decisions. Reviewed candidates require validation and consent.
 - Interactive choices use the controlling terminal when output is piped; a
   missing terminal cancels configuration apply instead of choosing silently.
 - Existing shell history, completion state, and local overlays are preserved.
@@ -19,7 +20,8 @@
 - Every cached download is keyed by and revalidated against its SHA256 digest.
 - Every managed install has an ownership record.
 - Backup restore preflights the complete manifest and verifies every stored
-  checksum before prompting or mutating a destination.
+  checksum and destination ancestors before prompting or mutating a destination.
+  Nonempty directories created since the snapshot are preserved.
 
 ## Failure Handling
 
@@ -34,8 +36,15 @@ DOTFILES_FAIL_AT=source:after ./scripts/install.sh --profile minimal --yes
 ./scripts/install.sh --resume
 ```
 
-The recovery suite proves that completed stages are skipped and the original
-run summary becomes successful after resume.
+Resume requires an unchanged versioned run plan. Changed source or options and
+legacy checkpoints without a plan fail closed: start a new bootstrap to review
+the new apply plan. The lightweight lifecycle suite checks a failure after apply,
+unchanged resume, changed-source refusal, retained attempt summaries, and
+post-doctor failure with revalidation and backup-ID retention. The
+minimal-install recovery suite checks failure after source and resumed apply.
+Doctor is never skipped on resume; the apply backup ID persists across attempts.
+Each attempt has a private summary in `runs/<id>/attempts/`; durations describe
+that attempt, not a misleading cumulative installation time.
 
 Download fault injection separately proves retries, atomic replacement, and
 checksum rejection. Cache tests additionally prove cache hits, corrupt-entry
@@ -83,6 +92,37 @@ already completed.
 `dot sync` refuses a dirty source checkout, pulls with `--ff-only`, and invokes
 the same installer. Manifest changes route only to affected sections through
 `scripts/reconcile-packages.sh`.
+
+`scripts/sections.json` is the shared implementation/dependency registry;
+`scripts/section-state.py` owns canonical fingerprints for bootstrap and updates.
+Only persisted selected sections (or explicit `--sections`) are reconciled.
+Checksum and installer changes count as inputs, including database and system
+packages. A failed section never advances its fingerprint.
+
+Tool ownership records use serialized atomic ledger writes and destination
+fingerprints. Binary/runtime candidates are smoke-tested before switching, and
+ordinary write failures preserve the previous tool. Removal refuses locally
+modified destinations, retains preserved APT entries, and routes UV Python
+runtime removal through `uv python uninstall`. This is not a cross-filesystem
+crash transaction: a crash between ownership-file updates fails closed on a
+fingerprint mismatch and requires review.
+
+## Agent and Cloud Safety
+
+Cloud test mode is a prompt fixture, not a credential sandbox. It refuses known
+provider credential overrides without printing their values. Test cloud command
+behavior in a separate credential-free, network-isolated container.
+
+MCP disable verifies native absence and aggregates failures across agents;
+already-absent servers remain idempotent. Running agents may still need a restart.
+Workspace names include a canonical-directory hash, and reuse verifies the
+directory on both tmux and Herdr. Explicit name collisions fail instead of
+switching agents into another checkout.
+
+Monthly grouped upgrades explicitly dispatch a heavy canary and correlate its
+run ID, commit, branch, workflow, and heavy job outcomes. PR comments and JSON/MD
+artifacts expose pending, failed, superseded, and successful outcomes. Mocked
+workflow tests do not replace a supervised live dispatch after deployment.
 
 Use `scripts/backup.sh verify <id>` to validate a snapshot without changing the
 home directory. Configuration rollback uses `dot restore <id>`. Tool rollback uses the install

@@ -39,7 +39,8 @@ fi
 for expected in \
   'type=absent' \
   'sha256sum "$target"' \
-  'rm -rf -- "$target"' \
+  'preflight_restore' \
+  'rmdir -- "$target"' \
   'chmod -R go-rwx' \
   'verify_backup_id' \
   'Backup verified:' \

@@ -35,43 +35,4 @@ if [[ -z "$SECTION" || "$SECTION" == "-h" || "$SECTION" == "--help" ]]; then
   exit 0
 fi
 
-if ! command -v chezmoi >/dev/null 2>&1; then
-  echo "chezmoi is required to render section templates" >&2
-  exit 1
-fi
-
-declare -A SECTIONS=(
-  [detect]=".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl"
-  [core]=".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl"
-  [zsh]=".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl"
-  [terminal]=".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl"
-  [languages]=".chezmoiscripts/run_once_04-install-languages.sh.tmpl"
-  [history]=".chezmoiscripts/run_once_04b-install-history.sh.tmpl"
-  [cloud]=".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
-  [tmux]=".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl"
-  [neovim]=".chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
-  [ai]=".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
-  [media]=".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl"
-  [fonts]=".chezmoiscripts/run_once_10-install-fonts.sh.tmpl"
-  [desktop]=".chezmoiscripts/run_once_11-install-desktop.sh.tmpl"
-  [system]=".chezmoiscripts/run_once_12-configure-system.sh.tmpl"
-  [theme]=".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl"
-  [vscode]=".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl"
-  [services]=".chezmoiscripts/run_once_after_enable-services.sh.tmpl"
-)
-
-script="${SECTIONS[$SECTION]:-}"
-if [[ -z "$script" ]]; then
-  echo "Unknown section: $SECTION" >&2
-  usage >&2
-  exit 1
-fi
-
-script_path="$DOTFILES_DIR/$script"
-if [[ ! -f "$script_path" ]]; then
-  echo "Missing section script: $script_path" >&2
-  exit 1
-fi
-
-DOTFILES_SOURCE_DIR="$DOTFILES_DIR" chezmoi execute-template <"$script_path" |
-  DOTFILES_SOURCE_DIR="$DOTFILES_DIR" DOTFILES_SECTION="$SECTION" bash
+exec "$DOTFILES_DIR/scripts/install.sh" --source "$DOTFILES_DIR" --only "$SECTION"

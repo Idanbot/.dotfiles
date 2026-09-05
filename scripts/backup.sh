@@ -59,7 +59,7 @@ create_backup() {
   }
 
   umask 077
-  id="$(date -u '+%Y%m%dT%H%M%SZ')-${run_id//[^a-zA-Z0-9._-]/_}"
+  id="$(date -u '+%Y%m%dT%H%M%S%NZ')-${run_id//[^a-zA-Z0-9._-]/_}"
   dir="$BACKUP_ROOT/$id"
   manifest="$dir/manifest.tsv"
   mkdir -p "$dir/files"
@@ -235,6 +235,39 @@ verify_backup() {
   printf 'Backup verified: %s\n' "$id"
 }
 
+preflight_restore() {
+  local manifest="$1" rel type mode hash parent component current target
+  local -a components
+  while IFS=$'\t' read -r rel type mode hash; do
+    parent="$(dirname "$rel")"
+    current="$HOME"
+    IFS=/ read -r -a components <<<"$parent"
+    for component in "${components[@]}"; do
+      [[ "$component" == . ]] && continue
+      current+="/$component"
+      if [[ -L "$current" || (-e "$current" && ! -d "$current") ]]; then
+        printf 'Unsafe restore ancestor: %s\n' "$current" >&2
+        return 1
+      fi
+    done
+    target="$HOME/$rel"
+    case "$type" in
+      file | symlink)
+        if [[ -d "$target" && ! -L "$target" ]]; then
+          printf 'Restore refuses directory in place of file: ~/%s\n' "$rel" >&2
+          return 1
+        fi
+        ;;
+      directory)
+        if [[ -L "$target" || (-e "$target" && ! -d "$target") ]]; then
+          printf 'Restore refuses changed directory type: ~/%s\n' "$rel" >&2
+          return 1
+        fi
+        ;;
+    esac
+  done < <(tail -n +2 "$manifest")
+}
+
 restore_backup() {
   [[ $# -ge 2 ]] || {
     usage >&2
@@ -269,11 +302,17 @@ restore_backup() {
     return 1
   }
 
+  preflight_restore "$manifest" || return 1
+  printf 'Restore plan (directories are removed only when empty):\n'
+  tail -n +2 "$manifest" | cut -f 1,2
+
   if [[ "$force" == false ]]; then
     read -r -p "Restore backup $id and replace current paths? [y/N] " answer
     [[ "$answer" =~ ^[Yy]$ ]] || exit 0
   fi
 
+  local temporary
+  local -a absent_directories=()
   while IFS=$'\t' read -r rel type mode hash; do
     safe_relative_path "$rel" || {
       printf 'Unsafe backup path: %s\n' "$rel" >&2
@@ -282,22 +321,28 @@ restore_backup() {
     target="$HOME/$rel"
     source="$dir/files/$rel"
     if [[ "$type" == absent ]]; then
-      rm -rf -- "$target"
-      printf 'removed newly-created ~/%s\n' "$rel"
+      if [[ -d "$target" && ! -L "$target" ]]; then
+        absent_directories+=("$target")
+      else
+        rm -f -- "$target"
+        printf 'removed newly-created ~/%s\n' "$rel"
+      fi
       continue
     fi
     if [[ "$type" == directory ]]; then
-      if [[ -e "$target" && ! -d "$target" ]] || [[ -L "$target" ]]; then
-        rm -rf -- "$target"
-      fi
       mkdir -p "$target"
       chmod "$mode" "$target"
       printf 'restored directory metadata ~/%s\n' "$rel"
       continue
     fi
-    rm -rf -- "$target"
     mkdir -p "$(dirname "$target")"
-    cp -a -- "$source" "$target"
+    temporary="$(mktemp -d "$(dirname "$target")/.dotfiles-restore.XXXXXX")"
+    if ! cp -a -- "$source" "$temporary/payload" ||
+      ! mv -Tf -- "$temporary/payload" "$target"; then
+      rm -rf -- "$temporary"
+      return 1
+    fi
+    rmdir "$temporary"
     if [[ "$type" == file ]]; then
       actual="$(sha256sum -- "$target" | awk '{print $1}')"
       [[ "$actual" == "$hash" ]] || {
@@ -314,6 +359,14 @@ restore_backup() {
     fi
     printf 'restored ~/%s\n' "$rel"
   done < <(tail -n +2 "$manifest")
+  # Children must be handled before their originally absent parent directories.
+  if ((${#absent_directories[@]})); then
+    while IFS= read -r -d '' target; do
+      if ! rmdir -- "$target" 2>/dev/null; then
+        printf 'preserved nonempty directory %s\n' "$target"
+      fi
+    done < <(printf '%s\0' "${absent_directories[@]}" | sort -zr)
+  fi
 }
 
 list_backups() {

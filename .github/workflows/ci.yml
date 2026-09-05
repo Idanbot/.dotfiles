@@ -117,6 +117,7 @@ jobs:
           tests/test-package-metadata.sh "$PWD"
           tests/test-update-packages.sh "$PWD"
           tests/test-npm-global-cli.sh "$PWD"
+          bash tests/test-runtime-staging.sh "$PWD"
           tests/test-agent-mcp.sh "$PWD"
           tests/test-ai-optimization.sh "$PWD"
           tests/test-agent-status.sh "$PWD"
@@ -314,6 +315,18 @@ jobs:
           docker compose -f .github/e2e/compose.yaml --profile workspace \
             up --build --abort-on-container-exit \
             --exit-code-from agent-workspace agent-workspace
+      - name: Test harness mutations and grouped canary with mocked GH
+        run: |
+          docker compose -f .github/e2e/compose.yaml --profile workspace \
+            run --rm --no-deps agent-workspace bash -lc '
+              set -e
+              sudo apt-get update -qq
+              sudo apt-get install -y python3 tmux yq gojq
+              python3 /dotfiles/tests/test-workspace-harness.py /dotfiles
+              python3 /dotfiles/tests/test-grouped-upgrade-canary.py /dotfiles
+              python3 /dotfiles/tests/test-run-plan.py /dotfiles
+              bash /dotfiles/tests/test-ci-operations.sh /dotfiles
+            '
       - name: Publish workspace summary
         if: always()
         run: |
@@ -431,7 +444,7 @@ jobs:
                 test-telemetry-policy.sh \
                 test-ssh-access.sh test-git-credential.sh \
                 test-conflict-resolution.sh \
-                test-ownership-ledger.sh test-update-routing.sh test-recovery.sh \
+                test-ownership-ledger.sh test-runtime-staging.sh test-update-routing.sh test-recovery.sh \
                 test-bootstrap-lock.sh test-json-escape.sh; do
                 /dotfiles/tests/$test /dotfiles
               done

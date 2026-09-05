@@ -45,6 +45,27 @@ read_user() {
 # shellcheck source=../scripts/conflicts.sh
 source "$DOTFILES_DIR/scripts/conflicts.sh"
 
+mkdir -p "$HOME/.ssh"
+printf 'Host review-host\n  ServerAliveInterval 5\n' >"$HOME/.ssh/config"
+printf '[credential]\n  helper = local-helper\n' >"$HOME/.gitconfig"
+for sensitive_format in .ssh/config .gitconfig; do
+  original="$(sha256sum "$HOME/$sensitive_format")"
+  if dotfiles_conflict_merge_append "$TMP_ROOT/source" "$sensitive_format"; then
+    printf 'unsafe append allowed: %s\n' "$sensitive_format" >&2
+    exit 1
+  fi
+  [[ "$original" == "$(sha256sum "$HOME/$sensitive_format")" ]]
+done
+CHOICE=y
+EDITOR=true
+export EDITOR
+before_ssh="$(ssh -G -F "$HOME/.ssh/config" review-host 2>/dev/null)"
+before_git="$(git config --file "$HOME/.gitconfig" --get-all credential.helper)"
+dotfiles_conflict_review_merge "$TMP_ROOT/source" .ssh/config
+dotfiles_conflict_review_merge "$TMP_ROOT/source" .gitconfig
+[[ "$(ssh -G -F "$HOME/.ssh/config" review-host 2>/dev/null)" == "$before_ssh" ]]
+[[ "$(git config --file "$HOME/.gitconfig" --get-all credential.helper)" == "$before_git" ]]
+
 [[ "$(dotfiles_conflict_status_path 'MM .zshrc')" == .zshrc ]]
 [[ "$(dotfiles_conflict_status_path $'MM .zshrc\r')" == .zshrc ]]
 touch "$HOME/.zshrc"
@@ -121,6 +142,21 @@ else
   [[ "$?" -eq 1 ]]
 fi
 unset CAT_FAILURE
+[[ "$before_cat_failure" == "$(sha256sum "$HOME/.zshrc")" ]]
+
+FAKE_MANAGED='if broken syntax'
+if dotfiles_conflict_merge_append "$TMP_ROOT/source" .zshrc; then
+  printf 'invalid shell merge accepted\n' >&2
+  exit 1
+fi
+[[ "$before_cat_failure" == "$(sha256sum "$HOME/.zshrc")" ]]
+FAKE_MANAGED='export MANAGED=3'
+mv() { return 37; }
+if dotfiles_conflict_merge_append "$TMP_ROOT/source" .zshrc; then
+  printf 'failed rename reported success\n' >&2
+  exit 1
+fi
+unset -f mv
 [[ "$before_cat_failure" == "$(sha256sum "$HOME/.zshrc")" ]]
 
 printf '%s\n' '{"local":true}' >"$HOME/settings.json"

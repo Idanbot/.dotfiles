@@ -24,7 +24,7 @@ Usage: cloud-context [command]
       --recent              Pick one of the five most recent pre-clear profiles
   -c, --clear [PROVIDER]    Clear one provider, or all providers when omitted
   -t, --test [PROVIDER] [--yes]
-                            Clear old fakes, then add an isolated fake context
+                            Clear old fakes, then add a prompt fixture (not a sandbox)
       --test-clear [PROVIDER]
                             Remove one fake context or all fake contexts
   --list                    List saved profiles
@@ -754,6 +754,7 @@ confirm_test_reset() {
 test_contexts() {
   local provider assume_yes="${2:-false}"
   provider="$(normalize_provider "${1:-all}")"
+  reject_test_credentials "$provider"
   confirm_test_reset "$assume_yes"
   clear_test_contexts all
   snapshot_test_environment
@@ -765,8 +766,32 @@ test_contexts() {
     touch "$TEST_ROOT/enabled-$provider"
   fi
   write_test_environment
-  info "Enabled isolated fake ${provider/all/all providers} context"
+  info "Enabled fake ${provider/all/all providers} prompt fixture; not a security sandbox"
   info "The Zsh wrapper applies it to this shell; use cloud-context --test-clear"
+}
+
+reject_test_credentials() {
+  local provider="$1" name owner failed=0
+  # Config paths replaced by the fixture are intentionally not conflicts.
+  for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN \
+    AWS_WEB_IDENTITY_TOKEN_FILE AWS_ROLE_ARN AWS_CONTAINER_CREDENTIALS_RELATIVE_URI \
+    AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_AUTHORIZATION_TOKEN \
+    AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE GOOGLE_APPLICATION_CREDENTIALS \
+    GOOGLE_OAUTH_ACCESS_TOKEN CLOUDSDK_AUTH_ACCESS_TOKEN CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE \
+    CLOUDSDK_AUTH_ACCESS_TOKEN_FILE CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT \
+    AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_CLIENT_CERTIFICATE_PATH AZURE_FEDERATED_TOKEN_FILE \
+    AZURE_USERNAME AZURE_PASSWORD AZURE_ACCESS_TOKEN; do
+    case "$name" in
+      AWS_*) owner=aws ;;
+      GOOGLE_* | CLOUDSDK_*) owner=gcloud ;;
+      AZURE_*) owner=azure ;;
+    esac
+    if [[ ("$provider" == all || "$provider" == "$owner") && -v "$name" ]]; then
+      warn "Refusing fake context: credential override $name is set"
+      failed=1
+    fi
+  done
+  return "$failed"
 }
 
 run_test_command() {

@@ -1,0 +1,19 @@
+{
+  "detect": {"script": ".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl", "manifest": []},
+  "core": {"script": ".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl", "manifest": ["core.github_cli"]},
+  "zsh": {"script": ".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl", "manifest": []},
+  "terminal": {"script": ".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl", "manifest": ["core"], "exclude": ["core.github_cli"]},
+  "languages": {"script": ".chezmoiscripts/run_once_04-install-languages.sh.tmpl", "manifest": ["languages"]},
+  "history": {"script": ".chezmoiscripts/run_once_04b-install-history.sh.tmpl", "manifest": ["history"]},
+  "cloud": {"script": ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl", "manifest": ["cloud", "database"]},
+  "tmux": {"script": ".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl", "manifest": ["terminal.tmux", "terminal.tmuxp", "terminal.herdr"]},
+  "neovim": {"script": ".chezmoiscripts/run_once_07-install-neovim.sh.tmpl", "manifest": ["editor"]},
+  "ai": {"script": ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl", "manifest": ["ai_tools"]},
+  "media": {"script": ".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl", "manifest": ["media"]},
+  "fonts": {"script": ".chezmoiscripts/run_once_10-install-fonts.sh.tmpl", "manifest": ["fonts"]},
+  "desktop": {"script": ".chezmoiscripts/run_once_11-install-desktop.sh.tmpl", "manifest": ["terminal.kitty"], "files": ["scripts/install-kitty.sh"]},
+  "system": {"script": ".chezmoiscripts/run_once_12-configure-system.sh.tmpl", "manifest": ["system"]},
+  "theme": {"script": ".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl", "manifest": []},
+  "vscode": {"script": ".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl", "manifest": []},
+  "services": {"script": ".chezmoiscripts/run_once_after_enable-services.sh.tmpl", "manifest": []}
+}

@@ -2,6 +2,8 @@
 # Remove only paths recorded in the managed-install ledger.
 
 set -euo pipefail
+DOTFILES_SOURCE_DIR="${DOTFILES_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 INCLUDE_PACKAGES=false
 DRY_RUN=false
@@ -36,6 +38,7 @@ done
 }
 
 STATE_ROOT="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
+managed_operation_lock
 LEDGER="$STATE_ROOT/installed.tsv"
 [[ -f "$LEDGER" ]] || {
   printf 'No managed-install ledger exists\n' >&2
@@ -43,8 +46,10 @@ LEDGER="$STATE_ROOT/installed.tsv"
 }
 
 safe_target() {
-  local target="$1"
-  [[ "$target" == "$HOME/.local/"* || "$target" == "$HOME/.cargo/"* || "$target" == /usr/local/* ]]
+  local target="$1" parent
+  [[ "$target" == "$HOME/.local/"* || "$target" == "$HOME/.cargo/"* || "$target" == /usr/local/* ]] || return 1
+  parent="$(realpath -m -- "$(dirname "$target")")" || return 1
+  [[ "$parent" == "$(dirname "$target")" ]] || return 1
 }
 
 matches="$(awk -F '\t' -v tool="$TOOL" '$1 == tool' "$LEDGER")"
@@ -68,7 +73,15 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
       prefix="$HOME/.local/share/npm"
       [[ "$DRY_RUN" == true ]] && printf 'would npm uninstall %s\n' "$package" || npm uninstall --global --prefix "$prefix" "$package"
       ;;
+    uv-python)
+      [[ "$DRY_RUN" == true ]] && printf 'would uv python uninstall %s\n' "$target" || uv python uninstall "$target"
+      ;;
     uv | uv:*)
+      if [[ "$owner" == uv && "$tool" == python ]]; then
+        [[ "$DRY_RUN" == true ]] && printf 'would uv python uninstall %s\n' "$_version" || uv python uninstall "$_version"
+        [[ "$DRY_RUN" == true ]] || forget_install "$tool" "$target"
+        continue
+      fi
       package="${owner#uv:}"
       [[ "$package" == uv ]] && package="$tool"
       [[ "$DRY_RUN" == true ]] && printf 'would uv tool uninstall %s\n' "$package" || uv tool uninstall "$package"
@@ -82,6 +95,7 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
         printf 'Refusing unsafe agent skill path: %s\n' "$target" >&2
         exit 1
       }
+      assert_owned_target "$target"
       [[ "$DRY_RUN" == true ]] && printf 'would remove %s\n' "$target" || rm -rf -- "$target"
       ;;
     dpkg)
@@ -97,6 +111,7 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
         printf 'Refusing unsafe ledger path: %s\n' "$target" >&2
         exit 1
       }
+      assert_owned_target "$target"
       if [[ "$DRY_RUN" == true ]]; then
         printf 'would remove %s\n' "$target"
       else
@@ -105,10 +120,7 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
       fi
       ;;
   esac
+  if [[ "$DRY_RUN" == false ]]; then
+    forget_install "$tool" "$target"
+  fi
 done <<<"$matches"
-
-if [[ "$DRY_RUN" == false ]]; then
-  awk -F '\t' -v tool="$TOOL" '$1 != tool' "$LEDGER" >"$LEDGER.tmp"
-  mv "$LEDGER.tmp" "$LEDGER"
-  chmod 600 "$LEDGER"
-fi

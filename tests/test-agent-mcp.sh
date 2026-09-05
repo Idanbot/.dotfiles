@@ -24,6 +24,59 @@ make_mock() {
 for command_name in codex claude serena context-mode; do
   make_mock "$command_name"
 done
+# Native mocks expose only their supported list interfaces and retain state.
+export NATIVE_STATE="$TMP_ROOT/native"
+mkdir -p "$NATIVE_STATE"
+for command_name in codex claude; do
+  cat >"$MOCK_BIN/$command_name" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+agent="${0##*/}"
+printf '%s\t%s\n' "$agent" "$*" >>"$NATIVE_STATE/calls"
+case "$2" in
+  add)
+    for arg in "$@"; do
+      case "$arg" in serena | context-mode) touch "$NATIVE_STATE/$agent-$arg"; break ;; esac
+    done ;;
+  remove)
+    [[ "${FAIL_REMOVE:-}" != "$agent" ]] || exit 37
+    [[ "${RETAIN_SERVER:-}" != "$agent" ]] || exit 0
+    rm -f "$NATIVE_STATE/$agent-$3" ;;
+  list)
+    [[ "${FAIL_LIST:-}" != "$agent" ]] || exit 38
+    if [[ "${MALFORMED_LIST:-}" == "$agent" ]]; then
+      printf 'invalid configuration\n'
+      exit 0
+    fi
+    if [[ "${EMPTY_LIST:-}" == "$agent" ]]; then
+      if [[ "$agent" == codex ]]; then
+        printf '[]\n'
+      else
+        printf 'No MCP servers configured. Use claude mcp add to add a server.\n'
+      fi
+      exit 0
+    fi
+    if [[ "$agent" == codex ]]; then
+      [[ "$*" == 'mcp list --json' ]] || exit 2
+      printf '['
+      separator=''
+      for server in keep serena context-mode; do
+        if [[ "$server" == keep || -f "$NATIVE_STATE/$agent-$server" ]]; then
+          printf '%s{"name":"%s"}' "$separator" "$server"
+          separator=,
+        fi
+      done
+      printf ']\n'
+    else
+      [[ "$*" == 'mcp list' ]] || exit 2
+      printf 'keep: keep - Connected\n'
+      for server in serena context-mode; do
+        [[ ! -f "$NATIVE_STATE/$agent-$server" ]] || printf '%s: command - Connected\n' "$server"
+      done
+    fi ;;
+esac
+EOF
+done
 ln -s "$(command -v gojq)" "$MOCK_BIN/gojq"
 
 export HOME="$TMP_ROOT/home"
@@ -44,8 +97,8 @@ printf '{"mcpServers":{"keep":{"command":"keep"}},"disabledServers":[]}\n' \
 
 "$SCRIPT" enable all --agent codex,claude,agy,opencode,omp >/dev/null
 
-grep -Fq $'codex\tmcp add serena -- serena start-mcp-server --project-from-cwd --context=codex' "$CALLS"
-grep -Fq $'claude\tmcp add --transport stdio --scope user context-mode -e CONTEXT_MODE_PLATFORM=claude-code -- context-mode' "$CALLS"
+grep -Fq $'codex\tmcp add serena -- serena start-mcp-server --project-from-cwd --context=codex' "$NATIVE_STATE/calls"
+grep -Fq $'claude\tmcp add --transport stdio --scope user context-mode -e CONTEXT_MODE_PLATFORM=claude-code -- context-mode' "$NATIVE_STATE/calls"
 
 AGY_CONFIG="$HOME/.gemini/config/mcp_config.json"
 OPENCODE_CONFIG="$XDG_CONFIG_HOME/opencode/opencode.json"
@@ -70,8 +123,8 @@ gojq -e \
 
 : >"$CALLS"
 "$SCRIPT" disable all --agent codex,claude,agy,opencode,omp >/dev/null
-grep -Fq $'codex\tmcp remove serena' "$CALLS"
-grep -Fq $'claude\tmcp remove context-mode --scope user' "$CALLS"
+grep -Fq $'codex\tmcp remove serena' "$NATIVE_STATE/calls"
+grep -Fq $'claude\tmcp remove context-mode --scope user' "$NATIVE_STATE/calls"
 gojq -e \
   '.mcpServers.keep.command == "keep" and
    .mcpServers.serena == null and
@@ -98,5 +151,49 @@ if "$SCRIPT" enable >/dev/null 2>&1; then
   printf 'agent-mcp enable accepted a missing server selection\n' >&2
   exit 1
 fi
+
+for agent in codex claude; do
+  touch "$NATIVE_STATE/$agent-serena"
+  if FAIL_REMOVE="$agent" "$SCRIPT" disable serena --agent all >"$TMP_ROOT/result" 2>&1; then
+    echo 'Removal failure reported success' >&2
+    exit 1
+  fi
+  [[ -f "$NATIVE_STATE/$agent-serena" ]]
+  ! grep -Eq "^disabled +serena +$agent$" "$TMP_ROOT/result" || exit 1
+  if RETAIN_SERVER="$agent" "$SCRIPT" disable serena --agent "$agent" >"$TMP_ROOT/result" 2>&1; then
+    echo 'Retained server reported success' >&2
+    exit 1
+  fi
+  ! grep -Eq '^disabled ' "$TMP_ROOT/result" || exit 1
+  rm "$NATIVE_STATE/$agent-serena"
+  FAIL_REMOVE="$agent" "$SCRIPT" disable serena --agent "$agent" >/dev/null
+  EMPTY_LIST="$agent" FAIL_REMOVE="$agent" "$SCRIPT" disable all --agent "$agent" >/dev/null
+  if MALFORMED_LIST="$agent" "$SCRIPT" disable serena --agent "$agent" >/dev/null 2>&1; then
+    echo 'Malformed native list reported success' >&2
+    exit 1
+  fi
+  if FAIL_LIST="$agent" FAIL_REMOVE="$agent" "$SCRIPT" disable serena --agent "$agent" >/dev/null 2>&1; then
+    echo 'Unverified absence reported success' >&2
+    exit 1
+  fi
+done
+if [[ "$(id -u)" != 0 ]]; then
+  cp "$AGY_CONFIG" "$TMP_ROOT/readonly-before"
+  chmod 400 "$AGY_CONFIG"
+  if "$SCRIPT" disable serena --agent agy >"$TMP_ROOT/result" 2>&1; then
+    echo 'Read-only configuration reported success' >&2
+    exit 1
+  fi
+  cmp "$AGY_CONFIG" "$TMP_ROOT/readonly-before"
+  chmod 600 "$AGY_CONFIG"
+fi
+printf 'broken json\n' >"$AGY_CONFIG"
+cp "$AGY_CONFIG" "$TMP_ROOT/broken-before"
+if "$SCRIPT" disable all --agent all >"$TMP_ROOT/result" 2>&1; then
+  echo 'Malformed configuration reported success' >&2
+  exit 1
+fi
+cmp "$AGY_CONFIG" "$TMP_ROOT/broken-before"
+grep -Eq '^disabled +context-mode +omp$' "$TMP_ROOT/result"
 
 printf 'Agent MCP manager test passed\n'
