@@ -5,7 +5,16 @@ set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 TMP_HOME="$(mktemp -d)"
-trap 'rm -rf "$TMP_HOME"' EXIT
+server_pid=""
+cleanup() {
+  herdr server stop >/dev/null 2>&1 || true
+  if [[ -n "$server_pid" ]]; then
+    kill "$server_pid" 2>/dev/null || true
+    wait "$server_pid" 2>/dev/null || true
+  fi
+  rm -rf "$TMP_HOME"
+}
+trap cleanup EXIT
 export HOME="$TMP_HOME"
 export DOTFILES_BIN_DIR="$TMP_HOME/bin"
 export DOTFILES_STATE_DIR="$TMP_HOME/state"

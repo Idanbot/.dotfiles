@@ -149,6 +149,55 @@ for backend in tmux herdr; do
   grep -Fq "$HOME/two/api" "$HOME/collision"
 done
 
+cat >"$HOME/bin/herdr" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  'workspace list') jq -n '{result:{workspaces:[{workspace_id:"w1",label:"shared"}]}}' ;;
+  'workspace get w1') jq -n --arg cwd "$EXISTING_CWD" '{result:{workspace:{workspace_id:"w1",cwd:$cwd}}}' ;;
+  'workspace focus w1') touch "$HOME/focused" ;;
+  *) exit 90 ;;
+esac
+EOF
+chmod +x "$HOME/bin/herdr"
+rm -f "$HOME/focused"
+HERDR_ENV=1 "$WORKSPACE" "$HOME/api-link" --backend herdr --name shared >/dev/null
+[[ -f "$HOME/focused" ]]
+rm "$HOME/focused"
+if HERDR_ENV=1 "$WORKSPACE" "$HOME/two/api" --backend herdr --name shared \
+  >"$HOME/collision-get" 2>&1; then
+  echo 'Workspace collision accepted without list cwd' >&2
+  exit 1
+fi
+[[ ! -e "$HOME/focused" ]]
+grep -Fq "$HOME/one/api" "$HOME/collision-get"
+grep -Fq "$HOME/two/api" "$HOME/collision-get"
+
+cat >"$HOME/bin/herdr" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "$*" in
+  'workspace list') jq -n '{result:{workspaces:[{workspace_id:"w1",label:"shared"}]}}' ;;
+  'workspace get w1') jq -n '{result:{workspace:{workspace_id:"w1",tab_count:6}}}' ;;
+  'pane list --workspace w1') jq -n --arg cwd "$EXISTING_CWD" \
+    '{result:[{workspace_id:"w1",cwd:$cwd}]}' ;;
+  'workspace focus w1') touch "$HOME/focused" ;;
+  *) exit 90 ;;
+esac
+EOF
+chmod +x "$HOME/bin/herdr"
+rm -f "$HOME/focused"
+HERDR_ENV=1 "$WORKSPACE" "$HOME/api-link" --backend herdr --name shared >/dev/null
+[[ -f "$HOME/focused" ]]
+rm "$HOME/focused"
+if HERDR_ENV=1 "$WORKSPACE" "$HOME/two/api" --backend herdr --name shared \
+  >"$HOME/collision-panes" 2>&1; then
+  echo 'Workspace collision accepted without get cwd' >&2
+  exit 1
+fi
+grep -Fq "$HOME/one/api" "$HOME/collision-panes"
+grep -Fq "$HOME/two/api" "$HOME/collision-panes"
+
 export WORKSPACE_STATE="$HOME/workspace-state"
 mkdir -p "$WORKSPACE_STATE"
 cat >"$HOME/bin/herdr" <<'EOF'

@@ -343,6 +343,35 @@ run_herdr_json() {
   printf -v "$output_name" '%s' "$payload"
 }
 
+herdr_workspace_directory() {
+  local workspace_id="$1" list_json="$2" directory="" detail panes
+  directory="$(jq -r --arg id "$workspace_id" \
+    'first(.result.workspaces[]? | select(.workspace_id == $id) | .cwd // empty) // empty' \
+    <<<"$list_json")"
+  if [[ -n "$directory" ]]; then
+    printf '%s' "$directory"
+    return 0
+  fi
+  if run_herdr_json detail workspace get "$workspace_id"; then
+    directory="$(jq -r '.result.workspace.cwd // .result.workspace.identity_cwd // .result.cwd // empty' <<<"$detail")"
+    if [[ -n "$directory" ]]; then
+      printf '%s' "$directory"
+      return 0
+    fi
+  fi
+  if run_herdr_json panes pane list --workspace "$workspace_id"; then
+    directory="$(jq -r '
+      def panes:
+        if (.result | type) == "array" then .result
+        elif (.result.panes | type) == "array" then .result.panes
+        elif type == "array" then .
+        else [] end;
+      first(panes[]? | .cwd // empty) // empty
+    ' <<<"$panes")"
+  fi
+  printf '%s' "$directory"
+}
+
 ensure_herdr_server() {
   local state_root log_file server_pid
   if herdr workspace list >/dev/null 2>&1; then
@@ -371,7 +400,7 @@ ensure_herdr_server() {
 }
 
 run_herdr_workspace() {
-  local list workspace_id created root_tab response placeholder_pane agent
+  local list workspace_id created root_tab response placeholder_pane agent existing_directory
   local -a launch_args
   if [[ "$PRINT_ONLY" == true ]]; then
     print_herdr_plan
@@ -394,8 +423,7 @@ run_herdr_workspace() {
   workspace_id="$(jq -r --arg label "$SESSION_NAME" \
     'first(.result.workspaces[]? | select(.label == $label) | .workspace_id) // empty' <<<"$list")"
   if [[ -n "$workspace_id" ]]; then
-    existing_directory="$(jq -r --arg id "$workspace_id" \
-      '.result.workspaces[] | select(.workspace_id == $id) | .cwd // empty' <<<"$list")"
+    existing_directory="$(herdr_workspace_directory "$workspace_id" "$list")"
     verify_workspace_directory "$existing_directory"
     herdr workspace focus "$workspace_id" >/dev/null
     printf 'Focused existing Herdr workspace: %s\n' "$SESSION_NAME"
