@@ -22,6 +22,7 @@ set -g history-limit 10000
 set -g detach-on-destroy off     # Don't exit tmux when closing a session
 
 # Performance & Terminal
+# Panes and outbound SSH see tmux-256color. Kitty truecolor is outer-client only.
 set -g default-terminal "tmux-256color"
 set -as terminal-features ",xterm-kitty:RGB"
 set -as terminal-features ",xterm-256color:RGB"
