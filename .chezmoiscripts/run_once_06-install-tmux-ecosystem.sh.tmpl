@@ -40,7 +40,9 @@ if ! is_installed uvx; then
 fi
 log_info "Prewarming tmuxp $TMUXP_VERSION through uvx"
 uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp --version
-record_install tmuxp "$TMUXP_VERSION" uvx "$(uv cache dir)/archive-v0"
+# uvx environments are shared, disposable cache entries, not owned install trees.
+forget_install tmuxp
+record_install tmuxp "$TMUXP_VERSION" uvx "tmuxp==$TMUXP_VERSION"
 log_success "tmuxp $TMUXP_VERSION is available through uvx"
 
 for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-battery; do

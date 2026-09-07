@@ -20,18 +20,21 @@ esac
 NVIM_SHA="$(package_metadata editor neovim "sha256_$(get_arch)")"
 
 NVIM_ROOT="$HOME/.local/share/dotfiles/tools/neovim/$NVIM_VERSION"
+nvim_probe() {
+  "$1/bin/nvim" --clean --headless '+lua assert(vim.version().minor >= 12)' +qa
+}
 if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --version 2>/dev/null | head -1 || true)" "$NVIM_VERSION"; then
   tmpdir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmpdir"' EXIT
   asset="nvim-linux-${NVIM_ARCH}.tar.gz"
   log_info "Installing verified Neovim $NVIM_VERSION"
   download_verified \
     "https://github.com/neovim/neovim/releases/download/v${NVIM_VERSION}/$asset" \
     "$tmpdir/$asset" "sha256:$NVIM_SHA" "$asset"
-  rm -rf "$NVIM_ROOT"
-  mkdir -p "$NVIM_ROOT"
-  tar -xzf "$tmpdir/$asset" -C "$NVIM_ROOT" --strip-components=1
+  mkdir -p "$tmpdir/app"
+  tar -xzf "$tmpdir/$asset" -C "$tmpdir/app" --strip-components=1
+  install_managed_app "$tmpdir/app" "$NVIM_ROOT" nvim "$NVIM_VERSION" github:neovim/neovim nvim_probe nvim
   rm -rf "$tmpdir"
-  record_install nvim "$NVIM_VERSION" github:neovim/neovim "$NVIM_ROOT"
   ((_INSTALLED++)) || true
   log_success "Neovim $NVIM_VERSION installed"
 else

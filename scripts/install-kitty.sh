@@ -42,7 +42,6 @@ mkdir -p "$PARENT"
 STAGING="$(mktemp -d "$PARENT/.kitty-install.XXXXXXXX")"
 ARCHIVE="$STAGING/$ASSET"
 NEW_APP="$STAGING/kitty.app"
-BACKUP="$PARENT/.kitty.app.previous"
 
 cleanup() { rm -rf "$STAGING"; }
 trap cleanup EXIT
@@ -56,18 +55,10 @@ tar -xJf "$ARCHIVE" -C "$NEW_APP"
   exit 1
 }
 
-rm -rf "$BACKUP"
-if [[ -e "$TARGET" ]]; then
-  mv "$TARGET" "$BACKUP"
-fi
-if ! mv "$NEW_APP" "$TARGET"; then
-  [[ ! -e "$BACKUP" ]] || mv "$BACKUP" "$TARGET"
-  exit 1
-fi
-rm -rf "$BACKUP"
-
-managed_link "$TARGET/bin/kitty" "$HOME/.local/bin/kitty" kitty "$VERSION"
-managed_link "$TARGET/bin/kitten" "$HOME/.local/bin/kitten" kitten "$VERSION"
+kitty_probe() {
+  "$1/bin/kitty" --version && "$1/bin/kitten" --version
+}
+install_managed_app "$NEW_APP" "$TARGET" kitty "$VERSION" github:kovidgoyal/kitty kitty_probe kitty kitten
 
 mkdir -p "$HOME/.local/share/applications"
 for desktop_file in kitty.desktop kitty-open.desktop; do
@@ -81,6 +72,5 @@ for desktop_file in kitty.desktop kitty-open.desktop; do
     "$target_file"
 done
 
-record_install kitty "$VERSION" github:kovidgoyal/kitty "$TARGET"
 log_success "$("$TARGET/bin/kitty" --version) installed"
 ((_INSTALLED++)) || true

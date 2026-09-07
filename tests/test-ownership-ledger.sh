@@ -137,4 +137,73 @@ done
 wait
 [[ "$(grep -c '^parallel-' "$DOTFILES_STATE_DIR/installed.tsv")" == 12 ]]
 
+# Legacy uvx ledger entries must never remove shared cache data, at either root.
+for cache in "$HOME/.cache/uv/archive-v0" "$HOME/.local/share/uv/archive-v0"; do
+  mkdir -p "$cache/other-tool"
+  printf 'keep\n' >"$cache/other-tool/sentinel"
+  record_install tmuxp 1 uvx "$cache"
+  "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run tmuxp
+  grep -q '^tmuxp' "$DOTFILES_STATE_DIR/installed.tsv"
+  "$DOTFILES_DIR/scripts/uninstall-tool.sh" tmuxp
+  grep -Fxq keep "$cache/other-tool/sentinel"
+  ! grep -q '^tmuxp' "$DOTFILES_STATE_DIR/installed.tsv"
+done
+
+# Exercise the real Radar shorthand block, including dangling and modified links.
+sed -n '/^RADAR_LINK=/,/^fi$/p' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl" >"$HOME/radar-block"
+export RADAR_VERSION=1
+for target in /bin/true "$HOME/missing"; do
+  ln -sfn "$target" "$HOME/.local/bin/radar"
+  source "$HOME/radar-block"
+  [[ "$(readlink "$HOME/.local/bin/radar")" == "$target" ]]
+done
+record_install radar 0 symlink "$HOME/.local/bin/radar"
+ln -sfn /bin/false "$HOME/.local/bin/radar"
+source "$HOME/radar-block"
+[[ "$(readlink "$HOME/.local/bin/radar")" == /bin/false ]]
+record_install radar 0 symlink "$HOME/.local/bin/radar"
+source "$HOME/radar-block"
+[[ "$(readlink "$HOME/.local/bin/radar")" == "$HOME/.local/bin/kubectl-radar" ]]
+
+mkdir -p "$HOME/app-source/bin"
+install -m 755 "$HOME/good" "$HOME/app-source/bin/app-test"
+app_probe() { "$1/bin/app-test"; }
+install_managed_app "$HOME/app-source" "$HOME/.local/app-test" app-test 1 test app_probe app-test
+ledger_before="$(cat "$DOTFILES_STATE_DIR/installed.tsv")"
+for failure in probe link ledger partial-ledger; do
+  (
+    case "$failure" in
+      probe) app_probe() { return 37; } ;;
+      link)
+        mv() {
+          [[ "${*: -1}" != "$HOME/.local/bin/app-test" ]] || return 1
+          command mv "$@"
+        }
+        ;;
+      ledger) record_install() { return 1; } ;;
+      partial-ledger)
+        eval "$(declare -f record_install | sed '1s/record_install/original_record_install/')"
+        record_install() {
+          [[ "$4" != "$HOME/.local/bin/app-test" ]] || return 1
+          original_record_install "$@"
+        }
+        ;;
+    esac
+    if install_managed_app "$HOME/app-source" "$HOME/.local/app-test" app-test 2 test app_probe app-test; then
+      printf 'application accepted %s failure\n' "$failure" >&2
+      exit 1
+    fi
+  )
+  [[ "$(cat "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger_before" ]]
+  [[ "$("$HOME/.local/bin/app-test")" == 1.0 ]]
+  assert_owned_target "$HOME/.local/app-test"
+  assert_owned_target "$HOME/.local/bin/app-test"
+done
+printf 'local edit\n' >"$HOME/.local/app-test/sentinel"
+if install_managed_app "$HOME/app-source" "$HOME/.local/app-test" app-test 2 test app_probe app-test; then
+  exit 1
+fi
+grep -Fxq 'local edit' "$HOME/.local/app-test/sentinel"
+
 printf 'Ownership ledger test passed\n'

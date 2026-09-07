@@ -252,9 +252,11 @@ elif [[ -L "$RADAR_LINK" ]] &&
   [[ "$(readlink -f "$RADAR_LINK")" == "$HOME/.local/bin/kubectl-radar" ]]; then
   log_skip "radar shorthand already points to kubectl-radar"
 elif [[ -L "$RADAR_LINK" ]]; then
-  ln -sfn "$HOME/.local/bin/kubectl-radar" "$RADAR_LINK"
-  record_install radar "$RADAR_VERSION" symlink "$RADAR_LINK"
-  log_success "radar shorthand updated"
+  if managed_link "$HOME/.local/bin/kubectl-radar" "$RADAR_LINK" radar "$RADAR_VERSION"; then
+    log_success "radar shorthand updated"
+  else
+    log_warn "Preserving existing $RADAR_LINK; use kubectl-radar"
+  fi
 else
   log_warn "Preserving existing non-symlink $RADAR_LINK; use kubectl-radar"
 fi

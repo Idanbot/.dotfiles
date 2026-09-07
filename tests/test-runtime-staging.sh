@@ -49,4 +49,51 @@ assert_owned_target "$NODE_ROOT"
 bash -c 'set -euo pipefail; source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; source "$1"' _ "$temporary/npm.sh"
 [[ "$("$NODE_ROOT/bin/npm" --version)" == "$EXPECTED_NPM" ]]
 assert_owned_target "$NODE_ROOT"
+# Execute the real application installers with offline archives and failed probes.
+mkdir -p "$temporary/app/bin"
+printf '#!/bin/sh\nexit 37\n' >"$temporary/app/bin/nvim"
+cp "$temporary/app/bin/nvim" "$temporary/app/bin/kitty"
+cp "$temporary/app/bin/nvim" "$temporary/app/bin/kitten"
+chmod +x "$temporary/app/bin/"*
+tar -czf "$temporary/nvim.tar.gz" -C "$temporary" app
+tar -cJf "$temporary/kitty.txz" -C "$temporary/app" .
+for application in nvim kitty; do
+  if [[ "$application" == nvim ]]; then
+    target="$HOME/.local/share/dotfiles/tools/neovim/99.0.0"
+    installer="$DOTFILES_DIR/.chezmoiscripts/run_once_07-install-neovim.sh.tmpl"
+    archive="$temporary/nvim.tar.gz"
+  else
+    target="$HOME/.local/kitty.app"
+    installer="$DOTFILES_DIR/scripts/install-kitty.sh"
+    archive="$temporary/kitty.txz"
+  fi
+  mkdir -p "$target/bin"
+  printf '#!/bin/sh\necho 0.0.0\n' >"$target/bin/$application"
+  chmod +x "$target/bin/$application"
+  record_install "$application" 0 test "$target"
+  # Omit only library loading so the real installer can use fixture downloads.
+  sed '/^source .*scripts\/lib.sh/d' "$installer" >"$temporary/installer.sh"
+  for failure in probe extraction; do
+    (
+      package_version() { printf '99.0.0\n'; }
+      package_metadata() { printf 'fixture\n'; }
+      download_verified() {
+        if [[ "$failure" == extraction ]]; then
+          printf 'invalid archive\n' >"$2"
+        else
+          cp "$archive" "$2"
+        fi
+      }
+      export -f package_version package_metadata download_verified
+      export failure archive
+      if bash -c 'source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; eval "$1"; script="$2"; set --; source "$script"' _ \
+        "$(declare -f package_version package_metadata download_verified)" "$temporary/installer.sh"; then
+        printf '%s accepted %s failure\n' "$application" "$failure" >&2
+        exit 1
+      fi
+    )
+    [[ "$("$target/bin/$application")" == 0.0.0 ]]
+    assert_owned_target "$target"
+  done
+done
 printf 'Runtime staging test passed\n'

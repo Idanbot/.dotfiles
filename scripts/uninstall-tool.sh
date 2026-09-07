@@ -60,6 +60,9 @@ matches="$(awk -F '\t' -v tool="$TOOL" '$1 == tool' "$LEDGER")"
 
 while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
   case "$owner" in
+    uvx)
+      printf 'preserved shared UV cache for %s; removing only its ledger entry\n' "$tool"
+      ;;
     apt)
       if [[ "$INCLUDE_PACKAGES" == true ]]; then
         [[ "$DRY_RUN" == true ]] && printf 'would apt remove %s\n' "$target" || sudo apt-get remove -y "$target"

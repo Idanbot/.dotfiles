@@ -692,6 +692,85 @@ install_managed_tree() (
   fi
 )
 
+# Publish an application and its command links as one rollback-capable operation.
+# The probe is a shell function taking the staged application root.
+install_managed_app() (
+  local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6"
+  shift 6
+  local temporary root path stamp index name committed=false changed=false ledger_fd
+  local -a paths=("$destination") names=("$tool")
+  managed_operation_lock || return 1
+  root="$(managed_state_root)"
+  for name in "$@"; do
+    paths+=("$HOME/.local/bin/$name")
+    names+=("$name")
+  done
+  for path in "${paths[@]}"; do
+    assert_owned_target "$path" || return 1
+  done
+  mkdir -p "$(dirname "$destination")" "$HOME/.local/bin" || return 1
+  temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-app.XXXXXX")" || return 1
+  cleanup_app() {
+    local rollback_failed=false
+    if [[ "$changed" == true && "$committed" == false ]]; then
+      for index in "${!paths[@]}"; do
+        path="${paths[$index]}"
+        rm -rf -- "$path" || rollback_failed=true
+        if [[ -e "$temporary/old-$index" || -L "$temporary/old-$index" ]]; then
+          cp -a -- "$temporary/old-$index" "$path" || rollback_failed=true
+        fi
+        stamp="$(ownership_stamp "$path")"
+        rm -f -- "$stamp"
+        [[ ! -f "$temporary/stamp-$index" ]] || cp -p "$temporary/stamp-$index" "$stamp" || rollback_failed=true
+      done
+      exec {ledger_fd}>"$root/ledger.lock"
+      flock -x "$ledger_fd"
+      touch "$root/installed.tsv"
+      awk -F '\t' 'NR == FNR { paths[$0] = 1; next } !($4 in paths)' \
+        "$temporary/paths" "$root/installed.tsv" >"$temporary/ledger"
+      cat "$temporary/records" >>"$temporary/ledger"
+      chmod 600 "$temporary/ledger"
+      command mv -f "$temporary/ledger" "$root/installed.tsv" || rollback_failed=true
+    fi
+    if [[ "$rollback_failed" == true ]]; then
+      log_error "Rollback incomplete; recovery files retained at $temporary"
+      return 1
+    fi
+    rm -rf -- "$temporary"
+  }
+  trap cleanup_app EXIT
+  cp -a -- "$source" "$temporary/new" || return 1
+  "$probe" "$temporary/new" || return 1
+  printf '%s\n' "${paths[@]}" >"$temporary/paths"
+  touch "$temporary/records"
+  for index in "${!paths[@]}"; do
+    path="${paths[$index]}"
+    if [[ -e "$path" || -L "$path" ]]; then
+      cp -a -- "$path" "$temporary/old-$index" || return 1
+    fi
+    stamp="$(ownership_stamp "$path")"
+    [[ ! -f "$stamp" ]] || cp -p "$stamp" "$temporary/stamp-$index" || return 1
+    if [[ -f "$root/installed.tsv" ]]; then
+      awk -F '\t' -v path="$path" '$4 == path' "$root/installed.tsv" >>"$temporary/records"
+    fi
+  done
+  changed=true
+  rm -rf -- "$destination" || return 1
+  mv -T -- "$temporary/new" "$destination" || return 1
+  for index in "${!paths[@]}"; do
+    [[ "$index" != 0 ]] || continue
+    ln -s "$destination/bin/${names[$index]}" "$temporary/link-$index" || return 1
+    mv -Tf -- "$temporary/link-$index" "${paths[$index]}" || return 1
+  done
+  "$probe" "$destination" || return 1
+  record_install "$tool" "$version" "$owner" "$destination" || return 1
+  for index in "${!paths[@]}"; do
+    [[ "$index" != 0 ]] || continue
+    record_install "${names[$index]}" "$version" symlink "${paths[$index]}" || return 1
+  done
+  committed=true
+)
+
 install_github_archive() {
   local binary="$1" repo="$2" requested_version="$3" asset_template="$4" member="$5" checksum_template="$6"
   local version_command="${7:-$binary --version}" tag arch asset checksum_url tmpdir archive current
