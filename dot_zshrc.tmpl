@@ -363,7 +363,9 @@ if command -v direnv >/dev/null 2>&1; then
   eval "$(direnv hook zsh)"
 fi
 
-
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi
 
 if [[ "${DOTFILES_ENABLE_ATUIN:-0}" == "1" ]] && command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init zsh)"
@@ -381,6 +383,9 @@ export BAT_THEME=ansi
 export FPATH="$HOME/Scripts/eza/completions/zsh:$FPATH"
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Support an existing standalone OpenCode install without shadowing managed tools.
+[[ -d "$HOME/.opencode/bin" ]] && path+=("$HOME/.opencode/bin")
 
 # Deduplicate PATH (must be after all PATH modifications)
 typeset -U path PATH

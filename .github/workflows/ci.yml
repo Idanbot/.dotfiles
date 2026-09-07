@@ -93,6 +93,7 @@ jobs:
           tests/test-repo-layout.sh "$PWD"
           tests/test-herdr-config.sh "$PWD"
           tests/test-tmux-config.sh "$PWD"
+          bash tests/test-shell-paths.sh "$PWD"
           tests/test-kitty.sh "$PWD"
           tests/test-kubecolor.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"

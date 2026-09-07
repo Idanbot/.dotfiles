@@ -42,6 +42,10 @@ assert_absent "$TMUX_CONFIG" '-E "tmux new-session -A -s scratchpad"' \
   'scratchpad cannot attach to the outer tmux server'
 assert_contains "$TMUX_CONFIG" "set -g @resurrect-capture-pane-contents 'off'" \
   'session recovery does not persist pane output'
+assert_contains "$TMUX_CONFIG" "set -g @continuum-boot 'off'" \
+  'continuum does not auto-start tmux at boot'
+assert_contains "$TMUX_CONFIG" "set -g @continuum-restore 'off'" \
+  'continuum restoration remains manual'
 assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-kube-status)' \
   'status delegates Kubernetes context formatting to cloud-context'
 assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-agent-status)' \
