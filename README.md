@@ -95,6 +95,14 @@ plain kubectl interactively.
 
 ## Reliability Model
 
+Bootstrap resume checks the effective platform, architecture, and a digest of
+non-secret template settings. Changed inputs require a new run rather than
+reusing stale checkpoints. Ubuntu's `/usr/bin/python3` runs section helpers, so
+an active virtual environment does not need bootstrap dependencies installed.
+Targeted reconciliation includes section-owned chezmoi externals and refuses to
+mark a skipped external conflict as reconciled. Managed font pins upgrade in
+place with rollback; separately installed font families are preserved.
+
 The installer follows one path for local, one-line, CI, native, and WSL runs:
 
 1. Validate the platform and selection.

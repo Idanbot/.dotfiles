@@ -10,16 +10,22 @@ require_sudo
 ARCH="$(get_arch)"
 
 # fzf source is a checksum-pinned chezmoi external.
+FZF_VERSION="$(package_version core fzf 0.74.0)"
 if [[ -x "$HOME/.fzf/install" ]]; then
-  if ! is_installed fzf; then
+  if [[ ! -x "$HOME/.fzf/bin/fzf" ]] || ! version_ge "$("$HOME/.fzf/bin/fzf" --version)" "$FZF_VERSION"; then
     "$HOME/.fzf/install" --all --no-update-rc --no-bash --no-fish
-    record_install fzf "$(package_version core fzf 0.74.0)" chezmoi-external "$HOME/.fzf"
+    version_ge "$("$HOME/.fzf/bin/fzf" --version)" "$FZF_VERSION" || {
+      log_error "fzf did not reach pinned version $FZF_VERSION; check its external source pin"
+      exit 1
+    }
+    record_install fzf "$FZF_VERSION" chezmoi-external "$HOME/.fzf"
     log_success "fzf installed"
   else
     log_skip "fzf already installed"
   fi
 else
   log_error "Checksum-pinned fzf external is missing"
+  exit 1
 fi
 
 apt_install fd-find ripgrep bat btop htop jq gojq pigz zstd

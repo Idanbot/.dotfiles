@@ -638,7 +638,7 @@ if [[ -n "$RESUME_REQUEST" ]]; then
   fi
   if [[ -f "$STATE_ROOT/runs/$RESOLVED_RESUME_ID/plan.json" ]]; then
     resume_source="$(<"$STATE_ROOT/runs/$RESOLVED_RESUME_ID/source")"
-    resume_options="$(python3 "$resume_source/scripts/run-plan.py" options --run-dir "$STATE_ROOT/runs/$RESOLVED_RESUME_ID")"
+    resume_options="$(/usr/bin/python3 "$resume_source/scripts/run-plan.py" options --run-dir "$STATE_ROOT/runs/$RESOLVED_RESUME_ID")"
     while IFS=$'\t' read -r option value; do
       case "$option" in
         conflict_policy) [[ "$CONFLICT_POLICY_SET" == true ]] || DOTFILES_CONFLICT_POLICY="$value" ;;
@@ -937,12 +937,18 @@ stage_prerequisites() {
 
 prepare_run_plan() {
   local -a args=()
+  local template_data
+  source "$CHEZMOI_SOURCE/scripts/environment.sh"
+  template_data="$(chezmoi execute-template --source="$CHEZMOI_SOURCE" \
+    '{{ dict "name" .name "email" .email "sessionizer_dirs" .sessionizer_dirs "is_wsl" .is_wsl "is_native" .is_native | toJson }}')"
   [[ -z "$RESUME_REQUEST" ]] || args+=(--resume)
-  python3 "$CHEZMOI_SOURCE/scripts/run-plan.py" prepare \
+  /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/run-plan.py" prepare \
     --run-dir "$RUN_DIR" --source "$CHEZMOI_SOURCE" \
     --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
     --profile "$PROFILE_NAME" --conflict-policy "$DOTFILES_CONFLICT_POLICY" \
-    --doctor "$RUN_DOCTOR" --only "$ONLY_SECTION" "${args[@]}"
+    --doctor "$RUN_DOCTOR" --only "$ONLY_SECTION" \
+    --platform "$(get_platform)" --arch "$(get_arch)" \
+    --template-data "$template_data" "${args[@]}"
 }
 
 stage_source() {
@@ -1090,7 +1096,10 @@ stage_apply() {
 
 run_install_section() {
   local section="$1" script_path
-  script_path="$(python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" script "$section")"
+  if [[ -n "$ONLY_SECTION" ]]; then
+    "$CHEZMOI_SOURCE/scripts/reconcile-externals.sh" "$section"
+  fi
+  script_path="$(/usr/bin/python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" script "$section")"
   [[ -n "$script_path" && -f "$CHEZMOI_SOURCE/$script_path" ]] || {
     log_error "Missing section implementation for $section"
     return 1
@@ -1105,7 +1114,7 @@ run_install_section() {
       DOTFILES_COLOR_ACTIVE="$DOTFILES_COLOR_ACTIVE" \
       bash
 
-  python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" --state "$STATE_ROOT" record "$section"
+  /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/section-state.py" --source "$CHEZMOI_SOURCE" --state "$STATE_ROOT" record "$section"
 }
 
 stage_doctor() {

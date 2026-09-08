@@ -1,61 +1,32 @@
 #!/usr/bin/env bash
-# test-lint.sh — Run all linters locally
+# Run the same file selection and linter options as CI; any failure is fatal.
 set -euo pipefail
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BOLD='\033[1m'
-NC='\033[0m'
-
-ERRORS=0
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
-
-echo -e "\n${BOLD}══ Lint Suite ══${NC}\n"
-
-# ── shellcheck ────────────────────────────────────────────────────────────────
-if command -v shellcheck &>/dev/null; then
-  echo -e "${BOLD}── shellcheck ──${NC}"
-  find "$DOTFILES_DIR" -name '*.sh' | while read -r f; do
-    if shellcheck -x -S warning "$f" 2>/dev/null; then
-      echo -e "  ${GREEN}✓${NC} $f"
-    else
-      echo -e "  ${RED}✗${NC} $f"
-      ((ERRORS++)) || true
-    fi
-  done
-else
-  echo -e "  ${YELLOW}⚠${NC} shellcheck not installed — skipping"
-fi
-
-# ── shfmt ─────────────────────────────────────────────────────────────────────
-if command -v shfmt &>/dev/null; then
-  echo -e "\n${BOLD}── shfmt ──${NC}"
-  if shfmt -d -i 2 -ci "$DOTFILES_DIR" 2>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} All files formatted correctly"
-  else
-    echo -e "  ${RED}✗${NC} Formatting issues found"
-    ((ERRORS++)) || true
+cd "$DOTFILES_DIR"
+errors=0
+mapfile -d '' -t files < <(
+  find scripts tests -type f -name '*.sh' -print0
+  find dot_local/bin -type f -name 'executable_*' ! -name '*.tmpl' -print0
+)
+for linter in shellcheck shfmt yamllint; do
+  printf '\n== %s ==\n' "$linter"
+  if ! command -v "$linter" >/dev/null 2>&1; then
+    printf '[FAIL] Required linter is missing: %s\n' "$linter" >&2
+    errors=$((errors + 1))
+    continue
   fi
-else
-  echo -e "  ${YELLOW}⚠${NC} shfmt not installed — skipping"
-fi
-
-# ── yamllint ──────────────────────────────────────────────────────────────────
-if command -v yamllint &>/dev/null; then
-  echo -e "\n${BOLD}── yamllint ──${NC}"
-  if yamllint -d relaxed "$DOTFILES_DIR" 2>/dev/null; then
-    echo -e "  ${GREEN}✓${NC} All YAML files valid"
-  else
-    echo -e "  ${YELLOW}⚠${NC} YAML lint warnings"
+  case "$linter" in
+    shellcheck) args=(-x -S warning -e 'SC1090,SC1091' "${files[@]}") ;;
+    shfmt) args=(-d -i 2 -ci "${files[@]}") ;;
+    yamllint) args=(.) ;;
+  esac
+  if ! "$linter" "${args[@]}"; then
+    printf '[FAIL] %s\n' "$linter" >&2
+    errors=$((errors + 1))
   fi
-else
-  echo -e "  ${YELLOW}⚠${NC} yamllint not installed — skipping"
-fi
-
-if [[ $ERRORS -gt 0 ]]; then
-  echo -e "\n${RED}${BOLD}LINT FAILED ($ERRORS errors)${NC}"
+done
+if ((errors)); then
+  printf 'LINT FAILED (%s failed or missing linters)\n' "$errors" >&2
   exit 1
-else
-  echo -e "\n${GREEN}${BOLD}ALL LINTS PASSED${NC}"
 fi
+printf 'ALL LINTS PASSED\n'

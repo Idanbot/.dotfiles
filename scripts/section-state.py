@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Canonical section inputs for bootstrap and targeted reconciliation."""
 import argparse
 import hashlib
@@ -16,6 +16,10 @@ def registry(root):
 def fingerprint(root, name):
     entry = registry(root)[name]
     inputs = {"schema": 1, "section": name, "definition": entry}
+    if entry.get("externals"):
+        inputs["externals"] = external_entries(root, name)
+        helper = root / "scripts/reconcile-externals.sh"
+        inputs["external_helper"] = hashlib.sha256(helper.read_bytes()).hexdigest() if helper.is_file() else None
     for filename in ("packages.yaml", "packages.meta.yaml"):
         data = yaml.safe_load((root / filename).read_text()) or {}
         for excluded in entry.get("exclude", []):
@@ -33,6 +37,15 @@ def fingerprint(root, name):
         path = root / filename
         inputs[filename] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def external_entries(root, name):
+    prefixes = registry(root)[name].get("externals", [])
+    if not prefixes:
+        return {}
+    entries = yaml.safe_load((root / ".chezmoiexternal.yaml").read_text()) or {}
+    return {path: value for path, value in entries.items()
+            if any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)}
 
 
 def record(root, state, name):
@@ -64,7 +77,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--state", type=Path)
-    parser.add_argument("command", choices=["list", "script", "fingerprint", "record", "selected"])
+    parser.add_argument("command", choices=["list", "script", "fingerprint", "record", "selected", "externals"])
     parser.add_argument("section", nargs="?")
     args = parser.parse_args()
     entries = registry(args.source)
@@ -76,6 +89,9 @@ def main():
         parser.error(f"Unknown section: {args.section}")
     elif args.command == "script":
         print(entries[args.section]["script"])
+    elif args.command == "externals":
+        for path in external_entries(args.source, args.section):
+            print(path)
     elif args.command == "fingerprint":
         print(fingerprint(args.source, args.section))
     else:

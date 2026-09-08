@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import tempfile
 
@@ -36,6 +37,9 @@ def main():
     parser.add_argument("--doctor")
     parser.add_argument("--only", default="")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--platform", default=platform.system())
+    parser.add_argument("--arch", default=platform.machine())
+    parser.add_argument("--template-data", default="{}")
     args = parser.parse_args()
     destination = args.run_dir / "plan.json"
     if args.command == "options":
@@ -43,10 +47,16 @@ def main():
         for key in ("conflict_policy", "doctor", "only"):
             print(f"{key}\t{data[key]}")
         return
-    data = {"schema": 1, "source": str(args.source.resolve()),
+    resolved = json.loads(args.template_data)
+    allowed = {key: resolved.get(key) for key in
+               ("name", "email", "sessionizer_dirs", "is_wsl", "is_native")}
+    data = {"schema": 2, "source": str(args.source.resolve()),
             "source_sha256": source_digest(args.source), "sections": args.sections,
             "profile": args.profile, "conflict_policy": args.conflict_policy,
-            "doctor": args.doctor, "only": args.only}
+            "doctor": args.doctor, "only": args.only,
+            "platform": args.platform, "arch": args.arch,
+            "wsl_override": os.environ.get("DOTFILES_WSL", "auto"),
+            "template_sha256": hashlib.sha256(json.dumps(allowed, sort_keys=True).encode()).hexdigest()}
     if args.resume:
         if not destination.is_file():
             raise ValueError("Legacy run has no validated plan. Start a new bootstrap run; existing backups are preserved.")

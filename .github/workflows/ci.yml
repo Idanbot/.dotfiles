@@ -94,6 +94,8 @@ jobs:
           tests/test-herdr-config.sh "$PWD"
           tests/test-tmux-config.sh "$PWD"
           bash tests/test-shell-paths.sh "$PWD"
+          tests/test-lint-wrapper.sh "$PWD"
+          tests/test-managed-upgrades.sh "$PWD"
           tests/test-kitty.sh "$PWD"
           tests/test-kubecolor.sh "$PWD"
           tests/test-cloud-context.sh "$PWD"
@@ -432,7 +434,7 @@ jobs:
             dotfiles-unit bash -lc '
               set -e
               sudo apt-get update -qq
-              sudo apt-get install -y python3 yq zsh tmux openssh-client
+              sudo apt-get install -y python3 yq zsh tmux openssh-client xz-utils
               /dotfiles/scripts/install-chezmoi.sh
               export PATH="$HOME/.local/bin:$PATH"
               for test in \

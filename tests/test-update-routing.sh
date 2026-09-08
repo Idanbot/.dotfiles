@@ -10,6 +10,7 @@ export DOTFILES_SOURCE_DIR="$TMP_ROOT/source"
 mkdir -p "$HOME" "$DOTFILES_SOURCE_DIR/scripts"
 cp "$DOTFILES_DIR/packages.yaml" "$DOTFILES_SOURCE_DIR/packages.yaml"
 cp "$DOTFILES_DIR/packages.meta.yaml" "$DOTFILES_SOURCE_DIR/packages.meta.yaml"
+cp "$DOTFILES_DIR/.chezmoiexternal.yaml" "$DOTFILES_SOURCE_DIR/.chezmoiexternal.yaml"
 cp -a "$DOTFILES_DIR/.chezmoiscripts" "$DOTFILES_SOURCE_DIR/"
 cp "$DOTFILES_DIR/scripts/section-state.py" "$DOTFILES_DIR/scripts/sections.json" "$DOTFILES_SOURCE_DIR/scripts/"
 cp "$DOTFILES_DIR/scripts/lib.sh" "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
@@ -29,6 +30,12 @@ first="$(wc -l <"$MOCK_CALLS")"
 [[ "$first" -eq 4 ]]
 grep -Fxq cloud "$MOCK_CALLS"
 grep -Fxq desktop "$MOCK_CALLS"
+# A user virtual environment/custom python3 must not own bootstrap dependencies.
+mkdir -p "$TMP_ROOT/venv/bin"
+printf '#!/bin/sh\necho "wrong Python interpreter" >&2\nexit 99\n' >"$TMP_ROOT/venv/bin/python3"
+chmod +x "$TMP_ROOT/venv/bin/python3"
+export VIRTUAL_ENV="$TMP_ROOT/venv"
+export PATH="$VIRTUAL_ENV/bin:$PATH"
 : >"$MOCK_CALLS"
 "$DOTFILES_SOURCE_DIR/scripts/reconcile-packages.sh" >/dev/null
 [[ ! -s "$MOCK_CALLS" ]]
@@ -55,7 +62,7 @@ sed -i '/^ai_tools:/a\  unselected_probe: changed' "$DOTFILES_SOURCE_DIR/package
 
 # Bootstrap's exact successful record operation establishes a reconcile baseline.
 sed -i '/^languages:/a\  bootstrap_probe: changed' "$DOTFILES_SOURCE_DIR/packages.yaml"
-python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR" --state "$DOTFILES_STATE_DIR" record languages
+/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR" --state "$DOTFILES_STATE_DIR" record languages
 "$DOTFILES_SOURCE_DIR/scripts/reconcile-packages.sh" >/dev/null
 [[ ! -s "$MOCK_CALLS" ]]
 before_failure="$(<"$DOTFILES_STATE_DIR/package-sections/languages.sha256")"
@@ -68,3 +75,35 @@ fi
 [[ "$(<"$DOTFILES_STATE_DIR/package-sections/languages.sha256")" == "$before_failure" ]]
 
 printf 'Update routing test passed\n'
+
+# External-only updates affect their owning section, not unrelated tools.
+fingerprint() {
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR" fingerprint "$1"
+}
+zsh_before="$(fingerprint zsh)"
+tmux_before="$(fingerprint tmux)"
+terminal_before="$(fingerprint terminal)"
+/usr/bin/python3 - "$DOTFILES_SOURCE_DIR/.chezmoiexternal.yaml" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+path = Path(sys.argv[1])
+data = yaml.safe_load(path.read_text())
+data['.oh-my-zsh']['checksum']['sha256'] = 'f' * 64
+path.write_text(yaml.safe_dump(data))
+PY
+[[ "$(fingerprint zsh)" != "$zsh_before" ]]
+[[ "$(fingerprint tmux)" == "$tmux_before" ]]
+[[ "$(fingerprint terminal)" == "$terminal_before" ]]
+
+mkdir -p "$TMP_ROOT/bin"
+printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "$MOCK_CALLS"\n[ "${FAIL_EXTERNAL:-0}" != 1 ]\n' >"$TMP_ROOT/bin/chezmoi"
+chmod +x "$TMP_ROOT/bin/chezmoi"
+: >"$MOCK_CALLS"
+PATH="$TMP_ROOT/bin:$PATH" "$DOTFILES_DIR/scripts/reconcile-externals.sh" terminal
+grep -Fq "apply --source=$DOTFILES_SOURCE_DIR --exclude=scripts --recursive -- $HOME/.fzf" "$MOCK_CALLS"
+grep -Fq "verify --source=$DOTFILES_SOURCE_DIR --exclude=scripts --recursive -- $HOME/.fzf" "$MOCK_CALLS"
+if PATH="$TMP_ROOT/bin:$PATH" FAIL_EXTERNAL=1 "$DOTFILES_DIR/scripts/reconcile-externals.sh" terminal; then
+  printf 'External apply failure was ignored\n' >&2
+  exit 1
+fi

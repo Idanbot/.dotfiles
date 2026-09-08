@@ -39,7 +39,7 @@ STATE_ROOT="$(managed_state_root)"
 HASH_DIR="$STATE_ROOT/package-sections"
 RUN_SECTION="${DOTFILES_RUN_SECTION:-$DOTFILES_SOURCE_DIR/scripts/run-section.sh}"
 mkdir -p "$HASH_DIR"
-state_command=(python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR" --state "$STATE_ROOT")
+state_command=(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR" --state "$STATE_ROOT")
 [[ -n "$SECTIONS" ]] || SECTIONS="$("${state_command[@]}" selected)"
 IFS=, read -r -a selected <<<"$SECTIONS"
 declare -A wanted=()

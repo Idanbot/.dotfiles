@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Regression coverage for immutable resume inputs, without installing tools."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 
 root = Path(sys.argv[1]).resolve()
+os.environ["DOTFILES_WSL"] = "false"
 with tempfile.TemporaryDirectory() as temporary:
     base = Path(temporary)
     source = base / "source"
@@ -40,7 +42,16 @@ with tempfile.TemporaryDirectory() as temporary:
     result = subprocess.run(command + ["--resume"], capture_output=True, text=True)
     assert result.returncode and "source_sha256" in result.stderr
     assert plan.read_bytes() == original
-    assert json.loads(original)["schema"] == 1
+    assert json.loads(original)["schema"] == 2
+    manifest.write_text("version: 1\n")
+    for option, value in [("--platform", "changed-platform"), ("--arch", "changed-arch"),
+                          ("--template-data", '{"sessionizer_dirs":"~/Different"}')]:
+        result = subprocess.run(command + [option, value, "--resume"], capture_output=True, text=True)
+        assert result.returncode and "Resume inputs changed" in result.stderr
+        assert plan.read_bytes() == original
+    result = subprocess.run(command + ["--resume"], env={**os.environ, "DOTFILES_WSL": "true"},
+                            capture_output=True, text=True)
+    assert result.returncode and "wsl_override" in result.stderr
     plan.unlink()
     result = subprocess.run(command + ["--resume"], capture_output=True, text=True)
     assert result.returncode and "Legacy run" in result.stderr
