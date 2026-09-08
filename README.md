@@ -582,6 +582,7 @@ cloud-context --test all            # fake every prompt context in isolated conf
 cloud-context --test-clear aws       # remove one fake context
 cloud-context --test-clear           # remove all fake contexts
 cloud-context --list
+cloud-context prompt aws --refresh # refresh account after SSO/role changes
 ```
 
 AWS profile selection is shell-local, so the managed Zsh wrapper sources only
@@ -589,6 +590,15 @@ AWS profile selection is shell-local, so the managed Zsh wrapper sources only
 `kubectl config`, GCloud uses named configurations and project selection, and
 Azure uses `az account`. Saved profiles are mode `0600` under
 `~/.config/dotfiles/cloud-contexts/`.
+
+Empty saved fields clear the corresponding selection through native commands;
+an empty GCP project clears the project without deleting a named configuration.
+Unavailable providers with empty saved fields are left alone. Partial failures
+remain errors, but successful AWS shell changes take effect immediately.
+The AWS account prompt caches results for at most 30 seconds and invalidates on
+credential environment or configuration-file changes, storing only a digest.
+Server-side SSO/role changes cannot always be detected locally: use
+`cloud-context prompt aws --refresh` to bypass that cache after switching identity.
 
 GCP, AWS, and Azure selectors prioritize the five most recently selected values
 before the full provider-native list. Before each `--clear`, the command stores

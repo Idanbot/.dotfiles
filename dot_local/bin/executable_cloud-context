@@ -28,6 +28,7 @@ Usage: cloud-context [command]
       --test-clear [PROVIDER]
                             Remove one fake context or all fake contexts
   --list                    List saved profiles
+  prompt aws --refresh      Refresh the cached AWS account immediately
 
 Selectable providers: gcloud, aws, azure
 Clear/test providers: kubectl, gcloud, aws, azure
@@ -109,6 +110,10 @@ aws_profile() {
 
 aws_region() {
   local profile
+  if [[ -n "${AWS_REGION:-${AWS_DEFAULT_REGION:-}}" ]]; then
+    printf '%s\n' "${AWS_REGION:-$AWS_DEFAULT_REGION}"
+    return
+  fi
   profile="$(aws_profile)"
   have aws && aws configure get region --profile "$profile" 2>/dev/null || true
 }
@@ -139,6 +144,7 @@ write_aws_env() {
     fi
     printf 'unset AWS_DEFAULT_PROFILE\n'
     if [[ -n "$region" ]]; then
+      printf 'export AWS_REGION=%q\n' "$region"
       printf 'export AWS_DEFAULT_REGION=%q\n' "$region"
     else
       printf 'unset AWS_DEFAULT_REGION AWS_REGION\n'
@@ -499,6 +505,8 @@ load_profile_file() {
         warn "kubectl context '$kube' could not be activated"
         failed=true
       }
+  elif have kubectl; then
+    clear_provider kubectl || failed=true
   fi
   if [[ -n "$gconfig" ]]; then
     gcloud config configurations activate "$gconfig" --quiet >/dev/null ||
@@ -513,6 +521,8 @@ load_profile_file() {
         warn "gcloud project '$gproject' could not be activated"
         failed=true
       }
+  elif have gcloud; then
+    clear_provider gcloud || failed=true
   fi
   if [[ -n "$azure" ]]; then
     az account set --subscription "$azure" ||
@@ -520,6 +530,8 @@ load_profile_file() {
         warn "Azure subscription '$azure' could not be activated"
         failed=true
       }
+  elif have az; then
+    clear_provider azure || failed=true
   fi
   if [[ "$failed" == true ]]; then
     warn "Profile '$name' was only partially loaded; inspect cloud-context --status"
@@ -828,6 +840,27 @@ clear_test_contexts() {
   info "Removed isolated fake ${provider/all/all providers} context"
 }
 
+aws_identity_key() {
+  # Only a digest leaves this pipeline, never credentials or their file contents.
+  local name file
+  {
+    for name in AWS_PROFILE AWS_DEFAULT_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY \
+      AWS_SESSION_TOKEN AWS_SECURITY_TOKEN AWS_ROLE_ARN AWS_ROLE_SESSION_NAME \
+      AWS_WEB_IDENTITY_TOKEN_FILE AWS_CONTAINER_CREDENTIALS_RELATIVE_URI \
+      AWS_CONTAINER_CREDENTIALS_FULL_URI AWS_CONTAINER_AUTHORIZATION_TOKEN \
+      AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE AWS_EC2_METADATA_DISABLED \
+      AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE; do
+      printf '%s=%s\0' "$name" "${!name:-}"
+    done
+    for file in "${AWS_CONFIG_FILE:-$HOME/.aws/config}" \
+      "${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}" \
+      "${AWS_WEB_IDENTITY_TOKEN_FILE:-}" "${AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE:-}"; do
+      printf '%s\0' "$file"
+      [[ ! -f "$file" || ! -r "$file" ]] || sha256sum <"$file"
+    done
+  } | sha256sum | awk '{print $1}'
+}
+
 prompt_aws() {
   local now profile cached_at cached_profile cached_account account
   if [[ -n "${CLOUD_CONTEXT_TEST_AWS_ACCOUNT:-}" ]]; then
@@ -836,12 +869,12 @@ prompt_aws() {
     return
   fi
   have aws || return 1
-  profile="$(aws_profile)"
+  profile="$(aws_identity_key)"
   now="$(date +%s)"
-  if [[ -r "$AWS_CACHE" ]]; then
+  if [[ "${1:-}" != --refresh && -r "$AWS_CACHE" ]]; then
     IFS=$'\t' read -r cached_at cached_profile cached_account <"$AWS_CACHE" || true
     if [[ "$cached_profile" == "$profile" && "$cached_at" =~ ^[0-9]+$ &&
-      $((now - cached_at)) -lt 300 ]]; then
+      $((now - cached_at)) -ge 0 && $((now - cached_at)) -lt 30 ]]; then
       [[ "$cached_account" != - ]] && printf '%s\n' "$cached_account"
       [[ "$cached_account" != - ]]
       return
@@ -920,7 +953,7 @@ case "${1:---status}" in
     ;;
   prompt)
     case "${2:-}" in
-      aws) prompt_aws ;;
+      aws) prompt_aws "${3:-}" ;;
       kubectl | kube) prompt_kubectl ;;
       *) exit 2 ;;
     esac

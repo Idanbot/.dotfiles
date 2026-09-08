@@ -341,8 +341,10 @@ _cloud_context_source_env() {
 }
 _cloud_context_source_env
 cloud-context() {
-  command cloud-context "$@" || return
+  local result=0
+  command cloud-context "$@" || result=$?
   _cloud_context_source_env
+  (( result == 0 )) || return "$result"
   case "${1:-}" in
     -t | --test) command cloud-context --status ;;
   esac

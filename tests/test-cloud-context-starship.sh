@@ -166,7 +166,8 @@ render_module() {
 }
 
 load_context() {
-  "$SCRIPT" "$@" >/dev/null || return
+  local result=0
+  "$SCRIPT" "$@" >/dev/null || result=$?
   if [[ -r "$XDG_STATE_HOME/dotfiles/cloud-context.env" ]]; then
     # shellcheck disable=SC1090
     source "$XDG_STATE_HOME/dotfiles/cloud-context.env"
@@ -175,6 +176,7 @@ load_context() {
     # shellcheck disable=SC1090
     source "$XDG_STATE_HOME/dotfiles/cloud-context-test.env"
   fi
+  return "$result"
 }
 
 [[ "$(starship prompt --path "$TMP_ROOT" --status 0 --cmd-duration 0)" != *".aws_account"* ]]
@@ -214,11 +216,20 @@ short_context="..${long_context: -26}"
 [[ "$kube_prompt" != *"$long_context"* ]]
 sed -i "s/current-context: $long_context/current-context: lab/" "$KUBECONFIG"
 
-load_context --clear
+printf 'kubectl_context\t\ngcloud_configuration\t\ngcloud_project\t\naws_profile\t\naws_region\t\nazure_subscription\t\n' \
+  >"${PROFILE%/*}/empty.tsv"
+load_context --load empty
 [[ -z "$(render_module custom.kubernetes_context)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module custom.aws_account)" ]]
+[[ -z "$(render_module azure)" ]]
+
+load_context --load work
+load_context --clear
+[[ -z "$(render_module custom.kubernetes_context)" ]]
+[[ -z "$(render_module gcloud)" ]]
+[[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module azure)" ]]
 
 load_context --test all --yes
@@ -257,3 +268,18 @@ fi
 [[ -z "$(render_module azure)" ]]
 
 printf 'Cloud context Starship integration test passed\n'
+
+# Run the actual Zsh wrapper: a failing provider must not defer AWS changes.
+sed -n '/^_cloud_context_source_env() {/,/^alias cctx=/p' \
+  "$DOTFILES_DIR/dot_zshrc.tmpl" >"$TMP_ROOT/wrapper.zsh"
+zsh -f -c '
+  source "$1"
+  export AWS_PROFILE=work AWS_REGION=eu-west-1 AWS_DEFAULT_REGION=eu-west-1
+  cloud-context --clear >/dev/null 2>&1
+  result=$?
+  [[ "$result" == 1 ]] || exit 1
+  [[ -z ${AWS_PROFILE:-}${AWS_REGION:-}${AWS_DEFAULT_REGION:-} ]] || exit 1
+  [[ -z "$(starship module aws)" ]] || exit 1
+  cloud-context --status >/dev/null
+  [[ -z ${AWS_PROFILE:-}${AWS_REGION:-}${AWS_DEFAULT_REGION:-} ]]
+' _ "$TMP_ROOT/wrapper.zsh"

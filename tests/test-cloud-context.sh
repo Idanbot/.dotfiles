@@ -75,7 +75,7 @@ case "$*" in
       printf "profile-%s\n" "$i"
     done
     ;;
-  "sts get-caller-identity --query Account --output text") printf "123456789012\n" ;;
+  "sts get-caller-identity --query Account --output text") printf "%s\n" "${MOCK_ACCOUNT:-123456789012}" ;;
 esac'
 make_mock az '
 case "$*" in
@@ -213,6 +213,32 @@ grep -Fq $'gcloud\tconfig set project project-123 --quiet' "$CALLS"
 grep -Fq 'export AWS_PROFILE=work' "$HOME/.local/state/dotfiles/cloud-context.env"
 
 [[ "$("$SCRIPT" prompt aws)" == 123456789012 ]]
+export AWS_ACCESS_KEY_ID=synthetic-key-one
+[[ "$(MOCK_ACCOUNT=111111111111 "$SCRIPT" prompt aws)" == 111111111111 ]]
+export AWS_ACCESS_KEY_ID=synthetic-key-two
+[[ "$(MOCK_ACCOUNT=222222222222 "$SCRIPT" prompt aws)" == 222222222222 ]]
+[[ "$(MOCK_ACCOUNT=333333333333 "$SCRIPT" prompt aws --refresh)" == 333333333333 ]]
+export AWS_CONFIG_FILE="$TMP_ROOT/aws-config"
+printf '[default]\nregion=eu-west-1\n' >"$AWS_CONFIG_FILE"
+[[ "$(MOCK_ACCOUNT=444444444444 "$SCRIPT" prompt aws)" == 444444444444 ]]
+printf '[default]\nregion=us-east-1\n' >"$AWS_CONFIG_FILE"
+[[ "$(MOCK_ACCOUNT=555555555555 "$SCRIPT" prompt aws)" == 555555555555 ]]
+export AWS_SHARED_CREDENTIALS_FILE="$TMP_ROOT/aws-credentials"
+printf 'synthetic-one\n' >"$AWS_SHARED_CREDENTIALS_FILE"
+[[ "$(MOCK_ACCOUNT=666666666666 "$SCRIPT" prompt aws)" == 666666666666 ]]
+printf 'synthetic-two\n' >"$AWS_SHARED_CREDENTIALS_FILE"
+[[ "$(MOCK_ACCOUNT=777777777777 "$SCRIPT" prompt aws)" == 777777777777 ]]
+! grep -Rq 'synthetic-' "$XDG_STATE_HOME/dotfiles"
+unset AWS_ACCESS_KEY_ID AWS_CONFIG_FILE AWS_SHARED_CREDENTIALS_FILE
+AWS_REGION=us-west-2 AWS_DEFAULT_REGION=eu-west-3 "$SCRIPT" --save region-test >/dev/null
+grep -Fq $'aws_region\tus-west-2' "${PROFILE%/*}/region-test.tsv"
+rm "${PROFILE%/*}/region-test.tsv"
+"$SCRIPT" --load workstation >/dev/null
+(
+  export AWS_REGION=us-west-2
+  source "$XDG_STATE_HOME/dotfiles/cloud-context.env"
+  [[ "$AWS_REGION" == eu-west-1 && "$AWS_DEFAULT_REGION" == eu-west-1 ]]
+)
 [[ "$("$SCRIPT" prompt kubectl)" == 'lab (team-a)' ]]
 long_context=organization-production-europe-west1-primary-cluster
 make_mock kubectl "
