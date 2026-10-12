@@ -240,7 +240,7 @@ jobs:
           ./scripts/hyperfine-benchmark.sh --output "$BENCHMARK_OUTPUT"
           cat "$BENCHMARK_OUTPUT/summary.md" >>"$GITHUB_STEP_SUMMARY"
       - name: Upload benchmark artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hyperfine-benchmarks
           path: ${{ runner.temp }}/dotfiles-hyperfine/
@@ -268,7 +268,7 @@ jobs:
           ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
           cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
       - name: Upload upgrade report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: version-checksum-report
           path: ${{ runner.temp }}/dotfiles-upgrade-report.md
@@ -336,7 +336,7 @@ jobs:
           cat artifacts/agent-workspace/summary.md >>"$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - name: Upload workspace observability bundle
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: agent-workspace-e2e
           path: artifacts/agent-workspace/
@@ -483,7 +483,7 @@ jobs:
             xargs -0 -r cat >>"$GITHUB_STEP_SUMMARY"
       - name: Upload E2E observability bundle
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: base-e2e-${{ matrix.service }}
           path: artifacts/
@@ -491,7 +491,7 @@ jobs:
           retention-days: 14
       - name: Upload performance sample
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: performance-sample-base-${{ matrix.service }}
           path: artifacts/**/performance.json
@@ -515,7 +515,7 @@ jobs:
         run: docker compose -f .github/e2e/compose.yaml --profile recovery run --rm failure-resume
       - name: Upload recovery logs
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: recovery-e2e
           path: artifacts/
@@ -557,7 +557,7 @@ jobs:
             xargs -0 -r cat >>"$GITHUB_STEP_SUMMARY"
       - name: Upload profile logs
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: heavy-e2e-${{ matrix.service }}
           path: artifacts/
@@ -565,7 +565,7 @@ jobs:
           retention-days: 14
       - name: Upload performance sample
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: performance-sample-heavy-${{ matrix.service }}
           path: artifacts/**/performance.json
@@ -641,7 +641,7 @@ jobs:
           cat "$RUNNER_TEMP/performance-dashboard/performance-history.md" \
             >>"$GITHUB_STEP_SUMMARY"
       - name: Upload rolling performance history
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: performance-history
           path: ${{ runner.temp }}/performance-dashboard/

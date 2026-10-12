@@ -64,8 +64,8 @@ core:
     repo: cli/cli
     binary: gh
     integrity: pinned-sha256
-    sha256_amd64: 3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
-    sha256_arm64: cf689084f3a3618f7eae4a2420d335d74626d65f5e594b9828d125d69f800d86
+    sha256_amd64: bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
+    sha256_arm64: 7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484
   jq:
     source: apt
     owner: apt
@@ -163,8 +163,8 @@ core:
     repo: ast-grep/ast-grep
     binary: ast-grep
     integrity: pinned-sha256
-    sha256_amd64: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
-    sha256_arm64: b39cfbc58da4b869a88b8a4bc57bd5deb0d24541e704cf7c257da7b53ec81c8f
+    sha256_amd64: 0fd3f489639abb8465a914b74b8779171577582318d8a940d00399f59dba81c5
+    sha256_arm64: 3a4ad22dd1dca7a4900a173de65885578617af57fa13dd93b8d345d6b352770e
   gitleaks:
     source: github
     owner: dotfiles-binary
@@ -242,8 +242,8 @@ editor:
     repo: neovim/neovim
     binary: nvim
     integrity: pinned-sha256
-    sha256_amd64: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
-    sha256_arm64: 1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725
+    sha256_amd64: 474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87
+    sha256_arm64: 8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815
 
 cloud:
   docker:
@@ -282,8 +282,8 @@ cloud:
     owner: vendor-installer
     binary: aws
     integrity: pinned-sha256
-    sha256_amd64: ac07f6cb7beffd1e8af3b373de5b192062ca6c486596203e6961d01e6de14b0e
-    sha256_arm64: c2f5060dca1d279325a84f1501e08a7ed7c69604cdde9f765b54625cb6bfab15
+    sha256_amd64: e6d3c672fb36ed4b12c354c39a993eee2b34da1437cafb10bac4480840cfa83f
+    sha256_arm64: 829c76096e05f743267d75098bc7cc7cfae799fc7e568554ebaa6d78e6aba753
   gcloud:
     source: apt_repo
     owner: apt
@@ -298,8 +298,8 @@ cloud:
     repo: cloudflare/cloudflared
     binary: cloudflared
     integrity: pinned-sha256
-    sha256_amd64: 660b348d473bba81997445b534e7eaefaf4c4e16331866922326c338a7013dd9
-    sha256_arm64: 2c0d991ed6061e55d2e0148b794d86f594ddb473c1db43cf0647278b62e326ab
+    sha256_amd64: 9721287c28f78cb623e77c7b95a63feea87e909054d75666a0ec9eff20e5d548
+    sha256_arm64: 7e0d76de3858b6396bd234ae26182bee222133398667d2647b90381d00c00e98
   s5cmd:
     source: github
     owner: dotfiles-binary
@@ -348,8 +348,8 @@ cloud:
     repo: skyhook-io/radar
     binary: kubectl-radar
     integrity: pinned-sha256
-    sha256_amd64: 5606aa34ad9c2e13c5100c60fe1765265dbfe9b6af7d0ce6a3f5dad6f85d049c
-    sha256_arm64: 6b893a11c933a56e5a24bf199a64039c71f5dbfbfb0684bd9b97507bae2fb946
+    sha256_amd64: f6c8af8434117eba76a1553935a9107dcda5ba7cfebb63ed1fbdb5711804798c
+    sha256_arm64: bd8dc0ceece3dff87d2c3a981b0469e4311b8c5d942a1a7ccc7984d48e79568c
 
 database:
   usql:
@@ -381,8 +381,8 @@ terminal:
     repo: kovidgoyal/kitty
     binary: kitty
     integrity: pinned-sha256
-    sha256_amd64: 967a1958e7fc67b495d279c0963bcd1a0482097151817ce6506fabc822689af7
-    sha256_arm64: 534b214d407a05e4603da75ef02fffa592ec1bbec20a413c5e0cd3f853c928cb
+    sha256_amd64: d573618b911e9c461bd421b96c13c74c7f1cb2f1ac9c327818d4ff84366cf5c6
+    sha256_arm64: 0c81a995614426cccf0fecaf7d104d47cd63bbccf173d14976e9f92e3d60fce6
   tmux:
     source: apt
     owner: apt
@@ -400,8 +400,8 @@ terminal:
     repo: ogulcancelik/herdr
     binary: herdr
     asset_template: herdr-linux-{release_arch}
-    sha256_amd64: 976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4
-    sha256_arm64: f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d
+    sha256_amd64: 18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7
+    sha256_arm64: 4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0
     integrity: pinned-sha256
 
 system:
@@ -411,8 +411,8 @@ system:
     repo: git-ecosystem/git-credential-manager
     binary: git-credential-manager
     integrity: pinned-sha256
-    sha256_amd64: a0c59d2ea873a930fd1c41031a25cb31055d31baaf80c10726847e1c1f7aa951
-    sha256_arm64: 8dd4cee6f5820516d1d1982bc8d68ce1c3e221cd2bf0629b10f0f2c059af9543
+    sha256_amd64: 530d7e2a99ddd048b62e71ed4e18e8692287bdb60df2eaace3cd439010b8f624
+    sha256_arm64: a915b3bb648e4e978aa9e198e8bbeb50df229bcdba3007193651dec237165291
 
 fonts:
   nerd_font:
@@ -439,14 +439,14 @@ ai_tools:
     url: https://chatgpt.com/codex/install.sh
     binary: codex
     integrity: pinned-sha256
-    sha256: ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a
+    sha256: 150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6
   antigravity_cli:
     source: install_script
     owner: vendor-installer
     url: https://antigravity.google/cli/install.sh
     binary: agy
     integrity: pinned-sha256
-    sha256: ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9c640
+    sha256: 62966c07365423bd4dc209355060744058fb30d60f5323e2d360e39de64e5042
   opencode:
     source: npm
     owner: npm
@@ -459,8 +459,8 @@ ai_tools:
     repo: can1357/oh-my-pi
     binary: omp
     asset_template: omp-linux-{release_arch}
-    sha256_amd64: 04780b41fb33b658ca6e8449353911babc8c90332ac444e7e6562d041d3eae52
-    sha256_arm64: a8bf4dcc47dcf3284a0f6c43ffeb94adc0a2f031dcd7f8ab8ed92d0215c89a9d
+    sha256_amd64: 9798d22d518b23342b4cadf57672b276ef09e756c1832adc6571b04b26ad4f1b
+    sha256_arm64: 5cad38a8edee60cec9c0ce91810eba38bda0efe349562157023810343dacb8d5
     integrity: pinned-sha256
   bun:
     source: github
@@ -468,8 +468,8 @@ ai_tools:
     repo: oven-sh/bun
     binary: bun
     asset_template: bun-linux-{release_arch}.zip
-    sha256_amd64: 184fb4595f0d401a217cf7c78c1bc430ba83314dab7a8b94805babbf7fa7097f
-    sha256_arm64: 4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e
+    sha256_amd64: 1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b
+    sha256_arm64: efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21
     integrity: pinned-sha256
   serena:
     source: uv
@@ -496,15 +496,15 @@ ai_tools:
     binary: rtk
     asset_template_amd64: rtk-x86_64-unknown-linux-musl.tar.gz
     asset_template_arm64: rtk-aarch64-unknown-linux-gnu.tar.gz
-    sha256_amd64: 79aa5b89c69566bbfeceb66c8a27cfbe52237fc7ee3e683115f43745a3262d21
-    sha256_arm64: e8c2e1787f46017ea7c5a711b2bc6a7f7cf61c7ad69385b4c1e4daff1135dcd1
+    sha256_amd64: 5028d3b19a8f0990d30fec9fbb07e32782bc5698e618fb1861aad8a9ccba4eb5
+    sha256_arm64: 8d6d1aad9e69b42481eda7039507d1f7ee93698f87713cecd873d287c1931632
     integrity: pinned-sha256
   ponytail:
     source: github
     owner: agent-skill
     repo: DietrichGebert/ponytail
     integrity: pinned-sha256
-    sha256: 7f45b3fab0b92ae5ff95c4608acda9f6ee2f0374b0122cba046289167d0cd256
+    sha256: 274eb980c585d09021d73c06422a9dbda8230a2ccc562662b844428e83a91ad0
   pix_optimizer:
     source: npm
     owner: omp-plugin

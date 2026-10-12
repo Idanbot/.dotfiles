@@ -2,20 +2,20 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: ebf48677ca10559c4712d3a9f903306a2322f7d30cd86ddb9b202e4057d8530a
-  metadata: 859e34f0ed4ebd31fc1cf73c1f5a79a02af321cd5d924ed731712b563c3bfde4
+  packages: affc60030a61572a55accfcddb81e5b5fda6d4dd5dd225b8d80b046a35a95201
+  metadata: 761cb827bda1e1044a280daea839e9b5149b30374d4f3448521bcea332b5f19b
 
 tools:
   - section: bootstrap
     name: chezmoi
-    version: 2.72.1
+    version: 2.73.1
     source: apt_or_github
     owner: bootstrap
     repo: twpayne/chezmoi
     integrity: upstream-checksum
   - section: core
     name: fzf
-    version: 0.74.3
+    version: 0.74.5
     source: external
     owner: chezmoi-external
     repo: junegunn/fzf
@@ -56,7 +56,7 @@ tools:
     integrity: pinned-sha256
   - section: core
     name: lazygit
-    version: 0.64.1
+    version: 0.66.1
     source: github
     owner: dotfiles-binary
     repo: jesseduffield/lazygit
@@ -81,13 +81,13 @@ tools:
     integrity: upstream-checksum
   - section: core
     name: github_cli
-    version: 2.98.0
+    version: 2.102.0
     source: github
     owner: dotfiles-binary
     repo: cli/cli
     binary: gh
-    sha256_amd64: 3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
-    sha256_arm64: cf689084f3a3618f7eae4a2420d335d74626d65f5e594b9828d125d69f800d86
+    sha256_amd64: bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
+    sha256_arm64: 7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484
     integrity: pinned-sha256
   - section: core
     name: jq
@@ -214,13 +214,13 @@ tools:
     integrity: pinned-sha256
   - section: core
     name: ast_grep
-    version: 0.45.3
+    version: 0.50.0
     source: github
     owner: dotfiles-binary
     repo: ast-grep/ast-grep
     binary: ast-grep
-    sha256_amd64: f8ac830881339d1edee6b2652f54798c0f4da5a827f2db38a08ee31117783ce8
-    sha256_arm64: b39cfbc58da4b869a88b8a4bc57bd5deb0d24541e704cf7c257da7b53ec81c8f
+    sha256_amd64: 0fd3f489639abb8465a914b74b8779171577582318d8a940d00399f59dba81c5
+    sha256_arm64: 3a4ad22dd1dca7a4900a173de65885578617af57fa13dd93b8d345d6b352770e
     integrity: pinned-sha256
   - section: core
     name: gitleaks
@@ -234,7 +234,7 @@ tools:
     integrity: pinned-sha256
   - section: languages
     name: go
-    version: 1.27.0
+    version: 1.27.2
     source: direct
     owner: dotfiles-runtime
     checksum_template: "https://go.dev/dl/?mode=json&include=all"
@@ -253,13 +253,13 @@ tools:
     integrity: rustup
   - section: languages
     name: node
-    version: 26.8.1
+    version: 26.11.1
     source: node-dist
     owner: dotfiles-runtime
     integrity: upstream-checksum
   - section: languages
     name: npm
-    version: 12.0.2
+    version: 12.2.0
     source: npm
     owner: node-runtime
     package: npm
@@ -275,7 +275,7 @@ tools:
     integrity: npm-registry
   - section: languages
     name: python
-    version: 3.14.7
+    version: 3.14.8
     source: uv
     owner: uv
     integrity: uv-managed
@@ -291,7 +291,7 @@ tools:
     integrity: pinned-sha256
   - section: languages
     name: uv
-    version: 0.12.8
+    version: 0.13.0
     source: github
     owner: dotfiles-binary
     repo: astral-sh/uv
@@ -299,7 +299,7 @@ tools:
     integrity: upstream-checksum
   - section: history
     name: atuin
-    version: 18.21.0
+    version: 18.23.0
     source: github
     owner: dotfiles-binary
     repo: atuinsh/atuin
@@ -307,13 +307,13 @@ tools:
     integrity: upstream-checksum
   - section: editor
     name: neovim
-    version: 0.12.5
+    version: 0.12.6
     source: github
     owner: dotfiles-runtime
     repo: neovim/neovim
     binary: nvim
-    sha256_amd64: bce0f56eda1f1b1db6eee8f4133d7a38813ea07933837dd1777411ca384c6875
-    sha256_arm64: 1aa5ca085249580ae0f91eb14f27ec0919773ff2d99a163d03f3d6c21ac29725
+    sha256_amd64: 474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87
+    sha256_arm64: 8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815
     integrity: pinned-sha256
   - section: database
     name: usql
@@ -349,14 +349,14 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: kubectl
-    version: 1.37.0
+    version: 1.37.1
     source: direct
     owner: dotfiles-binary
     binary: kubectl
     integrity: upstream-checksum
   - section: cloud
     name: helm
-    version: 4.2.4
+    version: 4.3.0
     source: github
     owner: dotfiles-binary
     repo: helm/helm
@@ -364,7 +364,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: terraform
-    version: 1.16.0
+    version: 1.16.5
     source: direct
     owner: dotfiles-binary
     binary: terraform
@@ -386,12 +386,12 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: aws_cli
-    version: 2.36.36
+    version: 2.37.12
     source: direct
     owner: vendor-installer
     binary: aws
-    sha256_amd64: ac07f6cb7beffd1e8af3b373de5b192062ca6c486596203e6961d01e6de14b0e
-    sha256_arm64: c2f5060dca1d279325a84f1501e08a7ed7c69604cdde9f765b54625cb6bfab15
+    sha256_amd64: e6d3c672fb36ed4b12c354c39a993eee2b34da1437cafb10bac4480840cfa83f
+    sha256_arm64: 829c76096e05f743267d75098bc7cc7cfae799fc7e568554ebaa6d78e6aba753
     integrity: pinned-sha256
   - section: cloud
     name: gcloud
@@ -407,13 +407,13 @@ tools:
     integrity: apt-signature
   - section: cloud
     name: cloudflared
-    version: 2026.8.3
+    version: 2026.10.0
     source: github
     owner: vendor-installer
     repo: cloudflare/cloudflared
     binary: cloudflared
-    sha256_amd64: 660b348d473bba81997445b534e7eaefaf4c4e16331866922326c338a7013dd9
-    sha256_arm64: 2c0d991ed6061e55d2e0148b794d86f594ddb473c1db43cf0647278b62e326ab
+    sha256_amd64: 9721287c28f78cb623e77c7b95a63feea87e909054d75666a0ec9eff20e5d548
+    sha256_arm64: 7e0d76de3858b6396bd234ae26182bee222133398667d2647b90381d00c00e98
     integrity: pinned-sha256
   - section: cloud
     name: s5cmd
@@ -441,7 +441,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: helmfile
-    version: 1.7.4
+    version: 1.8.1
     source: github
     owner: dotfiles-binary
     repo: helmfile/helmfile
@@ -465,7 +465,7 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: kubecolor
-    version: 0.7.1
+    version: 0.8.0
     source: github
     owner: dotfiles-binary
     repo: kubecolor/kubecolor
@@ -473,23 +473,23 @@ tools:
     integrity: upstream-checksum
   - section: cloud
     name: radar
-    version: 1.12.2
+    version: 1.16.0
     source: github
     owner: dotfiles-binary
     repo: skyhook-io/radar
     binary: kubectl-radar
-    sha256_amd64: 5606aa34ad9c2e13c5100c60fe1765265dbfe9b6af7d0ce6a3f5dad6f85d049c
-    sha256_arm64: 6b893a11c933a56e5a24bf199a64039c71f5dbfbfb0684bd9b97507bae2fb946
+    sha256_amd64: f6c8af8434117eba76a1553935a9107dcda5ba7cfebb63ed1fbdb5711804798c
+    sha256_arm64: bd8dc0ceece3dff87d2c3a981b0469e4311b8c5d942a1a7ccc7984d48e79568c
     integrity: pinned-sha256
   - section: terminal
     name: kitty
-    version: 0.48.2
+    version: 0.49.2
     source: github
     owner: dotfiles-binary
     repo: kovidgoyal/kitty
     binary: kitty
-    sha256_amd64: 967a1958e7fc67b495d279c0963bcd1a0482097151817ce6506fabc822689af7
-    sha256_arm64: 534b214d407a05e4603da75ef02fffa592ec1bbec20a413c5e0cd3f853c928cb
+    sha256_amd64: d573618b911e9c461bd421b96c13c74c7f1cb2f1ac9c327818d4ff84366cf5c6
+    sha256_arm64: 0c81a995614426cccf0fecaf7d104d47cd63bbccf173d14976e9f92e3d60fce6
     integrity: pinned-sha256
   - section: terminal
     name: tmux
@@ -508,24 +508,24 @@ tools:
     integrity: pypi
   - section: terminal
     name: herdr
-    version: 0.8.2
+    version: 0.9.3
     source: github
     owner: dotfiles-binary
     repo: ogulcancelik/herdr
     binary: herdr
     asset_template: "herdr-linux-{release_arch}"
-    sha256_amd64: 976150a14d490c94b243ea2e1a7eb2dfb67f12e36b182db90936f6728e6aecf4
-    sha256_arm64: f55610658e1c2e0d2aaef730b4b2ab885f7f8ba00285ab372bfb14f2e3d5b40d
+    sha256_amd64: 18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7
+    sha256_arm64: 4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0
     integrity: pinned-sha256
   - section: system
     name: git_credential_manager
-    version: 2.9.1
+    version: 3.0.1
     source: github
     owner: dpkg
     repo: git-ecosystem/git-credential-manager
     binary: git-credential-manager
-    sha256_amd64: a0c59d2ea873a930fd1c41031a25cb31055d31baaf80c10726847e1c1f7aa951
-    sha256_arm64: 8dd4cee6f5820516d1d1982bc8d68ce1c3e221cd2bf0629b10f0f2c059af9543
+    sha256_amd64: 530d7e2a99ddd048b62e71ed4e18e8692287bdb60df2eaace3cd439010b8f624
+    sha256_arm64: a915b3bb648e4e978aa9e198e8bbeb50df229bcdba3007193651dec237165291
     integrity: pinned-sha256
   - section: fonts
     name: nerd_font
@@ -543,7 +543,7 @@ tools:
     integrity: upstream-checksum
   - section: ai_tools
     name: claude_cli
-    version: 2.1.252
+    version: 2.1.296
     source: npm
     owner: npm
     package: "@anthropic-ai/claude-code"
@@ -556,7 +556,7 @@ tools:
     owner: vendor-installer
     binary: codex
     url: "https://chatgpt.com/codex/install.sh"
-    sha256: ba92dd27e5c06f0d3bbc58bfa4b9cfb6599cd2742fbb1f92a2765e6c07dedb5a
+    sha256: 150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6
     integrity: pinned-sha256
   - section: ai_tools
     name: antigravity_cli
@@ -565,11 +565,11 @@ tools:
     owner: vendor-installer
     binary: agy
     url: "https://antigravity.google/cli/install.sh"
-    sha256: ee1ea43ce4e9e56356c4ab6dad907ef357ae4bdfcaadb682735909fb57c9c640
+    sha256: 62966c07365423bd4dc209355060744058fb30d60f5323e2d360e39de64e5042
     integrity: pinned-sha256
   - section: ai_tools
     name: opencode
-    version: 1.18.25
+    version: 1.19.0
     source: npm
     owner: npm
     package: opencode-ai
@@ -577,25 +577,25 @@ tools:
     integrity: npm-registry
   - section: ai_tools
     name: omp
-    version: 18.1.1
+    version: 18.10.1
     source: github
     owner: dotfiles-binary
     repo: can1357/oh-my-pi
     binary: omp
     asset_template: "omp-linux-{release_arch}"
-    sha256_amd64: 04780b41fb33b658ca6e8449353911babc8c90332ac444e7e6562d041d3eae52
-    sha256_arm64: a8bf4dcc47dcf3284a0f6c43ffeb94adc0a2f031dcd7f8ab8ed92d0215c89a9d
+    sha256_amd64: 9798d22d518b23342b4cadf57672b276ef09e756c1832adc6571b04b26ad4f1b
+    sha256_arm64: 5cad38a8edee60cec9c0ce91810eba38bda0efe349562157023810343dacb8d5
     integrity: pinned-sha256
   - section: ai_tools
     name: bun
-    version: 1.4.0
+    version: 1.4.3
     source: github
     owner: dotfiles-binary
     repo: oven-sh/bun
     binary: bun
     asset_template: "bun-linux-{release_arch}.zip"
-    sha256_amd64: 184fb4595f0d401a217cf7c78c1bc430ba83314dab7a8b94805babbf7fa7097f
-    sha256_arm64: 4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e
+    sha256_amd64: 1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b
+    sha256_arm64: efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21
     integrity: pinned-sha256
   - section: ai_tools
     name: serena
@@ -615,7 +615,7 @@ tools:
     integrity: npm-registry
   - section: ai_tools
     name: graphify
-    version: 0.9.53
+    version: 0.9.86
     source: pypi
     owner: uv
     package: graphifyy
@@ -623,25 +623,25 @@ tools:
     integrity: pypi
   - section: ai_tools
     name: rtk
-    version: 0.46.0
+    version: 0.51.0
     source: github
     owner: dotfiles-binary
     repo: rtk-ai/rtk
     binary: rtk
-    sha256_amd64: 79aa5b89c69566bbfeceb66c8a27cfbe52237fc7ee3e683115f43745a3262d21
-    sha256_arm64: e8c2e1787f46017ea7c5a711b2bc6a7f7cf61c7ad69385b4c1e4daff1135dcd1
+    sha256_amd64: 5028d3b19a8f0990d30fec9fbb07e32782bc5698e618fb1861aad8a9ccba4eb5
+    sha256_arm64: 8d6d1aad9e69b42481eda7039507d1f7ee93698f87713cecd873d287c1931632
     integrity: pinned-sha256
   - section: ai_tools
     name: ponytail
-    version: 4.9.0
+    version: 5.1.0
     source: github
     owner: agent-skill
     repo: DietrichGebert/ponytail
-    sha256: 7f45b3fab0b92ae5ff95c4608acda9f6ee2f0374b0122cba046289167d0cd256
+    sha256: 274eb980c585d09021d73c06422a9dbda8230a2ccc562662b844428e83a91ad0
     integrity: pinned-sha256
   - section: ai_tools
     name: pix_optimizer
-    version: 1.1.28
+    version: 1.3.2
     source: npm
     owner: omp-plugin
     package: "@xynogen/pix-optimizer"

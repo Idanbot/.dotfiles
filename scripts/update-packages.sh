@@ -30,7 +30,7 @@ Options:
   -h, --help          Show this help.
 
 All apply modes update packages.yaml, pinned checksums in packages.meta.yaml,
-packages.lock, and docs/tool-inventory.md as one reviewed change set.
+packages.lock, README.md, and docs/tool-inventory.md as one reviewed change set.
 EOF
 }
 
@@ -668,6 +668,7 @@ apply_plan() {
   cp "$EXTERNALS_FILE" "$backup/.chezmoiexternal.yaml"
   cp "$DOTFILES_SOURCE_DIR/packages.lock" "$backup/packages.lock"
   cp "$DOTFILES_SOURCE_DIR/docs/tool-inventory.md" "$backup/docs/tool-inventory.md"
+  cp "$DOTFILES_SOURCE_DIR/README.md" "$backup/README.md"
 
   if ! python3 - "$PACKAGES_FILE" "$META_FILE" "$EXTERNALS_FILE" "$selected" <<'PYAPPLY'; then
 import os
@@ -803,6 +804,7 @@ PYAPPLY
     cp "$backup/.chezmoiexternal.yaml" "$EXTERNALS_FILE"
     cp "$backup/packages.lock" "$DOTFILES_SOURCE_DIR/packages.lock"
     cp "$backup/docs/tool-inventory.md" "$DOTFILES_SOURCE_DIR/docs/tool-inventory.md"
+    cp "$backup/README.md" "$DOTFILES_SOURCE_DIR/README.md"
     return 1
   fi
   log_success "Applied $(wc -l <"$selected") verified package update(s)"

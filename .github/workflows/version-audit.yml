@@ -34,7 +34,7 @@ jobs:
           ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
           cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
       - name: Upload upgrade report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: weekly-version-checksum-report
           path: ${{ runner.temp }}/dotfiles-upgrade-report.md

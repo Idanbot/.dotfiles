@@ -56,6 +56,36 @@ dot doctor
 dot status
 ```
 
+## Tools and Versions
+
+Versions below are requested pins, not a report of this machine's installed
+binaries. `distro` uses Ubuntu or the vendor's signed package repository;
+`standalone` tracks the provider installer with its script checksum pinned.
+Profile selection determines which tools are installed. Binary names, ownership,
+and integrity details are listed in [Tool Inventory](docs/tool-inventory.md).
+Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
+`tldr`, `ast_grep` -> `ast-grep`/`sg`, `aws_cli` -> `aws`, `gcloud` -> `gcloud`,
+`azure_cli` -> `az`, `claude_cli` -> `claude`, `codex_cli` -> `codex`, and
+`antigravity_cli` -> `agy`. Ubuntu provides `fd` as `fdfind` and `bat` as
+`batcat`; shell integration handles those names without replacing coreutils.
+
+<!-- tool-versions:start -->
+| Category | Tools and Requested Versions |
+| --- | --- |
+| bootstrap | `chezmoi` 2.73.1 |
+| core | `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.26.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.50.0, `gitleaks` 8.30.1 |
+| languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.8, `java` 25.0.4.1+1, `uv` 0.13.0 |
+| history | `atuin` 18.23.0 |
+| editor | `neovim` 0.12.6 |
+| database | `usql` 0.21.4, `iredis` 1.16.1, `pgloader` distro |
+| cloud | `docker` distro, `kubectl` 1.37.1, `helm` 4.3.0, `terraform` 1.16.5, `ansible` distro, `k9s` 0.51.0, `aws_cli` 2.37.12, `gcloud` distro, `azure_cli` distro, `cloudflared` 2026.10.0, `s5cmd` 2.3.0, `kcat` distro, `stern` 1.34.0, `helmfile` 1.8.1, `kubectx` 0.11.0, `kubens` 0.11.0, `kubecolor` 0.8.0, `radar` 1.16.0 |
+| terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.74.0, `herdr` 0.9.3 |
+| system | `git_credential_manager` 3.0.1 |
+| fonts | `nerd_font` FiraMono, `nerd_font_version` 3.5.1 |
+| ai_tools | `claude_cli` 2.1.296, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.0, `omp` 18.10.1, `bun` 1.4.3, `serena` 1.7.0, `context_mode` 1.0.169, `graphify` 0.9.86, `rtk` 0.51.0, `ponytail` 5.1.0, `pix_optimizer` 1.3.2 |
+| media | `yt_dlp` 2026.08.19, `rmpc` 0.11.0, `cava` distro |
+<!-- tool-versions:end -->
+
 ## Install Profiles
 
 | Profile | Intended use | Sections beyond the common shell baseline |

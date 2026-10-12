@@ -93,9 +93,9 @@
 
 ".fzf":
   type: archive
-  url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.74.3"
+  url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v0.74.5"
   exact: false
   stripComponents: 1
   checksum:
-    sha256: "5b142217c3068647a7d8faa9c678cffada100b5f11a48609aa79c94ce04b28ef"
+    sha256: "5529d08897b85ae773695787c811ff9c9eeee32419c8a297fa1dbe586ed0a27e"
   refreshPeriod: 168h

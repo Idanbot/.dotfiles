@@ -67,6 +67,7 @@ check_repo="$TMP_ROOT/check"
 copy_repo "$check_repo"
 before_packages="$(sha256sum "$check_repo/packages.yaml")"
 before_metadata="$(sha256sum "$check_repo/packages.meta.yaml")"
+before_readme="$(sha256sum "$check_repo/README.md")"
 DOTFILES_SOURCE_DIR="$check_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
   "$check_repo/scripts/update-packages.sh" --check \
   --report "$check_repo/upgrade-report.md" >/dev/null
@@ -82,6 +83,7 @@ grep -Fq './scripts/update-packages.sh --apply terminal.herdr@0.7.5' "$check_rep
   fail "report omits selective guidance"
 [[ "$(sha256sum "$check_repo/packages.yaml")" == "$before_packages" ]] || fail "check mode changed versions"
 [[ "$(sha256sum "$check_repo/packages.meta.yaml")" == "$before_metadata" ]] || fail "check mode changed checksums"
+[[ "$(sha256sum "$check_repo/README.md")" == "$before_readme" ]] || fail "check mode changed README"
 pass "check mode reports version/checksum deltas without mutation"
 
 set +e
@@ -99,6 +101,7 @@ DOTFILES_SOURCE_DIR="$selective_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
   "$selective_repo/scripts/update-packages.sh" --apply terminal.herdr@0.7.5 \
   --report "$selective_repo/upgrade-report.md" >/dev/null
 grep -Fq '  herdr: "0.7.5"' "$selective_repo/packages.yaml" || fail "selective apply did not update Herdr"
+grep -Fq '`herdr` 0.7.5' "$selective_repo/README.md" || fail "selective apply left README stale"
 grep -Fq "    sha256_amd64: $new_herdr_amd64" "$selective_repo/packages.meta.yaml" ||
   fail "selective apply did not update amd64 checksum"
 grep -Fq "    sha256_arm64: $new_herdr_arm64" "$selective_repo/packages.meta.yaml" ||
@@ -157,5 +160,17 @@ if DOTFILES_SOURCE_DIR="$unknown_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
 fi
 grep -Fq '  herdr: "0.7.4"' "$unknown_repo/packages.yaml" || fail "failed apply mutated versions"
 pass "unknown target fails before mutation"
+
+rollback_repo="$TMP_ROOT/rollback"
+copy_repo "$rollback_repo"
+sed -i '/<!-- tool-versions:end -->/d' "$rollback_repo/README.md"
+before_rollback="$(sha256sum "$rollback_repo"/{packages.yaml,packages.meta.yaml,packages.lock,README.md} "$rollback_repo/docs/tool-inventory.md")"
+if DOTFILES_SOURCE_DIR="$rollback_repo" DOTFILES_UPGRADE_FIXTURE="$fixture" \
+  "$rollback_repo/scripts/update-packages.sh" --apply terminal.herdr@0.7.5 >/dev/null 2>&1; then
+  fail "malformed README inventory unexpectedly succeeded"
+fi
+[[ "$(sha256sum "$rollback_repo"/{packages.yaml,packages.meta.yaml,packages.lock,README.md} "$rollback_repo/docs/tool-inventory.md")" == "$before_rollback" ]] ||
+  fail "failed inventory generation did not roll back the complete update"
+pass "README generation failure rolls back versions, checksums, lock, and documentation"
 
 printf 'Package upgrade interface test passed\n'

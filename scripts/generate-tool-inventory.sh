@@ -7,7 +7,12 @@ PACKAGES_FILE="$DOTFILES_DIR/packages.yaml"
 META_FILE="$DOTFILES_DIR/packages.meta.yaml"
 OUTPUT_FILE="${1:-$DOTFILES_DIR/docs/tool-inventory.md}"
 
-python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" <<'PYGEN'
+README_FILE="${2:-}"
+if (($# == 0)); then
+  README_FILE="$DOTFILES_DIR/README.md"
+fi
+
+python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" "$README_FILE" <<'PYGEN'
 from __future__ import annotations
 
 import sys
@@ -16,6 +21,7 @@ from pathlib import Path
 packages_file = Path(sys.argv[1])
 meta_file = Path(sys.argv[2])
 output_file = Path(sys.argv[3])
+readme_file = Path(sys.argv[4]) if sys.argv[4] else None
 
 
 def strip_value(value: str) -> str:
@@ -83,4 +89,18 @@ for section, tools in versions.items():
         )
 
 output_file.write_text("\n".join(lines) + "\n")
+
+if readme_file is not None:
+    start = "<!-- tool-versions:start -->"
+    end = "<!-- tool-versions:end -->"
+    text = readme_file.read_text()
+    if text.count(start) != 1 or text.count(end) != 1:
+        raise SystemExit("README must contain exactly one tool-versions block")
+    before, remaining = text.split(start)
+    _, after = remaining.split(end)
+    rows = ["", "| Category | Tools and Requested Versions |", "| --- | --- |"]
+    for section, tools in versions.items():
+        entries = ", ".join(f"`{tool}` {version}" for tool, version in tools.items())
+        rows.append(f"| {section} | {entries} |")
+    readme_file.write_text(before + start + "\n".join(rows) + "\n" + end + after)
 PYGEN

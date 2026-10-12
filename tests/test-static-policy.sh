@@ -92,7 +92,13 @@ fi
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-"$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmpdir/tool-inventory.md"
+cp "$DOTFILES_DIR/README.md" "$tmpdir/README.md"
+"$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmpdir/tool-inventory.md" "$tmpdir/README.md"
+if cmp -s "$tmpdir/README.md" "$DOTFILES_DIR/README.md"; then
+  pass "README version inventory is fresh"
+else
+  fail "README version inventory is stale; regenerate tool inventory"
+fi
 if cmp -s "$tmpdir/tool-inventory.md" "$DOTFILES_DIR/docs/tool-inventory.md"; then
   pass "tool inventory doc is fresh"
 else
@@ -119,6 +125,12 @@ from urllib.parse import unquote
 root = Path(sys.argv[1]).resolve()
 failures: list[str] = []
 link_pattern = re.compile(r"(?<!!)\[[^\]\n]+\]\(([^)\n]+)\)")
+
+# Floating major/minor comments drift away from otherwise immutable SHA pins.
+for workflow in sorted((root / ".github/workflows").glob("*.yml")):
+    for number, line in enumerate(workflow.read_text().splitlines(), 1):
+        if re.search(r"uses:.*@[0-9a-f]{40}\s+#\s+v\d+(?:\.\d+)?\s*$", line):
+            failures.append(f"{workflow.relative_to(root)}:{number}: use an exact release version comment")
 
 
 def ignored_target(target: str) -> bool:
