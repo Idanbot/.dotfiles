@@ -69,6 +69,11 @@ case "$2" in
       printf ']\n'
     else
       [[ "$*" == 'mcp list' ]] || exit 2
+      if [[ "${CLAUDE_UNICODE_HEADER:-0}" == 1 ]]; then
+        printf 'Checking MCP server health\u2026\n\n'
+      else
+        printf 'Checking MCP server health...\n\n'
+      fi
       printf 'keep: keep - Connected\n'
       for server in serena context-mode; do
         [[ ! -f "$NATIVE_STATE/$agent-$server" ]] || printf '%s: command - Connected\n' "$server"
@@ -122,7 +127,7 @@ gojq -e \
   "$OMP_CONFIG" >/dev/null
 
 : >"$CALLS"
-"$SCRIPT" disable all --agent codex,claude,agy,opencode,omp >/dev/null
+CLAUDE_UNICODE_HEADER=1 "$SCRIPT" disable all --agent codex,claude,agy,opencode,omp >/dev/null
 grep -Fq $'codex\tmcp remove serena' "$NATIVE_STATE/calls"
 grep -Fq $'claude\tmcp remove context-mode --scope user' "$NATIVE_STATE/calls"
 gojq -e \
