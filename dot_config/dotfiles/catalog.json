@@ -1,0 +1,60 @@
+{
+  "categories": {
+    "bootstrap": ["installation", "deploy", "dotfiles", "configuration"],
+    "core": ["terminal", "shell", "cli", "utility", "utilities"],
+    "languages": ["language", "runtime", "compiler", "development", "programming", "sdk"],
+    "history": ["history", "shell", "search"],
+    "editor": ["editor", "ide", "code"],
+    "database": ["db", "database", "data", "client", "storage"],
+    "cloud": ["cloud", "infrastructure", "infra", "devops", "operations"],
+    "terminal": ["terminal", "session", "workspace", "multiplexer"],
+    "system": ["system", "authentication", "credentials"],
+    "fonts": ["font", "fonts", "typography", "nerd-font", "icons"],
+    "ai_tools": ["ai", "llm", "agent", "agents", "agentic", "coding", "assistant"],
+    "media": ["media", "audio", "music", "video"]
+  },
+  "entries": {
+    "database.usql": {
+      "description": "Universal SQL client for multiple relational database engines",
+      "tags": ["db", "database", "rdb", "rdbms", "relational", "sql", "postgres", "postgresql", "pgsql", "mysql", "mariadb", "sqlite", "sqlite3", "mssql", "sqlserver", "oracle", "cockroachdb", "query", "repl", "connection", "client"],
+      "examples": ["usql postgres://USER@HOST/DATABASE", "usql sqlite:///PATH/database.db"]
+    },
+    "database.iredis": {"description": "Interactive Redis client with completion", "tags": ["redis", "key-value", "cache", "nosql", "repl", "connection"], "examples": ["iredis -h HOST -p 6379"]},
+    "database.pgloader": {"description": "Data migration into PostgreSQL, not an interactive SQL client", "tags": ["postgres", "postgresql", "migration", "etl", "import", "mysql", "sqlite"]},
+    "cloud.kubectl": {"tags": ["kubernetes", "k8s", "cluster", "pods", "deployment", "orchestration"]},
+    "cloud.kubectx": {"tags": ["kubernetes", "k8s", "context", "cluster", "switch"]},
+    "cloud.kubens": {"tags": ["kubernetes", "k8s", "namespace", "switch"]},
+    "cloud.aws_cli": {"tags": ["aws", "amazon", "s3", "ec2", "iam", "account", "profile"]},
+    "cloud.gcloud": {"tags": ["gcp", "google", "project", "compute", "iap"]},
+    "cloud.azure_cli": {"tags": ["azure", "microsoft", "subscription", "tenant"]},
+    "cloud.cloudflared": {"description": "Cloudflare Access and tunnel client; not a general-purpose VPN", "tags": ["cloudflare", "zero-trust", "access", "tunnel", "ssh", "remote", "vpn", "network"]},
+    "languages.go": {"upstream": "https://go.dev/", "tags": ["golang", "go", "compiler", "build"]},
+    "languages.java": {"tags": ["jdk", "jvm", "openjdk", "temurin", "java"]},
+    "languages.python": {"upstream": "https://www.python.org/", "tags": ["python", "python3", "cpython", "scripting"]},
+    "languages.node": {"upstream": "https://nodejs.org/", "tags": ["nodejs", "node", "javascript", "js", "runtime"]},
+    "languages.typescript": {"tags": ["typescript", "ts", "tsc", "javascript", "compiler"]},
+    "languages.rust": {"upstream": "https://www.rust-lang.org/", "tags": ["rust", "rustc", "rustup", "compiler"]},
+    "languages.cargo": {"upstream": "https://github.com/rust-lang/cargo", "tags": ["rust", "build", "package-manager"]},
+    "languages.uv": {"tags": ["python", "venv", "pip", "uvx", "package-manager"]},
+    "ai_tools.omp": {"tags": ["pi", "oh-my-pi", "harness", "coding-agent"]},
+    "ai_tools.pix_optimizer": {"description": "Oh My Pi package, not a standalone executable", "commands": [], "tags": ["pi", "omp", "optimizer", "tokens", "context", "extension"]},
+    "ai_tools.ponytail": {"description": "Agent skill package, not a standalone executable", "commands": [], "tags": ["skill", "skills", "browser", "automation"]},
+    "fonts.nerd_font": {"commands": [], "description": "Configured Nerd Font family"},
+    "fonts.nerd_font_version": {"commands": [], "description": "Requested Nerd Fonts release"}
+  },
+  "extras": [
+    {"id": "core.git", "commands": ["git"], "category": "core", "tags": ["git", "vcs", "version-control", "source", "repository", "clone", "commit"], "upstream": "https://git-scm.com/"},
+    {"id": "core.curl", "commands": ["curl"], "category": "core", "tags": ["http", "https", "api", "download", "request", "network"], "upstream": "https://curl.se/"},
+    {"id": "terminal.zsh", "commands": ["zsh"], "category": "terminal", "tags": ["shell", "completion", "interactive", "terminal"], "upstream": "https://www.zsh.org/"},
+    {"id": "terminal.bash", "commands": ["bash"], "category": "terminal", "tags": ["shell", "scripting", "terminal"], "upstream": "https://www.gnu.org/software/bash/"},
+    {"id": "cloud.cloud_context", "commands": ["cloud-context"], "category": "cloud", "requested": "repo-managed", "owner": "dotfiles", "source": "repo", "tags": ["aws", "azure", "gcp", "kubernetes", "k8s", "context", "profile", "switch", "fzf"], "upstream": "https://github.com/Idanbot/.dotfiles"},
+    {"id": "ai_tools.agent_mcp", "commands": ["agent-mcp"], "category": "ai_tools", "requested": "repo-managed", "owner": "dotfiles", "source": "repo", "tags": ["ai", "agent", "mcp", "serena", "context-mode", "enable", "disable"], "upstream": "https://github.com/Idanbot/.dotfiles"},
+    {"id": "ai_tools.dot_privacy", "commands": ["dot-privacy"], "category": "ai_tools", "requested": "repo-managed", "owner": "dotfiles", "source": "repo", "tags": ["ai", "privacy", "telemetry", "audit"], "upstream": "https://github.com/Idanbot/.dotfiles"},
+    {"id": "network.ssh", "commands": ["ssh"], "category": "network", "description": "OpenSSH remote shell and tunnels", "tags": ["ssh", "remote", "connection", "tunnel", "bastion", "jump-host"], "upstream": "https://www.openssh.com/", "examples": ["ssh rpi4", "ssh t420"]},
+    {"id": "network.tailscale", "commands": ["tailscale"], "category": "network", "description": "Optional mesh VPN client; not installed by this repo", "tags": ["vpn", "mesh", "wireguard", "network", "remote", "overlay"], "upstream": "https://github.com/tailscale/tailscale"},
+    {"id": "network.wireguard", "commands": ["wg"], "category": "network", "tags": ["vpn", "wireguard", "tunnel", "network"], "upstream": "https://www.wireguard.com/"},
+    {"id": "database.psql", "commands": ["psql"], "category": "database", "tags": ["db", "database", "rdb", "rdbms", "sql", "postgres", "postgresql", "pgsql", "client", "query"], "upstream": "https://www.postgresql.org/", "examples": ["psql -h HOST -U USER DATABASE"]},
+    {"id": "database.redis_cli", "commands": ["redis-cli"], "category": "database", "tags": ["db", "database", "redis", "cache", "nosql", "key-value", "client"], "upstream": "https://github.com/redis/redis", "examples": ["redis-cli -h HOST -p 6379"]},
+    {"id": "database.mysql", "commands": ["mysql", "mariadb"], "category": "database", "tags": ["db", "database", "rdb", "rdbms", "sql", "mysql", "mariadb", "client"], "upstream": "https://www.mysql.com/"}
+  ]
+}

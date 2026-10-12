@@ -19,6 +19,8 @@ Usage: dot <command> [args]
   sync [install args] Pull fast-forward updates and run the reliable installer
   doctor [args]       Run the post-install acceptance checks
   privacy             Audit managed telemetry and nonessential traffic controls
+  tools [args]        Search the tools, languages, and agent catalog
+  catalog [args]      Alias for tools; use --pick for an fzf details picker
   workspace [args]    Open the current project agent workspace
   profile [name]      Show or set the local machine profile (mode 0600)
   logs [run-id]       Show recent runs or tail one run log
@@ -31,6 +33,10 @@ USAGE
 }
 
 case "${1:-}" in
+  tools | catalog)
+    shift
+    exec /usr/bin/python3 "$SOURCE/scripts/catalog.py" "$@"
+    ;;
   status)
     printf 'Source: %s\n' "$SOURCE"
     git -C "$SOURCE" status --short --branch

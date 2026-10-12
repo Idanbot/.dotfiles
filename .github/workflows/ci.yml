@@ -59,7 +59,7 @@ jobs:
       - name: Install lint tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq gawk hyperfine openssh-client
+          sudo apt-get install -y shellcheck yamllint tmux zsh jq yq gojq gawk hyperfine openssh-client fzf
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
           ./scripts/install-chezmoi.sh
           starship_version="$(yq -r '.core.starship' packages.yaml)"
@@ -113,6 +113,7 @@ jobs:
           tests/test-conflict-resolution.sh "$PWD"
           tests/test-docker-package-routing.sh "$PWD"
           tests/test-dot-doctor.sh "$PWD"
+          tests/test-catalog.sh "$PWD"
           tests/test-bootstrap-safety.sh "$PWD"
           tests/test-bootstrap-lock.sh "$PWD"
           tests/test-json-escape.sh "$PWD"

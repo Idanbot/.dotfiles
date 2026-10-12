@@ -86,6 +86,36 @@ Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
 | media | `yt_dlp` 2026.08.19, `rmpc` 0.11.0, `cava` distro |
 <!-- tool-versions:end -->
 
+## Discover Installed Software
+
+The offline catalog covers every manifest entry: languages, runtimes, agents,
+MCP tools, terminals, databases, fonts, and utilities. It also recognizes optional
+clients such as `psql`, `redis-cli`, Tailscale, and WireGuard without installing them.
+
+```bash
+dot tools refresh                    # Bounded version probes; private JSON snapshot
+dot tools                            # Installed commands, requested/observed versions, paths
+dot tools sql                        # Search names, descriptions, and rich tags
+dot tools --category languages
+dot tools --tag vpn --available       # Include missing candidates
+dot tools --available --pick          # fzf with details preview; Enter shows details only
+dot catalog show database.usql        # Paths, upstream, tags, connection examples
+dot tools --available --json
+```
+
+Queries and previews never execute tools or contact services. Observed versions
+remain snapshots until `refresh`; changed executable paths, symlink targets,
+sizes, or modification times invalidate their cached version. Missing or unsupported probes show `?`, not
+the requested version. Refresh uses a version-command allowlist and three-second
+timeouts. It never attempts authentication or database/VPN connections. It stores
+only paths, version strings, probe status, and a timestamp, not command output or
+credentials, in `~/.local/state/dotfiles/catalog.json` (0600).
+
+Catalog descriptions, synonym tags, examples, and optional candidates live in
+`dot_config/dotfiles/catalog.json`; requested versions and ownership come from
+the existing manifests. Search terms are case-insensitive and combined with AND.
+Package/skill/font entries without executables remain visible with `--available`.
+
 ## Install Profiles
 
 | Profile | Intended use | Sections beyond the common shell baseline |
@@ -466,6 +496,21 @@ The managed SSH config intentionally declares no `IdentityFile`. GitHub,
 GitLab, and Cloudflare host mappings are safe to deploy without keys; OpenSSH
 uses standard local identities when they are restored later, while custom
 identity paths belong in the untracked `~/.ssh/config.local` overlay.
+
+The local overlay is included before managed defaults, so it can override a
+specific host without editing managed configuration. Keep only hosts you use;
+the repo already provides `rpi4`, `t420`, `github.com`, and `gitlab.com`.
+For example, a local-only port override (only if your server actually uses it):
+
+```sshconfig
+Host rpi4
+    Port 2222
+```
+
+Additional bastions, private hostnames/IPs, `ProxyJump`, and existing identity
+paths belong in this overlay, never in the public catalog. Validate without
+connecting using `ssh -G rpi4`; then connect normally with `ssh rpi4`.
+No new host mappings, private keys, or local empty files are created automatically.
 
 For a new host, restore an existing private key manually or run the supervised
 setup flow. It can create a passphrase-protected Ed25519 key, keeps the

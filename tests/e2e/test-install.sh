@@ -308,6 +308,11 @@ if [[ ",$selected_sections," == *,system,* ]]; then
 fi
 
 dot doctor --quick --sections "$selected_sections" >/dev/null
+dot tools refresh >/dev/null
+[[ "$(stat -c '%a' "$STATE_DIR/catalog.json")" == 600 ]]
+dot tools --available --json | /usr/bin/python3 -c \
+  'import json,sys; entries=json.load(sys.stdin); assert any(e["id"] == "database.usql" for e in entries); assert any(e["category"] == "languages" for e in entries)'
+dot catalog show database.usql | grep -Fq postgresql
 
 for log in "$ARTIFACT_DIR"/bootstrap-pass-*.log; do
   [[ "$(stat -c '%a' "$log")" == 600 ]] || {
