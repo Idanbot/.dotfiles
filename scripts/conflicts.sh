@@ -22,7 +22,7 @@ dotfiles_conflict_destination_modified() {
 
 dotfiles_conflict_diff() {
   local source="$1" rel="$2" limit="${3:-160}" output status=0 line count=0 total
-  output="$(chezmoi diff --source="$source" "$rel" 2>&1)" || status=$?
+  output="$(chezmoi diff --source="$source" "$HOME/$rel" 2>&1)" || status=$?
   if [[ -z "$output" ]]; then
     printf 'diff unavailable (chezmoi exit %s)\n' "$status"
     return 0
@@ -79,7 +79,7 @@ dotfiles_conflict_review_merge() (
   temporary="$(mktemp -d "$(dirname "$target")/.dotfiles-review.XXXXXX")" || return 1
   trap 'rm -rf -- "$temporary"' EXIT
   cp -p -- "$target" "$temporary/candidate" || return 1
-  chezmoi cat --source="$source" "$rel" >"$temporary/managed-reference" || return 1
+  chezmoi cat --source="$source" "$target" >"$temporary/managed-reference" || return 1
   read -r -a editor <<<"${VISUAL:-${EDITOR:-vi}}"
   log_info 'Review the candidate against managed-reference; only the candidate will be applied'
   "${editor[@]}" "$temporary/candidate" "$temporary/managed-reference" || return 1
@@ -108,7 +108,7 @@ dotfiles_conflict_merge_append() {
   }
   trap 'rm -f "$managed_file" "$local_file" "$merged_file"' RETURN
 
-  if ! chezmoi cat --source="$source" "$rel" >"$managed_file"; then
+  if ! chezmoi cat --source="$source" "$target" >"$managed_file"; then
     return 1
   fi
   [[ ! -s "$managed_file" ]] || LC_ALL=C grep -Iq . "$managed_file" || return 2
@@ -259,11 +259,11 @@ dotfiles_apply_selected_conflicts() {
 
     case "$action" in
       replace)
-        apply_targets+=("$rel")
+        apply_targets+=("$HOME/$rel")
         ;;
       replace-all)
         all_action=replace
-        apply_targets+=("$rel")
+        apply_targets+=("$HOME/$rel")
         ;;
       skip)
         log_skip "Preserving ~/$rel"

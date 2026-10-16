@@ -190,7 +190,7 @@ export CHEZMOI_SOURCE="$TMP_ROOT/source"
 export CHEZMOI_STATUS_OUTPUT=$'MM .zshrc\nMM .config\n M .config/other.conf'
 CONFLICT_AUTO_APPROVE=true
 dotfiles_apply_selected_conflicts
-grep -Fq -- '--force --no-tty .zshrc .config/other.conf' "$APPLY_LOG"
+grep -Fq -- "--force --no-tty $HOME/.zshrc $HOME/.config/other.conf" "$APPLY_LOG"
 ! grep -Fq -- '--force .config' "$APPLY_LOG"
 grep -Fq -- '--include=dirs,externals --force --no-tty' "$APPLY_LOG"
 

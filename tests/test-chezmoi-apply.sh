@@ -102,3 +102,38 @@ EOF
 
 run_fixture native false
 run_fixture wsl true
+
+# Target arguments must resolve under HOME even when launched from the checkout.
+(
+  export HOME="$TMP_ROOT/conflict-home"
+  export CHEZMOI_SOURCE="$TMP_ROOT/conflict-source"
+  mkdir -p "$HOME" "$CHEZMOI_SOURCE" "$TMP_ROOT/unrelated"
+  printf 'export MANAGED_ALIAS=1\n' >"$CHEZMOI_SOURCE/dot_bash_aliases"
+  printf 'export MANAGED_RC=1\n' >"$CHEZMOI_SOURCE/dot_bashrc"
+  printf 'export MANAGED_PROFILE=1\n' >"$CHEZMOI_SOURCE/dot_profile"
+  printf 'export LOCAL_ALIAS=1\n' >"$HOME/.bash_aliases"
+  printf 'export LOCAL_RC=1\n' >"$HOME/.bashrc"
+  log_info() { printf '%s\n' "$*"; }
+  log_warn() { printf '%s\n' "$*"; }
+  log_error() { printf '%s\n' "$*" >&2; }
+  log_skip() { printf '%s\n' "$*"; }
+  # shellcheck source=../scripts/conflicts.sh
+  source "$DOTFILES_DIR/scripts/conflicts.sh"
+  export CONFLICT_AUTO_APPROVE=true
+  for working_dir in "$CHEZMOI_SOURCE" "$TMP_ROOT/unrelated"; do
+    cd "$working_dir"
+    printf 'export LOCAL_RC=1\n' >"$HOME/.bashrc"
+    export CHEZMOI_STATUS_OUTPUT
+    CHEZMOI_STATUS_OUTPUT="$(chezmoi status --source="$CHEZMOI_SOURCE" --exclude=scripts)"
+    dotfiles_apply_selected_conflicts
+    grep -Fxq 'export MANAGED_RC=1' "$HOME/.bashrc"
+    grep -Fxq 'export MANAGED_PROFILE=1' "$HOME/.profile"
+    printf 'export LOCAL_ALIAS=1\n' >"$HOME/.bash_aliases"
+    preview="$(dotfiles_conflict_diff "$CHEZMOI_SOURCE" .bash_aliases)"
+    grep -Fq '+export MANAGED_ALIAS=1' <<<"$preview"
+    dotfiles_conflict_merge_append "$CHEZMOI_SOURCE" .bash_aliases
+    grep -Fxq 'export MANAGED_ALIAS=1' "$HOME/.bash_aliases"
+    grep -Fxq 'export LOCAL_ALIAS=1' "$HOME/.bash_aliases"
+  done
+  printf 'Conflict targets resolve under HOME from checkout and unrelated directories\n'
+)

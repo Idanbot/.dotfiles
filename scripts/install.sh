@@ -1038,7 +1038,7 @@ ensure_managed_entrypoint() {
 
   log_warn "Managed command $name is missing; repairing it through chezmoi"
   mkdir -p "$HOME/.local/bin"
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$rel"; then
+  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$target"; then
     log_error "Unable to repair managed command $name"
     return 1
   fi
