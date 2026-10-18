@@ -16,7 +16,8 @@ chezmoi_with_retry() (
       status=$?
     fi
     cat "$temporary/stderr" >&2
-    if ((attempt == attempts)) ||
+    if grep -Eiq 'checksum|signature|template:|not managed|permission denied' "$temporary/stderr" ||
+      ((attempt == attempts)) ||
       ! grep -Eiq '(https?://|download|fetch).*(429|Too Many Requests|50[0-9]|timeout|timed out|connection reset|unexpected EOF|temporary failure)|dial tcp.*(timeout|temporary failure)|TLS handshake timeout' \
         "$temporary/stderr"; then
       return "$status"

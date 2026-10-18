@@ -20,7 +20,7 @@ if ((count < 2)) || [[ "$MOCK_ERROR" == permanent || "$MOCK_ERROR" == checksum ]
     rate | permanent) printf 'chezmoi: .fzf: https://example.invalid/archive: 429 Too Many Requests\n' >&2 ;;
     server) printf 'chezmoi: .fzf: https://example.invalid/archive: 503 Service Unavailable\n' >&2 ;;
     timeout) printf 'chezmoi: https://example.invalid/archive: TLS handshake timeout\n' >&2 ;;
-    checksum) printf 'chezmoi: https://example.invalid/archive: checksum mismatch\n' >&2 ;;
+    checksum) printf 'chezmoi: https://example.invalid/archive: checksum mismatch (expected abc429def503)\n' >&2 ;;
   esac
   exit 22
 fi

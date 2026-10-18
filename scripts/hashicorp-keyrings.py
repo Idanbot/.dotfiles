@@ -38,7 +38,7 @@ def keyrings(root):
             stanza = "\n".join(
                 line for line in stanza.splitlines() if not line.startswith("#")
             )
-            fields = email.parser.Parser().parsestr(stanza)
+            fields = email.parser.Parser().parsestr(stanza.strip())
             if fields.get("Enabled", "yes").lower() == "no":
                 continue
             if any(is_hashicorp(uri) for uri in fields.get("URIs", "").split()):
