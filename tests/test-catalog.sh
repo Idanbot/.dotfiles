@@ -72,6 +72,19 @@ class CatalogTests(unittest.TestCase):
         with patch.object(catalog, "locate", return_value=("wg", "/mock/wg")), patch.object(catalog.subprocess, "run", side_effect=AssertionError("unsafe probe")):
             self.assertEqual(catalog.probe(entry)[1]["probe"], "not-supported")
 
+    def test_json_probe_uses_cli_field_not_component_version(self):
+        fixtures = [
+            ("gcloud", {"bundled-python3-unix": "3.14.0", "Google Cloud SDK": "600.0.0"}, "600.0.0"),
+            ("az", {"extensions": {"other": "99.0.0"}, "azure-cli": "2.91.0"}, "2.91.0"),
+            ("kubectl", {"kustomizeVersion": "v5.9.0", "clientVersion": {"gitVersion": "v1.37.1"}}, "1.37.1"),
+        ]
+        for command, data, expected in fixtures:
+            entry = {"id": command, "commands": [command]}
+            with patch.object(catalog, "locate", return_value=(command, "/mock/" + command)), patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, json.dumps(data), "")):
+                self.assertEqual(catalog.probe(entry)[1]["version"], expected)
+        with patch.object(catalog, "locate", return_value=("az", "/mock/az")), patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "not json", "")):
+            self.assertIsNone(catalog.probe({"id": "az", "commands": ["az"]})[1]["version"])
+
     def test_refresh_private_snapshot(self):
         with patch.dict(os.environ, self.env), patch.object(catalog, "probe", return_value=("fixture.tool", {"version": "1.2.3", "path": "/mock/tool"})):
             catalog.refresh([{"id": "fixture.tool"}])

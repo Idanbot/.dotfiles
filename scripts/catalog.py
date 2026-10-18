@@ -224,9 +224,18 @@ def probe(entry):
             if output.returncode != 0:
                 record["probe"] = "failed"
             else:
+                text = output.stdout + output.stderr
+                if command in {"gcloud", "az", "kubectl"}:
+                    data = json.loads(output.stdout)
+                    if command == "gcloud":
+                        text = data.get("Google Cloud SDK", "")
+                    elif command == "az":
+                        text = data.get("azure-cli", "")
+                    else:
+                        text = data.get("clientVersion", {}).get("gitVersion", "")
                 match = re.search(
                     r"(?<![\d.])\d+\.\d+(?:\.\d+)*(?:[+.-][\w.-]+)?",
-                    output.stdout + output.stderr,
+                    text,
                 )
                 record.update(
                     version=match.group() if match else None,
@@ -234,7 +243,7 @@ def probe(entry):
                 )
         except subprocess.TimeoutExpired:
             record["probe"] = "timeout"
-        except (OSError, UnicodeError):
+        except (OSError, UnicodeError, ValueError, TypeError, AttributeError):
             record["probe"] = "failed"
     elif path:
         record["probe"] = "not-supported"

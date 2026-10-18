@@ -78,7 +78,7 @@ fi
 # Real AWS verifier rejects signature failures and accepts only the pinned key.
 unset -f download_verified
 mkdir -m 700 "$temporary/keyring"
-gpg --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
+command gpg --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
   grep -Fq FB5DB77FD5C118B80511ADA8A6310ACC4672475C
 download() { printf 'payload\n' >"$2"; }
 gpg() {

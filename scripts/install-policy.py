@@ -17,6 +17,8 @@ import tempfile
 
 import yaml
 
+# Importing the shared probe must not dirty a writable source checkout.
+sys.dont_write_bytecode = True
 import catalog as software
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -179,7 +181,8 @@ def selected(root, sections):
         any(entry["id"] == prefix or entry["id"].startswith(prefix + ".")
             for prefix in registry[section]["manifest"])
         and entry["id"] not in registry[section].get("exclude", [])
-        for section in sections) and (stable(entry["requested"]) or entry["id"] in ROLLING)]
+        for section in sections) and entry["commands"]
+        and (stable(entry["requested"]) or entry["id"] in ROLLING)]
 
 
 def resolve(entry, meta, arch):
