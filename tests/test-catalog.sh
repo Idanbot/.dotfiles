@@ -86,6 +86,17 @@ class CatalogTests(unittest.TestCase):
         with patch.object(catalog, "locate", return_value=("az", "/mock/az")), patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "not json", "")):
             self.assertIsNone(catalog.probe({"id": "az", "commands": ["az"]})[1]["version"])
 
+    def test_fzf_external_path_and_nonstandard_version_probes(self):
+        home = Path(self.temp.name) / "home"
+        binary = home / ".fzf/bin/fzf"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("#!/bin/sh\necho 0.74.5\n")
+        binary.chmod(0o755)
+        with patch.object(catalog.shutil, "which", return_value=None), patch.object(catalog.Path, "home", return_value=home):
+            self.assertEqual(catalog.locate({"commands": ["fzf"]}), ("fzf", str(binary)))
+        self.assertEqual(catalog.PROBES["k9s"], ["version", "--short"])
+        self.assertEqual(catalog.PROBES["kubecolor"], ["--kubecolor-version"])
+
     def test_refresh_private_snapshot(self):
         with patch.dict(os.environ, self.env), patch.object(catalog, "probe", return_value=("fixture.tool", {"version": "1.2.3", "path": "/mock/tool"})):
             catalog.refresh([{"id": "fixture.tool"}])

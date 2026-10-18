@@ -153,6 +153,13 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(policy.upstream(entry, {})[0], "3.0.0")
             self.assertEqual(policy.upstream(entry, {}, 2)[0], "2.40.0")
 
+    def test_jdk_ga_major_only_release_name_is_normalized(self):
+        data = [{"release_name": "jdk-27+35", "version": {"major": 27, "minor": 0, "security": 0, "build": 35}}]
+        with patch.object(policy, "get_json", side_effect=[{"most_recent_feature_release": 27}, data]):
+            latest = policy.upstream(self.entry("languages.java", "25.0.4.1+1"), {})[0]
+        self.assertEqual(latest, "27.0.0+35")
+        self.assertTrue(policy.stable(latest))
+
     def test_atomic_private_plan_and_redirect_refusal(self):
         path = self.home / "run/versions.json"
         policy.atomic_json(path, {"target": "2.0.0"})

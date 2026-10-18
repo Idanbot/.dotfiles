@@ -121,4 +121,22 @@ if AWS_TEST_FINGERPRINT=0000000000000000000000000000000000000000 \
 fi
 [[ ! -e "$temporary/wrong-key.zip" ]]
 
+# The live harness must assert resolved rolling versions, not old baselines.
+latest_run="$temporary/expected-versions.json"
+export latest_run
+printf '{"tools":{"cloud.helm":{"target":"4.3.1"}}}\n' >"$latest_run"
+awk '/^manifest_version\(\)/ {block = 1} /^assert_version_contains\(\)/ {exit} block' \
+  "$ROOT/tests/e2e/test-install.sh" >"$temporary/e2e-versions.sh"
+source "$temporary/e2e-versions.sh"
+[[ "$(manifest_version cloud helm)" == 4.3.1 ]]
+[[ "$(manifest_version cloud kubectl)" == "$(yq -r .cloud.kubectl "$ROOT/packages.yaml")" ]]
+awk '/^assert_version_at_least\(\)/ {block = 1} /^if \[\[ ",\$selected_sections/ {exit} block' \
+  "$ROOT/tests/e2e/test-install.sh" >"$temporary/e2e-minimum.sh"
+source "$temporary/e2e-minimum.sh"
+assert_version_at_least Node 90.0.0 node --version
+if (assert_version_at_least Node 100.0.0 node --version); then
+  printf 'Live harness accepted a below-minimum runtime\n' >&2
+  exit 1
+fi
+
 printf 'Runtime preservation, signed downloads, and APT major-boundary tests passed\n'

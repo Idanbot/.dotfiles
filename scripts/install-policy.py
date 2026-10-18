@@ -134,7 +134,11 @@ def upstream(entry, meta, major=None):
     if ident == "languages.java":
         feature = get_json("https://api.adoptium.net/v3/info/available_releases")["most_recent_feature_release"]
         data = get_json(f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture=x64&image_type=jdk&os=linux")
-        return data[0]["release_name"].removeprefix("jdk-"), {}
+        numeric = data[0]["version"]
+        core = ".".join(str(numeric[key]) for key in ("major", "minor", "security"))
+        if numeric.get("patch"):
+            core += "." + str(numeric["patch"])
+        return core + "+" + str(numeric["build"]), {}
     if ident == "cloud.terraform":
         return github("hashicorp/terraform", major)
     if ident == "cloud.azure_cli":
@@ -142,7 +146,7 @@ def upstream(entry, meta, major=None):
     if meta.get("source") == "npm":
         package = meta.get("package", ident.split(".")[1]).replace("/", "%2f")
         return get_json(f"https://registry.npmjs.org/{package}/latest")["version"], {}
-    if meta.get("source") == "pypi":
+    if meta.get("source") in {"pypi", "uvx"}:
         package = meta.get("package", ident.split(".")[1])
         return get_json(f"https://pypi.org/pypi/{package}/json")["info"]["version"], {}
     if meta.get("repo"):

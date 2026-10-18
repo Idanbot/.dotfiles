@@ -5,6 +5,8 @@ set -Eeuo pipefail
 
 # shellcheck source=/dotfiles/scripts/performance-format.sh
 source /dotfiles/scripts/performance-format.sh
+# shellcheck source=/dotfiles/scripts/lib.sh
+source /dotfiles/scripts/lib.sh
 
 PROFILE="${E2E_PROFILE:-base}"
 PASSES="${E2E_PASSES:-2}"
@@ -137,7 +139,13 @@ grep -Fxq '# e2e-local-sentinel' "$HOME/.config/dotfiles/local.zsh"
 selected_sections="$(jq -r .sections "$latest_summary")"
 
 manifest_version() {
-  yq -r ".$1.$2" /dotfiles/packages.yaml
+  local target
+  target="$(jq -r --arg id "$1.$2" '.tools[$id].target // empty' "$latest_run")"
+  if [[ -n "$target" ]]; then
+    printf '%s\n' "$target"
+  else
+    yq -r ".$1.$2" "${DOTFILES_SOURCE_DIR:-/dotfiles}/packages.yaml"
+  fi
 }
 
 assert_version_contains() {
@@ -156,6 +164,16 @@ assert_version_contains() {
   }
 }
 
+assert_version_at_least() {
+  local label="$1" expected="$2" actual
+  shift 2
+  actual="$("$@" 2>&1)"
+  version_ge "$actual" "$expected" || {
+    printf '%s version below minimum: expected >= %s, got %s\n' "$label" "$expected" "$actual" >&2
+    exit 1
+  }
+}
+
 if [[ ",$selected_sections," == *,core,* ]]; then
   assert_version_contains GitHub-CLI "$(manifest_version core github_cli)" gh --version
 fi
@@ -170,15 +188,15 @@ if [[ ",$selected_sections," == *,terminal,* ]]; then
 fi
 
 if [[ ",$selected_sections," == *,languages,* ]]; then
-  assert_version_contains Go "$(manifest_version languages go)" go version
-  assert_version_contains Rust "$(manifest_version languages rust)" rustc --version
-  assert_version_contains Cargo "$(manifest_version languages cargo)" cargo --version
-  assert_version_contains Node "$(manifest_version languages node)" node --version
-  assert_version_contains npm "$(manifest_version languages npm)" npm --version
-  assert_version_contains TypeScript "$(manifest_version languages typescript)" tsc --version
-  python_path="$(uv python find "$(manifest_version languages python)")"
-  assert_version_contains Python "$(manifest_version languages python)" "$python_path" --version
-  assert_version_contains Java "$(manifest_version languages java | cut -d+ -f1)" java -version
+  assert_version_at_least Go "$(manifest_version languages go)" go version
+  assert_version_at_least Rust "$(manifest_version languages rust)" rustc --version
+  assert_version_at_least Cargo "$(manifest_version languages cargo)" cargo --version
+  assert_version_at_least Node "$(manifest_version languages node)" node --version
+  assert_version_at_least npm "$(manifest_version languages npm)" npm --version
+  assert_version_at_least TypeScript "$(manifest_version languages typescript)" tsc --version
+  python_path="$(uv python find "$(manifest_version languages python)" 2>/dev/null || command -v python3)"
+  assert_version_at_least Python "$(manifest_version languages python)" "$python_path" --version
+  assert_version_at_least Java "$(manifest_version languages java | cut -d+ -f1)" java -version
 fi
 
 if [[ ",$selected_sections," == *,cloud,* ]]; then
@@ -211,7 +229,7 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
     command -v "$agent" >/dev/null
     "$agent" --version >/dev/null
   done
-  assert_version_contains Bun "$(manifest_version ai_tools bun)" bun --version
+  assert_version_at_least Bun "$(manifest_version ai_tools bun)" bun --version
   assert_version_contains Serena "$(manifest_version ai_tools serena)" serena --version
   context_mode_manifest="$HOME/.local/share/npm/lib/node_modules/context-mode/package.json"
   [[ -f "$context_mode_manifest" ]]

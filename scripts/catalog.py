@@ -65,6 +65,7 @@ PROBES = {
         "lazydocker",
         "tldr",
         "curlie",
+        "trip",
         "ast-grep",
         "gitleaks",
         "rustc",
@@ -130,6 +131,7 @@ PROBES.update(
         "curlie": ["version"],
         "s5cmd": ["version"],
         "kubecolor": ["--kubecolor-version"],
+        "k9s": ["version", "--short"],
         "tmux": ["-V"],
         "ssh": ["-V"],
     }
@@ -199,6 +201,10 @@ def snapshot_path():
 def locate(entry):
     for command in entry["commands"]:
         path = shutil.which(command)
+        if not path and command == "fzf":
+            external = Path.home() / ".fzf/bin/fzf"
+            if external.is_file() and os.access(external, os.X_OK):
+                path = str(external)
         if path:
             # sg is also a Unix group-switching utility; do not misidentify it.
             if command == "sg" and Path(path).resolve() == Path("/usr/bin/sg"):
