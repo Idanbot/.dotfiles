@@ -94,34 +94,36 @@ else
 fi
 
 HELM_VERSION="$(package_version cloud helm 4.2.3)"
-if ! is_installed helm || ! version_ge "$(helm version --short 2>/dev/null || true)" "$HELM_VERSION"; then
+if runtime_is_current helm "$HELM_VERSION" "$(helm version --short 2>/dev/null || true)"; then
+  :
+else
   tmpdir="$(mktemp -d)"
   asset="helm-v${HELM_VERSION}-linux-${RELEASE_ARCH}.tar.gz"
   url="https://get.helm.sh/$asset"
   log_info "Installing Helm $HELM_VERSION"
-  download_verified "$url" "$tmpdir/$asset" "$url.sha256sum" "$asset"
+  HELM_INTEGRITY="$(version_plan_value cloud.helm integrity)"
+  download_verified "$url" "$tmpdir/$asset" "${HELM_INTEGRITY:-$url.sha256sum}" "$asset"
   tar -xzf "$tmpdir/$asset" -C "$tmpdir"
   install_managed_binary "$tmpdir/linux-${RELEASE_ARCH}/helm" helm "$HELM_VERSION" get.helm.sh
   rm -rf "$tmpdir"
   ((_INSTALLED++)) || true
-else
-  log_skip "Helm $HELM_VERSION already installed or newer"
 fi
 
 TERRAFORM_VERSION="$(package_version cloud terraform 1.15.8)"
-if ! is_installed terraform || ! version_ge "$(terraform version 2>/dev/null | head -1 || true)" "$TERRAFORM_VERSION"; then
+if runtime_is_current terraform "$TERRAFORM_VERSION" "$(terraform version 2>/dev/null | head -1 || true)"; then
+  :
+else
   tmpdir="$(mktemp -d)"
   asset="terraform_${TERRAFORM_VERSION}_linux_${HASHI_ARCH}.zip"
   base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
   log_info "Installing Terraform $TERRAFORM_VERSION"
+  TERRAFORM_INTEGRITY="$(version_plan_value cloud.terraform integrity)"
   download_verified "$base/$asset" "$tmpdir/$asset" \
-    "$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS" "$asset"
+    "${TERRAFORM_INTEGRITY:-$base/terraform_${TERRAFORM_VERSION}_SHA256SUMS}" "$asset"
   unzip -q "$tmpdir/$asset" -d "$tmpdir"
   install_managed_binary "$tmpdir/terraform" terraform "$TERRAFORM_VERSION" releases.hashicorp.com
   rm -rf "$tmpdir"
   ((_INSTALLED++)) || true
-else
-  log_skip "Terraform $TERRAFORM_VERSION already installed or newer"
 fi
 
 apt_install ansible kcat pgloader
@@ -135,12 +137,18 @@ install_github_archive \
 
 AWS_VERSION="$(package_version cloud aws_cli 2.36.7)"
 AWS_CURRENT="$(aws --version 2>/dev/null || true)"
-if ! is_installed aws || ! version_ge "$AWS_CURRENT" "$AWS_VERSION"; then
+if runtime_is_current aws "$AWS_VERSION" "$AWS_CURRENT"; then
+  :
+else
   AWS_SHA="$(package_metadata cloud aws_cli "sha256_$ARCH")"
   tmpdir="$(mktemp -d)"
   asset="awscli-exe-linux-${AWS_ARCH}-${AWS_VERSION}.zip"
   log_info "Installing AWS CLI $AWS_VERSION"
-  download_verified "https://awscli.amazonaws.com/$asset" "$tmpdir/$asset" "sha256:$AWS_SHA" "$asset"
+  if [[ "$(version_plan_value cloud.aws_cli integrity)" == aws-pgp:* ]]; then
+    download_aws_signed "https://awscli.amazonaws.com/$asset" "$tmpdir/$asset"
+  else
+    download_verified "https://awscli.amazonaws.com/$asset" "$tmpdir/$asset" "sha256:$AWS_SHA" "$asset"
+  fi
   unzip -q "$tmpdir/$asset" -d "$tmpdir"
   if is_installed aws; then
     sudo "$tmpdir/aws/install" --update
@@ -151,8 +159,6 @@ if ! is_installed aws || ! version_ge "$AWS_CURRENT" "$AWS_VERSION"; then
   record_install aws "$AWS_VERSION" aws-installer /usr/local/aws-cli
   ((_INSTALLED++)) || true
   log_success "AWS CLI $AWS_VERSION installed"
-else
-  log_skip "AWS CLI $AWS_VERSION already installed or newer"
 fi
 
 if [[ ! -f /etc/apt/sources.list.d/google-cloud-sdk.list ||
@@ -170,13 +176,15 @@ fi
 
 apt_update
 log_info "Ensuring Google Cloud CLI and Azure CLI are current from their signed repositories"
-sudo apt-get install -y google-cloud-cli azure-cli
-log_success "Google Cloud CLI $(gcloud version --format=json 2>/dev/null | jq -r '."Google Cloud SDK" // "unknown"') is current"
-log_success "Azure CLI $(az version --query '"azure-cli"' -o tsv 2>/dev/null || printf unknown) is current"
+GCLOUD_CURRENT="$(gcloud version --format=json 2>/dev/null | jq -r '."Google Cloud SDK" // ""' || true)"
+AZURE_CURRENT="$(az version --query '"azure-cli"' -o tsv 2>/dev/null || true)"
+install_policy_apt gcloud google-cloud-cli cloud.gcloud "$GCLOUD_CURRENT"
+install_policy_apt az azure-cli cloud.azure_cli "$AZURE_CURRENT"
 
 CLOUDFLARED_VERSION="$(package_version cloud cloudflared 2026.7.3)"
-if ! is_installed cloudflared ||
-  ! version_ge "$(cloudflared --version 2>/dev/null || true)" "$CLOUDFLARED_VERSION"; then
+if runtime_is_current cloudflared "$CLOUDFLARED_VERSION" "$(cloudflared --version 2>/dev/null || true)"; then
+  :
+else
   tmpdir="$(mktemp -d)"
   asset="cloudflared-linux-${ARCH}.deb"
   CLOUDFLARED_SHA="$(package_metadata cloud cloudflared "sha256_$ARCH")"
@@ -189,8 +197,6 @@ if ! is_installed cloudflared ||
   record_install cloudflared "$CLOUDFLARED_VERSION" github:cloudflare/cloudflared /usr/bin/cloudflared
   ((_INSTALLED++)) || true
   log_success "cloudflared $CLOUDFLARED_VERSION installed"
-else
-  log_skip "cloudflared $CLOUDFLARED_VERSION already installed or newer"
 fi
 
 STERN_VERSION="$(package_version cloud stern 1.34.0)"

@@ -63,6 +63,9 @@ binaries. `distro` uses Ubuntu or the vendor's signed package repository;
 `standalone` tracks the provider installer with its script checksum pinned.
 Profile selection determines which tools are installed. Binary names, ownership,
 and integrity details are listed in [Tool Inventory](docs/tool-inventory.md).
+Install-time rolling policies and preservation rules are described under
+[Installation Preflight](#installation-preflight); the table retains reviewed
+baselines, not floating upstream resolutions.
 Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
 `tldr`, `ast_grep` -> `ast-grep`/`sg`, `aws_cli` -> `aws`, `gcloud` -> `gcloud`,
 `azure_cli` -> `az`, `claude_cli` -> `claude`, `codex_cli` -> `codex`, and
@@ -168,12 +171,71 @@ The installer follows one path for local, one-line, CI, native, and WSL runs:
 1. Validate the platform and selection.
 2. Create a run ID, private logs, and stage checkpoints.
 3. Install bootstrap prerequisites and a checksum-verified chezmoi release.
-4. Resolve the source checkout and calculate pending config changes.
-5. Back up every changed or newly-created destination.
+4. Resolve the source checkout, run installation preflight, and freeze version targets.
+5. Calculate pending config changes and back up changed/new destinations.
 6. Apply configuration and checksum-pinned externals without running hidden
    chezmoi install scripts.
 7. Run selected install sections explicitly with timing and event records.
-8. Run acceptance checks and write a machine-readable summary.
+8. Run acceptance checks, report available updates, and write a machine-readable summary.
+
+## Installation Preflight
+
+Preflight runs automatically before config application or tool installation.
+The minimal Git/curl/Python/chezmoi prerequisites and source initialization must
+run first on a fresh machine. Preview an existing checkout without installing:
+
+```bash
+dot preflight --sections core,languages,cloud
+dot preflight --sections cloud --json
+/usr/bin/python3 scripts/install-policy.py --sections core,languages
+```
+
+Preflight checks platform/architecture, home permissions, disk headroom, PATH,
+interrupted package operations, and upstream resolution/integrity for rolling
+tools. It shows the detected version/path, target, ownership, and planned action.
+It never authenticates to clouds, changes credentials, or edits project pins.
+Standalone previews do not create run state. Repository/network problems have
+actionable diagnostics; an unresolved rolling version or checksum blocks apply.
+
+| Tools | Installation policy |
+| --- | --- |
+| `gh`, `aws`, `helm`, `terraform`, `cloudflared` | Latest stable in the major configured by the repository baseline; no automatic new majors |
+| `gcloud`, `az` | Latest stable in the installed major, through the vendor's signed APT repository; fresh installs use the latest stable major |
+| Languages and package managers (`go`, Rust/Cargo, Node/npm, TypeScript, Python, Java, uv, Bun) | Repository version is the minimum; preserve and notify when the active version is newer |
+| `kubectl` and other tools | Existing repository/distro policy; kubectl is deliberately not rolling |
+
+Google increments the SDK's first version component frequently: this is still
+treated as the major boundary, so an installed `gcloud` will often require a
+manual upgrade to cross that boundary. Cloudflared's year is its major boundary.
+APT must publish the exact selected upstream version before installation can
+continue; the installer never substitutes a different major when a repo lags.
+
+Unowned/locally modified executables are preserved with a warning and skipped,
+including executables elsewhere on PATH. APT updates are limited to package-owned
+Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
+`JAVA_HOME`, system Python, and project environments are not silently replaced.
+Python installs side-by-side through uv rather than replacing Ubuntu's Python.
+Existing explicit per-binary takeover remains opt-in, not an automatic policy.
+
+Each run saves private `versions.json` with exact targets and integrity data;
+resume reuses that plan without contacting upstream again. GitHub release asset
+SHA256 digests/vendor manifests verify rolling downloads; AWS CLI uses its vendor
+PGP signature with a repository-pinned public-key fingerprint and records the
+verified ZIP's SHA256. The checked-in checksums still cover baseline/manual installs.
+
+Every successful run prints a freshness report against releases resolved at
+preflight: yellow **LOW** for a newer minor/patch, red **HIGH** for a newer major.
+These are non-fatal warnings, including intentionally pinned/preserved versions;
+unknown freshness is reported explicitly, never described as current. Tools
+without an upstream resolver require the existing version audit. Text/JSONL logs,
+`versions.json`, and `update-warnings.json` are retained in the run's private state
+and included in CI observability artifacts.
+
+Automatic upgrades never cross the configured major. Review the existing
+version-audit report and accept a new repository baseline when a major upgrade
+is wanted; SDKs whose manifest says `distro` are upgraded across majors manually.
+
+## Configuration Conflicts
 
 Default conflict policy is `backup`. Other policies are explicit:
 

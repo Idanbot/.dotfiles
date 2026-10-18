@@ -85,7 +85,8 @@ cp "$DOTFILES_DIR/.chezmoi.yaml.tmpl" "$lifecycle_source/.chezmoi.yaml.tmpl"
 cp "$DOTFILES_DIR/scripts/environment.sh" "$lifecycle_source/scripts/environment.sh"
 cp "$DOTFILES_DIR/scripts/conflicts.sh" "$lifecycle_source/scripts/conflicts.sh"
 cp "$DOTFILES_DIR/scripts/chezmoi-network.sh" "$lifecycle_source/scripts/chezmoi-network.sh"
-cp "$DOTFILES_DIR/scripts/run-plan.py" "$DOTFILES_DIR/scripts/section-state.py" "$DOTFILES_DIR/scripts/sections.json" "$lifecycle_source/scripts/"
+cp "$DOTFILES_DIR/scripts/run-plan.py" "$DOTFILES_DIR/scripts/section-state.py" "$DOTFILES_DIR/scripts/sections.json" \
+  "$DOTFILES_DIR/scripts/install-policy.py" "$DOTFILES_DIR/scripts/catalog.py" "$lifecycle_source/scripts/"
 cp "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" "$lifecycle_source/"
 printf '%s\n' 'bootstrap lock lifecycle fixture' >"$lifecycle_source/dot_bootstrap-lock-fixture"
 printf '%s\n' '#!/usr/bin/env bash' \

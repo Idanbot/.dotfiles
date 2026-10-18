@@ -376,8 +376,10 @@ fi
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
-export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
-[[ -d "$JAVA_HOME/bin" ]] && path=("$JAVA_HOME/bin" $path)
+if [[ -z "${JAVA_HOME:-}" && -x "$HOME/.local/share/dotfiles/tools/java/current/bin/java" ]] &&
+  [[ "$(readlink -f "$(command -v java)")" == "$(readlink -f "$HOME/.local/share/dotfiles/tools/java/current/bin/java")" ]]; then
+  export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
+fi
 export CARGO_HOME=$HOME/.cargo
 
 export BAT_THEME=ansi

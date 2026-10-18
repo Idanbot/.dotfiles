@@ -36,6 +36,7 @@ else
 fi
 NPM
 chmod +x "$NODE_ROOT/bin/"*
+export PATH="$NODE_ROOT/bin:$PATH"
 printf '11.0.0\n' >"$NODE_ROOT/npm-version"
 record_install node "$NODE_VERSION" node-dist "$NODE_ROOT"
 awk '/^NPM_VERSION=/ { block = 1 } /^for binary in node / { exit } block' \

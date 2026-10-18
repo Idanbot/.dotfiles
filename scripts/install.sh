@@ -850,7 +850,7 @@ run_stage() {
   shift
   local checkpoint="$CHECKPOINT_DIR/$stage.done" started elapsed
   CURRENT_STAGE="$stage"
-  if [[ -n "$RESUME_REQUEST" && -f "$checkpoint" && "$stage" != doctor ]]; then
+  if [[ -n "$RESUME_REQUEST" && -f "$checkpoint" && "$stage" != doctor && "$stage" != preflight && "$stage" != update-report ]]; then
     log_skip "Resuming: $stage already completed"
     write_event skip "checkpoint hit"
     return 0
@@ -1125,6 +1125,14 @@ stage_doctor() {
     --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")"
 }
 
+stage_preflight() {
+  local -a args=()
+  [[ -z "$RESUME_REQUEST" ]] || args+=(--resume)
+  /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/install-policy.py" preflight \
+    --source "$CHEZMOI_SOURCE" --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
+    --plan "$DOTFILES_VERSION_PLAN" "${args[@]}"
+}
+
 write_run_summary() {
   local status="$1" duration duration_ms duration_human summary
   duration_ms="$(bootstrap_elapsed_ms)"
@@ -1165,6 +1173,9 @@ if ! assert_supported_platform; then
 fi
 log_info "Platform: $(get_platform) ($(get_arch))"
 
+export DOTFILES_VERSION_PLAN="$RUN_DIR/versions.json"
+run_stage preflight stage_preflight
+
 if [[ -z "$ONLY_SECTION" ]]; then
   run_stage apply stage_apply
 fi
@@ -1174,6 +1185,9 @@ done
 if [[ "$RUN_DOCTOR" == true ]]; then
   run_stage doctor stage_doctor
 fi
+
+run_stage update-report /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/install-policy.py" report \
+  --plan "$DOTFILES_VERSION_PLAN"
 
 write_run_summary success
 if [[ -z "$ONLY_SECTION" ]]; then

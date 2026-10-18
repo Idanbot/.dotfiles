@@ -109,6 +109,8 @@ jobs:
           bash tests/test-chezmoi-network.sh "$PWD"
           bash tests/test-binary-upgrades.sh "$PWD"
           bash tests/test-apt-key-repair.sh "$PWD"
+          python3 tests/test-install-policy.py "$PWD"
+          bash tests/test-runtime-policy.sh "$PWD"
           tests/test-download-cache.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
           tests/test-system-configuration.sh "$PWD"
@@ -332,6 +334,7 @@ jobs:
               python3 /dotfiles/tests/test-workspace-harness.py /dotfiles
               python3 /dotfiles/tests/test-grouped-upgrade-canary.py /dotfiles
               python3 /dotfiles/tests/test-run-plan.py /dotfiles
+              python3 /dotfiles/tests/test-install-policy.py /dotfiles
               bash /dotfiles/tests/test-ci-operations.sh /dotfiles
             '
       - name: Publish workspace summary
@@ -438,13 +441,13 @@ jobs:
             dotfiles-unit bash -lc '
               set -e
               sudo apt-get update -qq
-              sudo apt-get install -y python3 yq zsh tmux openssh-client xz-utils
+              sudo apt-get install -y python3 yq zsh tmux openssh-client xz-utils gnupg
               /dotfiles/scripts/install-chezmoi.sh
               export PATH="$HOME/.local/bin:$PATH"
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
                 test-network-faults.sh test-download-cache.sh \
-                test-chezmoi-network.sh test-binary-upgrades.sh test-apt-key-repair.sh \
+                test-chezmoi-network.sh test-binary-upgrades.sh test-apt-key-repair.sh test-runtime-policy.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \
@@ -476,6 +479,7 @@ jobs:
       - name: Run real installer twice
         env:
           E2E_SERVICE: ${{ matrix.service }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker compose -f .github/e2e/compose.yaml --profile base \
             up --build --abort-on-container-exit \
@@ -517,6 +521,8 @@ jobs:
       - name: Backup and restore
         run: docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
       - name: Inject failure and resume
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: docker compose -f .github/e2e/compose.yaml --profile recovery run --rm failure-resume
       - name: Upload recovery logs
         if: always()
@@ -550,6 +556,7 @@ jobs:
       - name: Run live profile
         env:
           E2E_SERVICE: ${{ matrix.service }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker compose -f .github/e2e/compose.yaml --profile "$E2E_SERVICE" \
             up --build --abort-on-container-exit \

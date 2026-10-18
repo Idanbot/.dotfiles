@@ -558,6 +558,33 @@ github_latest_release() {
   printf '%s\n' "$tag"
 }
 
+download_aws_signed() (
+  local url="$1" destination="$2" temporary fingerprint digest
+  temporary="$(mktemp -d)"
+  trap 'rm -rf -- "$temporary"' EXIT
+  chmod 700 "$temporary"
+  gpg --batch --homedir "$temporary" --import "$DOTFILES_SOURCE_DIR/scripts/keys/aws-cli.asc" >/dev/null 2>&1
+  fingerprint="$(gpg --batch --homedir "$temporary" --with-colons --fingerprint | awk -F: '$1 == "fpr" {print $10; exit}')"
+  [[ "$fingerprint" == FB5DB77FD5C118B80511ADA8A6310ACC4672475C ]] || {
+    log_error "AWS CLI public signing key fingerprint mismatch"
+    return 1
+  }
+  download "$url" "$temporary/aws.zip"
+  download "$url.sig" "$temporary/aws.zip.sig"
+  gpg --batch --homedir "$temporary" --verify "$temporary/aws.zip.sig" "$temporary/aws.zip" || {
+    log_error "AWS CLI signature verification failed; nothing installed"
+    return 1
+  }
+  digest="$(sha256_file "$temporary/aws.zip")"
+  log_success "Verified AWS CLI signature; SHA256 $digest"
+  # Persist the verified payload identity alongside the immutable version plan.
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]]; then
+    printf '%s\n' "$digest" >"${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+    chmod 600 "${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+  fi
+  install -m 600 "$temporary/aws.zip" "$destination"
+)
+
 resolve_tool_version() {
   local repo="$1" requested="${2:-latest}"
   if [[ -z "$requested" || "$requested" == "latest" ]]; then
@@ -670,13 +697,74 @@ binary_replacement_requested() {
 
 preserve_existing_release_binary() {
   local binary="$1" current="$2" target="${DOTFILES_BIN_DIR:-$HOME/.local/bin}/$1"
+  # Policy-managed runs must not shadow an executable owned by another installer.
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]] && command_exists "$binary"; then
+    target="$(command -v "$binary")"
+    if [[ "$binary" == aws ]] && target_is_owned /usr/local/aws-cli; then
+      return 1
+    fi
+    if [[ ! -f "$target" || ! -x "$target" ]]; then
+      log_warn "Preserving unowned $binary at $target; update skipped"
+      return 0
+    fi
+  fi
   [[ -e "$target" || -L "$target" ]] || return 1
   target_is_owned "$target" && return 1
   binary_replacement_requested "$binary" && return 1
-  [[ -f "$target" && -x "$target" && -n "$(extract_version "$current")" ]] || return 1
+  [[ -f "$target" && -x "$target" ]] || return 1
+  [[ -n "${DOTFILES_VERSION_PLAN:-}" || -n "$(extract_version "$current")" ]] || return 1
   log_warn "Preserving existing $binary ($current) at $target; upgrade skipped because it is unowned or modified"
   log_info "To back it up and replace only this binary, rerun with DOTFILES_REPLACE_BINARIES=$binary"
   return 0
+}
+
+runtime_is_current() {
+  local binary="$1" target="$2" current="$3"
+  if command_exists "$binary" && version_ge "$current" "$target"; then
+    if version_equals "$current" "$target"; then
+      log_skip "$binary $(extract_version "$current") matches repository $target"
+    else
+      log_skip "$binary $(extract_version "$current") is newer than repository $target; preserving current runtime"
+    fi
+    return 0
+  fi
+  preserve_existing_release_binary "$binary" "$current"
+}
+
+version_plan_value() {
+  [[ -n "${DOTFILES_VERSION_PLAN:-}" ]] || return 0
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" get \
+    --plan "$DOTFILES_VERSION_PLAN" --tool "$1" --field "$2"
+}
+
+install_policy_apt() {
+  local binary="$1" package="$2" id="$3" current="$4" target versions candidate
+  target="$(version_plan_value "$id" target)"
+  if [[ -z "$target" ]]; then
+    sudo apt-get install -y "$package"
+    return
+  fi
+  if command_exists "$binary"; then
+    if version_ge "$current" "$target"; then
+      log_skip "$binary $(extract_version "$current") is at or above run target $target"
+      return
+    fi
+    if ! dpkg-query -S "$(readlink -f "$(command -v "$binary")")" 2>/dev/null |
+      grep -Fq "$package:"; then
+      log_warn "Preserving unowned $binary at $(command -v "$binary"); update skipped"
+      return
+    fi
+  fi
+  versions="$(apt-cache madison "$package")"
+  candidate="$(awk -F '|' -v target="$target" '
+    { gsub(/^[ \t]+|[ \t]+$/, "", $2)
+      if ($2 == target || index($2, target "-") == 1) {print $2; exit} }
+  ' <<<"$versions")"
+  [[ -n "$candidate" ]] || {
+    log_error "$package $target is not yet available from its signed APT repository; retry after publication"
+    return 1
+  }
+  sudo apt-get install -y "$package=$candidate"
 }
 
 install_managed_binary() (
@@ -896,6 +984,14 @@ install_github_binary() {
 
 package_version() {
   local section="$1" key="$2" default="${3:-}" manifest
+  local resolved
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]]; then
+    resolved="$(version_plan_value "$section.$key" target)"
+    if [[ -n "$resolved" ]]; then
+      printf '%s\n' "$resolved"
+      return
+    fi
+  fi
   manifest="${DOTFILES_PACKAGES_FILE:-$DOTFILES_SOURCE_DIR/packages.yaml}"
   [[ -f "$manifest" ]] || {
     printf '%s\n' "$default"
@@ -919,6 +1015,14 @@ package_version() {
 
 package_metadata() {
   local section="$1" key="$2" field="$3" default="${4:-}" metadata
+  local resolved
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" && "$field" == sha256_* ]]; then
+    resolved="$(version_plan_value "$section.$key" integrity)"
+    if [[ "$resolved" == sha256:* ]]; then
+      printf '%s\n' "${resolved#sha256:}"
+      return
+    fi
+  fi
   metadata="${DOTFILES_PACKAGES_META_FILE:-$DOTFILES_SOURCE_DIR/packages.meta.yaml}"
   [[ -f "$metadata" ]] || {
     printf '%s\n' "$default"
@@ -1094,6 +1198,11 @@ npm_install_global() {
   )
   prefix="$(npm_global_prefix)"
   package_manifest="$prefix/lib/node_modules/$package/package.json"
+  local active_version
+  active_version="$($binary --version 2>/dev/null || true)"
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]] && runtime_is_current "$binary" "$version" "$active_version"; then
+    return 0
+  fi
   activate_node_paths
   if [[ -f "$package_manifest" ]]; then
     if command_exists gojq; then

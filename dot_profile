@@ -30,8 +30,8 @@ export PATH
 # Go
 export PATH="$PATH:/usr/local/go/bin"
 
-# Java
-export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
-if [ -d "$JAVA_HOME/bin" ]; then
-  PATH="$JAVA_HOME/bin:$PATH"
+# Do not shadow a newer or externally managed Java installation.
+if [ -z "${JAVA_HOME:-}" ] && [ -x "$HOME/.local/share/dotfiles/tools/java/current/bin/java" ] &&
+  [ "$(readlink -f "$(command -v java)")" = "$(readlink -f "$HOME/.local/share/dotfiles/tools/java/current/bin/java")" ]; then
+  export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
 fi

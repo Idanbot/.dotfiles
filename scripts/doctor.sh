@@ -137,8 +137,8 @@ check_stable_command() {
   if [[ "$actual" == "$expected" ]]; then
     result pass "$command-shim" "$expected"
   elif [[ -n "$actual" ]]; then
-    result warn "$command-shim" "resolved to $actual, expected stable path $expected" \
-      "rerun the languages section to recreate the user-local shim"
+    result warn "$command-shim" "external command preserved at $actual (managed path: $expected)" \
+      "use its original installer to update it; bootstrap preserves newer/unowned runtimes"
   else
     result fail "$command-shim" "command not found" "rerun the languages section"
   fi

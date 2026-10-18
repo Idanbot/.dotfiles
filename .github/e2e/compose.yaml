@@ -9,6 +9,7 @@ x-e2e-base: &e2e-base
     DOTFILES_COLOR: always
     DOTFILES_GIT_NAME: E2E User
     DOTFILES_GIT_EMAIL: e2e@example.invalid
+    GH_TOKEN: ${GH_TOKEN:-}
   volumes:
     - ../..:/dotfiles:ro
     - ../../artifacts:/artifacts

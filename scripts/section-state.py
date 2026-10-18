@@ -33,7 +33,7 @@ def fingerprint(root, name):
             selected[key] = value
         inputs[filename] = selected
     for filename in [entry["script"], "scripts/lib.sh", "scripts/environment.sh",
-                     "scripts/section-state.py", *entry.get("files", [])]:
+                     "scripts/section-state.py", "scripts/install-policy.py", *entry.get("files", [])]:
         path = root / filename
         inputs[filename] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()

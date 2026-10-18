@@ -26,7 +26,7 @@ This prevents duplicate or opaque execution paths.
 ## Bootstrap Flow
 
 ```text
-selector -> private run state -> prerequisites -> source
+selector -> private run state -> prerequisites -> source -> preflight/version plan
          -> status -> transactional backup -> config/externals apply
          -> ordered sections -> doctor -> summary
 ```

@@ -83,6 +83,13 @@ for pass in $(seq 1 "$PASSES"); do
     --profile "$PROFILE" \
     --conflict-policy backup \
     --yes
+
+  latest_run="$(find "$STATE_DIR/runs" -mindepth 2 -maxdepth 2 -name versions.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
+  [[ -s "$latest_run" && "$(stat -c '%a' "$latest_run")" == 600 ]]
+  jq -e '.schema == 1 and (.tools | type == "object")' "$latest_run" >/dev/null
+  [[ -f "${latest_run%/*}/checkpoints/preflight.done" ]]
+  [[ -f "${latest_run%/*}/update-warnings.json" ]]
+  jq -e 'all(.tools[]; if .id == "cloud.kubectl" then .policy == "repo-minimum" else true end)' "$latest_run" >/dev/null
   pass_ended="$(date +%s%N)"
   pass_elapsed_ms="$(((pass_ended - pass_started) / 1000000))"
   printf '%s\t%s\t%s\t%s\n' "$pass" "$pass_elapsed_ms" \
