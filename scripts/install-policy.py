@@ -90,6 +90,10 @@ def github(repo, major=None):
 def upstream(entry, meta, major=None):
     ident = entry["id"]
     if ident == "cloud.aws_cli":
+        if major is None:
+            tags = get_json("https://api.github.com/repos/aws/aws-cli/tags?per_page=100")
+            versions = [item["name"].removeprefix("v") for item in tags]
+            return max((v for v in versions if stable(v)), key=order), {}
         versions = re.findall(r"^([0-9]+\.[0-9]+\.[0-9]+)\r?$", fetch(
             "https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst"), re.M)
         versions = [v for v in versions if major is None or order(v)[0] == major]

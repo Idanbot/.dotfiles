@@ -146,6 +146,13 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(policy.upstream(entry, {}, 578)[0], "578.0.2")
             self.assertEqual(policy.upstream(entry, {})[0], "600.0.0")
 
+    def test_aws_major_advisory_is_not_limited_to_v2_changelog(self):
+        entry = self.entry("cloud.aws_cli", "2.37.12")
+        with patch.object(policy, "get_json", return_value=[{"name": "3.0.0"}, {"name": "3.1.0-rc1"}, {"name": "2.40.0"}]), \
+                patch.object(policy, "fetch", return_value="2.40.0\n======\n2.39.0\n"):
+            self.assertEqual(policy.upstream(entry, {})[0], "3.0.0")
+            self.assertEqual(policy.upstream(entry, {}, 2)[0], "2.40.0")
+
     def test_atomic_private_plan_and_redirect_refusal(self):
         path = self.home / "run/versions.json"
         policy.atomic_json(path, {"target": "2.0.0"})

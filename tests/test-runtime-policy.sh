@@ -9,10 +9,20 @@ export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_VERSION_PLAN="$temporary/versio
 mkdir -p "$HOME/.local/bin" "$HOME/external/bin"
 printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
 source "$ROOT/scripts/lib.sh"
-download_verified() { printf 'Unexpected download\n' >&2; return 99; }
+ARCH="$(get_arch)"
+download_verified() {
+  printf 'Unexpected download\n' >&2
+  return 99
+}
 require_sudo() { :; }
-rustup() { printf 'Unexpected rustup mutation\n' >&2; return 99; }
-managed_link() { printf 'Unexpected shim replacement\n' >&2; return 99; }
+rustup() {
+  printf 'Unexpected rustup mutation\n' >&2
+  return 99
+}
+managed_link() {
+  printf 'Unexpected shim replacement\n' >&2
+  return 99
+}
 for binary in go gofmt rustc cargo node npm npx java javac tsc uv uvx; do
   printf '#!/bin/sh\nprintf "%%s\\n" "99.99.99"\n' >"$HOME/external/bin/$binary"
   chmod +x "$HOME/external/bin/$binary"
