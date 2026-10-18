@@ -81,11 +81,12 @@ mkdir -m 700 "$temporary/keyring"
 download() { printf 'payload\n' >"$2"; }
 gpg() {
   case "$*" in
-    *--fingerprint*) printf 'fpr:::::::::FB5DB77FD5C118B80511ADA8A6310ACC4672475C:\n' ;;
+    *--fingerprint*) printf 'fpr:::::::::%s:\n' "${AWS_TEST_FINGERPRINT:-FB5DB77FD5C118B80511ADA8A6310ACC4672475C}" ;;
     *--verify*) return "${AWS_VERIFY_STATUS:-0}" ;;
   esac
 }
-command gpg --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
+GPG_BINARY=/usr/bin/gpg
+"$GPG_BINARY" --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
   grep -Fq FB5DB77FD5C118B80511ADA8A6310ACC4672475C
 if AWS_VERIFY_STATUS=1 download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws.zip"; then
   printf 'Bad AWS signature accepted\n' >&2
@@ -102,8 +103,8 @@ if download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/chan
   exit 1
 fi
 [[ ! -e "$temporary/changed.zip" ]]
-gpg() { printf 'fpr:::::::::0000000000000000000000000000000000000000:\n'; }
-if download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/wrong-key.zip"; then
+if AWS_TEST_FINGERPRINT=0000000000000000000000000000000000000000 \
+  download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/wrong-key.zip"; then
   printf 'Wrong AWS signing key accepted\n' >&2
   exit 1
 fi
