@@ -342,6 +342,29 @@ cloudflare-ssh [command]   authenticate and connect through Cloudflare Access
 Machine-specific choices live in
 `~/.config/dotfiles/machine.conf` with mode `0600`.
 
+Existing user-local release binaries are preserved when they are unowned or
+locally modified. The installer warns and continues when the current command
+works. To approve a verified upgrade of specific binaries, with a private backup
+of each original:
+
+```bash
+DOTFILES_REPLACE_BINARIES=gh ./scripts/install.sh --source "$PWD" --only core --yes
+# Multiple approved binaries: DOTFILES_REPLACE_BINARIES=gh,eza
+```
+
+Originals are retained under `~/.local/state/dotfiles/binary-backups/` before
+replacement. Failed candidate probes leave the original command untouched.
+HashiCorp APT sources using a dedicated `Signed-By` keyring are refreshed against
+the fingerprint in [HashiCorp's packaging guide](https://www.hashicorp.com/official-packaging-guide),
+without changing their suites or mirror choices.
+
+Pinned chezmoi externals stay cached until their URL changes. Bootstrap retries
+transient download failures (including HTTP 429) up to four times; checksum and
+configuration errors fail immediately. `DOTFILES_CHEZMOI_ATTEMPTS` and
+`DOTFILES_CHEZMOI_RETRY_DELAY` control the retry limit and delay in seconds.
+Tmux's right status bar shows Kubernetes context and the clock; use
+`dot-agent-status --check` for manual agent readiness checks.
+
 ## Agent Workspace
 
 The `agent` profile installs or validates Claude Code, Codex, Antigravity CLI

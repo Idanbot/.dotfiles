@@ -48,8 +48,8 @@ assert_contains "$TMUX_CONFIG" "set -g @continuum-restore 'off'" \
   'continuum restoration remains manual'
 assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-kube-status)' \
   'status delegates Kubernetes context formatting to cloud-context'
-assert_contains "$TMUX_CONFIG" '#(~/.local/bin/tmux-agent-status)' \
-  'status shows compact registered agent readiness'
+assert_absent "$TMUX_CONFIG" 'tmux-agent-status' \
+  'status does not poll static agent readiness'
 assert_absent "$TMUX_CONFIG" 'kubectl config current-context' \
   'status does not poll kubectl directly'
 assert_absent "$TMUX_CONFIG" ' SSH_TTY TERM LANG ' \
@@ -127,16 +127,6 @@ for expected in \
   fi
 done
 
-mkdir -p "$TEST_TMP/.local/bin"
-printf '#!/usr/bin/env bash\nprintf "agents 2/5\\n"\n' \
-  >"$TEST_TMP/.local/bin/dot-agent-status"
-chmod +x "$TEST_TMP/.local/bin/dot-agent-status"
-if [[ "$(HOME="$TEST_TMP" "$DOTFILES_DIR/dot_local/bin/executable_tmux-agent-status")" == 'agents 2/5' ]]; then
-  pass 'tmux agent status wrapper preserves compact readiness output'
-else
-  fail 'tmux agent status wrapper preserves compact readiness output'
-fi
-
 printf '\n== pinned tmux plugins ==\n'
 for plugin in tpm tmux-prefix-highlight tmux-resurrect tmux-continuum tmux-battery; do
   target=".tmux/plugins/$plugin"
@@ -161,11 +151,20 @@ if command -v tmux >/dev/null 2>&1; then
     BEGIN { include = 1 }
   ' "$TMUX_CONFIG" >"$TEST_TMP/tmux.conf"
   if HOME="$TEST_TMP" tmux -L dotfiles-tmux-contract -f "$TEST_TMP/tmux.conf" \
-    start-server \; source-file "$TEST_TMP/tmux.conf" \; kill-server; then
+    new-session -d \; source-file "$TEST_TMP/tmux.conf" \; \
+    show-options -gv status-right >"$TEST_TMP/status-right"; then
     pass 'tmux accepts the rendered native configuration'
+    if grep -Fq 'tmux-agent-status' "$TEST_TMP/status-right" ||
+      ! grep -Fq 'tmux-kube-status' "$TEST_TMP/status-right" ||
+      ! grep -Fq '%H:%M' "$TEST_TMP/status-right"; then
+      fail 'reloaded status contains only Kubernetes context and clock'
+    else
+      pass 'reloaded status contains only Kubernetes context and clock'
+    fi
   else
     fail 'tmux accepts the rendered native configuration'
   fi
+  tmux -L dotfiles-tmux-contract kill-server 2>/dev/null || true
 else
   printf '  [SKIP] tmux runtime validation (tmux unavailable)\n'
 fi

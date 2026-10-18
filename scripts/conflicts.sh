@@ -3,6 +3,8 @@
 
 # This file is sourced by scripts/install.sh. It intentionally does not enable
 # shell options so it can inherit the caller's strict-mode settings.
+# shellcheck source=scripts/chezmoi-network.sh
+source "$(dirname "${BASH_SOURCE[0]}")/chezmoi-network.sh"
 
 dotfiles_conflict_status_path() {
   local line="$1" path
@@ -299,7 +301,7 @@ dotfiles_apply_selected_conflicts() {
   done 3<<<"$CHEZMOI_STATUS_OUTPUT"
 
   if [[ "$had_conflict" == false ]]; then
-    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty; then
+    if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty; then
       return 1
     fi
     return 0
@@ -307,7 +309,7 @@ dotfiles_apply_selected_conflicts() {
 
   if [[ ${#apply_targets[@]} -gt 0 ]]; then
     log_info "Applying ${#apply_targets[@]} selected managed file(s)"
-    if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "${apply_targets[@]}"; then
+    if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "${apply_targets[@]}"; then
       return 1
     fi
   else
@@ -315,7 +317,7 @@ dotfiles_apply_selected_conflicts() {
   fi
   # Keep directory creation and verified externals convergent without touching
   # any file that the user explicitly skipped or merged.
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty; then
+  if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty; then
     return 1
   fi
 }

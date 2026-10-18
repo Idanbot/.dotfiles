@@ -98,6 +98,14 @@ requested, each object is stored under its SHA256 digest with private modes,
 and every read is revalidated. Per-object `flock` locking prevents parallel
 profiles from downloading or publishing the same object concurrently.
 
+Immutable chezmoi externals retain their cache until the pinned URL changes.
+External network operations retry transient failures without retrying checksum
+or configuration failures or exposing partial status output. Existing unowned
+release binaries remain in place with a warning; `DOTFILES_REPLACE_BINARIES`
+permits named replacements only after a private backup and successful probe.
+HashiCorp APT signing-key rotation updates dedicated scoped keyrings against the
+reviewed upstream fingerprint while preserving repository definitions.
+
 ## Agent Workspaces
 
 `agents.yaml` is the single command and workspace-order registry. Chezmoi

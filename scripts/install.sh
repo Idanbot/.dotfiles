@@ -1001,7 +1001,7 @@ stage_source() {
 
 collect_chezmoi_status() {
   local status
-  if ! status="$(chezmoi status --source="$CHEZMOI_SOURCE" --exclude=scripts)"; then
+  if ! status="$(chezmoi_with_retry status --source="$CHEZMOI_SOURCE" --exclude=scripts)"; then
     log_error "Unable to calculate chezmoi status from $CHEZMOI_SOURCE"
     return 1
   fi
@@ -1038,7 +1038,7 @@ ensure_managed_entrypoint() {
 
   log_warn "Managed command $name is missing; repairing it through chezmoi"
   mkdir -p "$HOME/.local/bin"
-  if ! chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$target"; then
+  if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "$target"; then
     log_error "Unable to repair managed command $name"
     return 1
   fi
@@ -1056,7 +1056,7 @@ stage_apply() {
       skip)
         log_warn "Conflict policy is skip; preserving current destination files"
         log_info "Applying verified externals without overwriting managed config"
-        chezmoi apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty
+        chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty
         return 0
         ;;
       abort)

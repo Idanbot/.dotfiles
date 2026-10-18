@@ -15,6 +15,7 @@ cp -a "$DOTFILES_DIR/.chezmoiscripts" "$DOTFILES_SOURCE_DIR/"
 cp "$DOTFILES_DIR/scripts/section-state.py" "$DOTFILES_DIR/scripts/sections.json" "$DOTFILES_SOURCE_DIR/scripts/"
 cp "$DOTFILES_DIR/scripts/lib.sh" "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 cp "$DOTFILES_DIR/scripts/environment.sh" "$DOTFILES_SOURCE_DIR/scripts/environment.sh"
+cp "$DOTFILES_DIR/scripts/chezmoi-network.sh" "$DOTFILES_SOURCE_DIR/scripts/chezmoi-network.sh"
 cp "$DOTFILES_DIR/scripts/reconcile-packages.sh" "$DOTFILES_SOURCE_DIR/scripts/reconcile-packages.sh"
 
 mock="$TMP_ROOT/mock-run-section"

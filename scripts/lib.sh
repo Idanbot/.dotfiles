@@ -159,7 +159,33 @@ apt_env() {
 }
 
 apt_update() {
+  refresh_hashicorp_apt_keys || return 1
   apt_env apt-get -o Acquire::Retries=3 -qq update
+}
+
+refresh_hashicorp_apt_keys() {
+  local keyrings keyring fingerprints
+  local expected=D55C0D1AC78A8D8126CB631CFC9CA96ACA026560
+  keyrings="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/hashicorp-keyrings.py" \
+    "${DOTFILES_APT_SOURCES_DIR:-/etc/apt}")" || return 1
+  [[ -n "$keyrings" ]] || return 0
+  command_exists gpg || {
+    log_error 'HashiCorp APT key repair requires gnupg; install it from Ubuntu first'
+    return 1
+  }
+  while IFS= read -r keyring; do
+    [[ ! -L "$keyring" && "$(realpath -m -- "$(dirname "$keyring")")" == "$(dirname "$keyring")" ]] || {
+      log_error "Preserving redirected HashiCorp keyring: $keyring"
+      return 1
+    }
+    fingerprints="$(gpg --show-keys --with-colons "$keyring" 2>/dev/null | awk -F: '$1 == "fpr" { print $10 }' || true)"
+    if grep -Fxq "$expected" <<<"$fingerprints"; then
+      continue
+    fi
+    log_info "Refreshing HashiCorp's scoped APT signing key: $keyring"
+    sudo mkdir -p "$(dirname "$keyring")" || return 1
+    install_apt_key https://apt.releases.hashicorp.com/gpg "$keyring" "$expected" || return 1
+  done <<<"$keyrings"
 }
 
 apt_install() {
@@ -617,25 +643,45 @@ ownership_stamp() {
   printf '%s/ownership/%s.sha256\n' "$(managed_state_root)" "$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
 }
 
-assert_owned_target() {
+target_is_owned() {
   local target="$1" stamp
+  stamp="$(ownership_stamp "$target")"
+  [[ -f "$stamp" && "$(<"$stamp")" == "$(managed_target_digest "$target")" ]] &&
+    awk -F '\t' -v target="$target" '$4 == target { found = 1 } END { exit !found }' \
+      "$(managed_state_root)/installed.tsv" 2>/dev/null
+}
+
+assert_owned_target() {
+  local target="$1"
   if [[ "$(realpath -m -- "$(dirname "$target")")" != "$(dirname "$target")" ]]; then
     log_error "Preserving path with redirected or noncanonical ancestors: $target"
     return 1
   fi
   [[ -e "$target" || -L "$target" ]] || return 0
-  stamp="$(ownership_stamp "$target")"
-  if [[ ! -f "$stamp" || "$(<"$stamp")" != "$(managed_target_digest "$target")" ]] ||
-    ! awk -F '\t' -v target="$target" '$4 == target { found = 1 } END { exit !found }' \
-      "$(managed_state_root)/installed.tsv" 2>/dev/null; then
+  if ! target_is_owned "$target"; then
     log_error "Preserving unowned or locally modified path: $target; review and move it aside before retrying"
     return 1
   fi
 }
 
+binary_replacement_requested() {
+  [[ ",${DOTFILES_REPLACE_BINARIES:-}," == *",$1,"* ]]
+}
+
+preserve_existing_release_binary() {
+  local binary="$1" current="$2" target="${DOTFILES_BIN_DIR:-$HOME/.local/bin}/$1"
+  [[ -e "$target" || -L "$target" ]] || return 1
+  target_is_owned "$target" && return 1
+  binary_replacement_requested "$binary" && return 1
+  [[ -f "$target" && -x "$target" && -n "$(extract_version "$current")" ]] || return 1
+  log_warn "Preserving existing $binary ($current) at $target; upgrade skipped because it is unowned or modified"
+  log_info "To back it up and replace only this binary, rerun with DOTFILES_REPLACE_BINARIES=$binary"
+  return 0
+}
+
 install_managed_binary() (
   local src="$1" binary="$2" version="${3:-unknown}" owner="${4:-managed-binary}"
-  local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest temporary
+  local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest temporary backup="" takeover=false
   local -a smoke
   managed_operation_lock || return 1
   mkdir -p "$bin_dir" || return 1
@@ -644,7 +690,13 @@ install_managed_binary() (
     record_install "$binary" "$version" "$owner" "$dest"
     return
   fi
-  assert_owned_target "$dest" || return 1
+  if binary_replacement_requested "$binary" && [[ -f "$dest" || -L "$dest" ]] &&
+    ! target_is_owned "$dest"; then
+    [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
+    takeover=true
+  else
+    assert_owned_target "$dest" || return 1
+  fi
   temporary="$(mktemp -d "$bin_dir/.dotfiles-binary.XXXXXX")" || return 1
   trap 'rm -rf -- "$temporary"' EXIT
   install -m 0755 "$src" "$temporary/new" || return 1
@@ -656,6 +708,12 @@ install_managed_binary() (
   fi
   if [[ -e "$dest" || -L "$dest" ]]; then
     cp -a -- "$dest" "$temporary/previous" || return 1
+  fi
+  if [[ "$takeover" == true ]]; then
+    backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$binary"
+    ensure_private_directory "$backup" || return 1
+    cp -a -- "$dest" "$backup/$binary" || return 1
+    log_warn "Backed up existing $binary to $backup/$binary before approved replacement"
   fi
   mv -Tf -- "$temporary/new" "$dest" || return 1
   if ! record_install "$binary" "$version" "$owner" "$dest"; then
@@ -782,6 +840,8 @@ install_github_archive() {
     return 0
   fi
 
+  preserve_existing_release_binary "$binary" "$current" && return 0
+
   arch="$(get_arch)"
   asset="$(github_asset_name "$asset_template" "$tag" "$arch")"
   member_path="$(github_asset_name "$member" "$tag" "$arch")"
@@ -816,6 +876,8 @@ install_github_binary() {
     log_skip "$binary $tag already installed or newer"
     return 0
   fi
+
+  preserve_existing_release_binary "$binary" "$current" && return 0
 
   arch="$(get_arch)"
   asset="$(github_asset_name "$asset_template" "$tag" "$arch")"

@@ -106,6 +106,9 @@ jobs:
           tests/test-performance-history.sh "$PWD"
           tests/test-ci-outcome.sh "$PWD"
           tests/test-network-faults.sh "$PWD"
+          bash tests/test-chezmoi-network.sh "$PWD"
+          bash tests/test-binary-upgrades.sh "$PWD"
+          bash tests/test-apt-key-repair.sh "$PWD"
           tests/test-download-cache.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
           tests/test-system-configuration.sh "$PWD"
@@ -441,6 +444,7 @@ jobs:
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
                 test-network-faults.sh test-download-cache.sh \
+                test-chezmoi-network.sh test-binary-upgrades.sh test-apt-key-repair.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \

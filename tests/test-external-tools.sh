@@ -10,6 +10,8 @@ export HOME="$TMP_ROOT/home"
 export DOTFILES_STATE_DIR="$TMP_ROOT/state"
 export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
 export DOTFILES_WSL=false
+# shellcheck source=scripts/chezmoi-network.sh
+source "$DOTFILES_DIR/scripts/chezmoi-network.sh"
 mkdir -p "$HOME" "$TMP_ROOT/destination"
 
 "$DOTFILES_DIR/scripts/install-chezmoi.sh" >/dev/null
@@ -19,7 +21,7 @@ chezmoi init \
   --promptString='Full name=External Smoke' \
   --promptString='Git email=external-smoke@example.invalid' \
   --promptString='tmux-sessionizer search dirs (space-separated)=~/Code'
-chezmoi apply \
+chezmoi_with_retry apply \
   --source="$DOTFILES_DIR" \
   --destination="$TMP_ROOT/destination" \
   --include=dirs,externals \

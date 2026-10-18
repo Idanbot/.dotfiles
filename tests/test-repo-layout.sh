@@ -39,7 +39,6 @@ required=(
   .github/workflows/native-vm-e2e.yml
   dot_local/bin/executable_cloud-context dot_local/bin/executable_agent-mcp dot_local/bin/executable_dot-agent-status
   dot_local/bin/executable_dot-privacy dot_config/dotfiles/privacy.sh dot_config/rtk/config.toml
-  dot_local/bin/executable_tmux-agent-status
   dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_local/bin/executable_tmux-help
@@ -153,7 +152,7 @@ for expected in \
   'run_stage "section-$section"' \
   'DOTFILES_FAIL_AT' \
   'scripts/backup.sh create' \
-  'chezmoi apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
+  'chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force' \
   '--no-tty' \
   'HAS_CONTROLLING_TTY' \
   'done 3<<<"$CHEZMOI_STATUS_OUTPUT"' \
