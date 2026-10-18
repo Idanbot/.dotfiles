@@ -10,6 +10,7 @@ mkdir -p "$HOME/.local/bin" "$HOME/external/bin"
 printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
 source "$ROOT/scripts/lib.sh"
 ARCH="$(get_arch)"
+export ARCH
 download_verified() {
   printf 'Unexpected download\n' >&2
   return 99
