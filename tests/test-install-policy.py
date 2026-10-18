@@ -141,8 +141,9 @@ class PolicyTests(unittest.TestCase):
 
     def test_gcloud_installed_major_is_not_crossed(self):
         entry = self.entry("cloud.gcloud", "distro", "578.0.1")
-        with patch.object(policy, "get_json", return_value={"version": "600.0.0"}):
-            self.assertEqual(policy.upstream(entry, {}, 578)[0], "578.0.1")
+        with patch.object(policy, "get_json", return_value={"version": "600.0.0"}), \
+                patch.object(policy.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "google-cloud-cli | 578.0.2-0 | signed repo\ngoogle-cloud-cli | 600.0.0-0 | repo\n", "")):
+            self.assertEqual(policy.upstream(entry, {}, 578)[0], "578.0.2")
             self.assertEqual(policy.upstream(entry, {})[0], "600.0.0")
 
     def test_atomic_private_plan_and_redirect_refusal(self):

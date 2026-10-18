@@ -377,6 +377,7 @@ fi
 [[ -f "$HOME/.local/bin/env" ]] && . "$HOME/.local/bin/env"
 
 if [[ -z "${JAVA_HOME:-}" && -x "$HOME/.local/share/dotfiles/tools/java/current/bin/java" ]] &&
+  command -v java >/dev/null 2>&1 &&
   [[ "$(readlink -f "$(command -v java)")" == "$(readlink -f "$HOME/.local/share/dotfiles/tools/java/current/bin/java")" ]]; then
   export JAVA_HOME="$HOME/.local/share/dotfiles/tools/java/current"
 fi

@@ -77,6 +77,7 @@ class CatalogTests(unittest.TestCase):
             ("gcloud", {"bundled-python3-unix": "3.14.0", "Google Cloud SDK": "600.0.0"}, "600.0.0"),
             ("az", {"extensions": {"other": "99.0.0"}, "azure-cli": "2.91.0"}, "2.91.0"),
             ("kubectl", {"kustomizeVersion": "v5.9.0", "clientVersion": {"gitVersion": "v1.37.1"}}, "1.37.1"),
+            ("terraform", {"provider_selections": {"example": "99.0.0"}, "terraform_version": "1.16.5"}, "1.16.5"),
         ]
         for command, data, expected in fixtures:
             entry = {"id": command, "commands": [command]}

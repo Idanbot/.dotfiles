@@ -579,8 +579,12 @@ download_aws_signed() (
   log_success "Verified AWS CLI signature; SHA256 $digest"
   # Persist the verified payload identity alongside the immutable version plan.
   if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]]; then
-    printf '%s\n' "$digest" >"${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
-    chmod 600 "${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+    if [[ -s "${DOTFILES_VERSION_PLAN%.json}-aws.sha256" ]]; then
+      verify_sha256 "$temporary/aws.zip" "$(<"${DOTFILES_VERSION_PLAN%.json}-aws.sha256")" aws-cli-resume || return 1
+    else
+      printf '%s\n' "$digest" >"${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+      chmod 600 "${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+    fi
   fi
   install -m 600 "$temporary/aws.zip" "$destination"
 )

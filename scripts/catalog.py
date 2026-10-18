@@ -125,6 +125,11 @@ PROBES.update(
         "gcloud": ["version", "--format=json"],
         "az": ["version", "--output", "json"],
         "java": ["-version"],
+        "terraform": ["version", "-json"],
+        "gitleaks": ["version"],
+        "curlie": ["version"],
+        "s5cmd": ["version"],
+        "kubecolor": ["--kubecolor-version"],
         "tmux": ["-V"],
         "ssh": ["-V"],
     }
@@ -219,18 +224,20 @@ def probe(entry):
                 capture_output=True,
                 text=True,
                 timeout=3,
-                env={**os.environ, "NO_COLOR": "1"},
+                env={**os.environ, "NO_COLOR": "1", "CHECKPOINT_DISABLE": "1"},
             )
             if output.returncode != 0:
                 record["probe"] = "failed"
             else:
                 text = output.stdout + output.stderr
-                if command in {"gcloud", "az", "kubectl"}:
+                if command in {"gcloud", "az", "kubectl", "terraform"}:
                     data = json.loads(output.stdout)
                     if command == "gcloud":
                         text = data.get("Google Cloud SDK", "")
                     elif command == "az":
                         text = data.get("azure-cli", "")
+                    elif command == "terraform":
+                        text = data.get("terraform_version", "")
                     else:
                         text = data.get("clientVersion", {}).get("gitVersion", "")
                 match = re.search(

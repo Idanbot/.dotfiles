@@ -100,7 +100,18 @@ def upstream(entry, meta, major=None):
         latest = str(get_json("https://dl.google.com/dl/cloudsdk/channels/rapid/components-2.json")["version"])
         # Google increments the first component for SDK releases. Do not cross
         # an installed major, even though it is not a conventional SemVer major.
-        return (entry["current"] if major is not None and order(latest)[0] != major else latest), {}
+        if major is not None and order(latest)[0] != major:
+            cached = subprocess.run(["apt-cache", "madison", "google-cloud-cli"],
+                                    capture_output=True, text=True, timeout=10)
+            candidates = [entry["current"]]
+            for line in cached.stdout.splitlines():
+                fields = line.split("|")
+                if len(fields) >= 2:
+                    candidate = fields[1].strip().split("-")[0]
+                    if stable(candidate) and order(candidate)[0] == major:
+                        candidates.append(candidate)
+            return max(candidates, key=order), {}
+        return latest, {}
     if ident == "cloud.kubectl":
         return fetch("https://dl.k8s.io/release/stable.txt").strip().removeprefix("v"), {}
     if ident == "languages.go":

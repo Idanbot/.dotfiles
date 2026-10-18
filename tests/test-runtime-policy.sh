@@ -78,8 +78,6 @@ fi
 # Real AWS verifier rejects signature failures and accepts only the pinned key.
 unset -f download_verified
 mkdir -m 700 "$temporary/keyring"
-command gpg --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
-  grep -Fq FB5DB77FD5C118B80511ADA8A6310ACC4672475C
 download() { printf 'payload\n' >"$2"; }
 gpg() {
   case "$*" in
@@ -87,6 +85,8 @@ gpg() {
     *--verify*) return "${AWS_VERIFY_STATUS:-0}" ;;
   esac
 }
+command gpg --batch --homedir "$temporary/keyring" --show-keys --with-colons "$ROOT/scripts/keys/aws-cli.asc" |
+  grep -Fq FB5DB77FD5C118B80511ADA8A6310ACC4672475C
 if AWS_VERIFY_STATUS=1 download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws.zip"; then
   printf 'Bad AWS signature accepted\n' >&2
   exit 1
@@ -94,6 +94,14 @@ fi
 [[ ! -e "$temporary/aws.zip" ]]
 download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws.zip"
 [[ -s "$temporary/aws.zip" && -s "${DOTFILES_VERSION_PLAN%.json}-aws.sha256" ]]
+download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws-resume.zip"
+[[ -s "$temporary/aws-resume.zip" ]]
+printf '%064d\n' 0 >"${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
+if download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/changed.zip"; then
+  printf 'Changed AWS resume payload accepted\n' >&2
+  exit 1
+fi
+[[ ! -e "$temporary/changed.zip" ]]
 gpg() { printf 'fpr:::::::::0000000000000000000000000000000000000000:\n'; }
 if download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/wrong-key.zip"; then
   printf 'Wrong AWS signing key accepted\n' >&2
