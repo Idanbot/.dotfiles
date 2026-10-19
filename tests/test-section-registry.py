@@ -111,6 +111,79 @@ class RegistryTests(unittest.TestCase):
                         (standalone.returncode, standalone.stdout, standalone.stderr),
                     )
 
+    def test_alternate_source_controls_registry_and_profiles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            alternate = temporary / "alternate checkout"
+            (alternate / "scripts").mkdir(parents=True)
+            shutil.copyfile(
+                ROOT / "scripts/section-registry.py",
+                alternate / "scripts/section-registry.py",
+            )
+            shutil.copytree(ROOT / ".chezmoiscripts", alternate / ".chezmoiscripts")
+            shutil.copytree(ROOT / "profiles", alternate / "profiles")
+            entries = json.loads((ROOT / "scripts/sections.json").read_text())
+            entries["terminal"]["order"], entries["zsh"]["order"] = (
+                entries["zsh"]["order"],
+                entries["terminal"]["order"],
+            )
+            entries["alternate"] = {**entries["detect"], "order": 15}
+            entries["ai"]["dependencies"] = ["history"]
+            (alternate / "scripts/sections.json").write_text(json.dumps(entries))
+            order = sorted(entries, key=lambda name: entries[name]["order"])
+            for path in (alternate / "profiles").glob("*.conf"):
+                lines = path.read_text().splitlines()
+                sections = next(
+                    line.removeprefix("sections=")
+                    for line in lines
+                    if line.startswith("sections=")
+                ).split(",")
+                if path.stem in {"base", "full"}:
+                    sections.append("alternate")
+                sections = [name for name in order if name in sections]
+                path.write_text(
+                    "\n".join(
+                        "sections=" + ",".join(sections)
+                        if line.startswith("sections=") else line
+                        for line in lines
+                    ) + "\n"
+                )
+            env = {
+                **os.environ, "HOME": directory,
+                "DOTFILES_SOURCE_OVERRIDE": "", "DOTFILES_COLOR": "never",
+            }
+            base = "detect,core,alternate,terminal,zsh"
+            cases = [
+                (["--profile", "base"], base),
+                (["--with=ai"], base + ",history,ai"),
+                (["--sections=terminal,alternate,core"], "core,alternate,terminal"),
+                (["--only", "alternate"], "alternate"),
+            ]
+            for source_args in (
+                ["--source", str(alternate)], [f"--source={alternate}"]
+            ):
+                for selection, expected in cases:
+                    for arguments in (
+                        source_args + selection, selection + source_args
+                    ):
+                        for stdin in (False, True):
+                            with self.subTest(arguments=arguments, stdin=stdin):
+                                command = (
+                                    ["bash", "-s", "--"] if stdin
+                                    else ["bash", str(ROOT / "scripts/install.sh")]
+                                )
+                                result = subprocess.run(
+                                    [*command, *arguments, "--print-plan"],
+                                    input=(ROOT / "scripts/install.sh").read_text()
+                                    if stdin else None,
+                                    cwd=directory, env=env,
+                                    capture_output=True, text=True,
+                                )
+                                self.assertEqual(0, result.returncode, result.stderr)
+                                self.assertIn(
+                                    "sections=" + expected, result.stdout.splitlines()
+                                )
+
     def test_helper_only_changes_route_to_their_consumers(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

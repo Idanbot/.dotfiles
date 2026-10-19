@@ -121,6 +121,27 @@ class ConvergenceTests(unittest.TestCase):
         self.assertTrue(any(str(overlay) in change for change in changes))
         self.assertTrue(any(str(history) in change for change in changes))
 
+    def test_generated_agent_state_and_runtime_payloads_are_compared(self):
+        for relative in (
+            ".gemini/antigravity-cli/settings.json",
+            ".omp/agent/optimizer.json",
+            ".agents/skills/graphify/SKILL.md",
+            ".rustup/toolchains/fixture/bin/rustc",
+            ".local/share/uv/python/fixture/bin/python3",
+        ):
+            with self.subTest(relative=relative):
+                path = self.home / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("original\n")
+                before = self.capture()
+                path.write_text("modified\n")
+                self.assertTrue(
+                    any(
+                        str(path) in change
+                        for change in MODULE.differences(before, self.capture())
+                    )
+                )
+
     def test_malformed_ledger_is_rejected(self):
         self.ledger.write_text("broken\trow\n")
         with self.assertRaises(ValueError):

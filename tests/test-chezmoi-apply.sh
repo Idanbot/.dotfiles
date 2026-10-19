@@ -14,8 +14,9 @@ fi
 
 mkdir -p "$TMP_SOURCE"
 tar -C "$DOTFILES_DIR" \
-  --exclude=.git \
-  --exclude=artifacts \
+  --exclude-vcs --exclude-vcs-ignores \
+  --exclude=artifacts --exclude=__pycache__ --exclude=.ruff_cache --exclude=.pytest_cache \
+  --exclude=.codex --exclude=.antigravitycli --exclude=.e2e --exclude=graphify-out \
   --exclude=.chezmoiexternal.yaml \
   -cf - . | tar -C "$TMP_SOURCE" -xf -
 

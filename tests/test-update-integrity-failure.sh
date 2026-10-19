@@ -5,7 +5,9 @@ DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 mkdir -p "$temporary/source" "$temporary/bin"
-tar -C "$DOTFILES_DIR" --exclude=.git --exclude=artifacts --exclude=__pycache__ -cf - . |
+tar -C "$DOTFILES_DIR" --exclude-vcs --exclude-vcs-ignores \
+  --exclude=artifacts --exclude=__pycache__ --exclude=.ruff_cache --exclude=.pytest_cache \
+  --exclude=.codex --exclude=.antigravitycli --exclude=.e2e --exclude=graphify-out -cf - . |
   tar -C "$temporary/source" -xf -
 cat >"$temporary/bin/curl" <<'MOCK'
 #!/usr/bin/env bash

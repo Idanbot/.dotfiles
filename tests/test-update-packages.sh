@@ -17,7 +17,9 @@ pass() { printf '  [PASS] %s\n' "$*"; }
 copy_repo() {
   local target="$1"
   mkdir -p "$target"
-  tar -C "$DOTFILES_DIR" --exclude=.git --exclude=artifacts --exclude=__pycache__ -cf - . |
+  tar -C "$DOTFILES_DIR" --exclude-vcs --exclude-vcs-ignores \
+    --exclude=artifacts --exclude=__pycache__ --exclude=.ruff_cache --exclude=.pytest_cache \
+    --exclude=.codex --exclude=.antigravitycli --exclude=.e2e --exclude=graphify-out -cf - . |
     tar -C "$target" -xf -
   # The grouped-upgrade workflow tests an already-mutated checkout. Reset the
   # fixture's covered tools to a known baseline so the test remains meaningful

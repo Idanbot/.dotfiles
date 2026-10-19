@@ -69,6 +69,15 @@ def snapshot(home, state, managed_paths, config_diff):
         path = Path(row[3])
         if path.is_absolute():
             destinations.update(tree_state(path))
+    # Vendor-generated state and runtime payloads are not always ledger targets.
+    for relative in (
+        ".gemini/antigravity-cli/settings.json",
+        ".omp/agent/optimizer.json",
+        ".agents/skills/graphify",
+        ".rustup/toolchains",
+        ".local/share/uv/python",
+    ):
+        destinations.update(tree_state(home / relative))
     preserved = {}
     for path in (
         home / ".zsh_history",

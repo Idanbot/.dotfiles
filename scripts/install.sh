@@ -42,13 +42,8 @@ declare -A PROFILE_SECTION_DEPENDENCIES=(
 )
 # END GENERATED SECTION REGISTRY
 
-# A local checkout uses live canonical facts; stdin bootstrap needs only Bash.
-if [[ -n "$LOCAL_SOURCE" && -x /usr/bin/python3 && -f "$LOCAL_SOURCE/scripts/section-registry.py" ]]; then
-  registry_block="$(/usr/bin/python3 "$LOCAL_SOURCE/scripts/section-registry.py" --source "$LOCAL_SOURCE")"
-  eval "$registry_block"
-fi
-
 SELECTED_SECTIONS=()
+SELECTION_ACTIONS=()
 WITH_SECTIONS=()
 WITHOUT_SECTIONS=()
 SELECTION_MODE=""
@@ -431,22 +426,22 @@ while [[ $# -gt 0 ]]; do
         printf '%s\n' '--profile requires a name' >&2
         exit 2
       }
-      select_profile "$2"
+      SELECTION_ACTIONS+=(profile "$2")
       AUTO_APPROVE=true
       shift 2
       ;;
     --profile=*)
-      select_profile "${1#--profile=}"
+      SELECTION_ACTIONS+=(profile "${1#--profile=}")
       AUTO_APPROVE=true
       shift
       ;;
     --full)
-      select_profile full
+      SELECTION_ACTIONS+=(profile full)
       AUTO_APPROVE=true
       shift
       ;;
     --base-only)
-      select_profile base
+      SELECTION_ACTIONS+=(profile base)
       AUTO_APPROVE=true
       shift
       ;;
@@ -455,12 +450,12 @@ while [[ $# -gt 0 ]]; do
         printf '%s\n' '--with requires sections' >&2
         exit 2
       }
-      parse_csv_sections "$2" WITH_SECTIONS
+      SELECTION_ACTIONS+=(with "$2")
       AUTO_APPROVE=true
       shift 2
       ;;
     --with=*)
-      parse_csv_sections "${1#--with=}" WITH_SECTIONS
+      SELECTION_ACTIONS+=(with "${1#--with=}")
       AUTO_APPROVE=true
       shift
       ;;
@@ -469,18 +464,12 @@ while [[ $# -gt 0 ]]; do
         printf '%s\n' '--sections requires sections' >&2
         exit 2
       }
-      SELECTED_SECTIONS=()
-      parse_csv_sections "$2" SELECTED_SECTIONS
-      PROFILE_NAME=custom
-      SELECTION_MODE=custom
+      SELECTION_ACTIONS+=(sections "$2")
       AUTO_APPROVE=true
       shift 2
       ;;
     --sections=*)
-      SELECTED_SECTIONS=()
-      parse_csv_sections "${1#--sections=}" SELECTED_SECTIONS
-      PROFILE_NAME=custom
-      SELECTION_MODE=custom
+      SELECTION_ACTIONS+=(sections "${1#--sections=}")
       AUTO_APPROVE=true
       shift
       ;;
@@ -489,12 +478,12 @@ while [[ $# -gt 0 ]]; do
         printf '%s\n' '--without requires sections' >&2
         exit 2
       }
-      parse_csv_sections "$2" WITHOUT_SECTIONS
+      SELECTION_ACTIONS+=(without "$2")
       AUTO_APPROVE=true
       shift 2
       ;;
     --without=*)
-      parse_csv_sections "${1#--without=}" WITHOUT_SECTIONS
+      SELECTION_ACTIONS+=(without "${1#--without=}")
       AUTO_APPROVE=true
       shift
       ;;
@@ -587,6 +576,27 @@ while [[ $# -gt 0 ]]; do
       printf 'Unknown option: %s\n' "$1" >&2
       usage >&2
       exit 2
+      ;;
+  esac
+done
+
+# Resolve selectors only after --source is known, regardless of option order.
+# Without a local checkout, stdin bootstrap continues to use the Bash block.
+if [[ -n "$LOCAL_SOURCE" && -x /usr/bin/python3 && -f "$LOCAL_SOURCE/scripts/section-registry.py" ]]; then
+  registry_block="$(/usr/bin/python3 "$LOCAL_SOURCE/scripts/section-registry.py" --source "$LOCAL_SOURCE")"
+  eval "$registry_block"
+fi
+for ((selection_index = 0; selection_index < ${#SELECTION_ACTIONS[@]}; selection_index += 2)); do
+  selection_value="${SELECTION_ACTIONS[$((selection_index + 1))]}"
+  case "${SELECTION_ACTIONS[$selection_index]}" in
+    profile) select_profile "$selection_value" ;;
+    with) parse_csv_sections "$selection_value" WITH_SECTIONS ;;
+    without) parse_csv_sections "$selection_value" WITHOUT_SECTIONS ;;
+    sections)
+      SELECTED_SECTIONS=()
+      parse_csv_sections "$selection_value" SELECTED_SECTIONS
+      PROFILE_NAME=custom
+      SELECTION_MODE=custom
       ;;
   esac
 done
