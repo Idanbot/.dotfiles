@@ -17,8 +17,8 @@ pass() { printf '  [PASS] %s\n' "$*"; }
 copy_repo() {
   local target="$1"
   mkdir -p "$target"
-  cp -a "$DOTFILES_DIR/." "$target/"
-  rm -rf "$target/.git"
+  tar -C "$DOTFILES_DIR" --exclude=.git --exclude=artifacts --exclude=__pycache__ -cf - . |
+    tar -C "$target" -xf -
   # The grouped-upgrade workflow tests an already-mutated checkout. Reset the
   # fixture's covered tools to a known baseline so the test remains meaningful
   # after a real update set has been applied.

@@ -61,4 +61,24 @@ jq -n '{caveman: "full", rtk: "on", ponytail: "lite"}' >"$pix_state"
 initialize_pix_optimizer_state
 jq -e '.caveman == "full" and .rtk == "on" and .ponytail == "lite"' "$pix_state" >/dev/null
 
+# Exercise the actual installer block so metadata migrations cannot empty its asset.
+awk '/^RTK_VERSION=/ { block = 1 } /^PONYTAIL_VERSION=/ { exit } block' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" >"$TMP_ROOT/rtk.sh"
+rtk_calls=0
+install_github_archive() {
+  [[ "$1" == rtk && "$2" == rtk-ai/rtk && "$3" == "v$RTK_VERSION" ]]
+  [[ "$4" == "$expected_asset" && "$5" == rtk ]]
+  [[ "$6" =~ ^sha256:[0-9a-f]{64}$ ]]
+  rtk_calls=$((rtk_calls + 1))
+}
+for architecture in amd64 arm64; do
+  get_arch() { printf '%s\n' "$architecture"; }
+  case "$architecture" in
+    amd64) expected_asset=rtk-x86_64-unknown-linux-musl.tar.gz ;;
+    arm64) expected_asset=rtk-aarch64-unknown-linux-gnu.tar.gz ;;
+  esac
+  source "$TMP_ROOT/rtk.sh"
+done
+[[ "$rtk_calls" == 2 ]]
+
 printf 'AI optimization package test passed\n'

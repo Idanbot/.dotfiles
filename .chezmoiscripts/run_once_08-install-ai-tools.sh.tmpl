@@ -130,7 +130,7 @@ install_uv_tool graphify graphifyy "$GRAPHIFY_VERSION" 3.13
 
 RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
 RTK_ARCH="$(get_arch)"
-RTK_ASSET="$(package_metadata ai_tools rtk "asset_template_$RTK_ARCH")"
+RTK_ASSET="$(package_release_field ai_tools rtk "$RTK_VERSION" "$RTK_ARCH" asset)"
 RTK_SHA256="$(package_metadata ai_tools rtk "sha256_$RTK_ARCH")"
 install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" "$RTK_ASSET" rtk \
   "sha256:$RTK_SHA256" 'rtk --version'

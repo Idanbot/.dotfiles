@@ -215,6 +215,13 @@ def main(argv=None):
     release.add_argument("metadata", type=Path)
     release.add_argument("packages", type=Path)
     release.add_argument("tool")
+    rendered = subparsers.add_parser("release-field")
+    rendered.add_argument("path", type=Path)
+    rendered.add_argument("section")
+    rendered.add_argument("tool")
+    rendered.add_argument("version")
+    rendered.add_argument("arch", choices=("amd64", "arm64"))
+    rendered.add_argument("field", choices=("repo", "tag", "asset"))
     for command in ("version", "field", "section-hash"):
         sub = subparsers.add_parser(command)
         sub.add_argument("path", type=Path)
@@ -256,6 +263,14 @@ def main(argv=None):
                     f"Invalid release specification delimiter for {args.tool}"
                 )
             print("|".join(fields))
+        elif args.command == "release-field":
+            metadata = load_metadata(args.path)
+            spec = release_spec(
+                metadata.get(args.section, {}).get(args.tool, {}),
+                args.version,
+                args.arch,
+            )
+            print(spec[args.field])
         elif args.command == "field":
             data = load_metadata(args.path)
             print(

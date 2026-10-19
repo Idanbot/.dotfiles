@@ -249,3 +249,8 @@ section_manifest_hash() {
   /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/dotfiles/metadata.py" \
     section-hash "${DOTFILES_PACKAGES_FILE:-$DOTFILES_SOURCE_DIR/packages.yaml}" "$1"
 }
+
+package_release_field() {
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/dotfiles/metadata.py" release-field \
+    "${DOTFILES_PACKAGES_META_FILE:-$DOTFILES_SOURCE_DIR/packages.meta.yaml}" "$@"
+}

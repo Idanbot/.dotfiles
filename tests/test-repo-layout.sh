@@ -231,11 +231,11 @@ fi
 
 AI_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
 if grep -Fq 'package_version ai_tools serena' "$AI_INSTALLER" &&
-  grep -Fq 'uv tool install --force -p 3.13 "serena-agent==${SERENA_VERSION}"' "$AI_INSTALLER" &&
+  grep -Fq 'install_uv_tool serena serena-agent "$SERENA_VERSION" 3.13' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools context_mode' "$AI_INSTALLER" &&
   grep -Fq 'context-mode,better-sqlite3' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools graphify' "$AI_INSTALLER" &&
-  grep -Fq 'uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"' "$AI_INSTALLER" &&
+  grep -Fq 'install_uv_tool graphify graphifyy "$GRAPHIFY_VERSION" 3.13' "$AI_INSTALLER" &&
   grep -Fq 'graphify install --platform agents' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools rtk' "$AI_INSTALLER" &&
   grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER" &&
