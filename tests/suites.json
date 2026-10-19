@@ -1,0 +1,958 @@
+{
+  "version": 1,
+  "suites": {
+    "static": {
+      "checks": [
+        [
+          "python3",
+          "scripts/section-registry.py",
+          "--check"
+        ],
+        [
+          "ruff",
+          "check",
+          "--no-cache",
+          "scripts/ci",
+          "scripts/dotfiles",
+          "scripts/section-registry.py",
+          "scripts/convergence.py",
+          "tests/test-ci-graph.py",
+          "tests/test-suite-registry.py",
+          "tests/test-section-registry.py",
+          "tests/test-convergence.py",
+          "scripts/apply-package-plan.py",
+          "tests/test-apply-package-plan.py",
+          "tests/test-metadata.py"
+        ]
+      ]
+    },
+    "behavior": {},
+    "selectors": {},
+    "workspace": {},
+    "release": {},
+    "upgrades": {
+      "checks": [
+        [
+          "bash",
+          "tests/test-package-metadata.sh",
+          "."
+        ],
+        [
+          "bash",
+          "tests/test-update-packages.sh",
+          "."
+        ],
+        [
+          "bash",
+          "tests/test-update-integrity-failure.sh",
+          "."
+        ]
+      ]
+    },
+    "benchmarks": {
+      "checks": [
+        [
+          "bash",
+          "scripts/hyperfine-benchmark.sh",
+          "--output",
+          "/artifacts/hyperfine"
+        ]
+      ]
+    },
+    "workflow-security": {
+      "checks": [
+        [
+          "actionlint"
+        ],
+        [
+          "zizmor",
+          "--pedantic",
+          "."
+        ]
+      ]
+    }
+  },
+  "tests": [
+    {
+      "path": "tests/e2e/test-agent-workspace.sh",
+      "kind": "suite",
+      "suite": "workspace",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/e2e/test-install.sh",
+      "kind": "manual",
+      "reason": "Two-pass live acceptance, gated by static/security/behavior/selectors",
+      "command": "scripts/ci/e2e.sh base-native",
+      "covered_by": [
+        ".github/e2e/compose.yaml",
+        ".github/actions/e2e/action.yml"
+      ]
+    },
+    {
+      "path": "tests/e2e/test-wsl.ps1",
+      "kind": "manual",
+      "reason": "Opt-in real Windows/WSL runner; never simulated as native acceptance",
+      "command": "./tests/e2e/test-wsl.ps1 -Workspace $env:CHECKOUT_WORKSPACE",
+      "covered_by": [
+        ".github/workflows/wsl-e2e.yml"
+      ]
+    },
+    {
+      "path": "tests/test-agent-mcp.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-agent-status.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-agent-workspace.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ai-optimization.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-apply-package-plan.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-apt-key-repair.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-audit-vulnerabilities.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        []
+      ]
+    },
+    {
+      "path": "tests/test-binary-upgrades.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-bootstrap-lock.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-bootstrap-safety.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-bootstrap.sh",
+      "kind": "wrapper",
+      "reason": "Compatibility aggregation; children run in behavior/selectors suites",
+      "command": "bash tests/test-bootstrap.sh .",
+      "covered_by": [
+        "tests/test-install-options.sh",
+        "tests/test-profiles.sh",
+        "tests/test-environment.sh",
+        "tests/test-version-helpers.sh",
+        "tests/test-bootstrap-safety.sh",
+        "tests/test-conflict-resolution.sh"
+      ]
+    },
+    {
+      "path": "tests/test-catalog.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-chezmoi-apply.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-chezmoi-network.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ci-graph.py",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ci-operations.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ci-outcome.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-cloud-context-starship.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-cloud-context.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-conflict-resolution.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-convergence.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-docker-package-routing.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-dot-doctor.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-download-cache.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-e2e-report.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-e2e-shell.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-environment.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-external-tools.sh",
+      "kind": "suite",
+      "suite": "release",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-failure-resume.sh",
+      "kind": "manual",
+      "reason": "Live failure injection and resume, run by gated recovery service",
+      "command": "scripts/ci/e2e.sh failure-resume",
+      "covered_by": [
+        ".github/e2e/compose.yaml"
+      ]
+    },
+    {
+      "path": "tests/test-git-credential.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-github-release-tools.sh",
+      "kind": "suite",
+      "suite": "release",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-grouped-upgrade-canary.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-herdr-config.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-hyperfine-benchmark.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-idempotency.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-install-options.sh",
+      "kind": "suite",
+      "suite": "selectors",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-install-policy.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-install-selector-profile.sh",
+      "kind": "suite",
+      "suite": "selectors",
+      "invocations": [
+        [
+          "profile",
+          "detect,core",
+          "false",
+          "--",
+          "--profile",
+          "minimal"
+        ],
+        [
+          "profile",
+          "detect,core,zsh,terminal",
+          "false",
+          "--",
+          "--profile",
+          "base"
+        ],
+        [
+          "custom",
+          "core,languages",
+          "false",
+          "--",
+          "--sections",
+          "core,languages"
+        ],
+        [
+          "profile",
+          "detect,core,zsh,terminal,languages,history,tmux,neovim,ai,media,fonts,desktop,system,theme,services",
+          "false",
+          "--",
+          "--full",
+          "--without",
+          "cloud,vscode"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-interactive-startup.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-json-escape.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-kitty.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-kubecolor.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-lint-wrapper.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-lint.sh",
+      "kind": "suite",
+      "suite": "static",
+      "timeout_seconds": 1200,
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-managed-upgrades.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-metadata.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-mutable-installers.sh",
+      "kind": "suite",
+      "suite": "release",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-network-faults.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-npm-global-cli.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ownership-ledger.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-package-metadata.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-performance-format.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-performance-history.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-performance-report.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-profiles.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-publish-upgrade-report.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-python-installer.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-recovery.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-release-metadata.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-repo-layout.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-run-plan.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-runtime-policy.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-runtime-staging.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-secret-boundary.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-section-preservation.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-section-registry.py",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-sessionizer.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-shell-paths.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-shell-performance.sh",
+      "kind": "manual",
+      "reason": "Requires a completed live install; called by the two-pass E2E harness",
+      "command": "bash tests/test-shell-performance.sh /artifacts/zsh-startup.json",
+      "covered_by": [
+        "tests/e2e/test-install.sh",
+        ".github/workflows/native-vm-e2e.yml"
+      ]
+    },
+    {
+      "path": "tests/test-ssh-access.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-static-policy.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-suite-registry.py",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-system-configuration.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-telemetry-policy.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-templates.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-tmux-config.sh",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-ubuntu-package-tools.sh",
+      "kind": "suite",
+      "suite": "release",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-update-integrity-failure.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-update-packages.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-update-routing.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-version-helpers.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    },
+    {
+      "path": "tests/test-workspace-harness.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [
+        [
+          "{root}"
+        ]
+      ]
+    }
+  ]
+}

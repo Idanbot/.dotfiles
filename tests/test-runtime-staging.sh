@@ -97,4 +97,46 @@ for application in nvim kitty; do
     assert_owned_target "$target"
   done
 done
+
+# Real uv publication records both the environment and command, converges, and
+# refuses a directory modified between the initial decision and the force call.
+(
+  export HOME="$temporary/uv-home" DOTFILES_STATE_DIR="$temporary/uv-state"
+  export DOTFILES_VERSION_PLAN="$temporary/uv-versions.json"
+  printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
+  mkdir -p "$HOME/.local/bin"
+  export PATH="$HOME/.local/bin:$PATH"
+  source "$DOTFILES_DIR/scripts/install-uv-tool.sh"
+  export UV_FIXTURE_VERSION=1.0.0 UV_FIXTURE_CALLS="$temporary/uv-calls"
+  uv() {
+    if [[ "$*" == 'tool dir' ]]; then
+      printf '%s\n' "$HOME/.local/share/uv/tools"
+      return
+    fi
+    printf '%s\n' "$*" >>"$UV_FIXTURE_CALLS"
+    local root="$HOME/.local/share/uv/tools/fixture-package"
+    mkdir -p "$root/bin"
+    printf '#!/bin/sh\necho %s\n' "$UV_FIXTURE_VERSION" >"$root/bin/fixture-cli"
+    chmod +x "$root/bin/fixture-cli"
+    ln -sfn "$root/bin/fixture-cli" "$HOME/.local/bin/fixture-cli"
+  }
+  install_uv_tool fixture-cli fixture-package "$UV_FIXTURE_VERSION"
+  assert_owned_target "$HOME/.local/share/uv/tools/fixture-package"
+  assert_owned_target "$HOME/.local/bin/fixture-cli"
+  before="$(managed_target_digest "$HOME/.local/share/uv/tools/fixture-package")"
+  install_uv_tool fixture-cli fixture-package "$UV_FIXTURE_VERSION"
+  [[ "$(wc -l <"$UV_FIXTURE_CALLS")" == 1 ]]
+  [[ "$(managed_target_digest "$HOME/.local/share/uv/tools/fixture-package")" == "$before" ]]
+  UV_FIXTURE_VERSION=1.0.1
+  install_uv_tool fixture-cli fixture-package "$UV_FIXTURE_VERSION" 3.13
+  [[ "$(fixture-cli --version)" == 1.0.1 ]]
+  [[ "$(wc -l <"$UV_FIXTURE_CALLS")" == 2 ]]
+  managed_operation_lock() {
+    printf 'local edit during lock acquisition\n' >"$HOME/.local/share/uv/tools/fixture-package/modified"
+  }
+  install_uv_tool fixture-cli fixture-package 1.0.2
+  [[ "$(wc -l <"$UV_FIXTURE_CALLS")" == 2 ]]
+  [[ -f "$HOME/.local/share/uv/tools/fixture-package/modified" ]]
+  [[ "$(fixture-cli --version)" == 1.0.1 ]]
+)
 printf 'Runtime staging test passed\n'

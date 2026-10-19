@@ -110,6 +110,40 @@ class PolicyTests(unittest.TestCase):
         entry["path"] = None
         self.assertEqual(policy.version_label(entry), "missing")
 
+    def test_unknown_active_version_preserved_even_when_digest_owned(self):
+        for current in ("", "unparseable"):
+            with self.subTest(current=current), \
+                    patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": ""}), \
+                    patch.object(policy, "ownership_status", return_value="verified-dotfiles") as owned:
+                action, ownership = policy.planned_action(self.entry(current=current))
+            self.assertIn("preserve active executable with unknown version", action)
+            self.assertEqual(ownership, "unknown-version")
+            owned.assert_not_called()
+        missing = {**self.entry(current=""), "path": None}
+        self.assertEqual(policy.planned_action(missing), ("install", "missing"))
+
+    def test_only_explicitly_named_replacement_overrides_unknown_preservation(self):
+        for replacement, expected in (("gh", "explicit-replacement"),
+                                      ("node,gh", "explicit-replacement"),
+                                      ("github_cli", "unknown-version"),
+                                      ("other", "unknown-version")):
+            with self.subTest(replacement=replacement), \
+                    patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": replacement}):
+                self.assertEqual(policy.planned_action(self.entry(current=""))[1], expected)
+
+    def test_preflight_warns_when_preserving_unknown_active_version(self):
+        args = ["policy", "preflight", "--source", str(ROOT), "--sections", "core", "--json"]
+        with patch.object(sys, "argv", args), patch.object(policy, "host_checks", return_value=[]), \
+                patch.object(policy, "selected", return_value=[self.entry()]), \
+                patch.object(policy, "resolve", return_value=self.entry(current="")), \
+                patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": ""}), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            policy.main()
+        plan = json.loads(output.getvalue())
+        self.assertEqual(plan["tools"]["core.github_cli"]["ownership"], "unknown-version")
+        self.assertTrue(any(level == "WARN" and "unknown version" in message
+                            for level, message in plan["checks"]))
+
     def test_legacy_and_modified_ownership_are_not_claimed_as_managed(self):
         binary = self.home / "tool"
         binary.write_text("original")
@@ -155,12 +189,87 @@ class PolicyTests(unittest.TestCase):
             self.assertEqual(policy.upgrade_candidate("languages.go", "1.27.2", "", {}), "1.27.3")
         with patch.object(policy, "upstream", return_value=("1.0.0", {})):
             self.assertEqual(policy.upgrade_candidate("languages.uv", "0.13.0", "", {}), "1.0.0")
-        data = {"versions": {"12.3.0": {"engines": {"node": ">=26.0.0"}},
+        data = {"dist-tags": {"latest": "13.0.0"},
+                "versions": {"12.3.0": {"engines": {"node": ">=26.0.0"}},
                              "13.0.0": {"engines": {"node": ">=27.0.0"}}}}
         with patch.object(policy, "get_json", return_value=data):
             self.assertEqual(policy.upgrade_candidate("languages.npm", "12.0.1", "26.11.1", {}), "12.3.0")
         self.assertTrue(policy.node_engine_matches("26.1.0", "^24.0.0 || >=26.0.0"))
         self.assertFalse(policy.node_engine_matches("26.1.0", "unrecognized-engine"))
+
+    def test_npm_candidates_obey_latest_ceiling_and_node_for_all_packages(self):
+        data = {"dist-tags": {"latest": "2.0.0"}, "versions": {
+            "1.0.0": {},
+            "1.5.0": {"engines": {"node": ">=26"}},
+            "2.0.0": {"engines": {"node": ">=27"}},
+            "2.1.0": {"engines": {"node": ">=26"}},
+            "3.0.0-rc.1": {},
+        }}
+        with patch.object(policy, "get_json", return_value=data) as get:
+            candidate = policy.upgrade_candidate(
+                "ai_tools.demo", "1.0.0", "26.11.1", {"source": "npm", "package": "@scope/demo"})
+        self.assertEqual(candidate, "1.5.0")
+        self.assertEqual(get.call_args.args[0], "https://registry.npmjs.org/@scope%2Fdemo")
+        with patch.object(policy, "get_json", return_value=data):
+            self.assertEqual(policy.upstream(self.entry("ai_tools.demo"),
+                                            {"source": "npm", "package": "demo"})[0], "2.0.0")
+
+    def test_npm_missing_or_unstable_latest_fails_closed(self):
+        for tags in ({}, {"latest": "2.0.0-rc.1"}):
+            with self.subTest(tags=tags), patch.object(policy, "get_json", return_value={
+                    "dist-tags": tags, "versions": {"1.1.0": {}}}):
+                with self.assertRaisesRegex(ValueError, "npm latest"):
+                    policy.upgrade_candidate("languages.npm", "1.0.0", "26.0.0", {})
+
+    def test_candidate_cli_passes_node_pin_for_npm_tools(self):
+        args = ["policy", "candidate", "--source", str(ROOT), "--tool", "languages.typescript"]
+        node = policy.load_versions(ROOT / "packages.yaml")["languages"]["node"]
+        with patch.object(sys, "argv", args), \
+                patch.object(policy, "upgrade_candidate", return_value="7.0.3") as candidate, \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            policy.main()
+        self.assertEqual(candidate.call_args.args[2], node)
+        self.assertEqual(output.getvalue(), "7.0.3\n")
+
+    def test_pypi_candidates_skip_yanked_empty_and_prerelease_versions(self):
+        data = {"info": {"version": "9.0.0"}, "releases": {
+            "1.1.0": [{"yanked": False}],
+            "1.2.0": [{"yanked": True}, {"yanked": False}],
+            "2.0.0": [{"yanked": True}],
+            "3.0.0": [],
+            "4.0.0rc1": [{"yanked": False}],
+        }}
+        meta = {"source": "pypi", "package": "demo"}
+        with patch.object(policy, "get_json", return_value=data):
+            self.assertEqual(policy.upgrade_candidate("ai_tools.demo", "1.0.0", "", meta), "1.2.0")
+            self.assertEqual(policy.upstream(self.entry("ai_tools.demo"), meta)[0], "1.2.0")
+            self.assertEqual(policy.upgrade_candidate("ai_tools.demo", "1.3.0", "", meta), "1.3.0")
+
+    def test_node_engine_ranges_reject_unsafe_caret_zero_major_matches(self):
+        cases = [
+            ("26.11.1", ">= 24 <27", True),
+            ("26.11.1", "24.x || 26.x", True),
+            ("26.11.1", "24 - 26", True),
+            ("27.0.0", "24 - 26", False),
+            ("0.2.5", "^0.2.3", True),
+            ("0.3.0", "^0.2.3", False),
+            ("0.0.4", "^0.0.3", False),
+            ("26.11.1", ">=27.0.0", False),
+            ("26.11.1", "~26.10.0", False),
+            ("26.11.1", "26.11.*", True),
+            ("26.11.1", ">=26 nonsense", False),
+            ("", ">=0", False),
+        ]
+        for node, requirement, expected in cases:
+            with self.subTest(node=node, requirement=requirement):
+                self.assertEqual(policy.node_engine_matches(node, requirement), expected)
+
+    def test_shared_policy_does_not_regress_or_cross_major_minor_lines(self):
+        versions = ["1.2.4", "1.3.0", "2.0.0", "3.0.0-rc1"]
+        self.assertEqual(policy.releases.latest_compatible(versions, "1.2.3", "minor"), "1.2.4")
+        self.assertEqual(policy.releases.latest_compatible(versions, "1.2.3", "major"), "1.3.0")
+        self.assertEqual(policy.releases.latest_compatible(versions, "1.2.3"), "2.0.0")
+        self.assertEqual(policy.releases.latest_compatible(versions, "4.0.0"), "4.0.0")
 
     def test_global_recommendations_include_out_of_line_versions(self):
         with patch.object(policy.software, "catalog", return_value=[self.entry("languages.python", "3.14.8")]), \

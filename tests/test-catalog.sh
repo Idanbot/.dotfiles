@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 root = Path(sys.argv[1])
+sys.path.insert(0, str(root / "scripts"))
 spec = importlib.util.spec_from_file_location("catalog", root / "scripts/catalog.py")
 catalog = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(catalog)
@@ -33,7 +34,7 @@ class CatalogTests(unittest.TestCase):
     def test_coverage_and_tags(self):
         entries = catalog.catalog()
         ids = {entry["id"] for entry in entries}
-        manifest = catalog.yaml.safe_load((root / "packages.yaml").read_text())
+        manifest, _ = catalog.load_repository(root)
         for section, tools in manifest.items():
             self.assertTrue({f"{section}.{tool}" for tool in tools} <= ids)
         self.assertEqual(len(ids), len(entries))
@@ -179,11 +180,13 @@ class CatalogTests(unittest.TestCase):
         directory = Path(self.temp.name)
         overlay = directory / "config.local"
         overlay.write_text("Host rpi4\n    User local-user\n    Port 2222\n")
+        overlay.chmod(0o600)
         config = directory / "config"
         template = (root / "private_dot_ssh/private_config.tmpl").read_text()
         self.assertIn(".ssh/config.local", (root / ".chezmoiignore").read_text())
         config.write_text(template.replace("Include ~/.ssh/config.local", f"Include {overlay}"))
-        result = subprocess.run([ssh, "-G", "-F", str(config), "rpi4"], capture_output=True, text=True, check=True)
+        result = subprocess.run([ssh, "-G", "-F", str(config), "rpi4"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("user local-user\n", result.stdout)
         self.assertIn("port 2222\n", result.stdout)
         self.assertIn("cloudflare-ssh proxy", result.stdout)

@@ -14,7 +14,8 @@ handling take precedence over supporting more platforms.
 | Chezmoi | Rendering and deploying configuration files and pinned externals | Package orchestration and user authentication |
 | `scripts/install.sh` | Selection, order, logs, checkpoints, backup, rollback, acceptance | Secret recovery or interactive tool login |
 | Section scripts | Installing one capability and recording ownership | Selecting profiles or applying config |
-| `scripts/lib.sh` | Platform-independent logging, versions, verified downloads, APT, ledger | Workflow policy |
+| `scripts/lib.sh` | Stable interface loading cohesive modules under `scripts/lib/` | Workflow policy |
+| `scripts/dotfiles/` | Validated manifests and shared release/compatibility policy | Installation side effects |
 | `scripts/environment.sh` | Native/WSL, Ubuntu release, architecture, color capability | Tool installation |
 | `scripts/doctor.sh` | Verifying the selected postcondition | Repairing failures |
 | `dot` | Daily lifecycle commands | Hidden background synchronization |
@@ -37,9 +38,11 @@ command. Resume uses the original source, profile, selection, and checkpoints.
 
 ## Profiles and Sections
 
-Profiles are data files in `profiles/`; built-in copies in the public one-line
-installer allow selection before the repository exists. Source profile files
-are checked against those built-ins to prevent drift.
+Profiles are data files in `profiles/`; `scripts/sections.json` owns section
+order, dependencies, shared implementation inputs, and basic command acceptance.
+`scripts/section-registry.py` generates the standalone installer's embedded
+registry, so selection still works before checkout. CI compares generated output
+and standalone/stdin plans with checkout-backed plans.
 
 Sections are ordered capabilities:
 
@@ -84,7 +87,14 @@ repository.
 source, owner, and integrity policy. Generated `packages.lock` and the readable
 tool inventory provide reviewable snapshots.
 
-Version comparison and GitHub asset expansion are centralized in `scripts/lib.sh`.
+The shared metadata module parses YAML with duplicate-key and scalar validation.
+Release tag/asset/architecture mappings live in `packages.meta.yaml`; inventory,
+lock generation, and updater discovery consume those facts. Reviewed updates
+edit parsed scalar positions, preserving comments and formatting. Failed
+supported checksum resolvers remain unresolved and cannot become proposals.
+Python release and Node-engine compatibility rules live in
+`scripts/dotfiles/releases.py`; audit and install policy share them. Shell helper
+names remain stable behind `scripts/lib.sh`.
 Install sections use distro signatures, upstream checksum manifests, pinned
 hashes, or verified signing-key fingerprints. Literal hash changes require
 review. Push/PR CI and the weekly version audit publish a non-mutating upgrade
@@ -138,3 +148,14 @@ integration.
 Simulation verifies platform branches; it does not claim to emulate the WSL
 kernel or Windows interoperability. `.github/workflows/wsl-e2e.yml` remains the
 separate real-WSL contract.
+
+`tests/suites.json` accounts for every test entrypoint and documents wrappers
+or manual tests. `scripts/ci/run-tests.py` executes the same suite interface in
+local Docker and CI. Two reusable workflows contain parallel checks and gated
+live acceptance; one final result rejects unexpected required-job skips.
+
+Two-pass E2E compares destinations, normalized ownership, histories, local
+overlays, configuration diffs, and replacements. Full-native and full-WSL
+installs are distinct scheduled/manual targets. A validator image stage serves
+tests; installation acceptance uses the minimal base stage so validators cannot
+conceal missing bootstrap prerequisites.

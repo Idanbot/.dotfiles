@@ -21,3 +21,9 @@ artifacts/
 *.orig
 .version-update-report
 graphify-out/
+
+# Python validation caches
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/

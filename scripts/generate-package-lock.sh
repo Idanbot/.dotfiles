@@ -7,66 +7,18 @@ PACKAGES_FILE="$DOTFILES_DIR/packages.yaml"
 META_FILE="$DOTFILES_DIR/packages.meta.yaml"
 OUTPUT_FILE="${1:-$DOTFILES_DIR/packages.lock}"
 
-python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" <<'PYGEN'
+PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)${PYTHONPATH:+:$PYTHONPATH}" /usr/bin/python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" <<'PYGEN'
 from __future__ import annotations
 
 import hashlib
 import sys
 from pathlib import Path
 
+from dotfiles.metadata import load_versions, load_metadata, validate_repository
+
 packages_file = Path(sys.argv[1])
 meta_file = Path(sys.argv[2])
 output_file = Path(sys.argv[3])
-
-if not packages_file.exists():
-    raise SystemExit(f"Missing packages manifest: {packages_file}")
-if not meta_file.exists():
-    raise SystemExit(f"Missing package metadata: {meta_file}")
-
-
-def strip_value(value: str) -> str:
-    value = value.split("#", 1)[0].strip()
-    return value.strip('"\'')
-
-
-def parse_versions(path: Path) -> dict[str, dict[str, str]]:
-    data: dict[str, dict[str, str]] = {}
-    section = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not raw.startswith(" ") and line.endswith(":"):
-            section = line[:-1].strip()
-            data[section] = {}
-            continue
-        if section and raw.startswith("  ") and not raw.startswith("    ") and ":" in line:
-            key, value = line.split(":", 1)
-            data[section][key.strip()] = strip_value(value)
-    return data
-
-
-def parse_meta(path: Path) -> dict[str, dict[str, dict[str, str]]]:
-    data: dict[str, dict[str, dict[str, str]]] = {}
-    section = ""
-    tool = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(raw) - len(raw.lstrip(" "))
-        if indent == 0 and line.endswith(":"):
-            section = line[:-1].strip()
-            data[section] = {}
-            tool = ""
-        elif indent == 2 and line.endswith(":"):
-            tool = line[:-1].strip()
-            data.setdefault(section, {})[tool] = {}
-        elif indent == 4 and ":" in line and section and tool:
-            key, value = line.split(":", 1)
-            data[section][tool][key.strip()] = strip_value(value)
-    return data
-
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -80,8 +32,7 @@ def yaml_scalar(value: str) -> str:
         return value
     return '"' + value.replace('\\', '\\\\').replace('\"', '\\"') + '"'
 
-versions = parse_versions(packages_file)
-metadata = parse_meta(meta_file)
+versions, metadata = validate_repository(load_versions(packages_file), load_metadata(meta_file))
 lines = [
     "# packages.lock — generated from packages.yaml and packages.meta.yaml",
     "# Regenerate with: ./scripts/generate-package-lock.sh",
@@ -109,7 +60,10 @@ for section, tools in versions.items():
             "crate",
             "binary",
             "url",
+            "tag_template",
             "asset_template",
+            "arch_amd64",
+            "arch_arm64",
             "checksum_template",
             "sha256",
             "sha256_amd64",

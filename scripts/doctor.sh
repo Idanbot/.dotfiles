@@ -7,12 +7,13 @@ DOTFILES_SOURCE_DIR="${DOTFILES_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
-SECTIONS="detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services"
+registry=(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR")
+VALID_SECTIONS="$("${registry[@]}" list | paste -sd, -)"
+SECTIONS="$VALID_SECTIONS"
 ACCEPTANCE=false
 JSON_OUTPUT=false
 QUICK=false
 STRICT=false
-VALID_SECTIONS="detect,core,zsh,terminal,languages,history,cloud,tmux,neovim,ai,media,fonts,desktop,system,theme,vscode,services"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -199,16 +200,22 @@ else
 fi
 check_command chezmoi true
 
-if selected core; then
-  doctor_step "Core"
-  for command in git gh curl wget jq yq make unzip rg fdfind batcat btop zoxide direnv delta hyperfine duf; do
-    check_command "$command" true
-  done
-fi
+for section in "${REQUESTED_SECTIONS[@]}"; do
+  command_checks="$("${registry[@]}" commands "$section")"
+  [[ -n "$command_checks" ]] || continue
+  doctor_step "$section commands"
+  while IFS=$'\t' read -r kind command platform; do
+    [[ "$platform" != native ]] || is_native || continue
+    case "$kind" in
+      required) check_command "$command" true ;;
+      optional) check_command "$command" false ;;
+      stable) check_stable_command "$command" ;;
+    esac
+  done <<<"$command_checks"
+done
 
 if selected zsh; then
   doctor_step "Shell"
-  check_command zsh true
   check_file "$HOME/.zshrc" zsh-config
   check_file "$HOME/.oh-my-zsh/oh-my-zsh.sh" oh-my-zsh
   if [[ "$QUICK" == false ]] && command -v timeout >/dev/null 2>&1; then
@@ -221,46 +228,12 @@ if selected zsh; then
   fi
 fi
 
-if selected terminal; then
-  doctor_step "Terminal"
-  for command in fzf fd bat eza lazygit starship sops lazydocker tldr curlie ast-grep gitleaks gojq pigz zstd; do
-    check_command "$command" true
-  done
-fi
-
-if selected languages; then
-  doctor_step "Languages"
-  for command in go rustc cargo node npm tsc uv uvx java; do
-    check_command "$command" true
-  done
-  for command in go rustc cargo node npm tsc; do
-    check_stable_command "$command"
-  done
-fi
-
-if selected history; then
-  doctor_step "History"
-  check_command atuin true
-fi
-
-if selected cloud; then
-  doctor_step "Cloud"
-  for command in docker kubectl helm terraform ansible k9s aws gcloud az cloud-context s5cmd kcat stern helmfile kubectx kubens kubecolor pgloader cloudflare-ssh kubectl-radar; do
-    check_command "$command" true
-  done
-  check_command radar false
-fi
-
 if selected tmux; then
   doctor_step "Terminal Multiplexers"
-  check_command tmux true
-  check_command herdr true
   check_file "$HOME/.tmux.conf" tmux-config
   check_file "$HOME/.config/tmuxp/agent-workspace.yaml" agent-workspace
   check_file "$HOME/.config/herdr/config.toml" herdr-config
   check_file "$HOME/.config/dotfiles/agents.yaml" agent-registry
-  check_command dot-workspace true
-  check_command dot-agent-launch true
   if [[ "$QUICK" == false ]]; then
     TMUX_CHECK_CONFIG="$(mktemp)"
     # Killing a probe server while TPM runs asynchronously can orphan plugin
@@ -290,7 +263,6 @@ fi
 
 if selected neovim; then
   doctor_step "Neovim"
-  check_command nvim true
   check_file "$HOME/.config/nvim/lazy-lock.json" neovim-lock
   if "$DOTFILES_SOURCE_DIR/scripts/validate-neovim.sh" --quick >/dev/null 2>&1; then
     result pass neovim-runtime "clean headless validation passed"
@@ -302,9 +274,6 @@ fi
 
 if selected ai; then
   doctor_step "Agent CLIs"
-  for command in claude codex agy opencode omp bun serena context-mode graphify rtk agent-mcp dot-privacy; do
-    check_command "$command" true
-  done
   if run_privacy_audit >/dev/null 2>&1; then
     result pass telemetry-policy "managed telemetry controls are active"
   else
@@ -322,10 +291,6 @@ if selected ai; then
   result warn agent-auth "authentication is intentionally manual"
 fi
 
-if selected media && is_native; then
-  doctor_step "Media"
-  for command in yt-dlp rmpc cava; do check_command "$command" true; done
-fi
 if selected fonts; then
   doctor_step "Fonts"
   FONT_NAME="$(package_version fonts nerd_font FiraMono)"
@@ -339,21 +304,14 @@ if selected fonts; then
       "rerun: $DOTFILES_SOURCE_DIR/scripts/run-section.sh fonts"
   fi
 fi
-if selected desktop && is_native; then
-  doctor_step "Desktop"
-  check_command kitty true
-fi
 if selected system; then
   doctor_step "System"
-  check_command git-credential-manager true
-  check_command git-credential-dotfiles true
   if gh auth status --active --hostname github.com >/dev/null 2>&1; then
     result pass github-auth "GitHub CLI has an active github.com account"
   else
     result warn github-auth "GitHub authentication is intentionally pending" \
       "run: gh auth login --hostname github.com --git-protocol https"
   fi
-  check_command ssh-key-load true
   check_file "$HOME/.ssh/config" ssh-config
 fi
 if selected theme; then

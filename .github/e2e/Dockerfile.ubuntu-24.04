@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS base
 
 # Avoid interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
@@ -38,3 +38,22 @@ ENV HOME="/home/testuser"
 ENV PATH="/home/testuser/.local/bin:${PATH}"
 ENV DOTFILES_CI=true
 ENV DOTFILES_COLOR=always
+
+# Validators live in a separate target; live installs start from the minimal base.
+FROM base AS tests
+USER root
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-venv python3-yaml yq gojq zsh tmux openssh-client \
+      xz-utils gnupg shellcheck yamllint gawk hyperfine fzf unzip pigz zstd \
+      kcat pgloader golang-go \
+    && rm -rf /var/lib/apt/lists/*
+COPY requirements-audit.txt /tmp/requirements-audit.txt
+RUN python3 -m venv /opt/validators && \
+    /opt/validators/bin/pip install --no-cache-dir -r /tmp/requirements-audit.txt \
+      PyYAML==6.0.3 ruff==0.14.2 zizmor==1.26.1
+ENV PATH="/opt/validators/bin:/home/testuser/.local/bin:${PATH}"
+USER 10000:10000
+RUN go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1 && \
+    go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+ENV PATH="/home/testuser/go/bin:${PATH}"

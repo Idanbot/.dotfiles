@@ -12,11 +12,13 @@ if (($# == 0)); then
   README_FILE="$DOTFILES_DIR/README.md"
 fi
 
-python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" "$README_FILE" <<'PYGEN'
+PYTHONPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)${PYTHONPATH:+:$PYTHONPATH}" /usr/bin/python3 - "$PACKAGES_FILE" "$META_FILE" "$OUTPUT_FILE" "$README_FILE" <<'PYGEN'
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+
+from dotfiles.metadata import load_versions, load_metadata, validate_repository
 
 packages_file = Path(sys.argv[1])
 meta_file = Path(sys.argv[2])
@@ -24,48 +26,7 @@ output_file = Path(sys.argv[3])
 readme_file = Path(sys.argv[4]) if sys.argv[4] else None
 
 
-def strip_value(value: str) -> str:
-    value = value.split("#", 1)[0].strip()
-    return value.strip('"\'')
-
-
-def parse_versions(path: Path) -> dict[str, dict[str, str]]:
-    data: dict[str, dict[str, str]] = {}
-    section = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not raw.startswith(" ") and line.endswith(":"):
-            section = line[:-1].strip()
-            data[section] = {}
-        elif section and raw.startswith("  ") and not raw.startswith("    ") and ":" in line:
-            key, value = line.split(":", 1)
-            data[section][key.strip()] = strip_value(value)
-    return data
-
-
-def parse_metadata(path: Path) -> dict[tuple[str, str], dict[str, str]]:
-    metadata: dict[tuple[str, str], dict[str, str]] = {}
-    section = ""
-    tool = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        indent = len(raw) - len(raw.lstrip(" "))
-        if indent == 0 and line.endswith(":"):
-            section = line[:-1].strip()
-        elif indent == 2 and line.endswith(":"):
-            tool = line[:-1].strip()
-            metadata[(section, tool)] = {}
-        elif indent == 4 and ":" in line and section and tool:
-            key, value = line.split(":", 1)
-            metadata[(section, tool)][key.strip()] = strip_value(value)
-    return metadata
-
-versions = parse_versions(packages_file)
-metadata = parse_metadata(meta_file) if meta_file.exists() else {}
+versions, metadata = validate_repository(load_versions(packages_file), load_metadata(meta_file))
 output_file.parent.mkdir(parents=True, exist_ok=True)
 
 lines = [
@@ -82,7 +43,7 @@ lines = [
 ]
 for section, tools in versions.items():
     for tool, version in tools.items():
-        meta = metadata.get((section, tool), {})
+        meta = metadata.get(section, {}).get(tool, {})
         lines.append(
             f"| {section} | {tool} | {version} | {meta.get('source', 'unknown')} "
             f"| {meta.get('owner', 'unknown')} | {meta.get('integrity', 'missing')} |"

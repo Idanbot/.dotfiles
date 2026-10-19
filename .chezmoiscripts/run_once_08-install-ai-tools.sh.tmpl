@@ -4,6 +4,8 @@ if [[ -z "${DOTFILES_SOURCE_DIR:-}" ]]; then
 fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
+# shellcheck source=scripts/install-uv-tool.sh
+source "$DOTFILES_SOURCE_DIR/scripts/install-uv-tool.sh"
 
 log_step "Installing AI Coding Tools"
 activate_node_paths
@@ -113,17 +115,7 @@ install_github_archive bun oven-sh/bun "bun-v$BUN_VERSION" \
   "sha256:$BUN_SHA256" 'bun --version'
 
 SERENA_VERSION="$(package_version ai_tools serena 1.6.1)"
-if ! is_installed serena ||
-  ! version_ge "$(serena --version 2>/dev/null || true)" "$SERENA_VERSION"; then
-  log_info "Installing optional Serena MCP runtime $SERENA_VERSION"
-  uv tool install --force -p 3.13 "serena-agent==${SERENA_VERSION}"
-  record_install serena "$SERENA_VERSION" uv:serena-agent \
-    "$HOME/.local/share/uv/tools/serena-agent"
-  ((_INSTALLED++)) || true
-  log_success "Serena $SERENA_VERSION installed"
-else
-  log_skip "Serena $SERENA_VERSION already installed or newer"
-fi
+install_uv_tool serena serena-agent "$SERENA_VERSION" 3.13
 if [[ ! -f "$HOME/.serena/serena_config.yml" ]]; then
   log_info "Initializing Serena's local language-server configuration"
   serena init
@@ -134,17 +126,7 @@ npm_install_global context-mode "$CONTEXT_MODE_VERSION" context-mode \
   context-mode,better-sqlite3
 
 GRAPHIFY_VERSION="$(package_version ai_tools graphify 0.9.38)"
-if ! is_installed graphify ||
-  ! version_ge "$(graphify --version 2>/dev/null || true)" "$GRAPHIFY_VERSION"; then
-  log_info "Installing optional Graphify skill runtime $GRAPHIFY_VERSION"
-  uv tool install --force -p 3.13 "graphifyy==${GRAPHIFY_VERSION}"
-  record_install graphify "$GRAPHIFY_VERSION" uv:graphifyy \
-    "$HOME/.local/share/uv/tools/graphifyy"
-  ((_INSTALLED++)) || true
-  log_success "Graphify $GRAPHIFY_VERSION installed"
-else
-  log_skip "Graphify $GRAPHIFY_VERSION already installed or newer"
-fi
+install_uv_tool graphify graphifyy "$GRAPHIFY_VERSION" 3.13
 
 RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
 RTK_ARCH="$(get_arch)"

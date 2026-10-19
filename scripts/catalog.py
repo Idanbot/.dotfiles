@@ -14,10 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    raise SystemExit("Catalog requires system python3-yaml; rerun the core section")
+from dotfiles.metadata import load_repository
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMANDS = {
@@ -139,8 +136,7 @@ PROBES.update(
 
 
 def catalog():
-    manifest = yaml.safe_load((ROOT / "packages.yaml").read_text())
-    metadata = yaml.safe_load((ROOT / "packages.meta.yaml").read_text())
+    manifest, metadata = load_repository(ROOT)
     config = json.loads((ROOT / "dot_config/dotfiles/catalog.json").read_text())
     result = []
     for category, tools in manifest.items():
@@ -484,6 +480,6 @@ def main():
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (OSError, ValueError, yaml.YAMLError) as error:
+    except (OSError, ValueError) as error:
         print(f"Catalog error: {error}", file=sys.stderr)
         raise SystemExit(1)

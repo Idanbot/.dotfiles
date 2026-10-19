@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test-static-policy.sh — Fast repository policy checks for the CI gate
+# Fast repository policy checks for the CI gate.
 set -euo pipefail
 
 RED='\033[0;31m'
@@ -24,8 +24,8 @@ check_git_whitespace() {
   fi
 
   if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
-    git -C "$DOTFILES_DIR" fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
-    git -C "$DOTFILES_DIR" diff --check FETCH_HEAD HEAD
+    git -C "$DOTFILES_DIR" rev-parse --verify "refs/remotes/origin/$GITHUB_BASE_REF" >/dev/null
+    git -C "$DOTFILES_DIR" diff --check "refs/remotes/origin/$GITHUB_BASE_REF" HEAD
   elif [[ "${GITHUB_ACTIONS:-}" == "true" ]] && git -C "$DOTFILES_DIR" rev-parse HEAD^ >/dev/null 2>&1; then
     git -C "$DOTFILES_DIR" diff --check HEAD^ HEAD
   else
@@ -71,10 +71,8 @@ fi
 
 missing_exec=$(
   find "$DOTFILES_DIR/scripts" "$DOTFILES_DIR/tests" \
-    -type f \
-    -name '*.sh' \
-    ! -perm -111 \
-    -print
+    -type f -name '*.sh' ! -path "$DOTFILES_DIR/scripts/lib/*" \
+    ! -perm -111 -print
 )
 if [[ -z "$missing_exec" ]]; then
   pass "script and test shell files are executable"
@@ -83,10 +81,10 @@ else
   fail "some shell entrypoints are not executable"
 fi
 
-if "$DOTFILES_DIR/tests/test-templates.sh" "$DOTFILES_DIR"; then
-  pass "rendered shell templates parse cleanly"
+if python3 "$DOTFILES_DIR/scripts/ci/run-tests.py" --root "$DOTFILES_DIR" --validate; then
+  pass "every test entrypoint is registered or has an explicit caller"
 else
-  fail "rendered shell template validation failed"
+  fail "test registry is incomplete"
 fi
 
 tmpdir=$(mktemp -d)

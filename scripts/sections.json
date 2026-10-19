@@ -1,19 +1,93 @@
 {
-  "detect": {"script": ".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl", "manifest": []},
-  "core": {"script": ".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl", "manifest": ["core.github_cli"]},
-  "zsh": {"script": ".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl", "manifest": [], "externals": [".oh-my-zsh"]},
-  "terminal": {"script": ".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl", "manifest": ["core"], "exclude": ["core.github_cli"], "externals": [".fzf"]},
-  "languages": {"script": ".chezmoiscripts/run_once_04-install-languages.sh.tmpl", "manifest": ["languages"], "files": ["scripts/python-installer.sh"]},
-  "history": {"script": ".chezmoiscripts/run_once_04b-install-history.sh.tmpl", "manifest": ["history"]},
-  "cloud": {"script": ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl", "manifest": ["cloud", "database"]},
-  "tmux": {"script": ".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl", "manifest": ["terminal.tmux", "terminal.tmuxp", "terminal.herdr"], "externals": [".tmux/plugins"]},
-  "neovim": {"script": ".chezmoiscripts/run_once_07-install-neovim.sh.tmpl", "manifest": ["editor"]},
-  "ai": {"script": ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl", "manifest": ["ai_tools"]},
-  "media": {"script": ".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl", "manifest": ["media"]},
-  "fonts": {"script": ".chezmoiscripts/run_once_10-install-fonts.sh.tmpl", "manifest": ["fonts"]},
-  "desktop": {"script": ".chezmoiscripts/run_once_11-install-desktop.sh.tmpl", "manifest": ["terminal.kitty"], "files": ["scripts/install-kitty.sh"]},
-  "system": {"script": ".chezmoiscripts/run_once_12-configure-system.sh.tmpl", "manifest": ["system"]},
-  "theme": {"script": ".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl", "manifest": []},
-  "vscode": {"script": ".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl", "manifest": []},
-  "services": {"script": ".chezmoiscripts/run_once_after_enable-services.sh.tmpl", "manifest": []}
+  "detect": {
+    "order": 0, "description": "environment and directory setup", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_before_00-detect-environment.sh.tmpl", "manifest": [], "commands": [],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh"]
+  },
+  "core": {
+    "order": 10, "description": "core apt packages", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_before_01-install-core-packages.sh.tmpl", "manifest": ["core.github_cli"],
+    "commands": ["git", "gh", "curl", "wget", "jq", "yq", "make", "unzip", "rg", "fdfind", "batcat", "btop", "zoxide", "direnv", "delta", "hyperfine", "duf"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
+  },
+  "zsh": {
+    "order": 20, "description": "zsh and shell ecosystem", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_before_02-install-zsh-ecosystem.sh.tmpl", "manifest": [], "externals": [".oh-my-zsh"], "commands": ["zsh"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/hashicorp-keyrings.py"]
+  },
+  "terminal": {
+    "order": 30, "description": "terminal CLI tools", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl", "manifest": ["core"], "exclude": ["core.github_cli"], "externals": [".fzf"],
+    "commands": ["fzf", "fd", "bat", "eza", "lazygit", "starship", "sops", "lazydocker", "tldr", "curlie", "ast-grep", "gitleaks", "gojq", "pigz", "zstd"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
+  },
+  "languages": {
+    "order": 40, "description": "Go, Rust, Node.js, TypeScript, Python, Java", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_04-install-languages.sh.tmpl", "manifest": ["languages"], "files": ["scripts/python-installer.sh"],
+    "commands": ["go", "rustc", "cargo", "node", "npm", "tsc", "uv", "uvx", "java"], "stable_commands": ["go", "rustc", "cargo", "node", "npm", "tsc"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "history": {
+    "order": 45, "description": "optional Atuin (activation remains local/manual)", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_04b-install-history.sh.tmpl", "manifest": ["history"], "commands": ["atuin"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "cloud": {
+    "order": 50, "description": "Docker, kubectl, Helm, Terraform, cloud CLIs", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl", "manifest": ["cloud", "database"],
+    "commands": ["docker", "kubectl", "helm", "terraform", "ansible", "k9s", "aws", "gcloud", "az", "cloud-context", "s5cmd", "kcat", "stern", "helmfile", "kubectx", "kubens", "kubecolor", "pgloader", "cloudflare-ssh", "kubectl-radar"], "optional_commands": ["radar"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py", "scripts/keys/aws-cli.asc"]
+  },
+  "tmux": {
+    "order": 60, "description": "tmux, tmuxp, and Herdr", "dependencies": ["languages"],
+    "script": ".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl", "manifest": ["terminal.tmux", "terminal.tmuxp", "terminal.herdr"], "externals": [".tmux/plugins"],
+    "commands": ["tmux", "herdr", "dot-workspace", "dot-agent-launch"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
+  },
+  "neovim": {
+    "order": 70, "description": "Neovim", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_07-install-neovim.sh.tmpl", "manifest": ["editor"], "commands": ["nvim"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "ai": {
+    "order": 80, "description": "AI CLIs", "dependencies": ["languages"],
+    "script": ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl", "manifest": ["ai_tools"], "files": ["scripts/install-uv-tool.sh"],
+    "commands": ["claude", "codex", "agy", "opencode", "omp", "bun", "serena", "context-mode", "graphify", "rtk", "agent-mcp", "dot-privacy"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "media": {
+    "order": 90, "description": "native media tools", "dependencies": ["languages"], "native_only": true,
+    "script": ".chezmoiscripts/run_once_09-install-media-tools.sh.tmpl", "manifest": ["media"], "files": ["scripts/install-uv-tool.sh"], "commands": ["yt-dlp", "rmpc", "cava"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
+  },
+  "fonts": {
+    "order": 100, "description": "Nerd Fonts", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_10-install-fonts.sh.tmpl", "manifest": ["fonts"], "commands": [],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "desktop": {
+    "order": 110, "description": "native desktop tools", "dependencies": [], "native_only": true,
+    "script": ".chezmoiscripts/run_once_11-install-desktop.sh.tmpl", "manifest": ["terminal.kitty"], "files": ["scripts/install-kitty.sh"], "commands": ["kitty"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
+  },
+  "system": {
+    "order": 120, "description": "system configuration", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_12-configure-system.sh.tmpl", "manifest": ["system"], "commands": ["git-credential-manager", "git-credential-dotfiles", "ssh-key-load"],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+  },
+  "theme": {
+    "order": 130, "description": "Catppuccin theme assets", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl", "manifest": [], "commands": [],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh"]
+  },
+  "vscode": {
+    "order": 140, "description": "VS Code extensions", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_14-install-vscode-extensions.sh.tmpl", "manifest": [], "commands": [],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh"]
+  },
+  "services": {
+    "order": 150, "description": "user services", "dependencies": [],
+    "script": ".chezmoiscripts/run_once_after_enable-services.sh.tmpl", "manifest": [], "commands": [],
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh"]
+  }
 }

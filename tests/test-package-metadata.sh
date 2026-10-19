@@ -26,67 +26,11 @@ for file in packages.yaml packages.meta.yaml packages.lock docs/tool-inventory.m
   fi
 done
 
-if python3 - "$DOTFILES_DIR/packages.yaml" "$DOTFILES_DIR/packages.meta.yaml" <<'PYTEST'; then
+if PYTHONPATH="$DOTFILES_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" /usr/bin/python3 - "$DOTFILES_DIR" <<'PYTEST'; then
 import sys
-from pathlib import Path
+from dotfiles.metadata import load_repository
 
-versions = Path(sys.argv[1])
-meta_path = Path(sys.argv[2])
-
-def keys(path):
-    result = []
-    section = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if not raw.startswith(" ") and line.endswith(":"):
-            section = line[:-1].strip()
-        elif section and raw.startswith("  ") and not raw.startswith("    ") and ":" in line:
-            result.append((section, line.split(":", 1)[0].strip()))
-    return result
-
-def parse_metadata(path):
-    result = {}
-    section = ""
-    tool = ""
-    for raw in path.read_text().splitlines():
-        line = raw.rstrip()
-        indent = len(raw) - len(raw.lstrip(" "))
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        if indent == 0 and line.endswith(":"):
-            section = line[:-1].strip()
-        elif indent == 2 and line.endswith(":"):
-            tool = line[:-1].strip()
-            result[(section, tool)] = {}
-        elif indent == 4 and ":" in line:
-            key, value = line.split(":", 1)
-            result[(section, tool)][key.strip()] = value.strip().strip('"\'')
-    return result
-
-meta = parse_metadata(meta_path)
-missing = sorted(set(keys(versions)) - set(meta))
-if missing:
-    for section, tool in missing:
-        print(f"missing source metadata: {section}.{tool}")
-    raise SystemExit(1)
-
-invalid = []
-for item in keys(versions):
-    values = meta[item]
-    for field in ("source", "owner", "integrity"):
-        if not values.get(field) or values[field] in {"missing", "null"}:
-            invalid.append((*item, field))
-    if values.get("integrity") == "pinned-sha256" and values.get("source") != "external":
-        has_single = bool(values.get("sha256"))
-        has_arches = bool(values.get("sha256_amd64") and values.get("sha256_arm64"))
-        if not (has_single or has_arches):
-            invalid.append((*item, "sha256 or sha256_amd64+sha256_arm64"))
-for section, tool, field in invalid:
-    print(f"missing {field}: {section}.{tool}")
-if invalid:
-    raise SystemExit(1)
+load_repository(sys.argv[1])
 PYTEST
   pass "all packages have source, owner, and integrity metadata"
 else
@@ -103,13 +47,20 @@ fi
 rm -f "$tmp_lock"
 
 tmp_inventory=$(mktemp)
-"$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmp_inventory"
+tmp_readme=$(mktemp)
+cp "$DOTFILES_DIR/README.md" "$tmp_readme"
+"$DOTFILES_DIR/scripts/generate-tool-inventory.sh" "$tmp_inventory" "$tmp_readme"
 if cmp -s "$tmp_inventory" "$DOTFILES_DIR/docs/tool-inventory.md"; then
   pass "tool inventory is up to date"
 else
   fail "tool inventory is stale"
 fi
-rm -f "$tmp_inventory"
+if cmp -s "$tmp_readme" "$DOTFILES_DIR/README.md"; then
+  pass "README tool versions are up to date"
+else
+  fail "README tool versions are stale"
+fi
+rm -f "$tmp_inventory" "$tmp_readme"
 
 tmp_keys=$(mktemp)
 "$DOTFILES_DIR/scripts/generate-keybinding-docs.sh" "$tmp_keys"

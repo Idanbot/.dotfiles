@@ -24,7 +24,17 @@ chmod 755 "$STATE_DIR"
 mkdir -p "$HOME/.config/dotfiles"
 printf 'history-sentinel\n' >"$HOME/.zsh_history"
 printf '# e2e-local-sentinel\n' >"$HOME/.config/dotfiles/local.zsh"
-chmod 600 "$HOME/.zsh_history" "$HOME/.config/dotfiles/local.zsh"
+printf '# e2e-bash-sentinel\n' >"$HOME/.config/dotfiles/local.bash"
+printf 'bash-history-sentinel\n' >"$HOME/.bash_history"
+printf '# e2e-tmux-sentinel\n' >"$HOME/.config/dotfiles/local.tmux.conf"
+mkdir -p "$HOME/.config/git" "$HOME/.ssh"
+printf '# e2e-git-sentinel\n' >"$HOME/.config/git/config.local"
+printf '# e2e-ssh-sentinel\n' >"$HOME/.ssh/config.local"
+PRESERVED_PATHS=("$HOME/.zsh_history" "$HOME/.bash_history" "$HOME/.config/dotfiles/local.zsh"
+  "$HOME/.config/dotfiles/local.bash" "$HOME/.config/dotfiles/local.tmux.conf"
+  "$HOME/.config/git/config.local" "$HOME/.ssh/config.local")
+chmod 600 "${PRESERVED_PATHS[@]}"
+sha256sum "${PRESERVED_PATHS[@]}" >"$ARTIFACT_DIR/preserved-before.sha256"
 
 collect_observability() {
   mkdir -p "$ARTIFACT_DIR/state"
@@ -85,6 +95,10 @@ for pass in $(seq 1 "$PASSES"); do
     --profile "$PROFILE" \
     --conflict-policy backup \
     --yes
+  sha256sum --check --status "$ARTIFACT_DIR/preserved-before.sha256"
+  for preserved_path in "${PRESERVED_PATHS[@]}"; do
+    [[ "$(stat -c '%a' "$preserved_path")" == 600 ]]
+  done
 
   latest_run="$(find "$STATE_DIR/runs" -mindepth 2 -maxdepth 2 -name versions.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
   [[ -s "$latest_run" && "$(stat -c '%a' "$latest_run")" == 600 ]]
@@ -101,6 +115,18 @@ for pass in $(seq 1 "$PASSES"); do
   printf '[E2E] %s pass %s completed in %s\n' "$PROFILE" "$pass" \
     "$(format_duration_ms "$pass_elapsed_ms")"
   jq empty "$STATE_DIR/runs"/*/summary.json
+  /usr/bin/python3 /dotfiles/scripts/convergence.py snapshot \
+    --home "$HOME" --state "$STATE_DIR" --source /dotfiles \
+    --output "$ARTIFACT_DIR/convergence-pass-$pass.json"
+  if ((pass > 1)); then
+    /usr/bin/python3 /dotfiles/scripts/convergence.py compare \
+      "$ARTIFACT_DIR/convergence-pass-$((pass - 1)).json" \
+      "$ARTIFACT_DIR/convergence-pass-$pass.json" \
+      >"$ARTIFACT_DIR/convergence-pass-$pass.txt" 2>&1 || {
+      cat "$ARTIFACT_DIR/convergence-pass-$pass.txt" >&2
+      exit 1
+    }
+  fi
 done
 
 latest_summary="$(find "$STATE_DIR/runs" -name summary.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
@@ -134,6 +160,10 @@ done
 
 grep -Fxq 'history-sentinel' "$HOME/.zsh_history"
 grep -Fxq '# e2e-local-sentinel' "$HOME/.config/dotfiles/local.zsh"
+grep -Fxq 'bash-history-sentinel' "$HOME/.bash_history"
+grep -Fxq '# e2e-tmux-sentinel' "$HOME/.config/dotfiles/local.tmux.conf"
+grep -Fxq '# e2e-git-sentinel' "$HOME/.config/git/config.local"
+grep -Fxq '# e2e-ssh-sentinel' "$HOME/.ssh/config.local"
 [[ "$(stat -c '%a' "$HOME/.config/dotfiles/local.zsh")" == 600 ]]
 
 selected_sections="$(jq -r .sections "$latest_summary")"

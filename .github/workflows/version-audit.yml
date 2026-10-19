@@ -32,21 +32,15 @@ jobs:
       - name: Check latest versions and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y python3-yaml
-          ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
-          python3 scripts/install-policy.py recommendations >>"$UPGRADE_REPORT"
-          python3 scripts/audit-vulnerabilities.py \
-            --upgrade-report-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/issues/34" \
-            >>"$UPGRADE_REPORT"
-          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
-      - name: Refresh the single upgrade advisory issue
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
-        run: python3 scripts/publish-upgrade-report.py "$UPGRADE_REPORT"
+          sudo apt-get install -y python3-yaml python3-venv
+          /usr/bin/python3 -m venv "$RUNNER_TEMP/audit-venv"
+          "$RUNNER_TEMP/audit-venv/bin/pip" install -r requirements-audit.txt PyYAML==6.0.3
+          export PATH="$RUNNER_TEMP/audit-venv/bin:$PATH"
+          ./scripts/ci/maintenance-audit.sh weekly "$UPGRADE_REPORT"
       - name: Upload upgrade report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

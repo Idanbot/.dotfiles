@@ -23,7 +23,9 @@ grep -Fq 'update_check_interval 24' "$CONFIG"
 grep -Fq 'map ctrl+shift+t new_tab_with_cwd' "$CONFIG"
 grep -Fq 'map ctrl+shift+q close_tab' "$CONFIG"
 grep -Fq 'map ctrl+shift+space select_tab' "$CONFIG"
-grep -Fq 'audit_github terminal kitty kovidgoyal/kitty' "$DOTFILES_DIR/scripts/update-packages.sh"
+release_spec="$(/usr/bin/python3 "$DOTFILES_DIR/scripts/dotfiles/metadata.py" \
+  release-spec "$DOTFILES_DIR/packages.meta.yaml" "$DOTFILES_DIR/packages.yaml" terminal.kitty)"
+[[ "$release_spec" == 'kovidgoyal/kitty|v{version}|kitty-{version}-{arch}.txz|x86_64|arm64' ]]
 grep -Fq 'kitty --version | grep -Fq "kitty $kitty_version "' \
   "$DOTFILES_DIR/tests/e2e/test-install.sh"
 

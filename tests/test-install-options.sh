@@ -11,6 +11,8 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 FAILED=0
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
 
 run_plan() {
   "$INSTALL_SCRIPT" "$@" --print-plan
@@ -23,6 +25,13 @@ assert_plan() {
   if ! output=$(run_plan "$@" 2>&1); then
     echo -e "  ${RED}✗${NC} $label failed"
     echo "$output"
+    FAILED=1
+    return
+  fi
+  local standalone
+  standalone="$(cd "$TMP_ROOT" && HOME="$TMP_ROOT" DOTFILES_SOURCE_OVERRIDE='' bash -s -- "$@" --print-plan <"$INSTALL_SCRIPT")"
+  if [[ "$standalone" != "$output" ]]; then
+    printf 'Standalone/file-backed plan mismatch: %s\n' "$label" >&2
     FAILED=1
     return
   fi

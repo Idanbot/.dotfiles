@@ -54,7 +54,11 @@ def mock_gh():
     elif args[-1].endswith("/jobs?per_page=100"):
         assert "--paginate" in args and "--slurp" in args
         jobs = [{"name": f"Live {profile} E2E", "conclusion": "success"}
-                for profile in ("developer", "agent", "cloud", "full")]
+                for profile in ("developer", "agent", "cloud", "full", "full-native")]
+        if scenario == "prefixed":
+            jobs = [{**job, "name": "Gated acceptance / " + job["name"]} for job in jobs]
+        if scenario == "duplicate-heavy":
+            jobs.append(jobs[-1])
         if scenario == "missing-heavy":
             jobs.pop()
         if scenario == "skipped-heavy":
@@ -80,7 +84,7 @@ def mock_gh():
 
 
 def test(root):
-    scenarios = ("create", "refresh", "no-update", "dispatch-failure", "empty-dispatch",
+    scenarios = ("create", "refresh", "prefixed", "duplicate-heavy", "no-update", "dispatch-failure", "empty-dispatch",
                  "failed-canary", "wrong-sha", "superseded", "approval", "timeout",
                  "missing-heavy", "skipped-heavy", "wrong-event", "wrong-workflow",
                  "poll-failure", "publication-failure", "final-publication-failure")
@@ -105,7 +109,7 @@ def test(root):
             )
             outcome = json.loads((output / "canary.json").read_text())
             calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
-            success = scenario in ("create", "refresh", "no-update")
+            success = scenario in ("create", "refresh", "prefixed", "no-update")
             assert (result.returncode == 0) == success, (scenario, result.stdout, result.stderr)
             assert outcome["outcome"] == ("no-update" if scenario == "no-update" else "success" if success else "failure"), outcome
             if scenario == "no-update":

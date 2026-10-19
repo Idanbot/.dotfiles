@@ -59,16 +59,10 @@ jobs:
         if: steps.upgrades.outputs.changed == 'true'
         run: |
           docker build \
-            -f .github/workflows/Dockerfile.ubuntu-24.04 \
+            --target tests -f .github/e2e/Dockerfile.ubuntu-24.04 \
             -t dotfiles-grouped-upgrades .
           docker run --rm -v "$PWD:/dotfiles:ro" \
-            dotfiles-grouped-upgrades bash -lc '
-              set -e
-              sudo apt-get update -qq
-              sudo apt-get install -y yq
-              /dotfiles/tests/test-package-metadata.sh /dotfiles
-              /dotfiles/tests/test-update-packages.sh /dotfiles
-            '
+            dotfiles-grouped-upgrades python3 /dotfiles/scripts/ci/run-tests.py upgrades
       - name: Commit, push, and create or refresh one PR
         if: steps.upgrades.outputs.changed == 'true'
         env:

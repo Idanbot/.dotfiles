@@ -81,16 +81,18 @@ if is_native && is_installed docker; then
 fi
 
 KUBECTL_VERSION="$(package_version cloud kubectl 1.36.3)"
-if ! is_installed kubectl || ! version_ge "$(kubectl version --client 2>/dev/null | head -1 || true)" "$KUBECTL_VERSION"; then
+if runtime_is_current kubectl "$KUBECTL_VERSION" "$(kubectl version --client 2>/dev/null | head -1 || true)"; then
+  log_skip "kubectl is current or preserved"
+else
   tmpdir="$(mktemp -d)"
   url="https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/${RELEASE_ARCH}/kubectl"
   log_info "Installing kubectl $KUBECTL_VERSION"
   download_verified "$url" "$tmpdir/kubectl" "$url.sha256" kubectl
-  install_managed_binary "$tmpdir/kubectl" kubectl "$KUBECTL_VERSION" dl.k8s.io
+  if ! runtime_is_current kubectl "$KUBECTL_VERSION" "$(kubectl version --client 2>/dev/null | head -1 || true)"; then
+    install_managed_binary "$tmpdir/kubectl" kubectl "$KUBECTL_VERSION" dl.k8s.io
+    ((_INSTALLED++)) || true
+  fi
   rm -rf "$tmpdir"
-  ((_INSTALLED++)) || true
-else
-  log_skip "kubectl $KUBECTL_VERSION already installed or newer"
 fi
 
 HELM_VERSION="$(package_version cloud helm 4.2.3)"

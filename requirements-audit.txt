@@ -1,0 +1,2 @@
+# CVSS v2/v3/v4 vector scoring for the OSV audit (not needed by installers).
+cvss==3.6

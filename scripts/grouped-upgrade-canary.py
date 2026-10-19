@@ -12,7 +12,8 @@ import time
 
 BRANCH = "automation/grouped-tool-upgrades"
 WORKFLOW = "ci.yml"
-HEAVY_JOBS = {f"Live {profile} E2E" for profile in ("developer", "agent", "cloud", "full")}
+HEAVY_JOBS = {f"Live {profile} E2E" for profile in
+              ("developer", "agent", "cloud", "full", "full-native")}
 
 
 def gh(*args):
@@ -108,8 +109,10 @@ def main():
                 if run["conclusion"] != "success":
                     raise RuntimeError(f"canary concluded {run['conclusion']}")
                 pages = gh_json("api", "--paginate", "--slurp", f"{api}/actions/runs/{run_id}/jobs?per_page=100")
-                jobs = [job for page in pages for job in page["jobs"] if job["name"] in HEAVY_JOBS]
-                if ({job["name"] for job in jobs} != HEAVY_JOBS or len(jobs) != 4
+                jobs = [{**job, "name": job["name"].rsplit(" / ", 1)[-1]}
+                        for page in pages for job in page["jobs"]
+                        if job["name"].rsplit(" / ", 1)[-1] in HEAVY_JOBS]
+                if ({job["name"] for job in jobs} != HEAVY_JOBS or len(jobs) != len(HEAVY_JOBS)
                         or any(job["conclusion"] != "success" for job in jobs)):
                     raise RuntimeError("heavy matrix missing, skipped, or unsuccessful")
                 verify_head()

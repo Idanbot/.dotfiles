@@ -138,9 +138,15 @@ not automatic.
 4. Workspace Docker E2E: both backend launch contracts, all registered agent
    commands, MCP toggles, directory propagation, and mocked failures.
 5. Base E2E: clean native and simulated-WSL install, two passes.
-6. Heavy E2E: developer, agent, cloud, and full profiles.
+6. Heavy E2E: developer, agent, cloud, full WSL-simulated, and two-pass full-native profiles.
 7. Native VM: real two-pass Ubuntu host integration plus transactional
    restore/reapply acceptance on a monthly ephemeral VM.
 8. Real WSL: self-hosted Windows runner with Ubuntu 24.04 WSL2.
 
 The simulated WSL tier must never be described as a real WSL kernel test.
+
+The registry and Docker runner are shared by local validation and CI. Every
+test is assigned to a suite or explicitly documented as manual/a wrapper.
+`CI Result` rejects failed, cancelled, and unexpectedly skipped required jobs.
+Two-pass E2E compares actual state after each pass instead of equating successful
+exit codes with convergence.

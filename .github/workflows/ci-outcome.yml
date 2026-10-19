@@ -17,6 +17,7 @@ env:
 jobs:
   classify:
     name: Classify completed CI run
+    if: github.event.workflow_run.conclusion != 'success'
     permissions:
       actions: read  # fetch the completed run's job conclusions and logs
       checks: write  # zizmor: ignore[excessive-permissions] publish the diagnostic check
@@ -31,6 +32,7 @@ jobs:
       - name: Checkout trusted classifier
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
       - name: Fetch jobs and available logs
         env:

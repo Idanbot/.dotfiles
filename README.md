@@ -726,7 +726,7 @@ Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.
 
-A separate daily **Pinned Version CVE Audit** queries exact repository pins
+The **Pinned Version CVE Audit** queries exact repository pins daily
 against OSV, emits GitHub warning annotations, and retains a downloadable
 report. It does not fail bootstrap or change pins. Packages without a reliable
 OSV coordinate are listed explicitly; GitHub release scans cover repository
@@ -734,9 +734,15 @@ tag advisories, not each tool's transitive dependency tree. For affected pins,
 it checks the latest compatible and latest stable candidates and recommends
 one only when OSV reports no advisories or a strictly lower known maximum
 severity; cross-policy candidates are marked for compatibility review.
-Otherwise it warns that no safer upgrade was established. The weekly
+CVSS v2/v3/v4 vectors are scored with the pinned audit dependency. Candidate
+queries use exact package/tag coordinates; missing results fail closed. npm
+recommendations respect `latest` and Node compatibility, and yanked-only PyPI
+releases are excluded. Otherwise it warns that no safer upgrade was established.
+The weekly
 version/checksum audit includes the same CVE report and continues to publish
 latest compatible same-major updates and latest stable major suggestions.
+The standalone daily workflow skips Monday because the weekly audit supplies
+that day's CVE scan. Both use the same report script.
 
 Run the all-stable advisory locally without changing pins:
 
@@ -890,12 +896,18 @@ Verification is tiered so a green result has a precise meaning:
 
 | Tier | Trigger | Coverage |
 | --- | --- | --- |
-| Push/PR CI | Every change | Security and policy checks, selector matrices, native/WSL-simulated units, two-pass base install, recovery/restore/resume |
+| Push/PR CI | Every change | Parallel security/static and Docker behavior suites, selector edge cases, two-pass native/WSL base install, recovery/restore/resume |
 | Agent workspace Docker E2E | Every push/PR | Both workspace backends, all registered agent launchers, MCP toggles, working-directory propagation, and failure recovery fixtures |
-| Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, and `full` profile installations |
+| Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, full WSL-simulated, and two-pass full-native installations |
 | Real WSL2 | Manual, private self-hosted Windows runner | Actual WSL kernel, Windows interop, and target-machine acceptance |
 
-The first push/PR stage runs these jobs in parallel:
+`ci.yml` owns triggers, concurrency, and one final **CI Result**. Two reusable
+workflows contain checks and live acceptance. `tests/suites.json` accounts for
+every test; missing and duplicate registrations fail CI. Security/static checks
+and Docker behavior/selector suites start independently. One validator image is
+shared for that commit, while installation acceptance uses a minimal base image.
+
+The checks include:
 
 - Gitleaks full-history scan.
 - ShellCheck, shfmt, YAML, templates, and generated-file contracts.
@@ -903,16 +915,23 @@ The first push/PR stage runs these jobs in parallel:
 - Actionlint and Zizmor `--pedantic`.
 - Trivy filesystem/secret/misconfiguration scan.
 - Pull-request dependency review.
-- Non-mutating latest-version and checksum report with a downloadable artifact.
+- Python linting, standalone profile equivalence, and package metadata validation.
 
-All seven must pass before the verified GitHub release/external smoke job. A
-pre-matrix gate then unlocks the normal matrices. A green push/PR run does not
+Required checks gate verified release/external smoke and live installation.
+A shared action retains E2E diagnostics even on failure. The final result rejects
+failed, cancelled, or unexpectedly skipped required jobs; the heavy matrix is
+optional only when not requested. A green push/PR run does not
 mean the scheduled heavy profiles or real-WSL workflow ran; check those tiers
 when changing platform integration or complete install behavior.
 
 Local test commands also execute inside Docker:
 
 ```bash
+./scripts/ci/docker-suite.sh static
+./scripts/ci/docker-suite.sh behavior
+./scripts/ci/docker-suite.sh selectors
+./scripts/ci/docker-suite.sh workspace
+./scripts/ci/docker-suite.sh workflow-security
 docker compose -f .github/e2e/compose.yaml --profile selectors run --rm selectors
 docker compose -f .github/e2e/compose.yaml --profile base up --build --abort-on-container-exit
 docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
@@ -928,7 +947,10 @@ a login shell:
 ./scripts/e2e-shell.sh
 ```
 
-The default is `--profile full --platform native --passes 1`. The validation
+The default is `--profile full --platform native --passes 1`. Two-pass runs also
+compare file hashes, modes, symlink targets, normalized install records, local
+history/overlays, configuration diffs, and replacement inventories. Volatile
+run timestamps and logs are excluded from convergence checks. The validation
 result is available inside the shell as `DOTFILES_E2E_STATUS`; `0` means the
 automated checks passed. Exit the shell to delete the container. Redacted logs,
 run summaries, diagnostics, and timing data remain under
@@ -976,7 +998,7 @@ regressions are visible but do not block merges until enforcement is explicitly
 enabled. CI runs also execute Hyperfine benchmarks for installer help, workspace
 help, isolated cloud-context status, agent readiness, and Zsh startup; real
 post-install startup timing uses the same benchmark engine. CI publishes those
-artifacts and a separate outcome-classification check so GitHub
+artifacts and, for unsuccessful runs, a separate outcome-classification check so GitHub
 runner interruptions are distinguishable from actionable failures without
 altering the original workflow conclusion.
 
@@ -993,10 +1015,14 @@ and an agent launch trace.
 ```text
 .chezmoiscripts/       explicit section implementations
 .github/e2e/           Docker profile harness
+.github/actions/       shared E2E execution and artifact collection
 .github/workflows/     CI, maintenance, native VM, and real WSL workflows
 dot_* / private_dot_*  chezmoi-managed configuration
 profiles/              machine profile definitions
 scripts/               orchestrator, recovery, doctor, update helpers
+scripts/lib/           internal helpers behind the stable lib.sh interface
+scripts/dotfiles/      validated metadata and shared release policies
+scripts/ci/            Docker suites, results, and shared audit reporting
 tests/                 contracts, units, fixtures, and E2E drivers
 agents.yaml            agent command registry
 packages*.yaml         version and ownership manifests
@@ -1016,6 +1042,7 @@ Design details and generated references:
 - [Security Model](docs/security-model.md)
 - [Implemented Improvements](docs/improvements-2026.md)
 - [ADRs](docs/adr/README.md)
+- [Shared Policy and CI Suites](docs/adr/0009-shared-policy-and-ci-suites.md)
 - [Tool Inventory](docs/tool-inventory.md)
 - [Keybindings](docs/keybindings.md)
 

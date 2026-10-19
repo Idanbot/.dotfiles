@@ -1,0 +1,254 @@
+name: Gated Live Acceptance
+
+on:
+  workflow_call:
+    inputs:
+      heavy:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  version-report:
+    name: Version and Checksum Report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check latest versions and checksums
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3-yaml
+          ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
+          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload upgrade report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: version-checksum-report
+          path: ${{ runner.temp }}/dotfiles-upgrade-report.md
+          retention-days: 14
+
+  github-release-tools:
+    name: Verified Release Asset Smoke
+    needs: [version-report]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download validators built for this SHA
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: test-image-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-image
+      - name: Load shared validators
+        run: zstd -dc "$RUNNER_TEMP/ci-image/test-image.tar.zst" | docker load
+      - name: Verify live release paths in Docker
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOTFILES_CI_IMAGE: dotfiles-ci-tests
+          DOTFILES_CI_SKIP_BUILD: "true"
+        run: ./scripts/ci/docker-suite.sh release
+
+  base-e2e:
+    name: base-e2e (${{ matrix.service }})
+    needs: [github-release-tools]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        service: [base-native, base-wsl-simulated]
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run acceptance and retain reports
+        uses: ./.github/actions/e2e
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          service: ${{ matrix.service }}
+          artifact: base-e2e-${{ matrix.service }}
+
+  recovery-e2e:
+    name: recovery-e2e (${{ matrix.service }})
+    needs: [github-release-tools]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        service: [recovery, failure-resume]
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run acceptance and retain reports
+        uses: ./.github/actions/e2e
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          service: ${{ matrix.service }}
+          artifact: recovery-e2e-${{ matrix.service }}
+
+  heavy-e2e:
+    name: Live ${{ matrix.service }} E2E
+    if: inputs.heavy
+    needs: [base-e2e, recovery-e2e]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        service: [developer, agent, cloud, full, full-native]
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run acceptance and retain reports
+        uses: ./.github/actions/e2e
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          service: ${{ matrix.service }}
+          artifact: heavy-e2e-${{ matrix.service }}
+
+  performance-history:
+    name: Rolling Performance History
+    if: >-
+      always() &&
+      needs.base-e2e.result == 'success' &&
+      github.event_name != 'pull_request'
+    needs: [base-e2e, heavy-e2e]
+    permissions:
+      actions: read  # download this run's and prior performance artifacts
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download prior history and current samples
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          input="$RUNNER_TEMP/performance-inputs"
+          mkdir -p "$input/prior" "$input/current"
+
+          prior_id="$(
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=performance-history&per_page=10" \
+              --jq '[.artifacts[] | select(.expired == false)][0].id // empty'
+          )"
+          if [[ -n "$prior_id" ]]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$prior_id/zip" \
+              >"$RUNNER_TEMP/prior-history.zip"
+            unzip -q "$RUNNER_TEMP/prior-history.zip" -d "$input/prior"
+          fi
+
+          mkdir -p "$input/recent"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '[
+              .artifacts[] |
+              select(.expired == false and (.name | startswith("performance-sample-"))) |
+              [.id, .name]
+            ][0:20][] | @tsv' |
+            while IFS=$'\t' read -r artifact_id artifact_name; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+                >"$RUNNER_TEMP/recent-$artifact_id.zip"
+              mkdir -p "$input/recent/$artifact_id-$artifact_name"
+              unzip -q "$RUNNER_TEMP/recent-$artifact_id.zip" \
+                -d "$input/recent/$artifact_id-$artifact_name"
+            done
+
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.name | startswith("performance-sample-")) | [.id, .name] | @tsv' |
+            while IFS=$'\t' read -r artifact_id artifact_name; do
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" \
+                >"$RUNNER_TEMP/$artifact_name.zip"
+              mkdir -p "$input/current/$artifact_name"
+              unzip -q "$RUNNER_TEMP/$artifact_name.zip" -d "$input/current/$artifact_name"
+            done
+      - name: Build trend dashboard
+        run: |
+          ./scripts/performance-history.sh \
+            "$RUNNER_TEMP/performance-inputs" \
+            "$RUNNER_TEMP/performance-dashboard"
+          cat "$RUNNER_TEMP/performance-dashboard/performance-history.md" \
+            >>"$GITHUB_STEP_SUMMARY"
+      - name: Upload rolling performance history
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-history
+          path: ${{ runner.temp }}/performance-dashboard/
+          if-no-files-found: error
+          retention-days: 90
+
+  result:
+    name: Live Acceptance Result
+    if: always()
+    needs: [version-report, github-release-tools, base-e2e, recovery-e2e, heavy-e2e, performance-history]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check all required live results
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+          HEAVY_REQUIRED: ${{ inputs.heavy }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          optional=()
+          [[ "$HEAVY_REQUIRED" == true ]] || optional+=(heavy-e2e)
+          [[ "$EVENT_NAME" != pull_request ]] || optional+=(performance-history)
+          python3 scripts/ci/result.py \
+            --required version-report github-release-tools base-e2e recovery-e2e heavy-e2e performance-history \
+            --optional "${optional[@]}"

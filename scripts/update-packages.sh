@@ -152,10 +152,17 @@ github_release_json() {
 }
 
 github_latest_version() {
-  local repo="$1" tag
+  local repo="$1" template="${2:-}" tag prefix suffix
+  [[ -n "$template" ]] || template='v{version}'
   tag="$(curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
     "https://api.github.com/repos/$repo/releases/latest" | jq -r .tag_name)"
-  printf '%s\n' "${tag#v}"
+  prefix="${template%%\{version\}*}"
+  suffix="${template#*\{version\}}"
+  [[ "$tag" == "$prefix"*"$suffix" ]] || return 1
+  tag="${tag#"$prefix"}"
+  [[ -z "$suffix" ]] || tag="${tag%"$suffix"}"
+  [[ "$tag" =~ ^[0-9]+([.][0-9]+)+([+][0-9]+)?$ ]] || return 1
+  printf '%s\n' "$tag"
 }
 
 npm_version() {
@@ -183,44 +190,8 @@ pypi_integrity() {
 }
 
 github_asset_spec() {
-  local id="$1"
-  case "$id" in
-    bootstrap.chezmoi) printf '%s\n' 'twpayne/chezmoi|v{version}|chezmoi_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    core.eza) printf '%s\n' 'eza-community/eza|v{version}|eza_{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
-    core.lazygit) printf '%s\n' 'jesseduffield/lazygit|v{version}|lazygit_{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
-    core.starship) printf '%s\n' 'starship/starship|v{version}|starship-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
-    core.github_cli) printf '%s\n' 'cli/cli|v{version}|gh_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    core.sops) printf '%s\n' 'getsops/sops|v{version}|sops-v{version}.linux.{arch}|amd64|arm64' ;;
-    core.lazydocker) printf '%s\n' 'jesseduffield/lazydocker|v{version}|lazydocker_{version}_Linux_{arch}.tar.gz|x86_64|arm64' ;;
-    core.tealdeer) printf '%s\n' 'dbrgn/tealdeer|v{version}|tealdeer-linux-{arch}-musl|x86_64|aarch64' ;;
-    core.curlie) printf '%s\n' 'rs/curlie|v{version}|curlie_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    core.ast_grep) printf '%s\n' 'ast-grep/ast-grep|{version}|app-{arch}-unknown-linux-gnu.zip|x86_64|aarch64' ;;
-    core.gitleaks) printf '%s\n' 'gitleaks/gitleaks|v{version}|gitleaks_{version}_linux_{arch}.tar.gz|x64|arm64' ;;
-    languages.uv) printf '%s\n' 'astral-sh/uv|{version}|uv-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
-    history.atuin) printf '%s\n' 'atuinsh/atuin|v{version}|atuin-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
-    editor.neovim) printf '%s\n' 'neovim/neovim|v{version}|nvim-linux-{arch}.tar.gz|x86_64|arm64' ;;
-    cloud.k9s) printf '%s\n' 'derailed/k9s|v{version}|k9s_Linux_{arch}.tar.gz|amd64|arm64' ;;
-    cloud.cloudflared) printf '%s\n' 'cloudflare/cloudflared|{version}|cloudflared-linux-{arch}.deb|amd64|arm64' ;;
-    cloud.s5cmd) printf '%s\n' 'peak/s5cmd|v{version}|s5cmd_{version}_Linux-{arch}.tar.gz|64bit|arm64' ;;
-    cloud.stern) printf '%s\n' 'stern/stern|v{version}|stern_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    cloud.helmfile) printf '%s\n' 'helmfile/helmfile|v{version}|helmfile_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    cloud.kubectx) printf '%s\n' 'ahmetb/kubectx|v{version}|kubectx_v{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
-    cloud.kubens) printf '%s\n' 'ahmetb/kubectx|v{version}|kubens_v{version}_linux_{arch}.tar.gz|x86_64|arm64' ;;
-    cloud.kubecolor) printf '%s\n' 'kubecolor/kubecolor|v{version}|kubecolor_{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    cloud.radar) printf '%s\n' 'skyhook-io/radar|v{version}|radar_v{version}_linux_{arch}.tar.gz|amd64|arm64' ;;
-    fonts.nerd_font_version)
-      printf 'ryanoasis/nerd-fonts|v{version}|%s.zip|shared|shared\n' \
-        "$(package_version fonts nerd_font FiraMono)"
-      ;;
-    terminal.kitty) printf '%s\n' 'kovidgoyal/kitty|v{version}|kitty-{version}-{arch}.txz|x86_64|arm64' ;;
-    terminal.herdr) printf '%s\n' 'ogulcancelik/herdr|v{version}|herdr-linux-{arch}|x86_64|aarch64' ;;
-    system.git_credential_manager) printf '%s\n' 'git-ecosystem/git-credential-manager|v{version}|gcm-linux-{arch}-{version}.deb|x64|arm64' ;;
-    ai_tools.omp) printf '%s\n' 'can1357/oh-my-pi|v{version}|omp-linux-{arch}|x64|arm64' ;;
-    ai_tools.bun) printf '%s\n' 'oven-sh/bun|bun-v{version}|bun-linux-{arch}.zip|x64-baseline|aarch64' ;;
-    ai_tools.rtk) printf '%s\n' 'rtk-ai/rtk|v{version}|rtk-{arch}.tar.gz|x86_64-unknown-linux-musl|aarch64-unknown-linux-gnu' ;;
-    media.rmpc) printf '%s\n' 'mierak/rmpc|v{version}|rmpc-v{version}-{arch}-unknown-linux-gnu.tar.gz|x86_64|aarch64' ;;
-    *) return 1 ;;
-  esac
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/dotfiles/metadata.py" \
+    release-spec "$META_FILE" "$PACKAGES_FILE" "$1"
 }
 
 render_template() {
@@ -277,6 +248,13 @@ external_archive_checksum() {
   [[ -s "$tmp" ]] || curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
     -o "$tmp" "https://codeload.github.com/$repo/tar.gz/refs/tags/$tag"
   sha256sum "$tmp" | awk '{print $1}'
+}
+
+direct_checksum_supported() {
+  case "$1" in
+    languages.go | languages.node | languages.java | cloud.kubectl | cloud.helm | cloud.terraform | cloud.aws_cli) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 direct_checksums() {
@@ -358,7 +336,7 @@ integrity_pair() {
   case "$integrity" in
     pinned-sha256)
       old="$(pinned_metadata_checksums "$section" "$key")" || old=unresolved
-      if github_asset_spec "$id" >/dev/null; then
+      if github_asset_spec "$id" >/dev/null 2>&1; then
         new="$(github_checksums "$id" "$latest")" || new=unresolved
       elif [[ "$id" == languages.java || "$id" == cloud.aws_cli ]]; then
         new="$(direct_checksums "$id" "$latest")" || new=unresolved
@@ -377,10 +355,10 @@ integrity_pair() {
       new="$(pypi_integrity "$package" "$latest")" || new=unresolved
       ;;
     upstream-checksum)
-      if github_asset_spec "$id" >/dev/null; then
+      if github_asset_spec "$id" >/dev/null 2>&1; then
         old="$(github_checksums "$id" "$current")" || old=unresolved
         new="$(github_checksums "$id" "$latest")" || new=unresolved
-      elif direct_checksums "$id" "$current" >/dev/null 2>&1; then
+      elif direct_checksum_supported "$id"; then
         old="$(direct_checksums "$id" "$current")" || old=unresolved
         new="$(direct_checksums "$id" "$latest")" || new=unresolved
       else
@@ -426,9 +404,10 @@ add_candidate() {
 }
 
 audit_github() {
-  local section="$1" key="$2" repo="$3" latest
+  local section="$1" key="$2" repo="$3" latest template
   wanted "$section.$key" || return 0
-  latest="$(github_latest_version "$repo" 2>/dev/null)" || latest=""
+  template="$(metadata_value "$section" "$key" tag_template 'v{version}')"
+  latest="$(github_latest_version "$repo" "$template" 2>/dev/null)" || latest=""
   add_candidate "$section" "$key" "$latest"
 }
 
@@ -473,75 +452,49 @@ load_fixture() {
 }
 
 run_live_audit() {
-  local latest key
-  audit_github bootstrap chezmoi twpayne/chezmoi
-  audit_github core fzf junegunn/fzf
-  audit_github core eza eza-community/eza
-  audit_github core lazygit jesseduffield/lazygit
-  audit_github core starship starship/starship
-  audit_github core github_cli cli/cli
-  audit_github core sops getsops/sops
-  audit_github core lazydocker jesseduffield/lazydocker
-  audit_github core tealdeer dbrgn/tealdeer
-  audit_github core curlie rs/curlie
-  audit_github core ast_grep ast-grep/ast-grep
-  audit_github core gitleaks gitleaks/gitleaks
+  local latest section key source reference targets="$WORK_DIR/audit-targets.tsv"
+  PYTHONPATH="$DOTFILES_SOURCE_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+    /usr/bin/python3 - "$PACKAGES_FILE" "$META_FILE" >"$targets" <<'PYTARGETS'
+import re
+import sys
+from dotfiles.metadata import load_metadata, load_versions
 
-  for key in go rust cargo node npm typescript python java uv; do
-    wanted "languages.$key" || continue
-    latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" candidate \
-      --source "$DOTFILES_SOURCE_DIR" --tool "languages.$key" 2>/dev/null)" || latest=""
-    add_candidate languages "$key" "$latest"
-  done
-  audit_github history atuin atuinsh/atuin
-  audit_github editor neovim neovim/neovim
-  if wanted cloud.kubectl; then
-    latest="$(curl "${CURL_ARGS[@]}" https://dl.k8s.io/release/stable.txt 2>/dev/null | sed 's/^v//' || true)"
-    add_candidate cloud kubectl "$latest"
-  fi
-  audit_github cloud helm helm/helm
-  audit_github cloud terraform hashicorp/terraform
-  audit_github cloud k9s derailed/k9s
-  if wanted cloud.aws_cli; then
-    latest="$(curl "${CURL_ARGS[@]}" \
-      https://raw.githubusercontent.com/aws/aws-cli/v2/CHANGELOG.rst 2>/dev/null |
-      awk '/^[0-9]+\.[0-9]+\.[0-9]+$/ { print; exit }' || true)"
-    add_candidate cloud aws_cli "$latest"
-  fi
-  audit_github cloud cloudflared cloudflare/cloudflared
-  audit_github cloud s5cmd peak/s5cmd
-  audit_github cloud stern stern/stern
-  audit_github cloud helmfile helmfile/helmfile
-  audit_github cloud kubectx ahmetb/kubectx
-  audit_github cloud kubens ahmetb/kubectx
-  audit_github cloud kubecolor kubecolor/kubecolor
-  audit_github cloud radar skyhook-io/radar
-  audit_github database usql xo/usql
-  audit_pypi database iredis iredis
-  audit_github system git_credential_manager git-ecosystem/git-credential-manager
-  audit_github fonts nerd_font_version ryanoasis/nerd-fonts
-  audit_npm ai_tools claude_cli @anthropic-ai/claude-code
-  audit_mutable_url ai_tools codex_cli https://chatgpt.com/codex/install.sh
-  audit_mutable_url ai_tools antigravity_cli https://antigravity.google/cli/install.sh
-  audit_npm ai_tools opencode opencode-ai
-  audit_github ai_tools omp can1357/oh-my-pi
-  if wanted ai_tools.bun; then
-    latest="$(curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
-      https://api.github.com/repos/oven-sh/bun/releases/latest 2>/dev/null |
-      jq -r '.tag_name // empty' | sed 's/^bun-v//' || true)"
-    add_candidate ai_tools bun "$latest"
-  fi
-  audit_pypi ai_tools serena serena-agent
-  audit_npm ai_tools context_mode context-mode
-  audit_pypi ai_tools graphify graphifyy
-  audit_github ai_tools rtk rtk-ai/rtk
-  audit_github ai_tools ponytail DietrichGebert/ponytail
-  audit_npm ai_tools pix_optimizer @xynogen/pix-optimizer
-  audit_pypi terminal tmuxp tmuxp
-  audit_github terminal kitty kovidgoyal/kitty
-  audit_github terminal herdr ogulcancelik/herdr
-  audit_github media yt_dlp yt-dlp/yt-dlp
-  audit_github media rmpc mierak/rmpc
+versions = load_versions(sys.argv[1])
+metadata = load_metadata(sys.argv[2])
+for section, tools in versions.items():
+    for key, pin in tools.items():
+        meta = metadata.get(section, {}).get(key, {})
+        source = meta.get("source", "")
+        if source == "install_script":
+            reference = meta["url"]
+        elif not re.match(r"^\d", pin):
+            continue
+        elif section == "languages" or source == "direct":
+            source, reference = "candidate", "-"
+        elif source in {"github", "apt_or_github", "external"} and meta.get("repo"):
+            source, reference = "github", meta["repo"]
+        elif source == "npm":
+            reference = meta["package"]
+        elif source in {"pypi", "uv", "uvx"} and meta.get("package"):
+            source, reference = "pypi", meta["package"]
+        else:
+            continue
+        print("\t".join((section, key, source, reference)))
+PYTARGETS
+  while IFS=$'\t' read -r section key source reference; do
+    wanted "$section.$key" || continue
+    case "$source" in
+      github) audit_github "$section" "$key" "$reference" ;;
+      npm) audit_npm "$section" "$key" "$reference" ;;
+      pypi) audit_pypi "$section" "$key" "$reference" ;;
+      install_script) audit_mutable_url "$section" "$key" "$reference" ;;
+      candidate)
+        latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" candidate \
+          --source "$DOTFILES_SOURCE_DIR" --tool "$section.$key" 2>/dev/null)" || latest=""
+        add_candidate "$section" "$key" "$latest"
+        ;;
+    esac
+  done <"$targets"
 }
 
 if [[ -n "${DOTFILES_UPGRADE_FIXTURE:-}" ]]; then
@@ -640,127 +593,8 @@ apply_plan() {
   cp "$DOTFILES_SOURCE_DIR/docs/tool-inventory.md" "$backup/docs/tool-inventory.md"
   cp "$DOTFILES_SOURCE_DIR/README.md" "$backup/README.md"
 
-  if ! python3 - "$PACKAGES_FILE" "$META_FILE" "$EXTERNALS_FILE" "$selected" <<'PYAPPLY'; then
-import os
-import re
-import sys
-import tempfile
-from pathlib import Path
-
-packages_path = Path(sys.argv[1])
-meta_path = Path(sys.argv[2])
-externals_path = Path(sys.argv[3])
-plan_path = Path(sys.argv[4])
-package_lines = packages_path.read_text(encoding="utf-8").splitlines()
-meta_lines = meta_path.read_text(encoding="utf-8").splitlines()
-external_lines = externals_path.read_text(encoding="utf-8").splitlines()
-
-
-def set_version(lines: list[str], section: str, key: str, value: str) -> None:
-    inside = False
-    for index, line in enumerate(lines):
-        if line == f"{section}:":
-            inside = True
-            continue
-        if inside and line and not line.startswith((" ", "#")):
-            break
-        if inside and re.match(rf"  {re.escape(key)}:\s*", line):
-            comment = ""
-            if " #" in line:
-                comment = " #" + line.split(" #", 1)[1]
-            lines[index] = f'  {key}: "{value}"{comment}'
-            return
-    raise RuntimeError(f"manifest key not found: {section}.{key}")
-
-
-def set_metadata(lines: list[str], section: str, tool: str, field: str, value: str) -> None:
-    section_start = next((i for i, line in enumerate(lines) if line == f"{section}:"), None)
-    if section_start is None:
-        raise RuntimeError(f"metadata section not found: {section}")
-    section_end = next(
-        (i for i in range(section_start + 1, len(lines)) if lines[i] and not lines[i].startswith((" ", "#"))),
-        len(lines),
-    )
-    tool_start = next(
-        (i for i in range(section_start + 1, section_end) if lines[i] == f"  {tool}:"),
-        None,
-    )
-    if tool_start is None:
-        raise RuntimeError(f"metadata tool not found: {section}.{tool}")
-    tool_end = next(
-        (i for i in range(tool_start + 1, section_end) if re.match(r"^  \S.*:\s*$", lines[i])),
-        section_end,
-    )
-    for index in range(tool_start + 1, tool_end):
-        if re.match(rf"    {re.escape(field)}:\s*", lines[index]):
-            lines[index] = f"    {field}: {value}"
-            return
-    lines.insert(tool_end, f"    {field}: {value}")
-
-
-def set_external_fzf(lines: list[str], version: str, sha256: str) -> None:
-    start = next((i for i, line in enumerate(lines) if line == '".fzf":'), None)
-    if start is None:
-        raise RuntimeError("external entry not found: .fzf")
-    end = next((i for i in range(start + 1, len(lines)) if lines[i] and not lines[i].startswith(" ")), len(lines))
-    url_found = False
-    sha_found = False
-    for index in range(start + 1, end):
-        if re.match(r"^  url:\s*", lines[index]):
-            lines[index] = f'  url: "https://codeload.github.com/junegunn/fzf/tar.gz/refs/tags/v{version}"'
-            url_found = True
-        if re.match(r"^    sha256:\s*", lines[index]):
-            lines[index] = f'    sha256: "{sha256}"'
-            sha_found = True
-    if not (url_found and sha_found):
-        raise RuntimeError("external .fzf URL or SHA256 field is missing")
-
-
-for raw in plan_path.read_text(encoding="utf-8").splitlines():
-    tool_id, section, key, current, latest, integrity, delta = raw.split("\t", 6)
-    set_version(package_lines, section, key, latest)
-    if tool_id == "core.fzf":
-        new_integrity = delta.split(" -> ", 1)[1]
-        value = new_integrity.removeprefix("sha256:")
-        if not re.fullmatch(r"[0-9a-fA-F]{64}", value):
-            raise RuntimeError("invalid SHA256 for core.fzf")
-        set_external_fzf(external_lines, latest, value.lower())
-        continue
-    if integrity != "pinned-sha256":
-        continue
-    new_integrity = delta.split(" -> ", 1)[1]
-    values = dict(part.split(":", 1) for part in new_integrity.split(";") if ":" in part)
-    if "sha256" in values:
-        if not re.fullmatch(r"[0-9a-fA-F]{64}", values["sha256"]):
-            raise RuntimeError(f"invalid SHA256 for {tool_id}")
-        set_metadata(meta_lines, section, key, "sha256", values["sha256"].lower())
-    else:
-        for arch in ("amd64", "arm64"):
-            value = values.get(arch, "")
-            if not re.fullmatch(r"[0-9a-fA-F]{64}", value):
-                raise RuntimeError(f"invalid {arch} SHA256 for {tool_id}")
-            set_metadata(meta_lines, section, key, f"sha256_{arch}", value.lower())
-
-
-def atomic_write(path: Path, lines: list[str]) -> None:
-    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write("\n".join(lines) + "\n")
-        os.chmod(temporary, path.stat().st_mode)
-        os.replace(temporary, path)
-    except Exception:
-        try:
-            os.unlink(temporary)
-        except FileNotFoundError:
-            pass
-        raise
-
-
-atomic_write(packages_path, package_lines)
-atomic_write(meta_path, meta_lines)
-atomic_write(externals_path, external_lines)
-PYAPPLY
+  if ! /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/apply-package-plan.py" \
+    "$PACKAGES_FILE" "$META_FILE" "$EXTERNALS_FILE" "$selected"; then
     cp "$backup/packages.yaml" "$PACKAGES_FILE"
     cp "$backup/packages.meta.yaml" "$META_FILE"
     cp "$backup/.chezmoiexternal.yaml" "$EXTERNALS_FILE"

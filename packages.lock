@@ -3,7 +3,7 @@
 
 generated_from:
   packages: affc60030a61572a55accfcddb81e5b5fda6d4dd5dd225b8d80b046a35a95201
-  metadata: 761cb827bda1e1044a280daea839e9b5149b30374d4f3448521bcea332b5f19b
+  metadata: acb91d2c2bf0f0471d3b99ce222fb0567f294f567eeb7e2813893dd7566d0d43
 
 tools:
   - section: bootstrap
@@ -12,6 +12,10 @@ tools:
     source: apt_or_github
     owner: bootstrap
     repo: twpayne/chezmoi
+    tag_template: "v{version}"
+    asset_template: "chezmoi_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: core
     name: fzf
@@ -51,6 +55,10 @@ tools:
     owner: dotfiles-binary
     repo: eza-community/eza
     binary: eza
+    tag_template: "v{version}"
+    asset_template: "eza_{arch}-unknown-linux-gnu.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     sha256_amd64: 35c70c5c43c29108075e58b893234c67ef585f0b53a7eaf8e9e7d4eec9f339b4
     sha256_arm64: 40b87ae8628aa2ff0f0d2dc24ab52f689631366385c3da630bae745671fd71ec
     integrity: pinned-sha256
@@ -61,7 +69,10 @@ tools:
     owner: dotfiles-binary
     repo: jesseduffield/lazygit
     binary: lazygit
+    tag_template: "v{version}"
     asset_template: "lazygit_{version}_linux_{arch}.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     checksum_template: "https://github.com/jesseduffield/lazygit/releases/download/{tag}/checksums.txt"
     integrity: upstream-checksum
   - section: core
@@ -78,6 +89,10 @@ tools:
     owner: dotfiles-binary
     repo: starship/starship
     binary: starship
+    tag_template: "v{version}"
+    asset_template: "starship-{arch}-unknown-linux-gnu.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     integrity: upstream-checksum
   - section: core
     name: github_cli
@@ -86,6 +101,10 @@ tools:
     owner: dotfiles-binary
     repo: cli/cli
     binary: gh
+    tag_template: "v{version}"
+    asset_template: "gh_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     sha256_amd64: bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
     sha256_arm64: 7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484
     integrity: pinned-sha256
@@ -177,6 +196,10 @@ tools:
     owner: dotfiles-binary
     repo: getsops/sops
     binary: sops
+    tag_template: "v{version}"
+    asset_template: "sops-v{version}.linux.{arch}"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: core
     name: lazydocker
@@ -185,6 +208,10 @@ tools:
     owner: dotfiles-binary
     repo: jesseduffield/lazydocker
     binary: lazydocker
+    tag_template: "v{version}"
+    asset_template: "lazydocker_{version}_Linux_{arch}.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: core
     name: tealdeer
@@ -193,6 +220,10 @@ tools:
     owner: dotfiles-binary
     repo: dbrgn/tealdeer
     binary: tldr
+    tag_template: "v{version}"
+    asset_template: "tealdeer-linux-{arch}-musl"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     integrity: upstream-checksum
   - section: core
     name: curlie
@@ -201,6 +232,10 @@ tools:
     owner: dotfiles-binary
     repo: rs/curlie
     binary: curlie
+    tag_template: "v{version}"
+    asset_template: "curlie_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: core
     name: trippy
@@ -209,6 +244,10 @@ tools:
     owner: dotfiles-binary
     repo: fujiapple852/trippy
     binary: trip
+    tag_template: "{version}"
+    asset_template: "trippy-{version}-{arch}-unknown-linux-musl.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     sha256_amd64: aa2b7b2a0773f3cc04da691100419049950b690fe3736d25e24ac955b63d6056
     sha256_arm64: 73af939aa94e9e0f07cac2b3c8177e02a6b1c3be88299d85988e02be81ae7004
     integrity: pinned-sha256
@@ -219,6 +258,10 @@ tools:
     owner: dotfiles-binary
     repo: ast-grep/ast-grep
     binary: ast-grep
+    tag_template: "{version}"
+    asset_template: "app-{arch}-unknown-linux-gnu.zip"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     sha256_amd64: 0fd3f489639abb8465a914b74b8779171577582318d8a940d00399f59dba81c5
     sha256_arm64: 3a4ad22dd1dca7a4900a173de65885578617af57fa13dd93b8d345d6b352770e
     integrity: pinned-sha256
@@ -229,6 +272,10 @@ tools:
     owner: dotfiles-binary
     repo: gitleaks/gitleaks
     binary: gitleaks
+    tag_template: "v{version}"
+    asset_template: "gitleaks_{version}_linux_{arch}.tar.gz"
+    arch_amd64: x64
+    arch_arm64: arm64
     sha256_amd64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     sha256_arm64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
     integrity: pinned-sha256
@@ -296,6 +343,10 @@ tools:
     owner: dotfiles-binary
     repo: astral-sh/uv
     binary: uv
+    tag_template: "{version}"
+    asset_template: "uv-{arch}-unknown-linux-gnu.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     integrity: upstream-checksum
   - section: history
     name: atuin
@@ -304,6 +355,10 @@ tools:
     owner: dotfiles-binary
     repo: atuinsh/atuin
     binary: atuin
+    tag_template: "v{version}"
+    asset_template: "atuin-{arch}-unknown-linux-gnu.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     integrity: upstream-checksum
   - section: editor
     name: neovim
@@ -312,6 +367,10 @@ tools:
     owner: dotfiles-runtime
     repo: neovim/neovim
     binary: nvim
+    tag_template: "v{version}"
+    asset_template: "nvim-linux-{arch}.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     sha256_amd64: 474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87
     sha256_arm64: 8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815
     integrity: pinned-sha256
@@ -322,6 +381,10 @@ tools:
     owner: dotfiles-binary
     repo: xo/usql
     binary: usql
+    tag_template: "v{version}"
+    asset_template: "usql-{version}-linux-{arch}.tar.bz2"
+    arch_amd64: amd64
+    arch_arm64: arm64
     sha256_amd64: 78bd9b221e223d7a954d41f51e9eca98bdd94b401618367ba0f3887abebd44fc
     sha256_arm64: ccad89d6f4c67a9bf595df0aa8a550e0a9e3d6a6f9356356ba1e164e311335e4
     integrity: pinned-sha256
@@ -383,6 +446,10 @@ tools:
     owner: dotfiles-binary
     repo: derailed/k9s
     binary: k9s
+    tag_template: "v{version}"
+    asset_template: "k9s_Linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: aws_cli
@@ -412,6 +479,10 @@ tools:
     owner: vendor-installer
     repo: cloudflare/cloudflared
     binary: cloudflared
+    tag_template: "{version}"
+    asset_template: "cloudflared-linux-{arch}.deb"
+    arch_amd64: amd64
+    arch_arm64: arm64
     sha256_amd64: 9721287c28f78cb623e77c7b95a63feea87e909054d75666a0ec9eff20e5d548
     sha256_arm64: 7e0d76de3858b6396bd234ae26182bee222133398667d2647b90381d00c00e98
     integrity: pinned-sha256
@@ -422,6 +493,10 @@ tools:
     owner: dotfiles-binary
     repo: peak/s5cmd
     binary: s5cmd
+    tag_template: "v{version}"
+    asset_template: "s5cmd_{version}_Linux-{arch}.tar.gz"
+    arch_amd64: 64bit
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: kcat
@@ -438,6 +513,10 @@ tools:
     owner: dotfiles-binary
     repo: stern/stern
     binary: stern
+    tag_template: "v{version}"
+    asset_template: "stern_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: helmfile
@@ -446,6 +525,10 @@ tools:
     owner: dotfiles-binary
     repo: helmfile/helmfile
     binary: helmfile
+    tag_template: "v{version}"
+    asset_template: "helmfile_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: kubectx
@@ -454,6 +537,10 @@ tools:
     owner: dotfiles-binary
     repo: ahmetb/kubectx
     binary: kubectx
+    tag_template: "v{version}"
+    asset_template: "kubectx_v{version}_linux_{arch}.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: kubens
@@ -462,6 +549,10 @@ tools:
     owner: dotfiles-binary
     repo: ahmetb/kubectx
     binary: kubens
+    tag_template: "v{version}"
+    asset_template: "kubens_v{version}_linux_{arch}.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: kubecolor
@@ -470,6 +561,10 @@ tools:
     owner: dotfiles-binary
     repo: kubecolor/kubecolor
     binary: kubecolor
+    tag_template: "v{version}"
+    asset_template: "kubecolor_{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     integrity: upstream-checksum
   - section: cloud
     name: radar
@@ -478,6 +573,10 @@ tools:
     owner: dotfiles-binary
     repo: skyhook-io/radar
     binary: kubectl-radar
+    tag_template: "v{version}"
+    asset_template: "radar_v{version}_linux_{arch}.tar.gz"
+    arch_amd64: amd64
+    arch_arm64: arm64
     sha256_amd64: f6c8af8434117eba76a1553935a9107dcda5ba7cfebb63ed1fbdb5711804798c
     sha256_arm64: bd8dc0ceece3dff87d2c3a981b0469e4311b8c5d942a1a7ccc7984d48e79568c
     integrity: pinned-sha256
@@ -488,6 +587,10 @@ tools:
     owner: dotfiles-binary
     repo: kovidgoyal/kitty
     binary: kitty
+    tag_template: "v{version}"
+    asset_template: "kitty-{version}-{arch}.txz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     sha256_amd64: d573618b911e9c461bd421b96c13c74c7f1cb2f1ac9c327818d4ff84366cf5c6
     sha256_arm64: 0c81a995614426cccf0fecaf7d104d47cd63bbccf173d14976e9f92e3d60fce6
     integrity: pinned-sha256
@@ -513,7 +616,10 @@ tools:
     owner: dotfiles-binary
     repo: ogulcancelik/herdr
     binary: herdr
-    asset_template: "herdr-linux-{release_arch}"
+    tag_template: "v{version}"
+    asset_template: "herdr-linux-{arch}"
+    arch_amd64: x86_64
+    arch_arm64: aarch64
     sha256_amd64: 18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7
     sha256_arm64: 4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0
     integrity: pinned-sha256
@@ -524,6 +630,10 @@ tools:
     owner: dpkg
     repo: git-ecosystem/git-credential-manager
     binary: git-credential-manager
+    tag_template: "v{version}"
+    asset_template: "gcm-linux-{arch}-{version}.deb"
+    arch_amd64: x64
+    arch_arm64: arm64
     sha256_amd64: 530d7e2a99ddd048b62e71ed4e18e8692287bdb60df2eaace3cd439010b8f624
     sha256_arm64: a915b3bb648e4e978aa9e198e8bbeb50df229bcdba3007193651dec237165291
     integrity: pinned-sha256
@@ -540,6 +650,10 @@ tools:
     source: github
     owner: dotfiles-assets
     repo: ryanoasis/nerd-fonts
+    tag_template: "v{version}"
+    asset_template: "{font}.zip"
+    arch_amd64: shared
+    arch_arm64: shared
     integrity: upstream-checksum
   - section: ai_tools
     name: claude_cli
@@ -582,7 +696,10 @@ tools:
     owner: dotfiles-binary
     repo: can1357/oh-my-pi
     binary: omp
-    asset_template: "omp-linux-{release_arch}"
+    tag_template: "v{version}"
+    asset_template: "omp-linux-{arch}"
+    arch_amd64: x64
+    arch_arm64: arm64
     sha256_amd64: 9798d22d518b23342b4cadf57672b276ef09e756c1832adc6571b04b26ad4f1b
     sha256_arm64: 5cad38a8edee60cec9c0ce91810eba38bda0efe349562157023810343dacb8d5
     integrity: pinned-sha256
@@ -593,7 +710,10 @@ tools:
     owner: dotfiles-binary
     repo: oven-sh/bun
     binary: bun
-    asset_template: "bun-linux-{release_arch}.zip"
+    tag_template: "bun-v{version}"
+    asset_template: "bun-linux-{arch}.zip"
+    arch_amd64: x64-baseline
+    arch_arm64: aarch64
     sha256_amd64: 1fc2edac843102909e3a1be1d8d9802cc6071cf074e67e88231f4ffe0f8b397b
     sha256_arm64: efa9813da5ed72423bf847f916e8d2c47c0d776add972354026a75e10da9aa21
     integrity: pinned-sha256
@@ -628,6 +748,10 @@ tools:
     owner: dotfiles-binary
     repo: rtk-ai/rtk
     binary: rtk
+    tag_template: "v{version}"
+    asset_template: "rtk-{arch}.tar.gz"
+    arch_amd64: x86_64-unknown-linux-musl
+    arch_arm64: aarch64-unknown-linux-gnu
     sha256_amd64: 5028d3b19a8f0990d30fec9fbb07e32782bc5698e618fb1861aad8a9ccba4eb5
     sha256_arm64: 8d6d1aad9e69b42481eda7039507d1f7ee93698f87713cecd873d287c1931632
     integrity: pinned-sha256
@@ -661,6 +785,10 @@ tools:
     owner: dotfiles-binary
     repo: mierak/rmpc
     binary: rmpc
+    tag_template: "v{version}"
+    asset_template: "rmpc-v{version}-{arch}-unknown-linux-gnu.tar.gz"
+    arch_amd64: x86_64
+    arch_arm64: arm64
     sha256_amd64: b03d4b777cf0afe61107abb4ee847b7c6539b8f5c76555fd759cd15a6c1ff604
     sha256_arm64: 12d9bb3bcabfe90c0573afac9b11e20333262872966a8769967611b578ff7328
     integrity: pinned-sha256

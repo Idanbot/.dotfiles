@@ -4,6 +4,8 @@ if [[ -z "${DOTFILES_SOURCE_DIR:-}" ]]; then
 fi
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
+# shellcheck source=scripts/install-uv-tool.sh
+source "$DOTFILES_SOURCE_DIR/scripts/install-uv-tool.sh"
 
 log_step "Installing Media Tools"
 if is_wsl; then
@@ -16,9 +18,7 @@ YTDLP_VERSION="$(package_version media yt_dlp 2026.07.04)"
 if ! is_installed uv; then
   log_error "uv is required for yt-dlp; include the languages section"
 else
-  uv tool install --force "yt-dlp==${YTDLP_VERSION}"
-  record_install yt-dlp "$YTDLP_VERSION" uv "$(uv tool dir)/yt-dlp"
-  log_success "yt-dlp $YTDLP_VERSION installed"
+  install_uv_tool yt-dlp yt-dlp "$YTDLP_VERSION"
 fi
 
 require_sudo
@@ -34,7 +34,9 @@ case "$(get_arch)" in
     ;;
 esac
 RMPC_SHA="$(package_metadata media rmpc "sha256_$(get_arch)")"
-if ! is_installed rmpc || ! version_ge "$(rmpc --version 2>/dev/null || true)" "$RMPC_VERSION"; then
+if runtime_is_current rmpc "$RMPC_VERSION" "$(rmpc --version 2>/dev/null || true)"; then
+  log_skip "rmpc is current or preserved"
+else
   tmpdir="$(mktemp -d)"
   asset="rmpc-v${RMPC_VERSION}-${RMPC_TARGET}.tar.gz"
   download_verified \
@@ -45,8 +47,6 @@ if ! is_installed rmpc || ! version_ge "$(rmpc --version 2>/dev/null || true)" "
   rm -rf "$tmpdir"
   ((_INSTALLED++)) || true
   log_success "rmpc $RMPC_VERSION installed"
-else
-  log_skip "rmpc $RMPC_VERSION already installed or newer"
 fi
 
 print_summary "Media Tools"

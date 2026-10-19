@@ -10,24 +10,8 @@ usage() {
 Usage: scripts/run-section.sh <section>
 
 Sections:
-  detect       environment and directory setup
-  core         core apt packages
-  zsh          zsh and shell ecosystem
-  terminal     terminal CLI tools
-  languages    Go, Rust, Node.js, TypeScript, Python, Java
-  history      optional Atuin installation (activation remains local/manual)
-  cloud        Docker, kubectl, Helm, Terraform, cloud CLIs
-  tmux         tmux, tmuxp, and Herdr
-  neovim       Neovim
-  ai           AI CLIs
-  media        media tools
-  fonts        Nerd Fonts
-  desktop      native desktop tools
-  system       system configuration
-  theme        Catppuccin theme assets
-  vscode       VS Code extensions
-  services     user services
 USAGE
+  /usr/bin/python3 "$DOTFILES_DIR/scripts/section-state.py" --source "$DOTFILES_DIR" describe
 }
 
 if [[ -z "$SECTION" || "$SECTION" == "-h" || "$SECTION" == "--help" ]]; then
@@ -35,4 +19,5 @@ if [[ -z "$SECTION" || "$SECTION" == "-h" || "$SECTION" == "--help" ]]; then
   exit 0
 fi
 
+/usr/bin/python3 "$DOTFILES_DIR/scripts/section-state.py" --source "$DOTFILES_DIR" script "$SECTION" >/dev/null
 exec "$DOTFILES_DIR/scripts/install.sh" --source "$DOTFILES_DIR" --only "$SECTION"

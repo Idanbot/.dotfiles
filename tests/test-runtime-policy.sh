@@ -46,6 +46,17 @@ done
 runtime_is_current node 26.11.1 'v99.99.99' >"$temporary/newer.log"
 grep -Fq 'newer than repository' "$temporary/newer.log"
 
+# Failed probes are not permission to overwrite a runtime, even an owned one.
+printf '#!/bin/sh\nexit 37\n' >"$HOME/.local/bin/unknown-runtime"
+chmod +x "$HOME/.local/bin/unknown-runtime"
+record_install unknown-runtime unknown fixture "$HOME/.local/bin/unknown-runtime"
+runtime_is_current unknown-runtime 1.0.0 ''
+if DOTFILES_REPLACE_BINARIES=unknown-runtime runtime_is_current unknown-runtime 1.0.0 ''; then
+  printf 'Explicit named unknown-version replacement was ignored\n' >&2
+  exit 1
+fi
+DOTFILES_REPLACE_BINARIES=node runtime_is_current node 1.0.0 99.99.99
+
 # An older external executable elsewhere on PATH must not be shadowed.
 printf '#!/bin/sh\necho 1.0.0\n' >"$HOME/external/bin/helm"
 chmod +x "$HOME/external/bin/helm"

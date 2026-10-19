@@ -4,6 +4,10 @@ LICENSE
 packages.yaml
 packages.meta.yaml
 packages.lock
+requirements-audit.txt
+pyproject.toml
+.ruff_cache/
+.pytest_cache/
 agents.yaml
 profiles/
 scripts/

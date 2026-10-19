@@ -60,4 +60,25 @@ if install_managed_binary "$temporary/broken" gh 3 github:cli/cli 'gh --version'
   exit 1
 fi
 [[ "$(gh --version)" == 'gh version 1.0.0' ]]
+
+# Unknown versions are not proof that even a digest-owned runtime is obsolete.
+unset DOTFILES_REPLACE_BINARIES
+printf '#!/bin/sh\necho unknown\n' >"$HOME/.local/bin/runtime-fixture"
+chmod +x "$HOME/.local/bin/runtime-fixture"
+record_install runtime-fixture unknown test "$HOME/.local/bin/runtime-fixture"
+target_is_owned "$HOME/.local/bin/runtime-fixture"
+runtime_is_current runtime-fixture 3.0.0 ''
+runtime_is_current runtime-fixture 3.0.0 'version unavailable'
+export DOTFILES_REPLACE_BINARIES=runtime-fixture-other
+runtime_is_current runtime-fixture 3.0.0 unknown
+export DOTFILES_REPLACE_BINARIES=runtime-fixture
+if runtime_is_current runtime-fixture 3.0.0 unknown; then
+  printf 'Named replacement unexpectedly preserved the unknown runtime\n' >&2
+  exit 1
+fi
+unset DOTFILES_REPLACE_BINARIES
+if runtime_is_current absent-runtime-fixture 3.0.0 ''; then
+  printf 'Missing runtime unexpectedly treated as installed\n' >&2
+  exit 1
+fi
 printf 'Legacy binary preservation and explicit upgrade tests passed\n'

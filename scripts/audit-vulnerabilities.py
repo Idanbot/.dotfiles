@@ -7,11 +7,17 @@ import os
 from pathlib import Path
 import re
 import sys
-from urllib.parse import quote
 import urllib.error
 import urllib.request
 
 import yaml
+from cvss import CVSS2, CVSS3, CVSS4
+from cvss.exceptions import CVSSError
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dotfiles import releases  # noqa: E402
+from dotfiles.metadata import load_versions  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 QUERY = "https://api.osv.dev/v1/querybatch"
@@ -36,8 +42,14 @@ SPECIAL = {
 }
 
 
-def version_key(value):
-    return tuple(int(part) for part in re.findall(r"\d+", str(value)))
+version_key = releases.order
+
+
+def git_coordinate(repo, pin, template):
+    if not isinstance(template, str) or template.count("{version}") != 1:
+        raise ValueError("Git tag template must contain exactly one {version}")
+    return {"package": {"ecosystem": "GIT", "name": f"https://github.com/{repo}.git"},
+            "version": template.format(version=pin)}
 
 
 def coordinate(ident, pin, meta):
@@ -45,10 +57,8 @@ def coordinate(ident, pin, meta):
         spec = SPECIAL[ident]
         if spec is None:
             return None
-        ecosystem, repo, tag = spec
-        return {"package": {"ecosystem": ecosystem,
-                "name": f"https://github.com/{repo}.git"},
-                "version": tag.format(version=pin)}
+        _, repo, tag = spec
+        return git_coordinate(meta.get("repo", repo), pin, meta.get("tag_template", tag))
     source = meta.get("source")
     if source == "npm" and meta.get("package"):
         return {"package": {"ecosystem": "npm", "name": meta["package"]},
@@ -58,9 +68,7 @@ def coordinate(ident, pin, meta):
                 "version": str(pin)}
     repo = meta.get("repo")
     if source == "github" and repo:
-        return {"package": {"ecosystem": "GIT",
-                            "name": f"https://github.com/{repo}.git"},
-                "version": f"v{pin}"}
+        return git_coordinate(repo, pin, meta.get("tag_template", "v{version}"))
     return None
 
 
@@ -90,68 +98,30 @@ def get_json(url):
             f"OSV request failed ({type(exc).__name__}); retry the audit") from None
 
 
-def stable_version(value):
-    return bool(re.fullmatch(r"\d+(?:\.\d+)+(?:\+\d+)?", str(value)))
+stable_version = releases.stable
 
 
 def release_versions(entry, fetch=get_json):
-    package = entry["package"]
-    ecosystem, name = package["ecosystem"], package["name"]
-    if ecosystem == "npm":
-        encoded = quote(name, safe="@")
-        data = fetch(f"https://registry.npmjs.org/{encoded}")
-        versions = data.get("versions", {})
-        return [version for version in versions if stable_version(version)]
-    if ecosystem == "PyPI":
-        data = fetch(f"https://pypi.org/pypi/{quote(name, safe='')}/json")
-        return [version for version in data.get("releases", {}) if stable_version(version)]
-    if ecosystem == "GIT":
-        prefix = entry["version"].removesuffix(entry["pin"])
-        suffix = ""
-        repo = name.removeprefix("https://github.com/").removesuffix(".git")
-        tags = fetch(f"https://api.github.com/repos/{repo}/tags?per_page=100")
-        versions = []
-        for item in tags:
-            tag = item.get("name", "")
-            if not tag.startswith(prefix) or (suffix and not tag.endswith(suffix)):
-                continue
-            value = tag[len(prefix):len(tag) - len(suffix) if suffix else None]
-            if stable_version(value):
-                versions.append(value)
-        return versions
-    return []
+    return releases.release_versions(entry["id"], {}, fetch,
+                                     node=entry.get("node", ""), entry=entry) or []
 
 
 def upgrade_candidates(entry, root, fetch=get_json):
     policy = json.loads((root / "scripts/update-policy.json").read_text())
     rule = policy.get(entry["id"], "stable")
-    versions = sorted(
-        {value for value in release_versions(entry, fetch)
-         if stable_version(value) and version_key(value) > version_key(entry["pin"])},
-        key=version_key)
-    if not versions:
-        return []
-    width = {"major": 1, "minor": 2}.get(rule, 0)
-    compatible = [value for value in versions
-                  if not width or version_key(value)[:width] == version_key(entry["pin"])[:width]]
-    latest = versions[-1]
-    selected = {}
-    if compatible:
-        selected[compatible[-1]] = ["latest-compatible"]
-    stable_labels = ["latest-stable"]
-    if width and version_key(latest)[:width] != version_key(entry["pin"])[:width]:
-        stable_labels.append("outside compatibility policy")
-    selected.setdefault(latest, []).extend(stable_labels)
-    prefix = entry["version"][:entry["version"].find(entry["pin"])]
-    suffix = entry["version"][len(prefix) + len(entry["pin"]):]
-    return [{"version": value,
-             "query_version": f"{prefix}{value}{suffix}",
-             "labels": labels}
-            for value, labels in selected.items()]
+    if entry["package"]["ecosystem"] == "npm":
+        packages = load_versions(root / "packages.yaml")
+        entry = {**entry, "node": str(packages.get("languages", {}).get("node", ""))}
+    options = releases.candidate_options(release_versions(entry, fetch), entry["pin"], rule)
+    prefix, found, suffix = entry["version"].partition(entry["pin"])
+    if not found:
+        raise ValueError("OSV query version does not contain its pin")
+    return [{**option, "query_version": f"{prefix}{option['version']}{suffix}"}
+            for option in options]
 
 
 def load_pins(root):
-    packages = yaml.safe_load((root / "packages.yaml").read_text())
+    packages = load_versions(root / "packages.yaml")
     metadata = yaml.safe_load((root / "packages.meta.yaml").read_text())
     scanned, skipped = [], []
     for section, tools in packages.items():
@@ -185,23 +155,58 @@ def fixed_versions(vulnerability):
     return sorted(versions, key=version_key)
 
 
+SEVERITY_RANK = {"none": 0, "low": 1, "moderate": 2, "high": 3, "critical": 4}
+
+
 def severity(vulnerability):
     values = []
-    for item in vulnerability.get("severity", []):
-        match = re.search(r"(?:^|/)([0-9]+(?:\.[0-9]+)?)(?:$|/)",
-                          str(item.get("score", "")))
-        if match:
-            score = float(match[1])
-            values.append("critical" if score >= 9 else "high" if score >= 7
-                          else "moderate" if score >= 4 else "low")
+    records = [vulnerability, *vulnerability.get("affected", [])]
+    for record in records:
+        for item in record.get("severity", []):
+            raw = str(item.get("score", "")).strip()
+            try:
+                if re.fullmatch(r"\d+(?:\.\d+)?", raw):
+                    score = float(raw)
+                elif raw.startswith("CVSS:4.0/"):
+                    score = float(CVSS4(raw).scores()[0])
+                elif raw.startswith(("CVSS:3.0/", "CVSS:3.1/")):
+                    score = float(CVSS3(raw).scores()[0])
+                elif item.get("type") == "CVSS_V2" or raw.startswith(("AV:", "CVSS:2.0/")):
+                    score = float(CVSS2(raw.removeprefix("CVSS:2.0/")).scores()[0])
+                else:
+                    continue
+            except (ValueError, CVSSError):
+                continue
+            if 0 <= score <= 10:
+                values.append("critical" if score >= 9 else "high" if score >= 7
+                              else "moderate" if score >= 4 else "low" if score else "none")
     for source in [vulnerability.get("database_specific", {}),
                    *(affected.get("database_specific", {}) for affected in vulnerability.get("affected", [])),
                    *(affected.get("ecosystem_specific", {}) for affected in vulnerability.get("affected", []))]:
         value = str(source.get("severity", "")).lower()
-        if value in {"critical", "high", "moderate", "medium", "low"}:
+        value = "moderate" if value == "medium" else value
+        if value in SEVERITY_RANK:
             values.append(value)
-    rank = {"low": 1, "moderate": 2, "medium": 2, "high": 3, "critical": 4}
-    return max(values, key=rank.get) if values else "unspecified"
+    return max(values, key=SEVERITY_RANK.get) if values else "unspecified"
+
+
+def batch_results(response, count, candidate=False):
+    label = "candidate batch" if candidate else "batch"
+    results = response.get("results") if isinstance(response, dict) else None
+    if not isinstance(results, list) or len(results) != count:
+        raise RuntimeError(f"OSV returned an incomplete {label} response")
+    for result in results:
+        if not isinstance(result, dict) or not isinstance(result.get("vulns", []), list):
+            raise RuntimeError(f"OSV returned a malformed {label} response")
+        if "error" in result:
+            raise RuntimeError(f"OSV returned an error in its {label} response")
+        if any(not isinstance(item, dict) or not item.get("id") for item in result.get("vulns", [])):
+            raise RuntimeError(f"OSV returned a malformed {label} advisory")
+        if result.get("next_page_token"):
+            context = "candidate response" if candidate else "response"
+            action = "advice" if candidate else "audit"
+            raise RuntimeError(f"OSV {context} was paginated; refusing a partial {action}")
+    return results
 
 
 def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_candidates):
@@ -215,11 +220,7 @@ def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_ca
     payload = {"queries": [
         {"package": {"ecosystem": eco, "name": name}, "version": version}
         for eco, name, version in keys]}
-    results = request(QUERY, payload).get("results", []) if keys else []
-    if len(results) != len(keys):
-        raise RuntimeError("OSV returned an incomplete batch response")
-    if any(result.get("next_page_token") for result in results):
-        raise RuntimeError("OSV response was paginated; refusing a partial audit")
+    results = batch_results(request(QUERY, payload), len(keys)) if keys else []
     findings = []
     vulnerability_cache = {}
     for key, result in zip(keys, results):
@@ -275,11 +276,7 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
     queries = {"queries": [
         {"package": {"ecosystem": ecosystem, "name": name}, "version": version}
         for ecosystem, name, version in candidate_keys]}
-    results = request(QUERY, queries).get("results", []) if candidate_keys else []
-    if len(results) != len(candidate_keys):
-        raise RuntimeError("OSV returned an incomplete candidate batch response")
-    if any(result.get("next_page_token") for result in results):
-        raise RuntimeError("OSV candidate response was paginated; refusing partial advice")
+    results = batch_results(request(QUERY, queries), len(candidate_keys), candidate=True) if candidate_keys else []
 
     severities = {}
     for key, result in zip(candidate_keys, results):
@@ -292,7 +289,7 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
         severities[key] = [severity(item) for item in records]
 
     advice = {}
-    rank = {"low": 1, "moderate": 2, "medium": 2, "high": 3, "critical": 4}
+    rank = SEVERITY_RANK
     for key, options in candidates.items():
         current = list(current_vulns[key].values())
         current_levels = [severity(item) for item in current]
@@ -300,8 +297,10 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
         current_max = max((rank.get(level, 0) for level in current_levels), default=0)
         improved = []
         for option in options:
-            candidate_key = (key[0], key[1], option["version"])
-            levels = severities.get(candidate_key, [])
+            candidate_key = (key[0], key[1], option["query_version"])
+            if candidate_key not in severities:
+                raise RuntimeError("OSV candidate result is missing; refusing partial advice")
+            levels = severities[candidate_key]
             clean = not levels
             lower = (current_known and all(level in rank for level in levels) and
                      bool(levels) and max(rank[level] for level in levels) < current_max)
@@ -316,7 +315,7 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
             else:
                 before = max(rank[level] for level in current_levels)
                 after = max(rank[level] for level in levels)
-                names = {1: "low", 2: "moderate", 3: "high", 4: "critical"}
+                names = {value: name for name, value in rank.items()}
                 message = (f"Recommend {option['version']} ({label}; maximum severity "
                            f"{names[before]} to {names[after]})")
             advice[key] = message

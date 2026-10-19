@@ -17,11 +17,11 @@ import sys
 import tempfile
 import tomllib
 
-import yaml
-
 # Importing the shared probe must not dirty a writable source checkout.
 sys.dont_write_bytecode = True
-import catalog as software
+import catalog as software  # noqa: E402
+from dotfiles import releases  # noqa: E402
+from dotfiles.metadata import load_metadata, load_repository, load_versions  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ROLLING = {"core.github_cli", "cloud.aws_cli", "cloud.gcloud", "cloud.helm",
@@ -29,18 +29,11 @@ ROLLING = {"core.github_cli", "cloud.aws_cli", "cloud.gcloud", "cloud.helm",
 AWS_FINGERPRINT = "FB5DB77FD5C118B80511ADA8A6310ACC4672475C"
 
 
-def version(value):
-    match = re.search(r"\d+(?:\.\d+)+(?:\+\d+)?", str(value))
-    return match.group() if match else ""
-
-
-def order(value):
-    parts = tuple(int(part) for part in re.findall(r"\d+", version(value)))
-    return parts + (0,) * (6 - len(parts))
-
-
-def stable(value):
-    return bool(re.fullmatch(r"\d+(?:\.\d+)+(?:\+\d+)?", value))
+version = releases.version
+order = releases.order
+stable = releases.stable
+release_version = releases.release_version
+node_engine_matches = releases.node_engine_matches
 
 
 @functools.lru_cache(maxsize=256)
@@ -62,11 +55,6 @@ def fetch(url):
 
 def get_json(url):
     return json.loads(fetch(url))
-
-
-def release_version(release):
-    tag = release.get("tag_name", "").removeprefix("bun-").removeprefix("azure-cli-").removeprefix("v")
-    return tag if stable(tag) and not release.get("prerelease") and not release.get("draft") else ""
 
 
 def github(repo, major=None):
@@ -120,20 +108,13 @@ def upstream(entry, meta, major=None):
         return latest, {}
     if ident == "cloud.kubectl":
         return fetch("https://dl.k8s.io/release/stable.txt").strip().removeprefix("v"), {}
-    if ident == "languages.go":
-        versions = [item["version"].removeprefix("go") for item in get_json("https://go.dev/dl/?mode=json") if item.get("stable")]
-        return max(versions, key=order), {}
+    if ident in {"languages.go", "languages.node", "languages.python"}:
+        versions = releases.release_versions(ident, meta, get_json)
+        return max((v for v in versions if stable(v)), key=order), {}
     if ident in {"languages.rust", "languages.cargo"}:
         data = tomllib.loads(fetch("https://static.rust-lang.org/dist/channel-rust-stable.toml"))
         # Cargo's crate/package version is not the Rust toolchain/CLI version.
         return data["pkg"]["rust"]["version"].split()[0], {}
-    if ident == "languages.node":
-        versions = [item["version"].removeprefix("v") for item in get_json("https://nodejs.org/dist/index.json")]
-        return max((v for v in versions if stable(v)), key=order), {}
-    if ident == "languages.python":
-        tags = get_json("https://api.github.com/repos/python/cpython/tags?per_page=100")
-        versions = [item["name"].removeprefix("v") for item in tags]
-        return max((v for v in versions if stable(v)), key=order), {}
     if ident == "languages.java":
         feature = get_json("https://api.adoptium.net/v3/info/available_releases")["most_recent_feature_release"]
         data = get_json(f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture=x64&image_type=jdk&os=linux")
@@ -146,12 +127,11 @@ def upstream(entry, meta, major=None):
         return github("hashicorp/terraform", major)
     if ident == "cloud.azure_cli":
         return github("Azure/azure-cli", major)
-    if meta.get("source") == "npm":
-        package = meta.get("package", ident.split(".")[1]).replace("/", "%2f")
-        return get_json(f"https://registry.npmjs.org/{package}/latest")["version"], {}
-    if meta.get("source") in {"pypi", "uvx", "uv"}:
-        package = meta.get("package", ident.split(".")[1])
-        return get_json(f"https://pypi.org/pypi/{package}/json")["info"]["version"], {}
+    if meta.get("source") in {"npm", "pypi", "uvx", "uv"}:
+        versions = releases.release_versions(ident, meta, get_json)
+        if not versions:
+            raise ValueError(f"No installable stable release for {ident}")
+        return max(versions, key=order), {}
     if meta.get("repo"):
         return github(meta["repo"], major)
     advisory_repos = {"core.bat": "sharkdp/bat", "core.btop": "aristocratos/btop",
@@ -170,27 +150,6 @@ def checksum(text, asset):
     raise ValueError(f"No SHA256 found for {asset}")
 
 
-def node_engine_matches(node, requirement):
-    """Conservative evaluator for registry engine comparators; unknown syntax is rejected."""
-    for alternative in requirement.split("||"):
-        matches = []
-        for clause in alternative.strip().split():
-            match = re.fullmatch(r"(>=|<=|>|<|\^|~|=)?(\d+)\.(\d+)\.(\d+)", clause)
-            if not match:
-                matches.append(False)
-                continue
-            operator = match[1] or "="
-            base = tuple(int(part) for part in match.groups()[1:])
-            actual = order(node)[:3]
-            matches.append({">=": actual >= base, "<=": actual <= base,
-                            ">": actual > base, "<": actual < base, "=": actual == base,
-                            "^": actual >= base and actual[0] == base[0],
-                            "~": actual >= base and actual[:2] == base[:2]}[operator])
-        if matches and all(matches):
-            return True
-    return False
-
-
 def upgrade_candidate(ident, baseline, node, meta):
     policies = json.loads((ROOT / "scripts/update-policy.json").read_text())
     rule = policies.get(ident, "stable")
@@ -199,27 +158,11 @@ def upgrade_candidate(ident, baseline, node, meta):
         feature = order(baseline)[0]
         data = get_json(f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture=x64&image_type=jdk&os=linux")
         candidates = [item["release_name"].removeprefix("jdk-") for item in data]
-        candidates = [candidate for candidate in candidates if stable(candidate)]
-        return max(candidates, key=order) if candidates else baseline
-    if ident == "languages.node":
-        candidates = [item["version"].removeprefix("v") for item in get_json("https://nodejs.org/dist/index.json")]
-    elif ident == "languages.go":
-        candidates = [item["version"].removeprefix("go") for item in get_json("https://go.dev/dl/?mode=json&include=all") if item.get("stable")]
-    elif ident == "languages.python":
-        candidates = [item["name"].removeprefix("v") for item in get_json("https://api.github.com/repos/python/cpython/tags?per_page=100")]
-    elif ident in {"languages.typescript", "languages.npm"}:
-        package = "typescript" if ident.endswith("typescript") else "npm"
-        data = get_json(f"https://registry.npmjs.org/{package}")
-        ceiling = data.get("dist-tags", {}).get("latest", "")
-        candidates = [v for v, item in data["versions"].items()
-                      if (not ceiling or order(v) <= order(ceiling)) and (ident != "languages.npm"
-                      or node_engine_matches(node, item.get("engines", {}).get("node", "")))]
     else:
-        return upstream(entry, meta)[0]
-    width = 2 if rule == "minor" else 1 if rule == "major" else 0
-    compatible = [v for v in candidates if stable(v) and order(v) >= order(baseline)
-                  and (not width or order(v)[:width] == order(baseline)[:width])]
-    return max(compatible, key=order) if compatible else baseline
+        candidates = releases.release_versions(ident, meta, get_json, node=node)
+        if candidates is None:
+            candidates = [upstream(entry, meta)[0]]
+    return releases.latest_compatible(candidates, baseline, rule)
 
 
 def integrity(entry, release, arch):
@@ -322,6 +265,12 @@ def ownership_status(path, state):
 def planned_action(entry):
     if not entry["path"]:
         return "install", "missing"
+    if not version(entry["current"]):
+        names = {*entry.get("commands", []), Path(entry["path"]).name}
+        replacements = set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(","))
+        if names & replacements:
+            return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
+        return "skip; preserve active executable with unknown version; explicit named replacement required", "unknown-version"
     if entry["current"] and stable(entry["target"]) and order(entry["current"]) >= order(entry["target"]):
         return "skip; preserve equal/newer version", "unchanged"
     if entry["id"] == "core.fzf":
@@ -355,8 +304,7 @@ def version_label(entry):
 
 def recommendations(root):
     """Global stable advisories, including versions outside automatic compatibility lines."""
-    metadata = yaml.safe_load((root / "packages.meta.yaml").read_text())
-    packages = yaml.safe_load((root / "packages.yaml").read_text())
+    packages, metadata = load_repository(root)
     policies = json.loads((root / "scripts/update-policy.json").read_text())
     node = str(packages["languages"]["node"])
     lines = ["## Latest Stable Recommendations", "",
@@ -503,11 +451,11 @@ def main():
     ROOT = args.source.resolve()
     software.ROOT = ROOT
     if args.command == "candidate":
-        packages = yaml.safe_load(Path(os.environ.get("DOTFILES_PACKAGES_FILE", ROOT / "packages.yaml")).read_text())
-        metadata = yaml.safe_load(Path(os.environ.get("DOTFILES_PACKAGES_META_FILE", ROOT / "packages.meta.yaml")).read_text())
+        packages = load_versions(Path(os.environ.get("DOTFILES_PACKAGES_FILE", ROOT / "packages.yaml")))
+        metadata = load_metadata(Path(os.environ.get("DOTFILES_PACKAGES_META_FILE", ROOT / "packages.meta.yaml")))
         group, key = args.tool.split(".")
         node = (upgrade_candidate("languages.node", str(packages["languages"]["node"]), "", {})
-                if args.tool == "languages.npm" else "")
+                if args.tool == "languages.npm" else str(packages.get("languages", {}).get("node", "")))
         print(upgrade_candidate(args.tool, args.baseline or str(packages[group][key]), node,
                                 metadata.get(group, {}).get(key, {})))
         return
@@ -536,7 +484,7 @@ def main():
         if data.get("schema") != 1 or data.get("sections") != sections or data.get("source") != str(ROOT):
             raise ValueError("Version plan inputs changed; start a new installation run")
     else:
-        metadata = yaml.safe_load((ROOT / "packages.meta.yaml").read_text())
+        metadata = load_metadata(ROOT / "packages.meta.yaml")
         entries = selected(ROOT, sections)
         arch = "amd64" if platform.machine() == "x86_64" else "arm64"
         def resolve_one(entry):
@@ -546,6 +494,8 @@ def main():
             tools = list(pool.map(resolve_one, entries))
         for entry in tools:
             entry["action"], entry["ownership"] = planned_action(entry)
+            if entry["ownership"] == "unknown-version":
+                checks.append(("WARN", f"{entry['id']}: {entry['action']}"))
         data = {"schema": 1, "source": str(ROOT), "sections": sections,
                 "resolved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "tools": {entry["id"]: entry for entry in tools}}

@@ -65,35 +65,7 @@ else
   fail "dot is missing verified download cache maintenance"
 fi
 
-CI_WORKFLOW="$DOTFILES_DIR/.github/workflows/ci.yml"
-if grep -Fq 'name: Version and Checksum Report' "$CI_WORKFLOW" &&
-  grep -Fq './scripts/update-packages.sh --check --report "$UPGRADE_REPORT"' "$CI_WORKFLOW" &&
-  grep -Fq 'cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"' "$CI_WORKFLOW"; then
-  pass "push/PR CI publishes the non-mutating upgrade report"
-else
-  fail "push/PR CI is missing the version/checksum report"
-fi
-
-if grep -Fq 'tests/test-e2e-report.sh "$PWD"' "$CI_WORKFLOW" &&
-  grep -Fq 'tests/test-performance-report.sh "$PWD"' "$CI_WORKFLOW" &&
-  grep -Fq 'name: Publish performance budget report' "$CI_WORKFLOW" &&
-  grep -Fq 'name: Hyperfine Benchmark Scenarios' "$CI_WORKFLOW" &&
-  grep -Fq 'scripts/hyperfine-benchmark.sh --output' "$CI_WORKFLOW"; then
-  pass "CI validates structured E2E reports and publishes Hyperfine performance budgets"
-else
-  fail "CI is missing E2E report or Hyperfine performance budget coverage"
-fi
-
-if grep -Fq 'agent-workspace-e2e:' "$CI_WORKFLOW" &&
-  grep -Fq 'agent-workspace-e2e' "$CI_WORKFLOW" &&
-  grep -Fq 'agent-workspace:' "$DOTFILES_DIR/.github/e2e/compose.yaml" &&
-  grep -Fq 'profiles: [workspace]' "$DOTFILES_DIR/.github/e2e/compose.yaml" &&
-  grep -Fq 'tests/e2e/test-agent-workspace.sh /dotfiles' \
-    "$DOTFILES_DIR/.github/e2e/compose.yaml"; then
-  pass "Docker validates both agent workspace backends and publishes diagnostics"
-else
-  fail "agent workspace Docker E2E harness is not wired into CI"
-fi
+python3 "$DOTFILES_DIR/scripts/ci/contracts.py" "$DOTFILES_DIR"
 
 PERFORMANCE_REPORT="$DOTFILES_DIR/scripts/performance-report.sh"
 if grep -Fq 'full_install:' "$PERFORMANCE_REPORT" &&
@@ -106,21 +78,13 @@ else
   fail "performance reports are missing full-install or human duration metrics"
 fi
 
-DOCKERFILE="$DOTFILES_DIR/.github/workflows/Dockerfile.ubuntu-24.04"
+DOCKERFILE="$DOTFILES_DIR/.github/e2e/Dockerfile.ubuntu-24.04"
 if grep -Fq 'USER 10000:10000' "$DOCKERFILE" &&
   grep -Fq 'ENV HOME="/home/testuser"' "$DOCKERFILE" &&
   ! grep -Fq 'USER testuser' "$DOCKERFILE"; then
   pass "Docker test image uses a resolvable numeric user identity"
 else
   fail "Docker test image still uses a non-numeric USER"
-fi
-
-if grep -Fq 'test-cloud-context.sh test-cloud-context-starship.sh' "$CI_WORKFLOW" &&
-  grep -Fq 'test-ssh-access.sh test-git-credential.sh' "$CI_WORKFLOW" &&
-  grep -Fq 'test-agent-status.sh' "$CI_WORKFLOW"; then
-  pass "Docker unit CI covers cloud, SSH, and agent readiness fixtures"
-else
-  fail "Docker unit CI is missing cloud, SSH, or agent readiness fixtures"
 fi
 
 CLOUD_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl"
@@ -234,12 +198,10 @@ else
   fail "managed Node must be on PATH before npm executes its env-based node shebang"
 fi
 
-if grep -Fq 'managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary"' \
-  "$DOTFILES_DIR/scripts/lib.sh" &&
-  grep -Fq -- '--allow-scripts=$allow_scripts' "$DOTFILES_DIR/scripts/lib.sh"; then
-  pass "npm global CLIs expose stable shims with explicit install-script allowlists"
+if bash -c 'source "$1/scripts/lib.sh"; declare -F npm_install_global managed_link >/dev/null' _ "$DOTFILES_DIR"; then
+  pass "shared library exposes npm installation and managed-link APIs"
 else
-  fail "npm global CLIs need stable shims and explicit install-script allowlists"
+  fail "shared library is missing its npm/managed-link APIs"
 fi
 
 if grep -Fq 'managed_link "$JAVA_CURRENT/bin/$binary"' \

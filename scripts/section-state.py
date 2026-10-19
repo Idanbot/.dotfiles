@@ -2,20 +2,26 @@
 """Canonical section inputs for bootstrap and targeted reconciliation."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import tempfile
 import yaml
 
+# Keep the registry reader stdlib-only so standalone generation needs no PyYAML.
+_spec = importlib.util.spec_from_file_location("section_registry", Path(__file__).with_name("section-registry.py"))
+_registry = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_registry)
+
 
 def registry(root):
-    return json.loads((root / "scripts/sections.json").read_text())
+    return _registry.registry(root)
 
 
 def fingerprint(root, name):
     entry = registry(root)[name]
-    inputs = {"schema": 1, "section": name, "definition": entry}
+    inputs = {"schema": 2, "section": name, "definition": entry}
     if entry.get("externals"):
         inputs["externals"] = external_entries(root, name)
         helper = root / "scripts/reconcile-externals.sh"
@@ -32,8 +38,18 @@ def fingerprint(root, name):
                 value = value.get(part) if isinstance(value, dict) else None
             selected[key] = value
         inputs[filename] = selected
-    for filename in [entry["script"], "scripts/lib.sh", "scripts/environment.sh",
-                     "scripts/section-state.py", "scripts/install-policy.py", *entry.get("files", [])]:
+    # Policies are data, not global helpers: only the owning manifest slice counts.
+    policies = json.loads((root / "scripts/update-policy.json").read_text()) if (root / "scripts/update-policy.json").is_file() else {}
+    inputs["policies"] = {key: value for key, value in policies.items()
+                          if key not in entry.get("exclude", []) and any(
+                              key == prefix or key.startswith(prefix + ".") for prefix in entry["manifest"])}
+    filenames = {entry["script"], "scripts/section-state.py", "scripts/section-registry.py", *entry.get("files", [])}
+    for pattern in entry["shared_inputs"]:
+        matches = list(root.glob(pattern))
+        filenames.update(str(path.relative_to(root)) for path in matches if path.is_file())
+        if not any(character in pattern for character in "*?["):
+            filenames.add(pattern)
+    for filename in sorted(filenames):
         path = root / filename
         inputs[filename] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
     return hashlib.sha256(json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -77,18 +93,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--state", type=Path)
-    parser.add_argument("command", choices=["list", "script", "fingerprint", "record", "selected", "externals"])
+    parser.add_argument("command", choices=["list", "script", "fingerprint", "record", "selected", "externals", "describe", "commands"])
     parser.add_argument("section", nargs="?")
     args = parser.parse_args()
     entries = registry(args.source)
     if args.command == "list":
         print("\n".join(entries))
+    elif args.command == "describe":
+        for name, entry in entries.items():
+            print(f"  {name:12s} {entry['description']}")
     elif args.command == "selected":
         print(selected_sections(args.state))
     elif args.section not in entries:
         parser.error(f"Unknown section: {args.section}")
     elif args.command == "script":
         print(entries[args.section]["script"])
+    elif args.command == "commands":
+        entry = entries[args.section]
+        for field, kind in (("commands", "required"), ("optional_commands", "optional"), ("stable_commands", "stable")):
+            for command in entry.get(field, []):
+                print(f"{kind}\t{command}\t{'native' if entry.get('native_only') else 'all'}")
     elif args.command == "externals":
         for path in external_entries(args.source, args.section):
             print(path)

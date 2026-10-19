@@ -1,0 +1,172 @@
+name: Static, Security, and Docker Contracts
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  test-image:
+    name: Build shared Docker validators
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and export one test image
+        run: |
+          docker build --target tests -f .github/e2e/Dockerfile.ubuntu-24.04 -t dotfiles-ci-tests .
+          docker save dotfiles-ci-tests | zstd -T0 -3 -o "$RUNNER_TEMP/test-image.tar.zst"
+      - name: Retain image for this run only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-image-${{ github.sha }}
+          path: ${{ runner.temp }}/test-image.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  gitleaks:
+    name: Secret Scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan full history and documentation
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  hadolint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
+        with:
+          dockerfile: .github/e2e/Dockerfile.ubuntu-24.04
+          failure-threshold: warning
+
+  trivy:
+    name: Filesystem and Misconfiguration Scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Trivy repository scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+      - name: Non-PR event
+        if: github.event_name != 'pull_request'
+        run: echo "Dependency review applies to pull requests"
+
+  contracts:
+    name: Docker ${{ matrix.suite }} (${{ matrix.platform }})
+    needs: [test-image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {suite: static, platform: native, wsl: "false"}
+          - {suite: behavior, platform: native, wsl: "false"}
+          - {suite: behavior, platform: wsl-simulated, wsl: "true"}
+          - {suite: selectors, platform: native, wsl: "false"}
+          - {suite: workspace, platform: native, wsl: "false"}
+          - {suite: benchmarks, platform: native, wsl: "false"}
+          - {suite: workflow-security, platform: native, wsl: "false"}
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # static policy compares PR base without writing to the read-only Docker mount
+          persist-credentials: false
+      - name: Prepare artifact volume
+        run: mkdir -p artifacts && chmod 0777 artifacts
+      - name: Download validators built for this SHA
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: test-image-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-image
+      - name: Load shared validators
+        run: zstd -dc "$RUNNER_TEMP/ci-image/test-image.tar.zst" | docker load
+      - name: Run registered suite
+        env:
+          CI_SUITE: ${{ matrix.suite }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOTFILES_CI_IMAGE: dotfiles-ci-tests
+          DOTFILES_CI_SKIP_BUILD: "true"
+          DOTFILES_WSL: ${{ matrix.wsl }}
+        run: ./scripts/ci/docker-suite.sh "$CI_SUITE"
+      - name: Upload diagnostics and benchmarks
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: contracts-${{ matrix.suite }}-${{ matrix.platform }}
+          path: artifacts/
+          if-no-files-found: ignore
+          retention-days: 30
