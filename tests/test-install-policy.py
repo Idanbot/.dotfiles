@@ -168,6 +168,12 @@ class PolicyTests(unittest.TestCase):
             report = policy.recommendations(ROOT)
         self.assertIn("3.15.0 | review upgrade", report)
 
+    def test_rust_and_cargo_advisories_use_toolchain_not_cargo_crate(self):
+        manifest = '[pkg.cargo]\nversion = "0.100.0 (fixture)"\n[pkg.rust]\nversion = "1.99.0 (fixture)"\n'
+        with patch.object(policy, "fetch", return_value=manifest):
+            for ident in ("languages.rust", "languages.cargo"):
+                self.assertEqual(policy.upstream(self.entry(ident), {})[0], "1.99.0")
+
     def test_repo_baseline_never_regresses(self):
         with patch.object(policy.software, "probe", return_value=("gh", {"version": None, "path": None})), \
                 patch.object(policy, "upstream", side_effect=[("2.0.0", {}), ("2.0.0", {})]):

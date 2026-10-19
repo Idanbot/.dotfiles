@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 
 import yaml
 
@@ -123,8 +124,9 @@ def upstream(entry, meta, major=None):
         versions = [item["version"].removeprefix("go") for item in get_json("https://go.dev/dl/?mode=json") if item.get("stable")]
         return max(versions, key=order), {}
     if ident in {"languages.rust", "languages.cargo"}:
-        text = fetch("https://static.rust-lang.org/dist/channel-rust-stable.toml")
-        return re.search(r'^version = "([0-9.]+)', text, re.M).group(1), {}
+        data = tomllib.loads(fetch("https://static.rust-lang.org/dist/channel-rust-stable.toml"))
+        # Cargo's crate/package version is not the Rust toolchain/CLI version.
+        return data["pkg"]["rust"]["version"].split()[0], {}
     if ident == "languages.node":
         versions = [item["version"].removeprefix("v") for item in get_json("https://nodejs.org/dist/index.json")]
         return max((v for v in versions if stable(v)), key=order), {}
@@ -147,11 +149,15 @@ def upstream(entry, meta, major=None):
     if meta.get("source") == "npm":
         package = meta.get("package", ident.split(".")[1]).replace("/", "%2f")
         return get_json(f"https://registry.npmjs.org/{package}/latest")["version"], {}
-    if meta.get("source") in {"pypi", "uvx"}:
+    if meta.get("source") in {"pypi", "uvx", "uv"}:
         package = meta.get("package", ident.split(".")[1])
         return get_json(f"https://pypi.org/pypi/{package}/json")["info"]["version"], {}
     if meta.get("repo"):
         return github(meta["repo"], major)
+    advisory_repos = {"core.bat": "sharkdp/bat", "core.btop": "aristocratos/btop",
+                      "core.fd": "sharkdp/fd", "core.ripgrep": "BurntSushi/ripgrep"}
+    if ident in advisory_repos:
+        return github(advisory_repos[ident], major)
     raise ValueError("No stable upstream resolver; use the version audit report")
 
 
@@ -202,8 +208,10 @@ def upgrade_candidate(ident, baseline, node, meta):
     elif ident in {"languages.typescript", "languages.npm"}:
         package = "typescript" if ident.endswith("typescript") else "npm"
         data = get_json(f"https://registry.npmjs.org/{package}")
-        candidates = [v for v, item in data["versions"].items() if ident != "languages.npm"
-                      or node_engine_matches(node, item.get("engines", {}).get("node", ""))]
+        ceiling = data.get("dist-tags", {}).get("latest", "")
+        candidates = [v for v, item in data["versions"].items()
+                      if (not ceiling or order(v) <= order(ceiling)) and (ident != "languages.npm"
+                      or node_engine_matches(node, item.get("engines", {}).get("node", "")))]
     else:
         return upstream(entry, meta)[0]
     width = 2 if rule == "minor" else 1 if rule == "major" else 0
