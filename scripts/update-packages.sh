@@ -294,11 +294,11 @@ direct_checksums() {
       ;;
     languages.java)
       amd="$(curl "${CURL_ARGS[@]}" \
-        "https://api.adoptium.net/v3/assets/feature_releases/25/ga?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
+        "https://api.adoptium.net/v3/assets/feature_releases/${version%%.*}/ga?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
         jq -r --arg release "jdk-$version" \
           '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
       arm="$(curl "${CURL_ARGS[@]}" \
-        "https://api.adoptium.net/v3/assets/feature_releases/25/ga?architecture=aarch64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
+        "https://api.adoptium.net/v3/assets/feature_releases/${version%%.*}/ga?architecture=aarch64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
         jq -r --arg release "jdk-$version" \
           '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
       ;;
@@ -473,7 +473,7 @@ load_fixture() {
 }
 
 run_live_audit() {
-  local current latest python_series
+  local latest key
   audit_github bootstrap chezmoi twpayne/chezmoi
   audit_github core fzf junegunn/fzf
   audit_github core eza eza-community/eza
@@ -487,42 +487,12 @@ run_live_audit() {
   audit_github core ast_grep ast-grep/ast-grep
   audit_github core gitleaks gitleaks/gitleaks
 
-  if wanted languages.go; then
-    latest="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json' 2>/dev/null | jq -r '.[0].version' | sed 's/^go//' || true)"
-    add_candidate languages go "$latest"
-  fi
-  if wanted languages.rust; then
-    latest="$(curl "${CURL_ARGS[@]}" https://static.rust-lang.org/dist/channel-rust-stable.toml 2>/dev/null |
-      awk -F '\"' '/^version = / { print $2; exit }' | awk '{print $1}' || true)"
-    add_candidate languages rust "$latest"
-  fi
-  if wanted languages.cargo; then
-    latest="$(curl "${CURL_ARGS[@]}" https://static.rust-lang.org/dist/channel-rust-stable.toml 2>/dev/null |
-      awk -F '\"' '/^version = / { print $2; exit }' | awk '{print $1}' || true)"
-    add_candidate languages cargo "$latest"
-  fi
-  if wanted languages.node; then
-    latest="$(curl "${CURL_ARGS[@]}" https://nodejs.org/dist/index.json 2>/dev/null |
-      jq -r '.[0].version' | sed 's/^v//' || true)"
-    add_candidate languages node "$latest"
-  fi
-  audit_npm languages npm npm
-  audit_npm languages typescript typescript
-  if wanted languages.python; then
-    current="$(package_version languages python)"
-    python_series="${current%.*}"
-    latest="$(curl "${CURL_ARGS[@]}" https://www.python.org/ftp/python/ 2>/dev/null |
-      grep -Eo "href=\"${python_series//./\\.}\\.[0-9]+/" | cut -d'"' -f2 | tr -d / |
-      sort -V | tail -1 || true)"
-    add_candidate languages python "$latest"
-  fi
-  if wanted languages.java; then
-    latest="$(curl "${CURL_ARGS[@]}" \
-      'https://api.adoptium.net/v3/assets/latest/25/hotspot?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse' 2>/dev/null |
-      jq -r '.[0].release_name // empty' | sed 's/^jdk-//' || true)"
-    add_candidate languages java "$latest"
-  fi
-  audit_github languages uv astral-sh/uv
+  for key in go rust cargo node npm typescript python java uv; do
+    wanted "languages.$key" || continue
+    latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" candidate \
+      --source "$DOTFILES_SOURCE_DIR" --tool "languages.$key" 2>/dev/null)" || latest=""
+    add_candidate languages "$key" "$latest"
+  done
   audit_github history atuin atuinsh/atuin
   audit_github editor neovim neovim/neovim
   if wanted cloud.kubectl; then

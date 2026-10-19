@@ -160,7 +160,7 @@ apt_env() {
 
 apt_update() {
   refresh_hashicorp_apt_keys || return 1
-  apt_env apt-get -o Acquire::Retries=3 -qq update
+  apt_env apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any -qq update
 }
 
 refresh_hashicorp_apt_keys() {
@@ -410,6 +410,48 @@ prepare_download_cache() {
   chmod 700 "$root" "$root/sha256" "$root/locks" "$root/tmp" || return 1
 }
 
+# Cache immutable verification material, not live release indexes or trust decisions.
+# The local digest detects cache corruption; vendor signatures/checksums remain authoritative.
+download_verification_material() (
+  local url="$1" dest="$2" root key file digest temporary cache_fd
+  if ! download_cache_enabled || ! command_exists flock ||
+    [[ "$url" == *latest* || "$url" == *stable.txt* || "$url" == *components-2.json* || "$url" == */rustup/dist/* ]]; then
+    download "$url" "$dest"
+    return
+  fi
+  root="$(download_cache_root)/verification"
+  mkdir -p "$root"
+  chmod 700 "$root"
+  key="$(printf '%s' "$url" | sha256sum | awk '{print $1}')"
+  file="$root/$key"
+  exec {cache_fd}>"$file.lock"
+  chmod 600 "$file.lock"
+  flock -w "${DOTFILES_DOWNLOAD_CACHE_LOCK_TIMEOUT:-300}" "$cache_fd" || return 1
+  if [[ -f "$file" && -f "$file.sha256" ]] && sha256_matches "$file" "$(<"$file.sha256")"; then
+    touch "$file" "$file.sha256"
+    cp -- "$file" "$dest"
+    chmod 600 "$dest"
+    return
+  fi
+  temporary="$(mktemp "$root/.download.XXXXXX")"
+  trap 'rm -f -- "$temporary"' EXIT
+  download "$url" "$temporary" || return 1
+  digest="$(sha256_file "$temporary")"
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$file"
+  printf '%s\n' "$digest" >"$file.sha256"
+  chmod 600 "$file.sha256"
+  cp -- "$file" "$dest"
+  chmod 600 "$dest"
+)
+
+discard_verification_material() {
+  local key root
+  root="$(download_cache_root)/verification"
+  key="$(printf '%s' "$1" | sha256sum | awk '{print $1}')"
+  rm -f -- "$root/$key" "$root/$key.sha256"
+}
+
 materialize_cached_download() {
   local cache_file="$1" dest="$2" expected="$3" candidate
   candidate="$(mktemp "${dest}.verified.XXXXXX")"
@@ -451,7 +493,7 @@ download_verified() {
       ;;
     https://*)
       checksum_file="$(mktemp)"
-      if ! download "$checksum_spec" "$checksum_file"; then
+      if ! download_verification_material "$checksum_spec" "$checksum_file"; then
         rm -f "$checksum_file"
         return 1
       fi
@@ -569,9 +611,11 @@ download_aws_signed() (
     log_error "AWS CLI public signing key fingerprint mismatch"
     return 1
   }
-  download "$url" "$temporary/aws.zip"
-  download "$url.sig" "$temporary/aws.zip.sig"
+  download_verification_material "$url" "$temporary/aws.zip"
+  download_verification_material "$url.sig" "$temporary/aws.zip.sig"
   gpg --batch --homedir "$temporary" --verify "$temporary/aws.zip.sig" "$temporary/aws.zip" || {
+    discard_verification_material "$url"
+    discard_verification_material "$url.sig"
     log_error "AWS CLI signature verification failed; nothing installed"
     return 1
   }
@@ -602,6 +646,11 @@ version_without_v() { printf '%s\n' "${1#v}"; }
 
 extract_version() {
   local value="${1#v}"
+  # lazygit emits commit/build metadata before its actual version field.
+  if [[ "$value" =~ version=([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return
+  fi
   grep -oE '[0-9]+([.][0-9]+){0,3}([+-][0-9A-Za-z._-]+)?' <<<"$value" | head -1
 }
 

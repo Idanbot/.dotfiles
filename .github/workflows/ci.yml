@@ -110,6 +110,8 @@ jobs:
           bash tests/test-binary-upgrades.sh "$PWD"
           bash tests/test-apt-key-repair.sh "$PWD"
           python3 tests/test-install-policy.py "$PWD"
+          python3 tests/test-publish-upgrade-report.py "$PWD"
+          bash tests/test-python-installer.sh "$PWD"
           bash tests/test-runtime-policy.sh "$PWD"
           tests/test-download-cache.sh "$PWD"
           tests/test-ci-operations.sh "$PWD"
@@ -447,7 +449,7 @@ jobs:
               for test in \
                 test-environment.sh test-version-helpers.sh test-profiles.sh \
                 test-network-faults.sh test-download-cache.sh \
-                test-chezmoi-network.sh test-binary-upgrades.sh test-apt-key-repair.sh test-runtime-policy.sh \
+                test-chezmoi-network.sh test-binary-upgrades.sh test-apt-key-repair.sh test-runtime-policy.sh test-python-installer.sh \
                 test-docker-package-routing.sh \
                 test-secret-boundary.sh test-agent-workspace.sh test-herdr-config.sh test-sessionizer.sh \
                 test-agent-status.sh test-cloud-context.sh test-cloud-context-starship.sh \

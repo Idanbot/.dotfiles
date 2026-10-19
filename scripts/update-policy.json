@@ -1,0 +1,12 @@
+{
+  "languages.node": "major",
+  "languages.python": "minor",
+  "languages.go": "minor",
+  "languages.java": "major",
+  "languages.typescript": "major",
+  "languages.rust": "stable",
+  "languages.cargo": "stable",
+  "languages.uv": "stable",
+  "languages.npm": "node-compatible",
+  "ai_tools.bun": "stable"
+}

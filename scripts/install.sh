@@ -909,14 +909,35 @@ install_chezmoi_fallback() {
 }
 
 stage_prerequisites() {
+  local repair_source="${SOURCE_OVERRIDE:-${LOCAL_SOURCE:-}}"
   if [[ "$(id -u)" -ne 0 ]]; then
     sudo -v
     SUDO=(sudo)
   else
     SUDO=()
   fi
-  "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
-    apt-get -o Acquire::Retries=3 -qq update
+  if [[ -z "$repair_source" ]]; then
+    for repair_source in "$HOME/.dotfiles" "$HOME/.local/share/chezmoi"; do
+      [[ ! -f "$repair_source/scripts/hashicorp-keyrings.py" ]] || break
+    done
+  fi
+  if [[ -x /usr/bin/python3 && -f "$repair_source/scripts/hashicorp-keyrings.py" && -f "$repair_source/scripts/lib.sh" ]]; then
+    # Keep library PATH/logging/traps out of the bootstrap orchestrator.
+    (
+      export DOTFILES_SOURCE_DIR="$repair_source"
+      # shellcheck source=scripts/lib.sh
+      source "$repair_source/scripts/lib.sh"
+      if [[ "$(id -u)" == 0 ]]; then
+        sudo() { "$@"; }
+      fi
+      refresh_hashicorp_apt_keys
+    )
+  fi
+  if ! "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
+    apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any -qq update; then
+    log_error "APT refresh failed; repair the reported repository/key or run from the current source checkout. Stale indexes will not be used."
+    return 1
+  fi
   "${SUDO[@]}" env DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a \
     apt-get -o Acquire::Retries=3 -o Dpkg::Options::=--force-confold \
     -y --no-install-recommends install git curl ca-certificates python3 python3-yaml
@@ -1131,6 +1152,9 @@ stage_preflight() {
   /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/install-policy.py" preflight \
     --source "$CHEZMOI_SOURCE" --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
     --plan "$DOTFILES_VERSION_PLAN" "${args[@]}"
+  if [[ ",$(join_by_comma "${SELECTED_SECTIONS[@]}")," == *,languages,* ]]; then
+    DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE" bash "$CHEZMOI_SOURCE/scripts/python-installer.sh" --check
+  fi
 }
 
 write_run_summary() {

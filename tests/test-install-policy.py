@@ -82,7 +82,7 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual((result["target"], result["latest"]), ("2.10.0", "3.0.0"))
 
     def test_cannot_silently_fall_back_after_resolution_failure(self):
-        observed = ("core.github_cli", {"version": "2.0.0", "path": "/test/gh"})
+        observed = ("core.github_cli", {"version": "1.9.0", "path": "/test/gh"})
         with patch.object(policy.software, "probe", return_value=observed), \
                 patch.object(policy, "upstream", side_effect=ValueError("API rate limit")):
             result = policy.resolve(self.entry(), {}, "amd64")
@@ -94,6 +94,79 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("error", result)
         self.assertEqual(result["target"], "26.0.0")
         self.assertIn("resolution_warning", result)
+
+    def test_optional_freshness_outage_preserves_satisfying_install(self):
+        observed = ("gh", {"version": "2.0.0", "path": "/test/gh"})
+        with patch.object(policy.software, "probe", return_value=observed), \
+                patch.object(policy, "upstream", side_effect=ValueError("offline")):
+            result = policy.resolve(self.entry(), {}, "amd64")
+        self.assertNotIn("error", result)
+        self.assertEqual(result["target"], "2.0.0")
+        self.assertIn("offline", result["resolution_warning"])
+
+    def test_unknown_version_is_not_missing(self):
+        entry = {**self.entry(), "current": "", "probe": "timeout"}
+        self.assertEqual(policy.version_label(entry), "version unknown (probe: timeout)")
+        entry["path"] = None
+        self.assertEqual(policy.version_label(entry), "missing")
+
+    def test_legacy_and_modified_ownership_are_not_claimed_as_managed(self):
+        binary = self.home / "tool"
+        binary.write_text("original")
+        state = self.home / "state"
+        state.mkdir()
+        (state / "installed.tsv").write_text(f"tool\t1.0.0\tgithub\t{binary}\n")
+        self.assertEqual(policy.ownership_status(str(binary), state), "legacy-no-stamp")
+        stamps = state / "ownership"
+        stamps.mkdir()
+        (stamps / (policy.hashlib.sha256(str(binary).encode()).hexdigest() + ".sha256")).write_text("incorrect")
+        self.assertEqual(policy.ownership_status(str(binary), state), "modified-or-unverifiable")
+        subprocess.run(["bash", "-c", 'source "$1/scripts/lib.sh"; record_install tool 1.0.0 fixture "$2"',
+                        "record-fixture", str(ROOT), str(binary)], check=True, capture_output=True,
+                       env={**os.environ, "DOTFILES_SOURCE_DIR": str(ROOT), "DOTFILES_STATE_DIR": str(state)})
+        self.assertEqual(policy.ownership_status(str(binary), state), "verified-dotfiles")
+        binary.write_text("locally modified")
+        self.assertEqual(policy.ownership_status(str(binary), state), "modified-or-unverifiable")
+
+    def test_platform_and_side_by_side_routing(self):
+        with patch.dict(os.environ, {"DOTFILES_WSL": "true"}):
+            entries = policy.selected(ROOT, ["media", "desktop", "languages"])
+        self.assertTrue(entries)
+        self.assertFalse(any(entry["id"].startswith("media.") or entry["id"] == "terminal.kitty" for entry in entries))
+        self.assertIn("~/.fzf", policy.planned_action(self.entry("core.fzf"))[0])
+        self.assertIn("private uv", policy.planned_action(self.entry("languages.python"))[0])
+
+    def test_failed_integrity_resolution_never_leaves_unverified_target(self):
+        observed = ("gh", {"version": "2.0.0", "path": "/test/gh"})
+        with patch.object(policy.software, "probe", return_value=observed), \
+                patch.object(policy, "upstream", return_value=("2.9.0", {})), \
+                patch.object(policy, "integrity", side_effect=ValueError("no digest")):
+            result = policy.resolve(self.entry(), {}, "amd64")
+        self.assertEqual(result["target"], "2.0.0")
+        self.assertNotIn("integrity", result)
+        self.assertNotIn("error", result)
+
+    def test_compatibility_lines_and_package_manager_majors(self):
+        with patch.object(policy, "get_json", return_value=[{"version": "v26.12.0"}, {"version": "v27.1.0"}, {"version": "v26.13.0-rc1"}]):
+            self.assertEqual(policy.upgrade_candidate("languages.node", "26.5.0", "", {}), "26.12.0")
+        with patch.object(policy, "get_json", return_value=[{"name": "v3.14.9"}, {"name": "v3.15.0"}]):
+            self.assertEqual(policy.upgrade_candidate("languages.python", "3.14.8", "", {}), "3.14.9")
+        with patch.object(policy, "get_json", return_value=[{"version": "go1.27.3", "stable": True}, {"version": "go1.28.0", "stable": True}]):
+            self.assertEqual(policy.upgrade_candidate("languages.go", "1.27.2", "", {}), "1.27.3")
+        with patch.object(policy, "upstream", return_value=("1.0.0", {})):
+            self.assertEqual(policy.upgrade_candidate("languages.uv", "0.13.0", "", {}), "1.0.0")
+        data = {"versions": {"12.3.0": {"engines": {"node": ">=26.0.0"}},
+                             "13.0.0": {"engines": {"node": ">=27.0.0"}}}}
+        with patch.object(policy, "get_json", return_value=data):
+            self.assertEqual(policy.upgrade_candidate("languages.npm", "12.0.1", "26.11.1", {}), "12.3.0")
+        self.assertTrue(policy.node_engine_matches("26.1.0", "^24.0.0 || >=26.0.0"))
+        self.assertFalse(policy.node_engine_matches("26.1.0", "unrecognized-engine"))
+
+    def test_global_recommendations_include_out_of_line_versions(self):
+        with patch.object(policy.software, "catalog", return_value=[self.entry("languages.python", "3.14.8")]), \
+                patch.object(policy, "upstream", return_value=("3.15.0", {})):
+            report = policy.recommendations(ROOT)
+        self.assertIn("3.15.0 | review upgrade", report)
 
     def test_repo_baseline_never_regresses(self):
         with patch.object(policy.software, "probe", return_value=("gh", {"version": None, "path": None})), \

@@ -94,7 +94,13 @@ download_verified https://example.invalid/manifest-asset "$TMP_ROOT/manifest-sec
   https://example.invalid/checksums.txt manifest-asset >/dev/null
 cmp "$MOCK_STATE/manifest-payload" "$TMP_ROOT/manifest-second"
 [[ "$(request_count manifest-asset)" == 1 ]]
+[[ "$(request_count checksums.txt)" == 1 ]]
+manifest_key="$(printf '%s' https://example.invalid/checksums.txt | sha256sum | awk '{print $1}')"
+printf 'corrupt\n' >"$DOTFILES_DOWNLOAD_CACHE_DIR/verification/$manifest_key"
+download_verified https://example.invalid/manifest-asset "$TMP_ROOT/manifest-recovered" \
+  https://example.invalid/checksums.txt manifest-asset >/dev/null
 [[ "$(request_count checksums.txt)" == 2 ]]
+cmp "$MOCK_STATE/manifest-payload" "$TMP_ROOT/manifest-recovered"
 
 concurrent_sha="$(sha256sum "$MOCK_STATE/concurrent" | awk '{print $1}')"
 download_verified https://example.invalid/concurrent "$TMP_ROOT/concurrent-one" \

@@ -34,7 +34,7 @@ APT
 : >"$calls"
 apt_update
 [[ "$(head -1 "$calls")" == 'key /usr/share/keyrings/hashicorp-archive-keyring.gpg' ]]
-[[ "$(tail -1 "$calls")" == 'apt apt-get -o Acquire::Retries=3 -qq update' ]]
+[[ "$(tail -1 "$calls")" == 'apt apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any -qq update' ]]
 : >"$calls"
 apt_update
 [[ "$(wc -l <"$calls")" == 1 ]]
@@ -71,4 +71,38 @@ if apt_update; then
   exit 1
 fi
 [[ ! -s "$calls" ]]
+
+# Execute the real prerequisite stage against a fixture checkout. Repair must
+# precede the first APT refresh and a failed refresh must block package installs.
+(
+  fixture="$temporary/bootstrap"
+  mkdir -p "$fixture/scripts"
+  touch "$fixture/scripts/hashicorp-keyrings.py"
+  cat >"$fixture/scripts/lib.sh" <<'LIB'
+refresh_hashicorp_apt_keys() { printf 'repair\n' >>"$BOOTSTRAP_CALLS"; }
+LIB
+  awk '/^stage_prerequisites\(\)/ {block = 1} /^prepare_run_plan\(\)/ {exit} block' \
+    "$DOTFILES_DIR/scripts/install.sh" >"$temporary/prerequisites.sh"
+  # shellcheck disable=SC2034
+  LOCAL_SOURCE="$fixture"
+  export BOOTSTRAP_CALLS="$temporary/bootstrap-calls"
+  sudo() {
+    [[ "$1" != -v ]] || return 0
+    printf '%s\n' "$*" >>"$BOOTSTRAP_CALLS"
+    [[ "$*" != *' update' || "${BOOTSTRAP_APT_FAILURE:-0}" == 0 ]]
+  }
+  id() { printf '1000\n'; }
+  chezmoi() { :; }
+  log_skip() { :; }
+  source "$temporary/prerequisites.sh"
+  stage_prerequisites
+  [[ "$(head -1 "$BOOTSTRAP_CALLS")" == repair ]]
+  grep -Fq APT::Update::Error-Mode=any "$BOOTSTRAP_CALLS"
+  : >"$BOOTSTRAP_CALLS"
+  if BOOTSTRAP_APT_FAILURE=1 stage_prerequisites; then
+    printf 'Bootstrap ignored failed APT refresh\n' >&2
+    exit 1
+  fi
+  ! grep -q ' install ' "$BOOTSTRAP_CALLS"
+)
 printf 'Scoped APT key repair tests passed\n'

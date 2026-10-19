@@ -120,7 +120,7 @@ if ! version_ge "$NPM_CURRENT" "$NPM_VERSION"; then
     tmpdir="$(mktemp -d)"
     cp -a "$NODE_ROOT" "$tmpdir/runtime"
     PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" \
-      install --global --prefix "$tmpdir/runtime" --no-audit --no-fund "npm@$NPM_VERSION"
+      install --global --prefix "$tmpdir/runtime" --engine-strict --no-audit --no-fund "npm@$NPM_VERSION"
     [[ "$(PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" --version)" == "$NPM_VERSION" ]]
     install_managed_tree "$tmpdir/runtime" "$NODE_ROOT" node "$NODE_VERSION" node-dist bin/node --version
     rm -rf "$tmpdir"
@@ -174,7 +174,7 @@ elif uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
   log_skip "Python $PYTHON_VERSION already installed"
 else
   log_info "Installing Python $PYTHON_VERSION with uv"
-  uv python install "$PYTHON_VERSION"
+  bash "$DOTFILES_SOURCE_DIR/scripts/python-installer.sh" --install
   record_install python "$PYTHON_VERSION" uv-python "$PYTHON_VERSION"
   ((_INSTALLED++)) || true
   log_success "Python $PYTHON_VERSION installed"

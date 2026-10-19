@@ -90,10 +90,14 @@ fi
 unset -f download_verified
 mkdir -m 700 "$temporary/keyring"
 download() { printf 'payload\n' >"$2"; }
+export AWS_VERIFY_CALLS="$temporary/aws-verify-calls"
 gpg() {
   case "$*" in
     *--fingerprint*) printf 'fpr:::::::::%s:\n' "${AWS_TEST_FINGERPRINT:-FB5DB77FD5C118B80511ADA8A6310ACC4672475C}" ;;
-    *--verify*) return "${AWS_VERIFY_STATUS:-0}" ;;
+    *--verify*)
+      printf 'verify\n' >>"$AWS_VERIFY_CALLS"
+      return "${AWS_VERIFY_STATUS:-0}"
+      ;;
   esac
 }
 GPG_BINARY=/usr/bin/gpg
@@ -108,6 +112,7 @@ download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws.zip
 [[ -s "$temporary/aws.zip" && -s "${DOTFILES_VERSION_PLAN%.json}-aws.sha256" ]]
 download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/aws-resume.zip"
 [[ -s "$temporary/aws-resume.zip" ]]
+[[ "$(wc -l <"$AWS_VERIFY_CALLS")" == 3 ]]
 printf '%064d\n' 0 >"${DOTFILES_VERSION_PLAN%.json}-aws.sha256"
 if download_aws_signed https://awscli.amazonaws.com/fixture.zip "$temporary/changed.zip"; then
   printf 'Changed AWS resume payload accepted\n' >&2

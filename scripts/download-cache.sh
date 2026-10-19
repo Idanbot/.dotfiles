@@ -18,6 +18,7 @@ EOF
 
 root="$(download_cache_root)"
 objects="$root/sha256"
+verification="$root/verification"
 
 case "${1:-status}" in
   status)
@@ -27,7 +28,11 @@ case "${1:-status}" in
       count="$(find "$objects" -maxdepth 1 -type f | wc -l | tr -d ' ')"
       bytes="$(du -sb "$objects" | awk '{print $1}')"
     fi
-    printf 'Cache: %s\nObjects: %s\nBytes: %s\n' "$root" "$count" "$bytes"
+    materials=0
+    if [[ -d "$verification" ]]; then
+      materials="$(find "$verification" -maxdepth 1 -type f ! -name '*.sha256' ! -name '*.lock' | wc -l | tr -d ' ')"
+    fi
+    printf 'Cache: %s\nObjects: %s\nBytes: %s\nVerification materials: %s\n' "$root" "$count" "$bytes" "$materials"
     ;;
   prune)
     days="${2:-30}"
@@ -44,6 +49,9 @@ case "${1:-status}" in
     fi
     if [[ -d "$root/locks" ]]; then
       find "$root/locks" -maxdepth 1 -type f -mtime "+$days" -delete
+    fi
+    if [[ -d "$verification" ]]; then
+      find "$verification" -maxdepth 1 -type f ! -name '*.lock' -mtime "+$days" -delete
     fi
     printf 'Pruned %s verified download cache object(s) older than %s day(s)\n' \
       "$removed" "$days"

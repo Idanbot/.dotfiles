@@ -14,5 +14,6 @@ before they become project direction.
 | [0005: Parameterized agent workspaces](0005-agent-workspaces.md) | Superseded | Historical tmuxp-only decision |
 | [0006: Backend-aware agent workspaces](0006-backend-aware-agent-workspaces.md) | Accepted | `dot_local/bin/executable_dot-workspace`, `tests/test-agent-workspace.sh` |
 | [0007: CI operations and maintenance](0007-ci-operations-and-maintenance.md) | Accepted | `.github/workflows/ci.yml`, `tests/test-ci-operations.sh` |
+| [0008: Reviewed update lines](0008-reviewed-update-lines.md) | Accepted | `scripts/update-policy.json`, `tests/test-install-policy.py`, `tests/test-python-installer.sh` |
 
-The next decision record uses sequence `0008`.
+The next decision record uses sequence `0009`.

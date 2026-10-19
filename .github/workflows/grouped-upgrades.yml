@@ -37,7 +37,7 @@ jobs:
       - name: Install update prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y jq yq python3
+          sudo apt-get install -y jq yq python3 python3-yaml
       - name: Resolve and apply one grouped update set
         id: upgrades
         env:
@@ -45,10 +45,11 @@ jobs:
           UPGRADE_REPORT: ${{ runner.temp }}/grouped-upgrades.md
         run: |
           ./scripts/update-packages.sh --apply-all --report "$UPGRADE_REPORT"
+          python3 scripts/install-policy.py recommendations >>"$UPGRADE_REPORT"
           cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
           if git diff --quiet -- \
             packages.yaml packages.meta.yaml packages.lock \
-            .chezmoiexternal.yaml docs/tool-inventory.md; then
+            .chezmoiexternal.yaml docs/tool-inventory.md README.md; then
             echo 'changed=false' >>"$GITHUB_OUTPUT"
             echo 'No fully verified upgrades are available.' >>"$GITHUB_STEP_SUMMARY"
           else
@@ -80,7 +81,7 @@ jobs:
           git switch -C "$branch"
           git add \
             packages.yaml packages.meta.yaml packages.lock \
-            .chezmoiexternal.yaml docs/tool-inventory.md
+            .chezmoiexternal.yaml docs/tool-inventory.md README.md
           git commit -m 'chore: refresh grouped tool versions'
 
           gh auth setup-git

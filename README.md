@@ -217,6 +217,37 @@ Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
 Python installs side-by-side through uv rather than replacing Ubuntu's Python.
 Existing explicit per-binary takeover remains opt-in, not an automatic policy.
 
+### Reviewed Update Lines
+
+Installs use CI-reviewed repository pins, not an untested `latest` lookup for
+languages. The grouped updater follows `scripts/update-policy.json`:
+
+| Component | Proposed automatic updates |
+| --- | --- |
+| Node, TypeScript | Minor/patch within the configured major |
+| Python, Go | Patch within the configured minor/release line |
+| Java | Maintenance updates within the configured feature release |
+| Rust/Cargo | Latest stable together |
+| uv, Bun | Latest stable, including new majors, reviewed through CI |
+| npm | Latest stable compatible with the proposed Node version; installation enforces engine compatibility |
+
+Explicit `--apply TOOL@VERSION` remains available for reviewed release-line
+changes. Project pins, external runtimes, and newer installations are preserved.
+When active uv cannot resolve the pinned Python, preflight checks a verified
+temporary copy of the repository-pinned uv **before applying files**. Installation
+uses that private copy without replacing external uv, uvx, or system Python.
+If the pinned Python is unavailable even there, preflight stops with an actionable
+error instead of silently downgrading Python. A failed optional freshness lookup
+warns rather than blocks when an installed version already satisfies the baseline;
+missing required targets or unverifiable new downloads still fail closed.
+
+Preflight distinguishes missing executables from unknown/timed-out version probes,
+verified ownership from legacy missing stamps or modified files, and distro-managed
+packages from exact download pins. WSL-only exclusions match installation routing.
+HashiCorp key repair runs before the first APT refresh when a source checkout is
+available. APT refresh failures never silently fall back to stale indexes; a remote
+bootstrap without repair helpers stops and identifies the repository to repair.
+
 Each run saves private `versions.json` with exact targets and integrity data;
 resume reuses that plan without contacting upstream again. GitHub release asset
 SHA256 digests/vendor manifests verify rolling downloads; AWS CLI uses its vendor
@@ -663,10 +694,18 @@ Verified payloads are cached by checksum under
 concurrent installs share a per-object lock. Set `DOTFILES_DOWNLOAD_CACHE=0`
 to bypass it or `DOTFILES_DOWNLOAD_CACHE_DIR` to relocate it. Use
 `dot cache status` and `dot cache prune [days]` for maintenance.
+Version-specific checksum manifests and AWS ZIP/signature pairs are also cached
+privately under `downloads/verification`. Local cache digests detect corruption;
+payload checksums and AWS vendor signatures are **reverified on every use**.
+Caching never substitutes a previous verification result for a new verification.
+Mutable release indexes and rustup's unversioned checksum are not cached there.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
-the repository. Once a month, one workflow applies all fully verified updates
+the repository and refreshes one standing **Latest stable upgrade recommendations**
+issue, editing its body instead of adding comments or opening per-tool issues.
+This includes newer release lines outside automatic update policy, with explicit
+unknown/manual-review entries where no resolver is available. Once a month, one workflow applies all fully verified updates
 to the stable `automation/grouped-tool-upgrades` branch and creates or refreshes
 one review PR; it never merges automatically. Dependabot likewise groups GitHub
 Actions updates into one monthly PR. The report
@@ -675,6 +714,12 @@ covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.
+
+Run the all-stable advisory locally without changing pins:
+
+```bash
+/usr/bin/python3 scripts/install-policy.py recommendations
+```
 
 Always-on CI downloads and verifies the release assets and executes the new
 CLIs. It also installs and runs the Ubuntu-managed `gojq`, `pigz`, `zstd`,
