@@ -198,7 +198,9 @@ def upgrade_candidate(ident, baseline, node, meta):
     if ident == "languages.java":
         feature = order(baseline)[0]
         data = get_json(f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture=x64&image_type=jdk&os=linux")
-        return data[0]["release_name"].removeprefix("jdk-")
+        candidates = [item["release_name"].removeprefix("jdk-") for item in data]
+        candidates = [candidate for candidate in candidates if stable(candidate)]
+        return max(candidates, key=order) if candidates else baseline
     if ident == "languages.node":
         candidates = [item["version"].removeprefix("v") for item in get_json("https://nodejs.org/dist/index.json")]
     elif ident == "languages.go":
@@ -354,17 +356,49 @@ def version_label(entry):
 def recommendations(root):
     """Global stable advisories, including versions outside automatic compatibility lines."""
     metadata = yaml.safe_load((root / "packages.meta.yaml").read_text())
-    lines = ["## Latest Stable Recommendations", "", "Repository pins remain authoritative until reviewed and tested.", "",
-             "| Component | Repository | Latest stable | Status |", "|---|---|---|---|"]
+    packages = yaml.safe_load((root / "packages.yaml").read_text())
+    policies = json.loads((root / "scripts/update-policy.json").read_text())
+    node = str(packages["languages"]["node"])
+    lines = ["## Latest Stable Recommendations", "",
+             "Repository pins remain authoritative until reviewed and tested. The compatible column follows the configured upgrade policy; the latest-stable column can cross major versions.", "",
+             "| Component | Repository pin | Latest compatible | Latest stable | Available update |", "|---|---|---|---|---|"]
     entries = [entry for entry in software.catalog() if stable(entry["requested"]) or entry["id"] in ROLLING]
     def recommend(entry):
         group, key = entry["id"].split(".")
+        baseline = entry["requested"]
         try:
-            latest, _ = upstream(entry, metadata.get(group, {}).get(key, {}))
-            status = "review upgrade" if order(latest) > order(entry["requested"]) else "current/newer pin"
+            meta = metadata.get(group, {}).get(key, {})
+            latest, _ = upstream(entry, meta)
+            compatible = upgrade_candidate(entry["id"], baseline, node, meta)
+            rule = policies.get(entry["id"], "stable")
+
+            def delta(target):
+                if order(target) <= order(baseline):
+                    return ""
+                if order(target)[0] != order(baseline)[0]:
+                    unit = "major"
+                elif order(target)[1] != order(baseline)[1]:
+                    unit = "minor"
+                else:
+                    unit = "patch"
+                return f"{unit} update available"
+
+            compatible_note = delta(compatible)
+            latest_note = delta(latest)
+            status_parts = []
+            if compatible_note:
+                status_parts.append(f"within policy: {compatible_note.removesuffix(' update available')}")
+            if latest_note:
+                if rule == "major" and order(latest)[0] != order(baseline)[0]:
+                    status_parts.append(f"newer major {order(latest)[0]} available")
+                elif rule == "minor" and order(latest)[:2] != order(baseline)[:2]:
+                    status_parts.append("newer minor line available")
+                elif order(latest) > order(compatible):
+                    status_parts.append(f"outside policy: {latest_note.removesuffix(' update available')}")
+            status = "; ".join(status_parts) or "pin current"
         except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.TimeoutExpired):
-            latest, status = "unknown", "manual upstream review needed"
-        return f"| {entry['id']} | {entry['requested']} | {latest} | {status} |"
+            compatible, latest, status = "unknown", "unknown", "manual upstream review needed"
+        return f"| {entry['id']} | {baseline} | {compatible} | {latest} | {status} |"
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
         lines.extend(pool.map(recommend, entries))
     return "\n".join(lines) + "\n"

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   report:
-    name: Report available version and checksum updates
+    name: Report versions, checksums, and pinned-version CVEs
     permissions:
       contents: read
       issues: write  # Refresh one standing advisory issue, never one issue per tool.
@@ -38,6 +38,9 @@ jobs:
           sudo apt-get install -y python3-yaml
           ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
           python3 scripts/install-policy.py recommendations >>"$UPGRADE_REPORT"
+          python3 scripts/audit-vulnerabilities.py \
+            --upgrade-report-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/issues/34" \
+            >>"$UPGRADE_REPORT"
           cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
       - name: Refresh the single upgrade advisory issue
         env:
@@ -47,6 +50,6 @@ jobs:
       - name: Upload upgrade report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: weekly-version-checksum-report
+          name: weekly-version-checksum-cve-report
           path: ${{ runner.temp }}/dotfiles-upgrade-report.md
           retention-days: 30

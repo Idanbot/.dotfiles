@@ -347,10 +347,20 @@ def details(entry):
         "observed_at",
     ):
         print(f"{name.replace('_', ' ').title()}: {entry.get(name) or '-'}")
-    print("Commands: " + ", ".join(entry["commands"]))
+    print("Commands:")
+    binary_descriptions = entry.get("binary_descriptions", {})
+    for command in entry["commands"]:
+        description = binary_descriptions.get(command, "")
+        print(f"  {command}" + (f": {description}" if description else ""))
     print("Tags: " + ", ".join(entry["tags"]))
     for example in entry.get("examples", []):
-        print("Example (not executed): " + example)
+        if isinstance(example, str):
+            command, description = example, ""
+        else:
+            command = example["command"]
+            description = example.get("description", "")
+        suffix = f" - {description}" if description else ""
+        print(f"Example (not executed): {command}{suffix}")
 
 
 def main():
@@ -387,8 +397,29 @@ def main():
     terms = [term.casefold() for term in args.query]
     selected = []
     for entry in entries:
+        binary_terms = [
+            item
+            for command, description in entry.get("binary_descriptions", {}).items()
+            for item in (command, description)
+        ]
+        example_terms = [
+            item
+            for example in entry.get("examples", [])
+            for item in (
+                (example, "")
+                if isinstance(example, str)
+                else (example.get("command", ""), example.get("description", ""))
+            )
+        ]
         haystack = " ".join(
-            [entry["id"], entry["description"], *entry["tags"], *entry["commands"]]
+            [
+                entry["id"],
+                entry["description"],
+                *entry["tags"],
+                *entry["commands"],
+                *binary_terms,
+                *example_terms,
+            ]
         ).casefold()
         if (not args.available and entry["status"] != "installed") or (
             args.category and entry["category"] != args.category

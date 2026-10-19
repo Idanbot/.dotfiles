@@ -37,9 +37,20 @@ class CatalogTests(unittest.TestCase):
         for section, tools in manifest.items():
             self.assertTrue({f"{section}.{tool}" for tool in tools} <= ids)
         self.assertEqual(len(ids), len(entries))
+        for entry in entries:
+            self.assertGreater(len(entry["description"].split()), 2, entry["id"])
+            self.assertTrue(not entry["commands"] or set(entry["commands"]) <= set(entry.get("binary_descriptions", {})), entry["id"])
+            self.assertTrue(not entry["commands"] or entry.get("examples"), entry["id"])
+            for example in entry.get("examples", []):
+                self.assertIsInstance(example, dict, entry["id"])
+                self.assertTrue(example.get("command"), entry["id"])
+                self.assertGreater(len(example.get("description", "").split()), 2, entry["id"])
         usql = next(entry for entry in entries if entry["id"] == "database.usql")
         self.assertTrue({"db", "database", "rdb", "rdbms", "postgresql"} <= set(usql["tags"]))
         self.assertEqual(usql["upstream"], "https://github.com/xo/usql")
+        atuin = next(entry for entry in entries if entry["id"] == "history.atuin")
+        self.assertIn("shell history", atuin["description"])
+        self.assertEqual(atuin["binary_descriptions"]["atuin"], "Shell history database, sync client, and search UI")
 
     def test_offline_search_filters_and_details(self):
         result = json.loads(self.query("postgresql", "--available", "--json").stdout)
@@ -49,8 +60,13 @@ class CatalogTests(unittest.TestCase):
         self.assertTrue(all(entry["category"] == "languages" for entry in result))
         result = json.loads(self.query("--tag", "vpn", "--available", "--json").stdout)
         self.assertIn("network.tailscale", [entry["id"] for entry in result])
+        result = json.loads(self.query("prior", "entries", "--available", "--json").stdout)
+        self.assertIn("history.atuin", [entry["id"] for entry in result])
         self.assertFalse(self.state.exists())
         self.assertIn("Example (not executed)", self.query("show", "database.usql").stdout)
+        atuin_details = self.query("show", "history.atuin").stdout
+        self.assertIn("atuin: Shell history", atuin_details)
+        self.assertIn("Find prior history entries", atuin_details)
 
     def test_queries_never_probe_and_stale_path(self):
         self.state.mkdir()

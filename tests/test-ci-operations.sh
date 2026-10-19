@@ -18,8 +18,31 @@ UPGRADES="$DOTFILES_DIR/.github/workflows/grouped-upgrades.yml"
 CANARY="$DOTFILES_DIR/scripts/grouped-upgrade-canary.py"
 NATIVE="$DOTFILES_DIR/.github/workflows/native-vm-e2e.yml"
 DEPENDABOT="$DOTFILES_DIR/.github/dependabot.yml"
+VERSION_AUDIT="$DOTFILES_DIR/.github/workflows/version-audit.yml"
+VULNERABILITY_AUDIT="$DOTFILES_DIR/.github/workflows/vulnerability-audit.yml"
 
 printf '\n== CI Operations ==\n'
+
+if grep -Fq 'cron: "17 4 * * 1"' "$VERSION_AUDIT" &&
+  grep -Fq 'workflow_dispatch:' "$VERSION_AUDIT" &&
+  grep -Fq 'scripts/publish-upgrade-report.py' "$VERSION_AUDIT" &&
+  grep -Fq 'scripts/audit-vulnerabilities.py' "$VERSION_AUDIT" &&
+  grep -Fq 'weekly-version-checksum-cve-report' "$VERSION_AUDIT"; then
+  pass 'weekly/manual version audit includes CVEs and refreshes the single advisory issue'
+else
+  fail 'version advisory is not scheduled, manually runnable, or refreshed'
+fi
+
+if grep -Fq 'cron: "23 4 * * *"' "$VULNERABILITY_AUDIT" &&
+  grep -Fq 'workflow_dispatch:' "$VULNERABILITY_AUDIT" &&
+  grep -Fq 'scripts/audit-vulnerabilities.py' "$VULNERABILITY_AUDIT" &&
+  grep -Fq 'daily-pinned-version-vulnerability-report' "$VULNERABILITY_AUDIT" &&
+  grep -Fq 'contents: read' "$VULNERABILITY_AUDIT" &&
+  grep -Fq 'tests/test-audit-vulnerabilities.py' "$CI"; then
+  pass 'daily OSV audit checks exact pins and retains a report with read-only permissions'
+else
+  fail 'daily pinned-version vulnerability audit or its mocked tests are missing'
+fi
 
 if grep -Fq "github.event_name == 'workflow_dispatch' && github.run_id || github.ref" "$CI" &&
   grep -Fq "cancel-in-progress: \${{ github.event_name == 'push' || github.event_name == 'pull_request' }}" "$CI"; then

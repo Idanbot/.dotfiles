@@ -164,9 +164,18 @@ class PolicyTests(unittest.TestCase):
 
     def test_global_recommendations_include_out_of_line_versions(self):
         with patch.object(policy.software, "catalog", return_value=[self.entry("languages.python", "3.14.8")]), \
-                patch.object(policy, "upstream", return_value=("3.15.0", {})):
+                patch.object(policy, "upstream", return_value=("3.15.0", {})), \
+                patch.object(policy, "upgrade_candidate", return_value="3.14.9"):
             report = policy.recommendations(ROOT)
-        self.assertIn("3.15.0 | review upgrade", report)
+        self.assertIn("3.14.8 | 3.14.9 | 3.15.0 | within policy: patch; newer minor line available", report)
+
+    def test_java_recommendations_show_pinned_feature_release_and_new_major(self):
+        with patch.object(policy.software, "catalog", return_value=[self.entry("languages.java", "25.0.4.1+1")]), \
+                patch.object(policy, "upstream", return_value=("27.0.0+35", {})), \
+                patch.object(policy, "upgrade_candidate", return_value="25.0.5+2"):
+            report = policy.recommendations(ROOT)
+        self.assertIn("25.0.4.1+1 | 25.0.5+2 | 27.0.0+35 | within policy: patch; newer major 27 available", report)
+        self.assertIn("Latest compatible", report)
 
     def test_rust_and_cargo_advisories_use_toolchain_not_cargo_crate(self):
         manifest = '[pkg.cargo]\nversion = "0.100.0 (fixture)"\n[pkg.rust]\nversion = "1.99.0 (fixture)"\n'
@@ -238,6 +247,15 @@ class PolicyTests(unittest.TestCase):
             latest = policy.upstream(self.entry("languages.java", "25.0.4.1+1"), {})[0]
         self.assertEqual(latest, "27.0.0+35")
         self.assertTrue(policy.stable(latest))
+
+    def test_jdk_compatible_candidate_stays_on_pinned_feature_release(self):
+        data = [
+            {"release_name": "jdk-25.0.4.1+1"},
+            {"release_name": "jdk-25.0.5+2"},
+        ]
+        with patch.object(policy, "get_json", return_value=data):
+            candidate = policy.upgrade_candidate("languages.java", "25.0.4.1+1", "", {})
+        self.assertEqual(candidate, "25.0.5+2")
 
     def test_atomic_private_plan_and_redirect_refusal(self):
         path = self.home / "run/versions.json"

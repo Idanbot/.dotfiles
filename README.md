@@ -114,10 +114,21 @@ timeouts. It never attempts authentication or database/VPN connections. It store
 only paths, version strings, probe status, and a timestamp, not command output or
 credentials, in `~/.local/state/dotfiles/catalog.json` (0600).
 
-Catalog descriptions, synonym tags, examples, and optional candidates live in
-`dot_config/dotfiles/catalog.json`; requested versions and ownership come from
-the existing manifests. Search terms are case-insensitive and combined with AND.
-Package/skill/font entries without executables remain visible with `--available`.
+Catalog descriptions, per-binary descriptions, synonym tags, and examples live in
+`dot_config/dotfiles/catalog.json`; every executable entry has a tool description
+and command examples with a one-line explanation. Examples are display-only and
+are never executed. Requested versions and ownership come from the existing
+manifests. Search terms are case-insensitive and combined with AND. Package,
+skill, and font entries without executables remain visible with `--available`.
+
+The Version Audit workflow refreshes the single open "Latest stable upgrade
+recommendations" issue weekly (Monday) and supports manual dispatch. It reports
+both the newest version allowed by each tool's configured compatibility policy
+and the latest stable release overall. For example, Java can show the latest
+JDK 25 maintenance release separately from a newer feature release such as JDK
+27, so you can choose a JDK 25 update without mistaking the newest major for the
+recommended target. The issue is only as fresh as the latest successful audit;
+workflow failures are visible in Actions and do not update the report.
 
 ## Install Profiles
 
@@ -715,6 +726,18 @@ Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.
 
+A separate daily **Pinned Version CVE Audit** queries exact repository pins
+against OSV, emits GitHub warning annotations, and retains a downloadable
+report. It does not fail bootstrap or change pins. Packages without a reliable
+OSV coordinate are listed explicitly; GitHub release scans cover repository
+tag advisories, not each tool's transitive dependency tree. For affected pins,
+it checks the latest compatible and latest stable candidates and recommends
+one only when OSV reports no advisories or a strictly lower known maximum
+severity; cross-policy candidates are marked for compatibility review.
+Otherwise it warns that no safer upgrade was established. The weekly
+version/checksum audit includes the same CVE report and continues to publish
+latest compatible same-major updates and latest stable major suggestions.
+
 Run the all-stable advisory locally without changing pins:
 
 ```bash
@@ -740,7 +763,7 @@ gh run list --workflow=version-audit.yml --limit 5
 run_id="$(gh run list --workflow=version-audit.yml --limit 1 \
   --json databaseId --jq '.[0].databaseId')"
 gh run view "$run_id"
-gh run download "$run_id" --name weekly-version-checksum-report
+gh run download "$run_id" --name weekly-version-checksum-cve-report
 ```
 
 Run the grouped update workflow early when needed:

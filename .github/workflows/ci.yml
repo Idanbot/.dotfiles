@@ -110,6 +110,7 @@ jobs:
           bash tests/test-binary-upgrades.sh "$PWD"
           bash tests/test-apt-key-repair.sh "$PWD"
           python3 tests/test-install-policy.py "$PWD"
+          python3 tests/test-audit-vulnerabilities.py
           python3 tests/test-publish-upgrade-report.py "$PWD"
           bash tests/test-python-installer.sh "$PWD"
           bash tests/test-runtime-policy.sh "$PWD"
