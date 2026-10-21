@@ -1,0 +1,35 @@
+name: Cached audit dependencies
+description: Cache public pip downloads only; recreate the audit environment every time
+runs:
+  using: composite
+  steps:
+    - name: Prepare system Python and cache identity
+      id: python
+      shell: bash
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y python3-yaml python3-venv
+        /usr/bin/python3 -c 'import sys; print("tag=" + sys.implementation.cache_tag)' >>"$GITHUB_OUTPUT"
+    - name: Restore exact pinned dependency downloads
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: ~/.cache/pip
+        key: >-
+          audit-pip-v1-${{ runner.os }}-${{ runner.arch }}-${{
+          steps.python.outputs.tag }}-${{ hashFiles('requirements-audit.txt') }}
+    - name: Create fresh audit environment
+      shell: bash
+      run: |
+        /usr/bin/python3 -m venv "$RUNNER_TEMP/audit-venv"
+        "$RUNNER_TEMP/audit-venv/bin/pip" install -r requirements-audit.txt
+    - name: Save public downloads from the default branch only
+      if: >-
+        github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+        steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: ~/.cache/pip
+        key: ${{ steps.restore.outputs.cache-primary-key }}

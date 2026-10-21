@@ -1,3 +1,15 @@
+FROM ubuntu:24.04 AS validator-build
+ARG VALIDATOR_REFRESH=local
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates golang-go git && rm -rf /var/lib/apt/lists/*
+ENV CGO_ENABLED=0
+ENV GOBIN=/out
+RUN --mount=type=cache,target=/root/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install -trimpath -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@v3.13.1 && \
+    go install -trimpath -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
 FROM ubuntu:24.04 AS base
 
 # Avoid interactive prompts during build
@@ -41,19 +53,19 @@ ENV DOTFILES_COLOR=always
 
 # Validators live in a separate target; live installs start from the minimal base.
 FROM base AS tests
-USER root
+USER 0:0
+ARG VALIDATOR_REFRESH=local
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 python3-venv python3-yaml yq gojq zsh tmux openssh-client \
       xz-utils gnupg shellcheck yamllint gawk hyperfine fzf unzip pigz zstd \
-      kcat pgloader golang-go \
+      kcat pgloader \
     && rm -rf /var/lib/apt/lists/*
 COPY requirements-audit.txt /tmp/requirements-audit.txt
+COPY .github/e2e/requirements-validators.txt /tmp/requirements-validators.txt
 RUN python3 -m venv /opt/validators && \
     /opt/validators/bin/pip install --no-cache-dir -r /tmp/requirements-audit.txt \
-      PyYAML==6.0.3 ruff==0.14.2 zizmor==1.26.1
+      -r /tmp/requirements-validators.txt
+COPY --from=validator-build /out/shfmt /out/actionlint /usr/local/bin/
 ENV PATH="/opt/validators/bin:/home/testuser/.local/bin:${PATH}"
 USER 10000:10000
-RUN go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1 && \
-    go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-ENV PATH="/home/testuser/go/bin:${PATH}"

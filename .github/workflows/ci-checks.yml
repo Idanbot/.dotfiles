@@ -23,15 +23,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build and export one test image
-        run: |
-          docker build --target tests -f .github/e2e/Dockerfile.ubuntu-24.04 -t dotfiles-ci-tests .
-          docker save dotfiles-ci-tests | zstd -T0 -3 -o "$RUNNER_TEMP/test-image.tar.zst"
+      - name: Restore or build slim validators
+        uses: ./.github/actions/validator-image
       - name: Retain image for this run only
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-image-${{ github.sha }}
-          path: ${{ runner.temp }}/test-image.tar.zst
+          path: ${{ runner.temp }}/validator-image/
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
@@ -153,7 +151,7 @@ jobs:
           name: test-image-${{ github.sha }}
           path: ${{ runner.temp }}/ci-image
       - name: Load shared validators
-        run: zstd -dc "$RUNNER_TEMP/ci-image/test-image.tar.zst" | docker load
+        run: ./scripts/ci/validator-image.sh load "$RUNNER_TEMP/ci-image"
       - name: Run registered suite
         env:
           CI_SUITE: ${{ matrix.suite }}

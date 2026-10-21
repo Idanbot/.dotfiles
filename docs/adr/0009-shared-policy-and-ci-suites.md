@@ -49,8 +49,18 @@ over exact source spelling.
 
 Keep `ci.yml` as triggers/concurrency/dependencies. Two reusable workflows own
 checks and gated live acceptance; a shared action retains E2E diagnostics.
-Build one validator image per commit. Actual installation uses the minimal
+Restore or build one validator image per run. Actual installation uses the minimal
 base image so preinstalled validators cannot hide missing prerequisites.
+
+The validator image uses a compiler-only build stage and a slim runtime stage.
+Reuse its compressed archive by exact reviewed input hash, OS/architecture, and
+UTC ISO week, with default-branch-only cache writes and no prefix fallback.
+Refresh weekly to avoid indefinitely stale distro packages. Check archive
+SHA256, cache identity, and loaded image ID; rebuild on cache loss/corruption,
+but fail closed if a distributed same-run artifact is invalid. Cache only public
+pip downloads for audit jobs and always recreate their virtual environments.
+No paid cache allowance, registry, or home/credential/state cache is required.
+Live acceptance remains cold so caches cannot mask bootstrap prerequisites.
 
 Expose one `CI Result` that rejects failed, cancelled, or unexpectedly skipped
 required jobs. The heavy matrix is optional only when not requested. Include
@@ -73,6 +83,13 @@ Two-pass tests compare hashes, modes, symlink targets, executable replacement,
 normalized ownership, config diffs, local histories/overlays, and backup
 inventories. Volatile logs and run timestamps are excluded. Timing budgets
 remain separate from convergence correctness.
+
+Real-Chezmoi drift fixtures cover source/local edits, private-mode changes,
+retargeted symlinks, and explicit skip/replace/merge/quit choices. Repeat merges
+must be no-ops without leaking shell cleanup traps. Unreadable snapshot trees
+fail instead of being treated as complete inventories. Cache fixtures verify
+input/platform/week invalidation, corruption, failed imports/builds, and trust
+boundary mutations in workflows.
 
 Require ordinary CI and explicit heavy canaries after structural changes,
 plus native acceptance when host integrations change. Tests run only in Docker

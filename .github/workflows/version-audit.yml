@@ -29,16 +29,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Prepare cached audit dependencies
+        uses: ./.github/actions/audit-python
       - name: Check latest versions and checksums
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y python3-yaml python3-venv
-          /usr/bin/python3 -m venv "$RUNNER_TEMP/audit-venv"
-          "$RUNNER_TEMP/audit-venv/bin/pip" install -r requirements-audit.txt PyYAML==6.0.3
           export PATH="$RUNNER_TEMP/audit-venv/bin:$PATH"
           ./scripts/ci/maintenance-audit.sh weekly "$UPGRADE_REPORT"
       - name: Upload upgrade report

@@ -81,6 +81,9 @@ def check(root):
     )
     assert "matrix.platform" in upload["with"]["name"]
     image_steps = checks["test-image"]["steps"]
+    assert any(
+        step.get("uses") == "./.github/actions/validator-image" for step in image_steps
+    )
     image_upload = next(
         step for step in image_steps if "upload-artifact@" in step.get("uses", "")
     )
@@ -134,7 +137,11 @@ def check(root):
             for step in job["steps"]
         )
         assert f"scripts/ci/maintenance-audit.sh {mode}" in commands
-        assert "requirements-audit.txt" in commands
+        assert any(
+            step.get("uses") == "./.github/actions/audit-python"
+            for job in workflow["jobs"].values()
+            for step in job["steps"]
+        )
     assert daily["permissions"] == {"contents": "read"}
     assert weekly["jobs"]["report"]["permissions"] == {
         "contents": "read",
@@ -157,6 +164,32 @@ def check(root):
     assert "--changed true" in canary_steps[0]["run"]
     assert "schedule" in triggers(workflows["native-vm-e2e.yml"])
     assert set(triggers(workflows["wsl-e2e.yml"])) == {"workflow_dispatch"}
+
+    for action in ("validator-image", "audit-python"):
+        steps = load(root / f".github/actions/{action}/action.yml")["runs"]["steps"]
+        restores = [
+            step for step in steps if "actions/cache/restore@" in step.get("uses", "")
+        ]
+        saves = [
+            step for step in steps if "actions/cache/save@" in step.get("uses", "")
+        ]
+        assert len(restores) == len(saves) == 1
+        assert "restore-keys" not in restores[0]["with"], (
+            "Never restore stale dependency images"
+        )
+        assert saves[0].get("if") == (
+            "github.ref == format('refs/heads/{0}', github.event.repository.default_branch) "
+            "&& steps.restore.outputs.cache-hit != 'true'"
+        )
+        assert restores[0].get("continue-on-error") is True
+        assert saves[0].get("continue-on-error") is True
+        expected_path = (
+            "${{ runner.temp }}/validator-image"
+            if action == "validator-image"
+            else "~/.cache/pip"
+        )
+        assert restores[0]["with"]["path"] == expected_path
+        assert saves[0]["with"]["path"] == expected_path
 
     for filename, workflow in workflows.items():
         assert "permissions" in workflow, f"{filename}: implicit token permissions"

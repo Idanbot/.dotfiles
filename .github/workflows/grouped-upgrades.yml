@@ -55,14 +55,14 @@ jobs:
           else
             echo 'changed=true' >>"$GITHUB_OUTPUT"
           fi
+      - name: Restore or build slim validators
+        if: steps.upgrades.outputs.changed == 'true'
+        uses: ./.github/actions/validator-image
       - name: Validate generated update set in Docker
         if: steps.upgrades.outputs.changed == 'true'
         run: |
-          docker build \
-            --target tests -f .github/e2e/Dockerfile.ubuntu-24.04 \
-            -t dotfiles-grouped-upgrades .
           docker run --rm -v "$PWD:/dotfiles:ro" \
-            dotfiles-grouped-upgrades python3 /dotfiles/scripts/ci/run-tests.py upgrades
+            dotfiles-ci-tests python3 /dotfiles/scripts/ci/run-tests.py upgrades
       - name: Commit, push, and create or refresh one PR
         if: steps.upgrades.outputs.changed == 'true'
         env:

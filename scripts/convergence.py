@@ -37,7 +37,13 @@ def path_state(path):
 def tree_state(path):
     result = {str(path): path_state(path)}
     if path.is_dir() and not path.is_symlink():
-        for directory, names, files in os.walk(path, followlinks=False):
+
+        def unreadable(error):
+            raise error
+
+        for directory, names, files in os.walk(
+            path, followlinks=False, onerror=unreadable
+        ):
             for name in sorted(names + files):
                 child = Path(directory) / name
                 result[str(child)] = path_state(child)

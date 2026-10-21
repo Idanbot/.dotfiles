@@ -55,6 +55,49 @@ class GraphTests(unittest.TestCase):
                 with self.assertRaises((AssertionError, KeyError)):
                     contracts.check(root)
 
+    def test_cache_trust_or_freshness_drift_is_rejected(self):
+        for action in ("validator-image", "audit-python"):
+            for mutation in (
+                "write-from-pr",
+                "inverted-branch",
+                "stale-restore",
+                "credential-cache",
+                "credential-save",
+            ):
+                with (
+                    self.subTest(action=action, mutation=mutation),
+                    tempfile.TemporaryDirectory() as directory,
+                ):
+                    root = Path(directory)
+                    shutil.copytree(ROOT / ".github", root / ".github")
+                    path = root / f".github/actions/{action}/action.yml"
+                    data = contracts.load(path)
+                    restore = next(
+                        step
+                        for step in data["runs"]["steps"]
+                        if "cache/restore@" in step.get("uses", "")
+                    )
+                    save = next(
+                        step
+                        for step in data["runs"]["steps"]
+                        if "cache/save@" in step.get("uses", "")
+                    )
+                    if mutation == "write-from-pr":
+                        save["if"] = "always()"
+                    elif mutation == "inverted-branch":
+                        save["if"] = save["if"].replace(
+                            "github.ref ==", "github.ref !="
+                        )
+                    elif mutation == "stale-restore":
+                        restore["with"]["restore-keys"] = "validators-"
+                    elif mutation == "credential-cache":
+                        restore["with"]["path"] = "~/.ssh"
+                    else:
+                        save["with"]["path"] = "~/.aws"
+                    path.write_text(contracts.yaml.safe_dump(data))
+                    with self.assertRaises(AssertionError):
+                        contracts.check(root)
+
     def test_required_results(self):
         self.assertEqual(result.failures({"checks": {"result": "success"}}), [])
         for conclusion in ("failure", "cancelled", "skipped", "timed_out", None):

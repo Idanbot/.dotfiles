@@ -904,8 +904,36 @@ Verification is tiered so a green result has a precise meaning:
 `ci.yml` owns triggers, concurrency, and one final **CI Result**. Two reusable
 workflows contain checks and live acceptance. `tests/suites.json` accounts for
 every test; missing and duplicate registrations fail CI. Security/static checks
-and Docker behavior/selector suites start independently. One validator image is
-shared for that commit, while installation acceptance uses a minimal base image.
+and Docker behavior/selector suites start independently. A slim validator image
+is restored or built once and distributed within that run. Installation
+acceptance still uses a minimal, cold base image.
+
+Validator compilers and Go module/build caches stay in a separate build stage;
+only `shfmt` and `actionlint` binaries enter the runtime image. Exact cache keys
+include the OS/architecture, Dockerfile, pinned Python requirements, cache
+implementation, and UTC ISO week. A weekly rebuild refreshes distro packages;
+source/config edits do not cause unnecessary image rebuilds. Every suite still
+tests the current checkout, never cached test results.
+
+Only default-branch runs save caches. Pull requests can restore compatible
+entries but do not publish them. Corrupt, stale, missing, or unavailable image
+caches rebuild; corrupt same-run artifacts fail closed. Archives are checked
+against SHA256 and the loaded Docker image ID. Preparation time and image/archive
+sizes appear in the job summary; image artifacts expire after one day.
+
+Daily/weekly CVE jobs reuse pinned public pip downloads, not virtual environments.
+No credentials, cloud context, home directories, install state, or live-E2E
+destinations are cached. This uses GitHub's built-in cache without increasing
+the repository's storage allowance or enabling paid services. GitHub's default
+cache limit is [10 GB with unused entries evicted after seven days](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy).
+To force a fresh validator build early, remove its `validators-v1-...` entry
+under **Actions > Caches**, then run CI again.
+
+Drift regressions exercise real Chezmoi decisions after both source and local
+config changes: skip/quit/EOF preservation, explicit replacement, repeatable
+append merges, retargeted symlinks, private file modes, and unchanged histories
+and local overlays. Snapshot traversal fails on unreadable trees rather than
+silently omitting potential drift.
 
 The checks include:
 

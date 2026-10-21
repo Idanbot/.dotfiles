@@ -63,7 +63,7 @@ jobs:
           name: test-image-${{ github.sha }}
           path: ${{ runner.temp }}/ci-image
       - name: Load shared validators
-        run: zstd -dc "$RUNNER_TEMP/ci-image/test-image.tar.zst" | docker load
+        run: ./scripts/ci/validator-image.sh load "$RUNNER_TEMP/ci-image"
       - name: Verify live release paths in Docker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

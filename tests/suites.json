@@ -22,7 +22,9 @@
           "tests/test-convergence.py",
           "scripts/apply-package-plan.py",
           "tests/test-apply-package-plan.py",
-          "tests/test-metadata.py"
+          "tests/test-metadata.py",
+          "tests/test-validator-cache.py",
+          "tests/test-config-drift.py"
         ]
       ]
     },
@@ -73,6 +75,18 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-validator-cache.py",
+      "kind": "suite",
+      "suite": "static",
+      "invocations": [["{root}"]]
+    },
+    {
+      "path": "tests/test-config-drift.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [["{root}"]]
+    },
     {
       "path": "tests/e2e/test-agent-workspace.sh",
       "kind": "suite",

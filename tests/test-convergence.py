@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = (
     Path(sys.argv.pop(1)).resolve()
@@ -63,6 +64,27 @@ class ConvergenceTests(unittest.TestCase):
         self.link.symlink_to("missing")
         changes = MODULE.differences(before, self.capture())
         self.assertTrue(any(str(self.link) in change for change in changes))
+
+    def test_same_target_symlink_replacement_is_detected(self):
+        before = self.capture()
+        replacement = self.home / "new-link"
+        replacement.symlink_to("config")
+        replacement.replace(self.link)
+        self.assertTrue(
+            any(
+                str(self.link) in change
+                for change in MODULE.differences(before, self.capture())
+            )
+        )
+
+    def test_unreadable_tree_fails_instead_of_hiding_config_drift(self):
+        def denied(path, **kwargs):
+            kwargs["onerror"](PermissionError(f"unreadable: {path}"))
+            return iter(())
+
+        with patch.object(MODULE.os, "walk", side_effect=denied):
+            with self.assertRaises(PermissionError):
+                self.capture()
 
     def test_owned_tree_addition_and_deletion_are_detected(self):
         before = self.capture()

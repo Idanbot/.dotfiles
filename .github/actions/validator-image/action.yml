@@ -1,0 +1,35 @@
+name: Cached validator image
+description: Restore a weekly content-keyed image or rebuild, without caching credentials or installed user state
+runs:
+  using: composite
+  steps:
+    - name: Resolve immutable cache inputs and freshness period
+      id: policy
+      shell: bash
+      env:
+        CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+      run: python3 scripts/ci/cache-policy.py --platform "$CACHE_PLATFORM" >>"$GITHUB_OUTPUT"
+    - name: Restore exact validator cache
+      id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/validator-image
+        key: ${{ steps.policy.outputs.key }}
+    - name: Verify or rebuild validator image
+      id: image
+      shell: bash
+      env:
+        IMAGE_DIRECTORY: ${{ runner.temp }}/validator-image
+        CACHE_PERIOD: ${{ steps.policy.outputs.period }}
+        CACHE_KEY: ${{ steps.policy.outputs.key }}
+      run: ./scripts/ci/validator-image.sh ensure "$IMAGE_DIRECTORY" dotfiles-ci-tests "$CACHE_PERIOD" "$CACHE_KEY"
+    - name: Save only reviewed default-branch builds
+      if: >-
+        github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+        steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      continue-on-error: true
+      with:
+        path: ${{ runner.temp }}/validator-image
+        key: ${{ steps.policy.outputs.key }}

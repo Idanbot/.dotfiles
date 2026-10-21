@@ -92,7 +92,7 @@ dotfiles_conflict_review_merge() (
   mv -Tf -- "$temporary/candidate" "$target" || return 1
 )
 
-dotfiles_conflict_merge_append() {
+dotfiles_conflict_merge_append() (
   local source="$1" rel="$2" target
   local managed_file local_file merged_file managed_hash start_marker end_marker
   target="$HOME/$rel"
@@ -108,7 +108,7 @@ dotfiles_conflict_merge_append() {
     rm -f "$managed_file" "$local_file"
     return 1
   }
-  trap 'rm -f "$managed_file" "$local_file" "$merged_file"' RETURN
+  trap 'rm -f "$managed_file" "$local_file" "$merged_file"' EXIT
 
   if ! chezmoi cat --source="$source" "$target" >"$managed_file"; then
     return 1
@@ -151,8 +151,7 @@ dotfiles_conflict_merge_append() {
   chmod --reference="$target" "$merged_file" || return 1
   mv -Tf -- "$merged_file" "$target" || return 1
   rm -f "$managed_file" "$local_file"
-  trap - RETURN
-}
+)
 
 dotfiles_conflict_show_diff() {
   local source="$1" rel="$2" limit="${3:-160}" line
