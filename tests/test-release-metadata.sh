@@ -57,7 +57,7 @@ printf 'One metadata edit controls release discovery and both architecture check
 # The smoke check and section must use the same reviewed vendor URL and digest.
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
-TMP_ROOT="$temporary"
+export TMP_ROOT="$temporary"
 download_verified() {
   printf '%s\n' "$1" >>"$temporary/vendor-urls"
   [[ "$3" =~ ^sha256:[0-9a-f]{64}$ ]]
