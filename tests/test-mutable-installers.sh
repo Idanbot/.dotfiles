@@ -12,14 +12,15 @@ export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
 source "$DOTFILES_DIR/scripts/lib.sh"
 
 verify_installer() {
-  local section="$1" key="$2" url="$3" filename="$4" expected
+  local section="$1" key="$2" filename="$3" url expected
+  url="$(package_metadata "$section" "$key" url)"
   expected="$(package_metadata "$section" "$key" sha256)"
   download_verified "$url" "$TMP_ROOT/$filename" "sha256:$expected" "$filename"
 }
 
 verify_installer \
-  ai_tools codex_cli https://chatgpt.com/codex/install.sh codex-install.sh
+  ai_tools codex_cli codex-install.sh
 verify_installer \
-  ai_tools antigravity_cli https://antigravity.google/cli/install.sh antigravity-install.sh
+  ai_tools antigravity_cli antigravity-install.sh
 
 printf 'Mutable vendor installer checksum smoke passed\n'

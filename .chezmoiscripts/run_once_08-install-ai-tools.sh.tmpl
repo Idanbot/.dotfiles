@@ -33,7 +33,7 @@ if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   tmpdir="$(mktemp -d)"
   log_info "Installing Codex CLI with OpenAI's standalone installer"
   download_verified \
-    https://chatgpt.com/codex/install.sh "$tmpdir/codex-install.sh" \
+    "$(package_metadata ai_tools codex_cli url)" "$tmpdir/codex-install.sh" \
     "sha256:$CODEX_INSTALLER_SHA" codex-install.sh
   retry_command "Codex standalone installer" 4 5 \
     env CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
@@ -59,7 +59,7 @@ else
   mkdir -p "$tmpdir/home"
   log_info "Installing Antigravity CLI with Google's standalone installer"
   download_verified \
-    https://antigravity.google/cli/install.sh "$tmpdir/antigravity-install.sh" \
+    "$(package_metadata ai_tools antigravity_cli url)" "$tmpdir/antigravity-install.sh" \
     "sha256:$ANTIGRAVITY_INSTALLER_SHA" antigravity-install.sh
   # Contain the vendor's shell-profile edits; chezmoi already manages PATH.
   retry_command "Antigravity standalone installer" 4 5 \

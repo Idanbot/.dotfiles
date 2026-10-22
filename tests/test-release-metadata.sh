@@ -23,6 +23,8 @@ data['core']['github_cli'].update({
     'arch_amd64': 'x64',
     'arch_arm64': 'a64',
 })
+data['ai_tools']['codex_cli']['url'] = 'https://example.invalid/reviewed-codex.sh'
+data['ai_tools']['antigravity_cli']['url'] = 'https://example.invalid/reviewed-agy.sh'
 path.write_text(yaml.safe_dump(data, sort_keys=False))
 PY
 cat >"$temporary/bin/curl" <<'MOCK'
@@ -51,3 +53,20 @@ grep -Fq 'github_cli: "2.999.0"' "$DOTFILES_SOURCE_DIR/packages.yaml"
 grep -Fq '0000000000000000000000000000000000000000000000000000000000000002' \
   "$DOTFILES_SOURCE_DIR/packages.meta.yaml"
 printf 'One metadata edit controls release discovery and both architecture checksums\n'
+
+# The smoke check and section must use the same reviewed vendor URL and digest.
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
+TMP_ROOT="$temporary"
+download_verified() {
+  printf '%s\n' "$1" >>"$temporary/vendor-urls"
+  [[ "$3" =~ ^sha256:[0-9a-f]{64}$ ]]
+}
+source <(sed -n '/^verify_installer()/,$p' "$DOTFILES_DIR/tests/test-mutable-installers.sh")
+grep -Fxq 'https://example.invalid/reviewed-codex.sh' "$temporary/vendor-urls"
+grep -Fxq 'https://example.invalid/reviewed-agy.sh' "$temporary/vendor-urls"
+for tool in codex_cli antigravity_cli; do
+  grep -Fq "\$(package_metadata ai_tools $tool url)" \
+    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
+done
+printf 'Vendor installation and live smoke share metadata URLs and pinned checksums\n'

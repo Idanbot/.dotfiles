@@ -3,7 +3,7 @@
 
 generated_from:
   packages: b58e011be724c1398a82f30bb6d2d5a0fc8f8b1ebea629d08efbfc9b031e90fb
-  metadata: 1b9a1814251dfcc2d308e745053dbec77c5e66129b98599aa21b49f9d81335c8
+  metadata: 956e8e4d279ee7b4d501053a0f4a49c1702307ff2227267d57c9edbe3ffd9ba7
 
 tools:
   - section: bootstrap
@@ -669,7 +669,7 @@ tools:
     source: install_script
     owner: vendor-installer
     binary: codex
-    url: "https://chatgpt.com/codex/install.sh"
+    url: "https://releases.openai.com/codex/install.sh"
     sha256: 150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6
     integrity: pinned-sha256
   - section: ai_tools

@@ -550,7 +550,7 @@ ai_tools:
   codex_cli:
     source: install_script
     owner: vendor-installer
-    url: https://chatgpt.com/codex/install.sh
+    url: https://releases.openai.com/codex/install.sh
     binary: codex
     integrity: pinned-sha256
     sha256: 150e3cf675682efeaac115aa3747add3f27887896d04ce6d0b56478d8b428bf6
