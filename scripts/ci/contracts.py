@@ -235,6 +235,23 @@ def check(root):
     assert services["full-native"]["environment"]["DOTFILES_WSL"] == "false"
     assert services["full"]["environment"]["DOTFILES_WSL"] == "true"
 
+    acceptance_steps = load(root / ".github/actions/e2e/action.yml")["runs"]["steps"]
+    diagnostics = next(
+        step
+        for step in acceptance_steps
+        if step["name"] == "Upload acceptance diagnostics"
+    )
+    assert diagnostics["if"] == "always()"
+    assert diagnostics["with"]["if-no-files-found"] == "error"
+    performance = next(
+        step for step in acceptance_steps if step["name"] == "Upload performance sample"
+    )
+    assert performance["if"] == (
+        "success() && inputs.service != 'recovery' && inputs.service != 'failure-resume'"
+    )
+    assert performance["with"]["if-no-files-found"] == "error"
+    assert performance["with"]["path"] == "artifacts/**/performance.json"
+
     outcome = workflows["ci-outcome.yml"]["jobs"]["classify"]
     assert outcome["if"] == "github.event.workflow_run.conclusion != 'success'"
     checkout = next(

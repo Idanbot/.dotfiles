@@ -953,6 +953,9 @@ image is ready; live acceptance waits for the complete checks gate. Native and
 WSL behavior remain separate; the common updater tests run once in the required
 `upgrades` suite. ShellCheck retains full source analysis with at most two
 workers. Installation acceptance still uses a minimal, cold base image.
+Every acceptance service retains Compose output and cleanup logs, including
+recovery tests. Successful installation profiles must produce performance
+samples; recovery scenarios do not upload nonexistent install timing files.
 
 Validator compilers and Go module/build caches stay in a separate build stage;
 only `shfmt` and `actionlint` binaries enter the runtime image. Exact cache keys

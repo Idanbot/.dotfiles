@@ -27,13 +27,13 @@ runs:
       with:
         name: ${{ inputs.artifact }}
         path: artifacts/
-        if-no-files-found: warn
+        if-no-files-found: error
         retention-days: 14
     - name: Upload performance sample
-      if: always()
+      if: success() && inputs.service != 'recovery' && inputs.service != 'failure-resume'
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: performance-sample-${{ inputs.artifact }}
         path: artifacts/**/performance.json
-        if-no-files-found: warn
+        if-no-files-found: error
         retention-days: 90

@@ -70,24 +70,36 @@ class GraphTests(unittest.TestCase):
 
     def test_updater_scheduling_drift_is_rejected(self):
         for mutation in (
-            "duplicate-matrix", "wsl-matrix", "missing-test", "behavior-test",
-            "duplicate-check", "skipped-step", "ignored-step", "ignored-job",
+            "duplicate-matrix",
+            "wsl-matrix",
+            "missing-test",
+            "behavior-test",
+            "duplicate-check",
+            "skipped-step",
+            "ignored-step",
+            "ignored-job",
         ):
-            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+            with (
+                self.subTest(mutation=mutation),
+                tempfile.TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 copy_contract_fixture(root)
                 path = root / ".github/workflows/ci-checks.yml"
                 workflow = contracts.load(path)
                 job = workflow["jobs"]["contracts"]
                 matrix = job["strategy"]["matrix"]["include"]
-                upgrade = next(entry for entry in matrix if entry["suite"] == "upgrades")
+                upgrade = next(
+                    entry for entry in matrix if entry["suite"] == "upgrades"
+                )
                 suite_step = next(
                     step for step in job["steps"] if "CI_SUITE" in step.get("env", {})
                 )
                 registry_path = root / "tests/suites.json"
                 registry = json.loads(registry_path.read_text())
                 updater = next(
-                    entry for entry in registry["tests"]
+                    entry
+                    for entry in registry["tests"]
                     if entry["path"] == "tests/test-update-integrity-failure.sh"
                 )
                 if mutation == "duplicate-matrix":
@@ -112,7 +124,8 @@ class GraphTests(unittest.TestCase):
                 registry_path.write_text(json.dumps(registry))
                 completed = subprocess.run(
                     [sys.executable, str(ROOT / "scripts/ci/contracts.py"), str(root)],
-                    capture_output=True, text=True,
+                    capture_output=True,
+                    text=True,
                 )
                 self.assertNotEqual(completed.returncode, 0, mutation)
 
@@ -413,6 +426,83 @@ class GraphTests(unittest.TestCase):
             self.assertTrue(
                 all(line.startswith("compose -p dotfiles-ci-") for line in lines)
             )
+
+    def test_e2e_retains_logs_and_propagates_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mock = root / "docker"
+            mock.write_text(
+                '#!/bin/sh\ncase " $* " in\n'
+                '  *" up "*) printf "compose stdout\\n"; printf "compose stderr\\n" >&2; exit "$UP_EXIT" ;;\n'
+                '  *" down "*) printf "cleanup stdout\\n"; exit "$DOWN_EXIT" ;;\n'
+                "  *) exit 99 ;;\nesac\n"
+            )
+            mock.chmod(0o755)
+            for up, down, expected in (
+                (0, 0, 0),
+                (37, 0, 37),
+                (0, 23, 1),
+                (37, 23, 37),
+            ):
+                with self.subTest(up=up, down=down):
+                    completed = subprocess.run(
+                        ["bash", str(ROOT / "scripts/ci/e2e.sh"), "recovery"],
+                        cwd=root,
+                        env={
+                            **os.environ,
+                            "PATH": str(root) + ":" + os.environ["PATH"],
+                            "UP_EXIT": str(up),
+                            "DOWN_EXIT": str(down),
+                        },
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(expected, completed.returncode, completed.stderr)
+                    log = (root / "artifacts/recovery-compose.log").read_text()
+                    self.assertIn("compose stdout", log)
+                    self.assertIn("compose stderr", log)
+                    self.assertIn(
+                        "cleanup stdout",
+                        (root / "artifacts/recovery-cleanup.log").read_text(),
+                    )
+
+    def test_acceptance_artifact_contract_mutations_are_rejected(self):
+        for mutation in (
+            "skip-diagnostics",
+            "ignore-diagnostics",
+            "always-performance",
+            "ignore-performance",
+        ):
+            with (
+                self.subTest(mutation=mutation),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                copy_contract_fixture(root)
+                path = root / ".github/actions/e2e/action.yml"
+                action = contracts.load(path)
+                steps = action["runs"]["steps"]
+                diagnostics = next(
+                    step
+                    for step in steps
+                    if step["name"] == "Upload acceptance diagnostics"
+                )
+                performance = next(
+                    step
+                    for step in steps
+                    if step["name"] == "Upload performance sample"
+                )
+                if mutation == "skip-diagnostics":
+                    diagnostics["if"] = "success()"
+                elif mutation == "ignore-diagnostics":
+                    diagnostics["with"]["if-no-files-found"] = "ignore"
+                elif mutation == "always-performance":
+                    performance["if"] = "always()"
+                else:
+                    performance["with"]["if-no-files-found"] = "ignore"
+                path.write_text(contracts.yaml.safe_dump(action))
+                with self.assertRaises(AssertionError):
+                    contracts.check(root)
 
 
 @unittest.skipUnless(
