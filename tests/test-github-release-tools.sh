@@ -179,7 +179,9 @@ PIX_OPTIMIZER_VERSION="$(package_version ai_tools pix_optimizer 1.1.26)"
 omp_install_package @xynogen/pix-optimizer "$PIX_OPTIMIZER_VERSION" pix-optimizer
 initialize_pix_optimizer_state
 [[ "$(jq -r .version "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json")" == "$PIX_OPTIMIZER_VERSION" ]]
-[[ "$(jq -r .rtk "$HOME/.omp/agent/optimizer.json")" == off ]]
+[[ "$(jq -r .optimizer.rtk "$HOME/.pi/agent/pix.json")" == off ]]
+[[ "$(jq -r .version "$HOME/.omp/plugins/node_modules/@xynogen/pix-pretty/package.json")" == "$(package_metadata ai_tools pix_optimizer dependency_overrides | jq -r '.["@xynogen/pix-pretty"]')" ]]
+omp plugin list | grep -Fq "@xynogen/pix-optimizer@$PIX_OPTIMIZER_VERSION"
 
 RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
 install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" \

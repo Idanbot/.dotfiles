@@ -77,7 +77,7 @@ Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
 | --- | --- |
 | bootstrap | `chezmoi` 2.73.1 |
 | core | `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.26.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.50.0, `gitleaks` 8.30.1 |
-| languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.8, `java` 25.0.4.1+1, `uv` 0.13.0 |
+| languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.9, `java` 25.0.4.1+1, `uv` 0.13.5 |
 | history | `atuin` 18.23.0 |
 | editor | `neovim` 0.12.6 |
 | database | `usql` 0.21.4, `iredis` 1.16.1, `pgloader` distro |
@@ -85,7 +85,7 @@ Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
 | terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.74.0, `herdr` 0.9.3 |
 | system | `git_credential_manager` 3.0.1 |
 | fonts | `nerd_font` FiraMono, `nerd_font_version` 3.5.1 |
-| ai_tools | `claude_cli` 2.1.296, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.0, `omp` 18.10.1, `bun` 1.4.3, `serena` 1.7.0, `context_mode` 1.0.169, `graphify` 0.9.86, `rtk` 0.51.0, `ponytail` 5.1.0, `pix_optimizer` 1.3.2 |
+| ai_tools | `claude_cli` 2.1.296, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.0, `omp` 18.12.6, `bun` 1.4.3, `serena` 1.7.0, `context_mode` 1.0.169, `graphify` 0.9.86, `rtk` 0.51.0, `ponytail` 5.1.0, `pix_optimizer` 1.3.5 |
 | media | `yt_dlp` 2026.08.19, `rmpc` 0.11.0, `cava` distro |
 <!-- tool-versions:end -->
 
@@ -347,6 +347,8 @@ were previously absent. Restoring therefore also removes files created by a
 failed apply. Every restore first validates the complete manifest and all
 backed-up checksums before changing a destination; inspect a snapshot without
 restoring it with `scripts/backup.sh verify <backup-id>`.
+Restoring `.zshrc` clears its regular bytecode cache so older restored settings
+take effect. A symlinked cache is preserved with a manual-regeneration warning.
 Restore also rejects changed ancestor symlinks and unsafe file-type changes
 before any writes. Previously absent directories are removed only when empty;
 unrelated files added later are preserved.
@@ -495,6 +497,9 @@ never arbitrary shell code, SSH/Git config, or credentials; it does not apply
 the patch. Explicit output files are `0600`, refuse symlinks/overwrite, and are
 never uploaded automatically. See [Local Review](docs/local-review.md) for scope,
 diagnostic codes, and limitations.
+Advisory snapshots expire after 7 UTC days by default. Expired or future-dated
+data cannot establish current coverage; `--max-age-days` explicitly changes the
+limit without enabling network access.
 
 Pinned chezmoi externals stay cached until their URL changes. Bootstrap retries
 transient download failures (including HTTP 429) up to four times; checksum and
@@ -592,6 +597,10 @@ existing local copy. OMP receives the pinned Pix Optimizer plugin; use
 `/optimizer` inside OMP to select Caveman, RTK, and Ponytail modes. These modes
 remain user-controlled rather than being enabled by bootstrap. A verified Bun
 runtime is installed alongside OMP because OMP uses it for plugin management.
+Pix settings live in `~/.pi/agent/pix.json` (or `PI_CODING_AGENT_DIR`), with new
+modes initialized off and existing choices preserved. The reviewed Bun override
+in `packages.meta.yaml` keeps Pix's UI dependency compatible with OMP; conflicting
+user overrides require manual review rather than being replaced silently.
 
 RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
 optional shell-output optimizer. Bootstrap does not install its agent hooks;
@@ -938,10 +947,12 @@ Verification is tiered so a green result has a precise meaning:
 
 `ci.yml` owns triggers, concurrency, and one final **CI Result**. Two reusable
 workflows contain checks and live acceptance. `tests/suites.json` accounts for
-every test; missing and duplicate registrations fail CI. Security/static checks
-and Docker behavior/selector suites start independently. A slim validator image
-is restored or built once and distributed within that run. Installation
-acceptance still uses a minimal, cold base image.
+every test; missing and duplicate registrations fail CI. Security checks run
+alongside the validator build. Registered Docker suites start when the shared
+image is ready; live acceptance waits for the complete checks gate. Native and
+WSL behavior remain separate; the common updater tests run once in the required
+`upgrades` suite. ShellCheck retains full source analysis with at most two
+workers. Installation acceptance still uses a minimal, cold base image.
 
 Validator compilers and Go module/build caches stay in a separate build stage;
 only `shfmt` and `actionlint` binaries enter the runtime image. Exact cache keys

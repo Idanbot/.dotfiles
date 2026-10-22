@@ -2,6 +2,7 @@
 """Semantic contracts for the CI graph and its security boundaries."""
 
 import argparse
+import json
 from pathlib import Path
 import re
 import shlex
@@ -144,6 +145,7 @@ def check(root):
     assert suites == {
         "static",
         "behavior",
+        "upgrades",
         "selectors",
         "workspace",
         "benchmarks",
@@ -154,11 +156,45 @@ def check(root):
         for entry in matrix
         if entry["suite"] == "behavior"
     } == {("native", "false"), ("wsl-simulated", "true")}
+    expected_matrix = {(suite, "native", "false") for suite in suites} | {
+        ("behavior", "wsl-simulated", "true")
+    }
+    actual_matrix = [
+        (entry["suite"], entry["platform"], entry["wsl"]) for entry in matrix
+    ]
+    assert len(actual_matrix) == len(expected_matrix)
+    assert set(actual_matrix) == expected_matrix
+    registry = json.loads((root / "tests/suites.json").read_text())
+    updater_paths = {
+        "tests/test-package-metadata.sh",
+        "tests/test-update-packages.sh",
+        "tests/test-update-integrity-failure.sh",
+    }
+    updaters = [entry for entry in registry["tests"] if entry["path"] in updater_paths]
+    assert len(updaters) == len(updater_paths)
+    assert {entry["path"] for entry in updaters} == updater_paths
+    assert all(
+        entry["kind"] == "suite"
+        and entry["suite"] == "upgrades"
+        and entry["invocations"] == [["{root}"]]
+        for entry in updaters
+    )
+    for suite in registry["suites"].values():
+        for command in suite.get("checks", []):
+            if command[0] in {"bash", "python3"}:
+                assert not updater_paths.intersection(command[1:]), (
+                    "Run registered updater tests through their suite, not duplicate checks"
+                )
+    assert checks["contracts"].get("continue-on-error", False) is False
+    assert "if" not in checks["contracts"]
     suite_step = next(
         step
         for step in checks["contracts"]["steps"]
         if "CI_SUITE" in step.get("env", {})
     )
+    assert suite_step.get("continue-on-error", False) is False
+    assert "if" not in suite_step
+    assert suite_step["env"]["CI_SUITE"] == "${{ matrix.suite }}"
     assert suite_step["env"]["DOTFILES_WSL"] == "${{ matrix.wsl }}"
     upload = next(
         step

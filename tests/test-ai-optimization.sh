@@ -29,6 +29,7 @@ omp() {
   mkdir -p "$(dirname "$manifest")"
   jq -n --arg name "$package" --arg version "$version" \
     '{name: $name, version: $version, pi: {extensions: ["./src/index.ts"]}}' >"$manifest"
+  [[ "${OMP_FORCE_FAIL:-false}" != true ]] || return 37
 }
 
 mkdir -p "$HOME/.agents/skills/ponytail"
@@ -53,13 +54,58 @@ omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
 grep -Fq $'pix-optimizer\t1.1.26\tomp:@xynogen/pix-optimizer' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 
+export OMP_FORCE_FAIL=true
+if omp_install_package @xynogen/pix-optimizer 1.1.27 pix-optimizer; then
+  printf 'Native extension validation failure was ignored\n' >&2
+  exit 1
+fi
+unset OMP_FORCE_FAIL
+grep -Fq $'pix-optimizer\t1.1.26\tomp:@xynogen/pix-optimizer' \
+  "$DOTFILES_STATE_DIR/installed.tsv"
+call_count="$(wc -l <"$OMP_CALLS")"
+
 initialize_pix_optimizer_state
-pix_state="$HOME/.omp/agent/optimizer.json"
-jq -e '.caveman == "off" and .rtk == "off" and .ponytail == "off"' "$pix_state" >/dev/null
+pix_state="$HOME/.pi/agent/pix.json"
+jq -e '.optimizer | .caveman == "off" and .rtk == "off" and .ponytail == "off"' "$pix_state" >/dev/null
 [[ "$(stat -c %a "$pix_state")" == 600 ]]
-jq -n '{caveman: "full", rtk: "on", ponytail: "lite"}' >"$pix_state"
+jq -n '{optimizer: {caveman: "full", rtk: "on", ponytail: "lite"}, other: "keep"}' >"$pix_state"
 initialize_pix_optimizer_state
-jq -e '.caveman == "full" and .rtk == "on" and .ponytail == "lite"' "$pix_state" >/dev/null
+jq -e '.other == "keep" and .optimizer.caveman == "full" and .optimizer.rtk == "on" and .optimizer.ponytail == "lite"' "$pix_state" >/dev/null
+
+plugin_settings="$DOTFILES_OMP_PLUGIN_ROOT/package.json"
+jq -e '.overrides["@xynogen/pix-pretty"] == "1.30.0"' "$plugin_settings" >/dev/null
+[[ "$(stat -c %a "$plugin_settings")" == 600 ]]
+jq '.overrides["@xynogen/pix-pretty"] = "1.32.0" | .other = "keep"' \
+  "$plugin_settings" >"$TMP_ROOT/settings.json"
+cp "$TMP_ROOT/settings.json" "$plugin_settings"
+if omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer; then
+  printf 'Conflicting user override was not refused\n' >&2
+  exit 1
+fi
+cmp "$TMP_ROOT/settings.json" "$plugin_settings"
+[[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
+
+rm "$plugin_settings"
+ln -s "$TMP_ROOT/settings.json" "$plugin_settings"
+if omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer; then
+  printf 'Symlinked plugin settings were not refused\n' >&2
+  exit 1
+fi
+[[ -L "$plugin_settings" ]]
+
+rm "$pix_state"
+mkdir -p "$HOME/.omp/agent"
+jq -n '{caveman: "full", rtk: "on", ponytail: "lite"}' >"$HOME/.omp/agent/optimizer.json"
+initialize_pix_optimizer_state
+jq -e '.optimizer.caveman == "full" and .optimizer.rtk == "on"' "$pix_state" >/dev/null
+[[ -f "$HOME/.omp/agent/optimizer.json" ]]
+rm "$pix_state"
+ln -s "$TMP_ROOT/settings.json" "$pix_state"
+if initialize_pix_optimizer_state; then
+  printf 'Symlinked Pix settings were not refused\n' >&2
+  exit 1
+fi
+[[ -L "$pix_state" ]]
 
 # Exercise the actual installer block so metadata migrations cannot empty its asset.
 awk '/^RTK_VERSION=/ { block = 1 } /^PONYTAIL_VERSION=/ { exit } block' \

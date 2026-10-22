@@ -26,6 +26,8 @@
           "tests/test-validator-cache.py",
           "tests/test-config-drift.py",
           "scripts/local-review.py",
+          "scripts/omp-settings.py",
+          "tests/test-omp-settings.py",
           "tests/test-local-review.py"
         ]
       ]
@@ -34,25 +36,7 @@
     "selectors": {},
     "workspace": {},
     "release": {},
-    "upgrades": {
-      "checks": [
-        [
-          "bash",
-          "tests/test-package-metadata.sh",
-          "."
-        ],
-        [
-          "bash",
-          "tests/test-update-packages.sh",
-          "."
-        ],
-        [
-          "bash",
-          "tests/test-update-integrity-failure.sh",
-          "."
-        ]
-      ]
-    },
+    "upgrades": {},
     "benchmarks": {
       "checks": [
         [
@@ -77,6 +61,12 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-omp-settings.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
+    },
     {
       "path": "tests/test-local-review.py",
       "kind": "suite",
@@ -659,7 +649,7 @@
     {
       "path": "tests/test-package-metadata.sh",
       "kind": "suite",
-      "suite": "behavior",
+      "suite": "upgrades",
       "invocations": [
         [
           "{root}"
@@ -929,7 +919,7 @@
     {
       "path": "tests/test-update-integrity-failure.sh",
       "kind": "suite",
-      "suite": "behavior",
+      "suite": "upgrades",
       "invocations": [
         [
           "{root}"
@@ -939,7 +929,7 @@
     {
       "path": "tests/test-update-packages.sh",
       "kind": "suite",
-      "suite": "behavior",
+      "suite": "upgrades",
       "invocations": [
         [
           "{root}"

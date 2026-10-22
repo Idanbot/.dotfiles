@@ -65,6 +65,7 @@ for section, tools in versions.items():
             "arch_amd64",
             "arch_arm64",
             "checksum_template",
+            "dependency_overrides",
             "sha256",
             "sha256_amd64",
             "sha256_arm64",

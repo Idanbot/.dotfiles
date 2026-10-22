@@ -37,7 +37,7 @@ jobs:
           ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
           cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
       - name: Upload upgrade report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: version-checksum-report
           path: ${{ runner.temp }}/dotfiles-upgrade-report.md
@@ -222,7 +222,7 @@ jobs:
           cat "$RUNNER_TEMP/performance-dashboard/performance-history.md" \
             >>"$GITHUB_STEP_SUMMARY"
       - name: Upload rolling performance history
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: performance-history
           path: ${{ runner.temp }}/performance-dashboard/

@@ -274,21 +274,28 @@ npm_install_global() {
 
 omp_install_package() {
   local package="$1" version="$2" tool="$3"
-  local root manifest installed_version="" spec
+  local root manifest installed_version="" spec policy_changed=unchanged
   root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
   manifest="$root/node_modules/$package/package.json"
   spec="${package}@${version}"
 
+  if [[ "$package" == @xynogen/pix-optimizer ]]; then
+    policy_changed="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
+      plugins "$root/package.json" \
+      --overrides "$(package_metadata ai_tools pix_optimizer dependency_overrides)")" || return 1
+    initialize_pix_optimizer_state || return 1
+  fi
+
   if [[ -f "$manifest" ]]; then
     installed_version="$(jq -r '.version // empty' "$manifest" 2>/dev/null || true)"
   fi
-  if version_equals "$installed_version" "$version"; then
+  if version_equals "$installed_version" "$version" && [[ "$policy_changed" == unchanged ]]; then
     log_skip "$tool $version already installed in OMP"
     return 0
   fi
 
   log_info "Installing $tool $version for OMP"
-  omp plugin install "$spec"
+  omp plugin install "$spec" || return 1
   [[ -f "$manifest" ]] || {
     log_error "$tool package manifest was not created at $manifest"
     return 1
@@ -304,18 +311,9 @@ omp_install_package() {
 }
 
 initialize_pix_optimizer_state() {
-  local state="$HOME/.omp/agent/optimizer.json" tmp
-  if [[ -e "$state" ]]; then
-    jq empty "$state" >/dev/null 2>&1 ||
-      log_warn "Existing Pix Optimizer state is invalid and was preserved: $state"
-    return 0
-  fi
-  ensure_private_directory "$(dirname "$state")"
-  tmp="$(mktemp "${state}.XXXXXX")"
-  jq -n '{caveman: "off", rtk: "off", ponytail: "off"}' >"$tmp"
-  chmod 600 "$tmp"
-  mv "$tmp" "$state"
-  log_success "Pix Optimizer initialized with all modes off"
+  local directory="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
+    optimizer "$directory/pix.json" --legacy "$HOME/.omp/agent/optimizer.json" >/dev/null
 }
 
 install_github_agent_skill() {

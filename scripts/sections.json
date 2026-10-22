@@ -51,7 +51,7 @@
   },
   "ai": {
     "order": 80, "description": "AI CLIs", "dependencies": ["languages"],
-    "script": ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl", "manifest": ["ai_tools"], "files": ["scripts/install-uv-tool.sh"],
+    "script": ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl", "manifest": ["ai_tools"], "files": ["scripts/install-uv-tool.sh", "scripts/omp-settings.py"],
     "commands": ["claude", "codex", "agy", "opencode", "omp", "bun", "serena", "context-mode", "graphify", "rtk", "agent-mcp", "dot-privacy"],
     "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
   },

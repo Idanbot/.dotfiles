@@ -110,4 +110,53 @@ set -e
 
 "$BACKUP" list | grep -Fxq "$backup_id"
 
+# Bytecode must not override restored source with an older preserved timestamp.
+if command -v zsh >/dev/null 2>&1; then
+  (
+    export HOME="$TEST_HOME/zsh-cache"
+    export DOTFILES_STATE_DIR="$HOME/.local/state/dotfiles"
+    mkdir -p "$HOME"
+    printf 'export RESTORE_CACHE_DEMO=original\n' >"$HOME/.zshrc"
+    touch -d '5 minutes ago' "$HOME/.zshrc"
+    printf 'MM .zshrc\n' >"$HOME/zsh-status"
+    zsh_backup="$($BACKUP create --status-file "$HOME/zsh-status" --run-id zsh-cache | sed -n 's/^backup_id=//p')"
+    printf 'export RESTORE_CACHE_DEMO=changed\n' >"$HOME/.zshrc"
+    zsh -dfc 'zcompile -U "$HOME/.zshrc.zwc" "$HOME/.zshrc"'
+    zsh -dfc 'source "$HOME/.zshrc"; [[ "$RESTORE_CACHE_DEMO" == changed ]]'
+    "$BACKUP" restore "$zsh_backup" --force >/dev/null
+    zsh -dfc 'source "$HOME/.zshrc"; [[ "$RESTORE_CACHE_DEMO" == original ]]' || {
+      printf 'Restored shell source is shadowed by stale bytecode\n' >&2
+      exit 1
+    }
+    [[ ! -e "$HOME/.zshrc.zwc" ]]
+
+    printf 'export RESTORE_CACHE_DEMO=changed\n' >"$HOME/.zshrc"
+    zsh -dfc 'zcompile -U "$HOME/external.zwc" "$HOME/.zshrc"'
+    ln -s "$HOME/external.zwc" "$HOME/.zshrc.zwc"
+    external_before="$(sha256sum "$HOME/external.zwc")"
+    warning="$($BACKUP restore "$zsh_backup" --force 2>&1)"
+    grep -Fq 'preserved user-managed ~/.zshrc.zwc' <<<"$warning"
+    [[ -L "$HOME/.zshrc.zwc" && "$(sha256sum "$HOME/external.zwc")" == "$external_before" ]]
+    grep -Fq 'RESTORE_CACHE_DEMO=original' "$HOME/.zshrc"
+    rm "$HOME/.zshrc.zwc" "$HOME/.zshrc"
+
+    absent_backup="$($BACKUP create --status-file "$HOME/zsh-status" --run-id zsh-absent | sed -n 's/^backup_id=//p')"
+    printf 'export RESTORE_CACHE_DEMO=created\n' >"$HOME/.zshrc"
+    zsh -dfc 'zcompile -U "$HOME/.zshrc.zwc" "$HOME/.zshrc"'
+    "$BACKUP" restore "$absent_backup" --force >/dev/null
+    [[ ! -e "$HOME/.zshrc" && ! -e "$HOME/.zshrc.zwc" ]]
+
+    printf 'export RESTORE_CACHE_DEMO=keep\n' >"$HOME/.zshrc"
+    zsh -dfc 'zcompile -U "$HOME/.zshrc.zwc" "$HOME/.zshrc"'
+    cache_before="$(sha256sum "$HOME/.zshrc.zwc")"
+    printf 'tampered\n' >"$DOTFILES_STATE_DIR/backups/$zsh_backup/files/.zshrc"
+    if "$BACKUP" restore "$zsh_backup" --force >/dev/null 2>&1; then
+      printf 'Restore accepted a tampered shell backup\n' >&2
+      exit 1
+    fi
+    [[ "$(sha256sum "$HOME/.zshrc.zwc")" == "$cache_before" ]]
+    grep -Fq 'RESTORE_CACHE_DEMO=keep' "$HOME/.zshrc"
+  )
+fi
+
 printf 'Recovery test passed: %s\n' "$backup_id"

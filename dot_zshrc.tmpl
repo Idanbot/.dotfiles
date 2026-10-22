@@ -402,7 +402,17 @@ export FPATH="$HOME/Scripts/eza/completions/zsh:$FPATH"
 typeset -U path PATH
 
 # Compile .zshrc to byte-code (.zwc) in the background if it changes
-# Uses atomic rename to prevent corruption from concurrent shells
-if [[ ~/.zshrc -nt ~/.zshrc.zwc ]]; then
-  (zcompile ~/.zshrc.tmp.$$ && mv -f ~/.zshrc.tmp.$$.zwc ~/.zshrc.zwc &) 2>/dev/null
+# Publish a private, complete cache; never follow a user-managed symlink.
+if [[ -f "$HOME/.zshrc" && ! -L "$HOME/.zshrc" &&
+  ! -L "$HOME/.zshrc.zwc" && ( ! -e "$HOME/.zshrc.zwc" || -f "$HOME/.zshrc.zwc" ) &&
+  ( ! -f "$HOME/.zshrc.zwc" || "$HOME/.zshrc" -nt "$HOME/.zshrc.zwc" ) ]]; then
+  (
+    umask 077
+    compile_dir="$(command mktemp -d "$HOME/.zshrc-compile.XXXXXXXX")" || exit
+    trap 'command rm -rf -- "$compile_dir"' EXIT
+    builtin zcompile -U "$compile_dir/zshrc.zwc" "$HOME/.zshrc" || exit
+    command chmod 600 "$compile_dir/zshrc.zwc" || exit
+    [[ ! -L "$HOME/.zshrc.zwc" && ( ! -e "$HOME/.zshrc.zwc" || -f "$HOME/.zshrc.zwc" ) ]] || exit
+    command mv -fT -- "$compile_dir/zshrc.zwc" "$HOME/.zshrc.zwc"
+  ) </dev/null >/dev/null 2>&1 &!
 fi

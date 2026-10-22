@@ -153,6 +153,9 @@ separate real-WSL contract.
 or manual tests. `scripts/ci/run-tests.py` executes the same suite interface in
 local Docker and CI. Two reusable workflows contain parallel checks and gated
 live acceptance; one final result rejects unexpected required-job skips.
+Native and WSL behavior suites remain separate. The common updater fault matrix
+runs once in a required upgrades suite. ShellCheck follows sources with the same
+analysis flags in at most two workers.
 
 Two-pass E2E compares destinations, normalized ownership, histories, local
 overlays, configuration diffs, and replacements. Full-native and full-WSL

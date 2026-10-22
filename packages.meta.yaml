@@ -576,8 +576,8 @@ ai_tools:
     arch_amd64: x64
     arch_arm64: arm64
     binary: omp
-    sha256_amd64: 9798d22d518b23342b4cadf57672b276ef09e756c1832adc6571b04b26ad4f1b
-    sha256_arm64: 5cad38a8edee60cec9c0ce91810eba38bda0efe349562157023810343dacb8d5
+    sha256_amd64: 85d9daf3a05fc76e8cd425ae1904eb576af8d21cc85fcf4690742626e07ccfa4
+    sha256_arm64: eee8e586274cef2e725c218b2b28b48ca9965d46dd58f60998cb347eca4ad0cf
     integrity: pinned-sha256
   bun:
     source: github
@@ -632,6 +632,8 @@ ai_tools:
     owner: omp-plugin
     package: "@xynogen/pix-optimizer"
     integrity: npm-registry
+    # Newer pix-pretty imports hyperlink(), absent from OMP's Pi TUI shim.
+    dependency_overrides: '{"@xynogen/pix-pretty":"1.30.0"}'
 
 media:
   yt_dlp:

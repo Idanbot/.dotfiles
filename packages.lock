@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: affc60030a61572a55accfcddb81e5b5fda6d4dd5dd225b8d80b046a35a95201
-  metadata: acb91d2c2bf0f0471d3b99ce222fb0567f294f567eeb7e2813893dd7566d0d43
+  packages: b58e011be724c1398a82f30bb6d2d5a0fc8f8b1ebea629d08efbfc9b031e90fb
+  metadata: 1b9a1814251dfcc2d308e745053dbec77c5e66129b98599aa21b49f9d81335c8
 
 tools:
   - section: bootstrap
@@ -322,7 +322,7 @@ tools:
     integrity: npm-registry
   - section: languages
     name: python
-    version: 3.14.8
+    version: 3.14.9
     source: uv
     owner: uv
     integrity: uv-managed
@@ -338,7 +338,7 @@ tools:
     integrity: pinned-sha256
   - section: languages
     name: uv
-    version: 0.13.0
+    version: 0.13.5
     source: github
     owner: dotfiles-binary
     repo: astral-sh/uv
@@ -691,7 +691,7 @@ tools:
     integrity: npm-registry
   - section: ai_tools
     name: omp
-    version: 18.10.1
+    version: 18.12.6
     source: github
     owner: dotfiles-binary
     repo: can1357/oh-my-pi
@@ -700,8 +700,8 @@ tools:
     asset_template: "omp-linux-{arch}"
     arch_amd64: x64
     arch_arm64: arm64
-    sha256_amd64: 9798d22d518b23342b4cadf57672b276ef09e756c1832adc6571b04b26ad4f1b
-    sha256_arm64: 5cad38a8edee60cec9c0ce91810eba38bda0efe349562157023810343dacb8d5
+    sha256_amd64: 85d9daf3a05fc76e8cd425ae1904eb576af8d21cc85fcf4690742626e07ccfa4
+    sha256_arm64: eee8e586274cef2e725c218b2b28b48ca9965d46dd58f60998cb347eca4ad0cf
     integrity: pinned-sha256
   - section: ai_tools
     name: bun
@@ -765,10 +765,11 @@ tools:
     integrity: pinned-sha256
   - section: ai_tools
     name: pix_optimizer
-    version: 1.3.2
+    version: 1.3.5
     source: npm
     owner: omp-plugin
     package: "@xynogen/pix-optimizer"
+    dependency_overrides: "{\"@xynogen/pix-pretty\":\"1.30.0\"}"
     integrity: npm-registry
   - section: media
     name: yt_dlp

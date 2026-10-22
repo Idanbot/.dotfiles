@@ -320,6 +320,14 @@ restore_backup() {
     }
     target="$HOME/$rel"
     source="$dir/files/$rel"
+    # Restores preserve old mtimes; a newer dump could execute the wrong config.
+    if [[ "$rel" == .zshrc ]]; then
+      if [[ -L "$HOME/.zshrc.zwc" ]]; then
+        printf 'Warning: preserved user-managed ~/.zshrc.zwc; regenerate its target after restore\n' >&2
+      elif [[ -f "$HOME/.zshrc.zwc" ]]; then
+        rm -f -- "$HOME/.zshrc.zwc" || return 1
+      fi
+    fi
     if [[ "$type" == absent ]]; then
       if [[ -d "$target" && ! -L "$target" ]]; then
         absent_directories+=("$target")

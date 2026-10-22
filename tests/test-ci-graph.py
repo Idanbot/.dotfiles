@@ -27,9 +27,94 @@ result = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(result)
 
 
+def copy_contract_fixture(root):
+    shutil.copytree(ROOT / ".github", root / ".github")
+    (root / "tests").mkdir()
+    shutil.copy2(ROOT / "tests/suites.json", root / "tests/suites.json")
+
+
 class GraphTests(unittest.TestCase):
     def test_repository_contracts(self):
         contracts.check(ROOT)
+
+    def test_updater_tests_run_once_in_contracts(self):
+        workflow = contracts.load(ROOT / ".github/workflows/ci-checks.yml")
+        matrix = workflow["jobs"]["contracts"]["strategy"]["matrix"]["include"]
+        updater_tests = {
+            "tests/test-package-metadata.sh": 0,
+            "tests/test-update-packages.sh": 0,
+            "tests/test-update-integrity-failure.sh": 0,
+        }
+        for entry in matrix:
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/ci/run-tests.py"),
+                    entry["suite"],
+                    "--root",
+                    str(ROOT),
+                    "--list",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            for line in completed.stdout.splitlines():
+                argv = shlex.split(line)
+                if argv[:2] != ["+", "bash"]:
+                    continue
+                path = str((ROOT / argv[2]).resolve().relative_to(ROOT))
+                if path in updater_tests:
+                    updater_tests[path] += 1
+        self.assertEqual(updater_tests, dict.fromkeys(updater_tests, 1))
+
+    def test_updater_scheduling_drift_is_rejected(self):
+        for mutation in (
+            "duplicate-matrix", "wsl-matrix", "missing-test", "behavior-test",
+            "duplicate-check", "skipped-step", "ignored-step", "ignored-job",
+        ):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_contract_fixture(root)
+                path = root / ".github/workflows/ci-checks.yml"
+                workflow = contracts.load(path)
+                job = workflow["jobs"]["contracts"]
+                matrix = job["strategy"]["matrix"]["include"]
+                upgrade = next(entry for entry in matrix if entry["suite"] == "upgrades")
+                suite_step = next(
+                    step for step in job["steps"] if "CI_SUITE" in step.get("env", {})
+                )
+                registry_path = root / "tests/suites.json"
+                registry = json.loads(registry_path.read_text())
+                updater = next(
+                    entry for entry in registry["tests"]
+                    if entry["path"] == "tests/test-update-integrity-failure.sh"
+                )
+                if mutation == "duplicate-matrix":
+                    matrix.append(upgrade.copy())
+                elif mutation == "wsl-matrix":
+                    upgrade.update(platform="wsl-simulated", wsl="true")
+                elif mutation == "missing-test":
+                    registry["tests"].remove(updater)
+                elif mutation == "behavior-test":
+                    updater["suite"] = "behavior"
+                elif mutation == "duplicate-check":
+                    registry["suites"]["upgrades"]["checks"] = [
+                        ["bash", updater["path"], "."]
+                    ]
+                elif mutation == "skipped-step":
+                    suite_step["if"] = "false"
+                elif mutation == "ignored-step":
+                    suite_step["continue-on-error"] = True
+                else:
+                    job["continue-on-error"] = True
+                path.write_text(contracts.yaml.safe_dump(workflow))
+                registry_path.write_text(json.dumps(registry))
+                completed = subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/ci/contracts.py"), str(root)],
+                    capture_output=True, text=True,
+                )
+                self.assertNotEqual(completed.returncode, 0, mutation)
 
     def test_graph_mutations_are_rejected(self):
         mutations = [
@@ -48,7 +133,7 @@ class GraphTests(unittest.TestCase):
                 tempfile.TemporaryDirectory() as directory,
             ):
                 root = Path(directory)
-                shutil.copytree(ROOT / ".github", root / ".github")
+                copy_contract_fixture(root)
                 path = root / ".github/workflows" / filename
                 workflow = contracts.load(path)
                 mutate(workflow)
@@ -239,7 +324,7 @@ class GraphTests(unittest.TestCase):
                     tempfile.TemporaryDirectory() as directory,
                 ):
                     root = Path(directory)
-                    shutil.copytree(ROOT / ".github", root / ".github")
+                    copy_contract_fixture(root)
                     path = root / f".github/actions/{action}/action.yml"
                     data = contracts.load(path)
                     restore = next(

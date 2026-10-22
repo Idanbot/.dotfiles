@@ -26,7 +26,7 @@ jobs:
       - name: Restore or build slim validators
         uses: ./.github/actions/validator-image
       - name: Retain image for this run only
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-image-${{ github.sha }}
           path: ${{ runner.temp }}/validator-image/
@@ -129,6 +129,7 @@ jobs:
           - {suite: static, platform: native, wsl: "false"}
           - {suite: behavior, platform: native, wsl: "false"}
           - {suite: behavior, platform: wsl-simulated, wsl: "true"}
+          - {suite: upgrades, platform: native, wsl: "false"}
           - {suite: selectors, platform: native, wsl: "false"}
           - {suite: workspace, platform: native, wsl: "false"}
           - {suite: benchmarks, platform: native, wsl: "false"}
@@ -162,7 +163,7 @@ jobs:
         run: ./scripts/ci/docker-suite.sh "$CI_SUITE"
       - name: Upload diagnostics and benchmarks
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: contracts-${{ matrix.suite }}-${{ matrix.platform }}
           path: artifacts/

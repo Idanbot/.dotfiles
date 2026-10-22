@@ -40,9 +40,9 @@ languages:
   node: "26.11.1"
   npm: "12.2.0"
   typescript: "7.0.2"
-  python: "3.14.8"
+  python: "3.14.9"
   java: "25.0.4.1+1"
-  uv: "0.13.0"
+  uv: "0.13.5"
 
 history:
   atuin: "18.23.0"
@@ -94,14 +94,14 @@ ai_tools:
   codex_cli: "standalone"
   antigravity_cli: "standalone"
   opencode: "1.19.0"
-  omp: "18.10.1"
+  omp: "18.12.6"
   bun: "1.4.3"
   serena: "1.7.0"
   context_mode: "1.0.169"
   graphify: "0.9.86"
   rtk: "0.51.0"
   ponytail: "5.1.0"
-  pix_optimizer: "1.3.2"
+  pix_optimizer: "1.3.5"
 
 media:
   yt_dlp: "2026.08.19"

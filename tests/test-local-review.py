@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """User-invoked local reviews never expose raw machine data or change settings."""
 
+import datetime
 import json
 import os
 from pathlib import Path
@@ -36,6 +37,7 @@ class LocalReviewTests(unittest.TestCase):
         self.secret = (
             "private-person-77 secret.example.invalid 192.0.2.77 token-super-private"
         )
+        self.today = datetime.datetime.now(datetime.timezone.utc).date()
         (self.home / ".zshrc").write_text(
             "# " + self.secret + "\nexport HISTSIZE=34567\n"
         )
@@ -250,7 +252,7 @@ class LocalReviewTests(unittest.TestCase):
                 {
                     "schema": 1,
                     "kind": "dotfiles-advisories",
-                    "as_of": "2026-10-22",
+                    "as_of": self.today.isoformat(),
                     "tools": [
                         {
                             "id": "languages.node",
@@ -290,6 +292,120 @@ class LocalReviewTests(unittest.TestCase):
             if item["id"] == "languages.node"
         )
         self.assertEqual("unknown", audited["status"])
+
+    def test_expired_advisories_never_establish_current_coverage_offline(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from dotfiles import installed_audit
+
+        data = json.loads(self.cli("receipt", "create").stdout)
+        data["tools"] = [
+            {
+                "id": "languages.node",
+                "version": "27.0.0",
+                "state": "observed",
+                "management": "external-or-unrecorded",
+            }
+        ]
+        cache = {
+            "schema": 1,
+            "kind": "dotfiles-advisories",
+            "as_of": "2000-01-01",
+            "tools": [{"id": "languages.node", "version": "27.0.0", "advisories": []}],
+        }
+        report, unchanged_cache = installed_audit.audit(
+            ROOT,
+            data,
+            cache=cache,
+            request=lambda *_: self.fail("offline audit made a request"),
+        )
+        self.assertEqual("stale", report["tools"][0]["status"])
+        self.assertEqual(1, report["coverage"]["stale"])
+        self.assertEqual("expired", report["freshness"]["status"])
+        self.assertIn("advisory-cache-expired", report["warnings"])
+        self.assertEqual(cache, unchanged_cache)
+
+        frozen = datetime.date(2026, 10, 22)
+        cache["as_of"] = frozen.isoformat()
+        for findings in (
+            [],
+            [{"id": "CVE-2026-12345", "severity": "high", "fixed": ["27.0.1"]}],
+        ):
+            cache["tools"][0]["advisories"] = findings
+            for age, expected in (
+                (0, "fresh"),
+                (7, "fresh"),
+                (8, "expired"),
+                (-1, "future-dated"),
+            ):
+                with self.subTest(age=age, findings=bool(findings)):
+                    before = json.dumps(cache, sort_keys=True)
+                    report, _ = installed_audit.audit(
+                        ROOT,
+                        data,
+                        cache=cache,
+                        today=frozen + datetime.timedelta(days=age),
+                        request=lambda *_: self.fail("offline audit made a request"),
+                    )
+                    status = "advisories" if findings else "no-known-advisories"
+                    if expected != "fresh":
+                        status = "stale"
+                    self.assertEqual(status, report["tools"][0]["status"])
+                    self.assertEqual(findings, report["tools"][0]["advisories"])
+                    self.assertEqual(
+                        {"status": expected, "age_days": age, "max_age_days": 7},
+                        report["freshness"],
+                    )
+                    self.assertEqual(
+                        [] if expected == "fresh" else ["advisory-cache-" + expected],
+                        report["warnings"],
+                    )
+                    self.assertEqual(before, json.dumps(cache, sort_keys=True))
+        for invalid in (-1, 366, True):
+            with self.subTest(max_age_days=invalid), self.assertRaises(ValueError):
+                installed_audit.audit(ROOT, data, cache=cache, max_age_days=invalid)
+
+    def test_audit_cli_reports_expiry_and_accepts_explicit_lifetime(self):
+        data = json.loads(self.cli("receipt", "create").stdout)
+        data["tools"] = [
+            {
+                "id": "languages.node",
+                "version": "27.0.0",
+                "state": "observed",
+                "management": "external-or-unrecorded",
+            }
+        ]
+        receipt = self.home / "observed.json"
+        receipt.write_text(json.dumps(data))
+        cache = self.home / "advisories.json"
+        cache.write_text(
+            json.dumps(
+                {
+                    "schema": 1,
+                    "kind": "dotfiles-advisories",
+                    "as_of": (self.today - datetime.timedelta(days=14)).isoformat(),
+                    "tools": [
+                        {"id": "languages.node", "version": "27.0.0", "advisories": []}
+                    ],
+                }
+            )
+        )
+        before = cache.read_bytes()
+        args = ("audit", "--installed", "--receipt", receipt, "--advisories", cache)
+        expired = self.cli(*args)
+        self.assertEqual(0, expired.returncode, expired.stderr)
+        self.assertEqual("expired", json.loads(expired.stdout)["freshness"]["status"])
+        self.assertEqual("stale", json.loads(expired.stdout)["tools"][0]["status"])
+        current = self.cli(*args, "--max-age-days", "30")
+        self.assertEqual(0, current.returncode, current.stderr)
+        report = json.loads(current.stdout)
+        self.assertEqual("fresh", report["freshness"]["status"])
+        self.assertEqual("no-known-advisories", report["tools"][0]["status"])
+        for invalid in ("-1", "366", "token-super-private"):
+            rejected = self.cli(*args, "--max-age-days", invalid)
+            self.assertNotEqual(0, rejected.returncode)
+            self.assertNotIn("token-super-private", rejected.stdout + rejected.stderr)
+        self.assertEqual(before, cache.read_bytes())
+        self.assertNotIn("private-person", expired.stdout + current.stdout)
 
     def test_tmux_and_starship_capture_exclude_other_local_settings(self):
         for target, filename, content, expected in (
@@ -373,6 +489,8 @@ class LocalReviewTests(unittest.TestCase):
         report, cache = installed_audit.audit(
             ROOT, data, online=True, request=request, fetch=fetch
         )
+        self.assertEqual("fresh", report["freshness"]["status"])
+        self.assertEqual(0, report["freshness"]["age_days"])
         self.assertEqual("v27.0.0", queries[0]["queries"][0]["version"])
         self.assertEqual({"package", "version"}, set(queries[0]["queries"][0]))
         serialized = json.dumps([report, cache, queries])
@@ -426,7 +544,7 @@ class LocalReviewTests(unittest.TestCase):
                 {
                     "schema": 1,
                     "kind": "dotfiles-advisories",
-                    "as_of": "2026-10-22",
+                    "as_of": self.today.isoformat(),
                     "tools": [
                         {
                             "id": "languages.node",

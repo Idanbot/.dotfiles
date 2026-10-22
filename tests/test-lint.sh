@@ -8,6 +8,28 @@ mapfile -d '' -t files < <(
   find scripts tests -type f -name '*.sh' -print0
   find dot_local/bin -type f -name 'executable_*' ! -name '*.tmpl' -print0
 )
+check_shells() (
+  ((${#files[@]})) || exit 1
+  temporary="$(mktemp -d)" || exit 1
+  trap 'rm -rf "$temporary"' EXIT
+  pids=()
+  status=0
+  # Retain full source context per file, with two workers and intact diagnostics.
+  for worker in 0 1; do
+    batch=()
+    for ((index = worker; index < ${#files[@]}; index += 2)); do
+      batch+=("${files[index]}")
+    done
+    ((${#batch[@]})) || continue
+    shellcheck -x -S warning -e 'SC1090,SC1091' "${batch[@]}" >"$temporary/$worker" 2>&1 &
+    pids+=("$!")
+  done
+  for ((worker = 0; worker < ${#pids[@]}; worker++)); do
+    wait "${pids[worker]}" || status=1
+    cat "$temporary/$worker" || status=1
+  done
+  exit "$status"
+)
 for linter in shellcheck shfmt yamllint; do
   printf '\n== %s ==\n' "$linter"
   if ! command -v "$linter" >/dev/null 2>&1; then
@@ -16,11 +38,11 @@ for linter in shellcheck shfmt yamllint; do
     continue
   fi
   case "$linter" in
-    shellcheck) args=(-x -S warning -e 'SC1090,SC1091' "${files[@]}") ;;
-    shfmt) args=(-d -i 2 -ci "${files[@]}") ;;
-    yamllint) args=(.) ;;
+    shellcheck) args=(check_shells) ;;
+    shfmt) args=(shfmt -d -i 2 -ci "${files[@]}") ;;
+    yamllint) args=(yamllint .) ;;
   esac
-  if ! "$linter" "${args[@]}"; then
+  if ! "${args[@]}"; then
     printf '[FAIL] %s\n' "$linter" >&2
     errors=$((errors + 1))
   fi

@@ -147,6 +147,9 @@ class ConvergenceTests(unittest.TestCase):
         for relative in (
             ".gemini/antigravity-cli/settings.json",
             ".omp/agent/optimizer.json",
+            ".pi/agent/pix.json",
+            ".omp/plugins/package.json",
+            ".omp/plugins/bun.lock",
             ".agents/skills/graphify/SKILL.md",
             ".rustup/toolchains/fixture/bin/rustc",
             ".local/share/uv/python/fixture/bin/python3",

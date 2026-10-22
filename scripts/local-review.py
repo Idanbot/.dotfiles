@@ -9,6 +9,7 @@ import sys
 sys.dont_write_bytecode = True
 try:
     from dotfiles import local_review as review
+    from dotfiles.installed_audit import DEFAULT_MAX_AGE_DAYS
 except ImportError:
     raise SystemExit("local-review: missing-bootstrap-python-dependencies") from None
 
@@ -56,6 +57,12 @@ def main():
     audit.add_argument("--receipt", type=Path)
     audit.add_argument("--online", action="store_true")
     audit.add_argument("--advisories", type=Path)
+    audit.add_argument(
+        "--max-age-days",
+        type=int,
+        default=DEFAULT_MAX_AGE_DAYS,
+        help=f"advisory-cache lifetime in UTC days (0-365; default: {DEFAULT_MAX_AGE_DAYS})",
+    )
     audit.add_argument("--cache-output", type=Path)
     audit.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -86,7 +93,11 @@ def main():
         )
         cache = review.read_json(args.advisories) if args.advisories else None
         data, cached = installed_audit.audit(
-            root, observed, online=args.online, cache=cache
+            root,
+            observed,
+            online=args.online,
+            cache=cache,
+            max_age_days=args.max_age_days,
         )
         if args.cache_output:
             review.write_private(

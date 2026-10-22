@@ -8,6 +8,7 @@ from .local_review import ReviewError, entries, numeric_version, validate_receip
 from .metadata import load_metadata
 
 LEVELS = {"none", "low", "moderate", "high", "critical", "unspecified"}
+DEFAULT_MAX_AGE_DAYS = 7
 
 
 def audit_module(root):
@@ -78,8 +79,21 @@ def validate_cache(data, root):
     return data
 
 
-def audit(root, receipt, *, online=False, cache=None, request=None, fetch=None):
+def audit(
+    root,
+    receipt,
+    *,
+    online=False,
+    cache=None,
+    request=None,
+    fetch=None,
+    max_age_days=DEFAULT_MAX_AGE_DAYS,
+    today=None,
+):
     validate_receipt(receipt, root)
+    if type(max_age_days) is not int or not 0 <= max_age_days <= 365:
+        raise ReviewError("invalid-advisory-max-age")
+    today = today or datetime.datetime.now(datetime.timezone.utc).date()
     if online and cache is not None:
         raise ReviewError("choose-online-or-offline-data")
     if cache is not None:
@@ -144,10 +158,20 @@ def audit(root, receipt, *, online=False, cache=None, request=None, fetch=None):
         cache = {
             "schema": 1,
             "kind": "dotfiles-advisories",
-            "as_of": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+            "as_of": today.isoformat(),
             "tools": cached_tools,
         }
         validate_cache(cache, root)
+    age = (today - datetime.date.fromisoformat(cache["as_of"])).days if cache else None
+    freshness = (
+        "unavailable"
+        if age is None
+        else "future-dated"
+        if age < 0
+        else "expired"
+        if age > max_age_days
+        else "fresh"
+    )
     observations = (
         {(item["id"], item["version"]): item["advisories"] for item in cache["tools"]}
         if cache
@@ -162,6 +186,8 @@ def audit(root, receipt, *, online=False, cache=None, request=None, fetch=None):
             status = "unsupported"
         elif findings is None:
             status = "unknown"
+        elif freshness != "fresh":
+            status = "stale"
         else:
             status = "advisories" if findings else "no-known-advisories"
         tools.append(
@@ -177,11 +203,20 @@ def audit(root, receipt, *, online=False, cache=None, request=None, fetch=None):
         "kind": "dotfiles-installed-audit",
         "source": "online" if online else "offline",
         "as_of": cache["as_of"] if cache else None,
+        "freshness": {
+            "status": freshness,
+            "age_days": age,
+            "max_age_days": max_age_days,
+        },
+        "warnings": ["advisory-cache-" + freshness]
+        if freshness in {"expired", "future-dated"}
+        else [],
         "coverage": {
             status: sum(item["status"] == status for item in tools)
             for status in (
                 "advisories",
                 "no-known-advisories",
+                "stale",
                 "unknown",
                 "unsupported",
                 "unobserved",

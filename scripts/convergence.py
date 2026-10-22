@@ -79,6 +79,9 @@ def snapshot(home, state, managed_paths, config_diff):
     for relative in (
         ".gemini/antigravity-cli/settings.json",
         ".omp/agent/optimizer.json",
+        ".pi/agent/pix.json",
+        ".omp/plugins/package.json",
+        ".omp/plugins/bun.lock",
         ".agents/skills/graphify",
         ".rustup/toolchains",
         ".local/share/uv/python",

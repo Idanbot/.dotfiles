@@ -279,8 +279,8 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   pix_manifest="$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json"
   [[ -f "$pix_manifest" ]]
   [[ "$(gojq -r '.version' "$pix_manifest")" == "$(manifest_version ai_tools pix_optimizer)" ]]
-  gojq -e '.caveman == "off" and .rtk == "off" and .ponytail == "off"' \
-    "$HOME/.omp/agent/optimizer.json" >/dev/null
+  gojq -e '.optimizer | .caveman == "off" and .rtk == "off" and .ponytail == "off"' \
+    "$HOME/.pi/agent/pix.json" >/dev/null
   [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null
   mcp_status="$(agent-mcp status all)"

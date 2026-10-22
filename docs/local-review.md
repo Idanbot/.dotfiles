@@ -96,8 +96,15 @@ fail closed without echoing their contents.
 
 Results distinguish missing, unobserved, unsupported, unknown, known advisories,
 and no known advisories in the dated dataset. Repository pins are never
-substituted for observed versions. Unknown coverage and stale snapshots cannot
-establish safety. CVSS vectors are scored when the pinned audit dependencies in
+substituted for observed versions. Snapshots expire when their UTC date is more
+than 7 days old; `--max-age-days N` accepts 0-365 (0 means today's UTC date only).
+Future-dated snapshots are also untrusted. Reports include freshness/age, fixed
+warning codes, and `stale` coverage for matching observations that are no longer
+current. Previously recorded advisories remain visible for review, but an empty
+stale snapshot never means no known advisories today. Expiry does not change the
+cache or trigger a network request; refresh only with explicit `--online` consent.
+Unknown coverage and stale snapshots cannot establish safety.
+CVSS vectors are scored when the pinned audit dependencies in
 `requirements-audit.txt` are available; otherwise vector-only findings remain
 unscored. The report is advisory and never changes pins or installed software.
 
