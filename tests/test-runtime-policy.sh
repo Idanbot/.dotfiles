@@ -8,7 +8,45 @@ export HOME="$temporary/home" DOTFILES_SOURCE_DIR="$ROOT"
 export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_VERSION_PLAN="$temporary/versions.json"
 mkdir -p "$HOME/.local/bin" "$HOME/external/bin"
 printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
+for binary in go gofmt rustc cargo node npm npx java javac tsc uv uvx; do
+  printf '#!/bin/sh\nprintf "%%s\\n" "99.99.99"\n' >"$HOME/external/bin/$binary"
+  chmod +x "$HOME/external/bin/$binary"
+  printf '#!/bin/sh\nprintf "%%s\\n" "0.0.1"\n' >"$HOME/.local/bin/$binary"
+  chmod +x "$HOME/.local/bin/$binary"
+done
+(
+  export PATH="$HOME/.local/bin:$PATH"
+  source "$ROOT/scripts/lib.sh"
+  for binary in go gofmt rustc cargo node npm npx java javac tsc uv uvx; do
+    record_install "$binary" 0.0.1 fixture "$HOME/.local/bin/$binary"
+  done
+)
+ledger_before="$(sha256sum "$DOTFILES_STATE_DIR/installed.tsv")"
+export PATH="$HOME/external/bin:$HOME/.local/bin:$PATH"
+# Resolve the real preflight with offline upstream lookup failures. Its active
+# paths must survive sourcing the library and executing the real section blocks.
+printf '#!/bin/sh\nexit 22\n' >"$HOME/external/bin/curl"
+chmod +x "$HOME/external/bin/curl"
+/usr/bin/python3 "$ROOT/scripts/install-policy.py" preflight --source "$ROOT" \
+  --sections languages --plan "$DOTFILES_VERSION_PLAN" --json >"$temporary/preflight.json"
+/usr/bin/python3 - "$temporary/preflight.json" "$HOME/external/bin" <<'PY'
+import json
+import sys
+
+report = json.load(open(sys.argv[1]))
+for tool, command in [("go", "go"), ("rust", "rustc"), ("node", "node"), ("npm", "npm"), ("java", "java")]:
+    entry = report["tools"]["languages." + tool]
+    assert entry["path"] == sys.argv[2] + "/" + command, entry
+    assert entry["current"] == "99.99.99", entry
+    assert "preserve" in entry["action"], entry
+PY
 source "$ROOT/scripts/lib.sh"
+for binary in go rustc cargo node npm java tsc uv; do
+  [[ "$(command -v "$binary")" == "$HOME/external/bin/$binary" ]] || {
+    printf 'Library changed preflight selection for %s\n' "$binary" >&2
+    exit 1
+  }
+done
 ARCH="$(get_arch)"
 export ARCH
 download_verified() {
@@ -24,11 +62,6 @@ managed_link() {
   printf 'Unexpected shim replacement\n' >&2
   return 99
 }
-for binary in go gofmt rustc cargo node npm npx java javac tsc uv uvx; do
-  printf '#!/bin/sh\nprintf "%%s\\n" "99.99.99"\n' >"$HOME/external/bin/$binary"
-  chmod +x "$HOME/external/bin/$binary"
-done
-export PATH="$HOME/external/bin:$PATH"
 
 for spec in 'GO_VERSION=:RUST_CHANNEL=' 'RUST_CHANNEL=:NODE_VERSION=' 'NODE_VERSION=:TYPESCRIPT_VERSION=' 'JAVA_VERSION=:print_summary'; do
   start="${spec%%:*}" end="${spec#*:}"
@@ -42,7 +75,11 @@ done
 [[ "$(node --version)" == 99.99.99 && "$(npm --version)" == 99.99.99 ]]
 [[ "$(command -v java)" == "$HOME/external/bin/java" ]]
 [[ ! -e "$HOME/.local/share/dotfiles/tools/java/current" ]]
-[[ ! -e "$DOTFILES_STATE_DIR/installed.tsv" ]]
+[[ "$(sha256sum "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger_before" ]]
+for binary in go gofmt rustc cargo node npm npx java javac tsc uv uvx; do
+  [[ "$("$HOME/.local/bin/$binary" --version)" == 0.0.1 ]]
+  [[ "$(command -v "$binary")" == "$HOME/external/bin/$binary" ]]
+done
 runtime_is_current node 26.11.1 'v99.99.99' >"$temporary/newer.log"
 grep -Fq 'newer than repository' "$temporary/newer.log"
 

@@ -1,0 +1,85 @@
+name: Native ARM64 Binary Smoke
+
+on:
+  schedule:
+    - cron: "29 5 8 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  arm64-smoke:
+    name: Cold ARM64 release binaries (not full acceptance)
+    if: github.event.repository.private == false
+    # Standard native ARM64 runner, free for public repositories:
+    # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build cold base without validators or restored install state
+        id: base
+        run: |
+          [[ "$(uname -m)" == aarch64 ]]
+          docker build --pull --platform linux/arm64 --target base \
+            -f .github/e2e/Dockerfile.ubuntu-24.04 -t dotfiles-arm64-smoke .
+      - name: Download, verify, and execute representative ARM64 binaries
+        id: smoke
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p artifacts/arm64
+          docker run --rm --platform linux/arm64 -e GH_TOKEN -e DOTFILES_WSL=false \
+            -v "$GITHUB_WORKSPACE:/dotfiles:ro" dotfiles-arm64-smoke \
+            bash -euo pipefail -c '
+              [[ "$(uname -m)" == aarch64 && "$(dpkg --print-architecture)" == arm64 ]]
+              for binary in chezmoi eza herdr; do
+                if command -v "$binary"; then exit 1; fi
+              done
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends python3-yaml
+              source /dotfiles/scripts/lib.sh
+              [[ "$(get_arch)" == arm64 ]]
+              /dotfiles/scripts/install-chezmoi.sh
+
+              version="$(package_version core eza)"
+              install_github_archive eza \
+                "$(package_release_field core eza "$version" arm64 repo)" \
+                "$(package_release_field core eza "$version" arm64 tag)" \
+                "$(package_release_field core eza "$version" arm64 asset)" ./eza \
+                "sha256:$(package_metadata core eza sha256_arm64)" "eza --version"
+
+              version="$(package_version terminal herdr)"
+              install_github_binary herdr \
+                "$(package_release_field terminal herdr "$version" arm64 repo)" \
+                "$(package_release_field terminal herdr "$version" arm64 tag)" \
+                "$(package_release_field terminal herdr "$version" arm64 asset)" herdr \
+                "sha256:$(package_metadata terminal herdr sha256_arm64)" "herdr --version"
+
+              for binary in chezmoi eza herdr; do
+                "$HOME/.local/bin/$binary" --version
+              done
+            ' 2>&1 | tee artifacts/arm64/smoke.log
+      - name: Upload ARM64 smoke log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-arm64-binary-smoke
+          path: artifacts/arm64/
+          if-no-files-found: warn
+          retention-days: 30

@@ -22,6 +22,10 @@ Usage: dot <command> [args]
   privacy             Audit managed telemetry and nonessential traffic controls
   tools [args]        Search the tools, languages, and agent catalog
   catalog [args]      Alias for tools; use --pick for an fzf details picker
+  check-local [args]  Offline local checks; diagnostic codes only, never uploaded
+  receipt [args]      Create or compare an allowlisted software receipt offline
+  capture [args]      Export typed settings as a private review-only patch
+  audit --installed  Audit observed versions; network requires explicit --online
   workspace [args]    Open the current project agent workspace
   profile [name]      Show or set the local machine profile (mode 0600)
   logs [run-id]       Show recent runs or tail one run log
@@ -34,6 +38,12 @@ USAGE
 }
 
 case "${1:-}" in
+  check-local | receipt | capture | audit)
+    review_command="$1"
+    [[ "$review_command" != check-local ]] || review_command=check
+    shift
+    exec /usr/bin/python3 "$SOURCE/scripts/local-review.py" --source "$SOURCE" "$review_command" "$@"
+    ;;
   preflight)
     shift
     exec /usr/bin/python3 "$SOURCE/scripts/install-policy.py" preflight --source "$SOURCE" "$@"

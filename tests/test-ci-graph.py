@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,175 @@ class GraphTests(unittest.TestCase):
                 path.write_text(contracts.yaml.safe_dump(workflow))
                 with self.assertRaises((AssertionError, KeyError)):
                     contracts.check(root)
+
+    def test_platform_coverage_mutations_are_rejected(self):
+        def step(workflow, identity):
+            return next(
+                entry
+                for entry in workflow["jobs"]["arm64-smoke"]["steps"]
+                if entry.get("id") == identity
+            )
+
+        def rewrite(workflow, identity, old, new):
+            entry = step(workflow, identity)
+            self.assertIn(old, entry["run"])
+            entry["run"] = entry["run"].replace(old, new)
+
+        mutations = [
+            (
+                "arm64-smoke.yml",
+                "x64",
+                lambda w: w["jobs"]["arm64-smoke"].update(
+                    **{"runs-on": "ubuntu-24.04"}
+                ),
+            ),
+            (
+                "arm64-smoke.yml",
+                "per-pr",
+                lambda w: contracts.triggers(w).update(pull_request=None),
+            ),
+            (
+                "arm64-smoke.yml",
+                "weekly",
+                lambda w: contracts.triggers(w).update(
+                    schedule=[{"cron": "29 5 * * 1"}]
+                ),
+            ),
+            (
+                "arm64-smoke.yml",
+                "private-billing",
+                lambda w: w["jobs"]["arm64-smoke"].pop("if"),
+            ),
+            (
+                "arm64-smoke.yml",
+                "shared-manual-concurrency",
+                lambda w: w["concurrency"].update(group="arm64-smoke"),
+            ),
+            (
+                "arm64-smoke.yml",
+                "full-matrix",
+                lambda w: w["jobs"]["arm64-smoke"].update(
+                    strategy={"matrix": {"profile": ["base", "full"]}}
+                ),
+            ),
+            (
+                "arm64-smoke.yml",
+                "validator-target",
+                lambda w: rewrite(w, "base", "--target base", "--target tests"),
+            ),
+            (
+                "arm64-smoke.yml",
+                "emulated-run",
+                lambda w: rewrite(w, "smoke", "linux/arm64", "linux/amd64"),
+            ),
+            (
+                "arm64-smoke.yml",
+                "wrong-checksum",
+                lambda w: rewrite(w, "smoke", "sha256_arm64", "sha256_amd64"),
+            ),
+            (
+                "arm64-smoke.yml",
+                "no-binary-execution",
+                lambda w: rewrite(
+                    w, "smoke", '"$HOME/.local/bin/$binary" --version', "true"
+                ),
+            ),
+            (
+                "arm64-smoke.yml",
+                "hidden-failure",
+                lambda w: step(w, "smoke").update(**{"continue-on-error": True}),
+            ),
+            (
+                "arm64-smoke.yml",
+                "skipped-smoke",
+                lambda w: step(w, "smoke").update(**{"if": "false"}),
+            ),
+            (
+                "arm64-smoke.yml",
+                "cached-validators",
+                lambda w: w["jobs"]["arm64-smoke"]["steps"].insert(
+                    2, {"uses": "./.github/actions/validator-image"}
+                ),
+            ),
+            (
+                "arm64-smoke.yml",
+                "unpinned-action",
+                lambda w: w["jobs"]["arm64-smoke"]["steps"][1].update(
+                    uses="actions/checkout@v7"
+                ),
+            ),
+            (
+                "wsl-e2e.yml",
+                "scheduled-personal-wsl",
+                lambda w: contracts.triggers(w).update(
+                    schedule=[{"cron": "29 5 8 * *"}]
+                ),
+            ),
+            (
+                "wsl-e2e.yml",
+                "push-wsl",
+                lambda w: contracts.triggers(w).update(push=None),
+            ),
+            (
+                "wsl-e2e.yml",
+                "hosted-wsl",
+                lambda w: w["jobs"]["wsl"].update(**{"runs-on": "windows-latest"}),
+            ),
+            (
+                "wsl-e2e.yml",
+                "missing-rootfs",
+                lambda w: next(
+                    s
+                    for s in w["jobs"]["wsl"]["steps"]
+                    if "test-wsl.ps1" in s.get("run", "")
+                )["env"].pop("DOTFILES_WSL_ROOTFS"),
+            ),
+        ]
+        for filename, mutation, mutate in mutations:
+            with self.subTest(mutation=mutation):
+                workflows = {
+                    path.name: contracts.load(path)
+                    for path in (ROOT / ".github/workflows").glob("*.yml")
+                }
+                mutate(workflows[filename])
+                with self.assertRaises((AssertionError, KeyError, ValueError)):
+                    contracts.platform_coverage(workflows)
+
+    def test_arm64_smoke_pipeline_preserves_container_failure(self):
+        workflow = contracts.load(ROOT / ".github/workflows/arm64-smoke.yml")
+        smoke = next(
+            s
+            for s in workflow["jobs"]["arm64-smoke"]["steps"]
+            if s.get("id") == "smoke"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mock = root / "docker"
+            arguments = root / "arguments"
+            mock.write_text(
+                '#!/bin/sh\nprintf "%s\\n" "$@" >"$MOCK_ARGUMENTS"\n'
+                'exit "$MOCK_EXIT_CODE"\n'
+            )
+            mock.chmod(0o755)
+            for status in (0, 37):
+                with self.subTest(status=status):
+                    completed = subprocess.run(
+                        ["bash", "-euo", "pipefail", "-c", smoke["run"]],
+                        cwd=root,
+                        env={
+                            **os.environ,
+                            "PATH": f"{root}:{os.environ['PATH']}",
+                            "GITHUB_WORKSPACE": directory,
+                            "MOCK_ARGUMENTS": str(arguments),
+                            "MOCK_EXIT_CODE": str(status),
+                        },
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(completed.returncode, status, completed.stderr)
+                    self.assertTrue((root / "artifacts/arm64/smoke.log").is_file())
+                    argv = shlex.split(smoke["run"])
+                    self.assertIn(argv[argv.index("-c") + 1], arguments.read_text())
 
     def test_cache_trust_or_freshness_drift_is_rejected(self):
         for action in ("validator-image", "audit-python"):
@@ -158,6 +328,282 @@ class GraphTests(unittest.TestCase):
             self.assertTrue(
                 all(line.startswith("compose -p dotfiles-ci-") for line in lines)
             )
+
+
+@unittest.skipUnless(
+    shutil.which("pwsh"), "PowerShell required for mocked WSL lifecycle"
+)
+class WslSafetyTests(unittest.TestCase):
+    def run_harness(self, scenario):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace = root / "checkout with ' apostrophe"
+            workspace.mkdir()
+            rootfs = root / "ubuntu rootfs.tar"
+            if scenario == "directory-rootfs":
+                rootfs.mkdir()
+            elif scenario != "missing-rootfs":
+                rootfs.touch()
+            mock = root / "mock-wsl.ps1"
+            mock.write_text(r"""
+param([string]$Target, [string]$Workspace, [string]$Rootfs, [string]$Scenario)
+$ErrorActionPreference = "Stop"
+$global:wslCalls = [System.Collections.Generic.List[object]]::new()
+$global:wslRegistered = $false
+$global:wslDistroName = $null
+$global:wslInstallPath = $null
+$global:wslPathCount = 0
+function wsl.exe {
+  $arguments = @($args)
+  $stdin = @($input) -join "`n"
+  $global:wslCalls.Add(@{arguments = $arguments; stdin = $stdin})
+  $global:LASTEXITCODE = 0
+  switch ($arguments[0]) {
+    "--list" {
+      if ($Scenario -eq "list-failure") { $global:LASTEXITCODE = 20; return }
+      if ($Scenario -eq "cleanup-list-failure" -and $global:wslDistroName) {
+        $global:LASTEXITCODE = 20
+        return
+      }
+      ("Ubuntu-24.04".ToCharArray() -join "`0")
+      if ($Scenario -eq "existing-name") {
+        Get-Variable -Name distro -Scope 2 -ValueOnly
+      }
+      if ($global:wslRegistered) { ($global:wslDistroName.ToCharArray() -join "`0") }
+      return
+    }
+    "--import" {
+      $global:wslDistroName = $arguments[1]
+      $global:wslInstallPath = $arguments[2]
+      if ($Scenario -ne "import-failure") { $global:wslRegistered = $true }
+      if ($Scenario -in @("import-failure", "partial-import-failure")) {
+        $global:LASTEXITCODE = 21
+      }
+      return
+    }
+    "--unregister" {
+      if ($Scenario -eq "cleanup-failure") { $global:LASTEXITCODE = 22; return }
+      if ($Scenario -eq "cleanup-removes-directory") {
+        Remove-Item -LiteralPath $global:wslInstallPath -Recurse -Force
+      }
+      $global:wslRegistered = $false
+      return
+    }
+    "--distribution" {
+      if ($arguments[5] -eq "wslpath") {
+        $global:wslPathCount++
+        if (($Scenario -eq "first-path-failure" -and $global:wslPathCount -eq 1) -or
+            ($Scenario -eq "second-path-failure" -and $global:wslPathCount -eq 2)) {
+          $global:LASTEXITCODE = 23
+          return
+        }
+        if ($global:wslPathCount -eq 1) { "/mnt/checkout with ' apostrophe" }
+        else { "/mnt/checkout with ' apostrophe/artifacts/wsl" }
+      } elseif ($arguments[5] -eq "bash") {
+        if (($Scenario -eq "setup-failure" -and $arguments[3] -eq "root") -or
+            ($Scenario -eq "bootstrap-failure" -and $arguments[3] -eq "dotfiles-e2e")) {
+          $global:LASTEXITCODE = 24
+        }
+      } else { throw "Unexpected WSL executable" }
+      return
+    }
+    default { throw "Unexpected WSL invocation" }
+  }
+}
+$failure = $null
+try {
+  $tokens = $null
+  $parseErrors = $null
+  [System.Management.Automation.Language.Parser]::ParseFile(
+    $Target, [ref]$tokens, [ref]$parseErrors
+  ) | Out-Null
+  if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+  if ($Scenario -eq "env-rootfs") {
+    $env:DOTFILES_WSL_ROOTFS = $Rootfs
+    & $Target -Workspace $Workspace
+  } else {
+    & $Target -Workspace $Workspace -Rootfs $Rootfs
+  }
+} catch { $failure = "$($_.Exception.Message) at $($_.ScriptStackTrace)" }
+@{
+  calls = $global:wslCalls.ToArray()
+  failure = $failure
+  registered = $global:wslRegistered
+  installDirExists = ($global:wslInstallPath -and (Test-Path -LiteralPath $global:wslInstallPath))
+} | ConvertTo-Json -Depth 8 -Compress
+""")
+            completed = subprocess.run(
+                [
+                    "pwsh",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-File",
+                    str(mock),
+                    "-Target",
+                    str(ROOT / "tests/e2e/test-wsl.ps1"),
+                    "-Workspace",
+                    str(workspace),
+                    "-Rootfs",
+                    str(rootfs),
+                    "-Scenario",
+                    scenario,
+                ],
+                env={**os.environ, "TMPDIR": directory},
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            self.assertFalse(completed.stderr, completed.stderr)
+            report = json.loads(completed.stdout)
+            for call in report["calls"]:
+                if call["arguments"][0] == "--distribution":
+                    self.assertEqual(call["arguments"][2], "--user")
+                    self.assertIn(call["arguments"][3], ("root", "dotfiles-e2e"))
+                    self.assertRegex(
+                        call["arguments"][1], r"^dotfiles-e2e-[0-9a-f]{32}$"
+                    )
+                if call["stdin"]:
+                    subprocess.run(
+                        ["bash", "-n"],
+                        input=call["stdin"] + "\r\n",
+                        text=True,
+                        check=True,
+                    )
+            return report
+
+    def test_disposable_distro_and_explicit_users(self):
+        for scenario in ("success", "env-rootfs", "cleanup-removes-directory"):
+            with self.subTest(scenario=scenario):
+                report = self.run_harness(scenario)
+                self.assertIsNone(report["failure"])
+                self.assertFalse(report["registered"])
+                self.assertFalse(report["installDirExists"])
+                calls = report["calls"]
+                imported = next(
+                    c["arguments"] for c in calls if c["arguments"][0] == "--import"
+                )
+                self.assertRegex(imported[1], r"^dotfiles-e2e-[0-9a-f]{32}$")
+                self.assertEqual(imported[-2:], ["--version", "2"])
+                unregistered = next(
+                    c["arguments"] for c in calls if c["arguments"][0] == "--unregister"
+                )
+                self.assertEqual(unregistered, ["--unregister", imported[1]])
+                executions = [c for c in calls if c["arguments"][0] == "--distribution"]
+                self.assertEqual(len(executions), 4)
+                self.assertTrue(
+                    all(c["arguments"][1] == imported[1] for c in executions)
+                )
+                setup, bootstrap = executions[-2:]
+                self.assertEqual(setup["arguments"][3], "root")
+                self.assertNotIn("--yes", setup["stdin"])
+                self.assertIn("useradd --create-home", setup["stdin"])
+                self.assertIn("microsoft.*wsl2", setup["stdin"])
+                self.assertEqual(bootstrap["arguments"][3], "dotfiles-e2e")
+                self.assertEqual(
+                    bootstrap["arguments"][-3:],
+                    [
+                        "--",
+                        "/mnt/checkout with ' apostrophe",
+                        "/mnt/checkout with ' apostrophe/artifacts/wsl",
+                    ],
+                )
+                self.assertIn('"$HOME" == /home/dotfiles-e2e', bootstrap["stdin"])
+                self.assertIn(
+                    "--profile base --conflict-policy backup --yes", bootstrap["stdin"]
+                )
+                self.assertNotIn("/mnt/checkout", bootstrap["stdin"])
+
+    def test_shell_guards_reject_personal_context_before_sudo(self):
+        report = self.run_harness("success")
+        script = next(
+            c["stdin"]
+            for c in report["calls"]
+            if c["arguments"][0] == "--distribution"
+            and c["arguments"][3] == "dotfiles-e2e"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "id").write_text('#!/bin/sh\nprintf "%s\\n" "$MOCK_USER"\n')
+            (root / "sudo").write_text('#!/bin/sh\ntouch "$SUDO_CALLED"\nexit 99\n')
+            (root / "id").chmod(0o755)
+            (root / "sudo").chmod(0o755)
+            for distro, user in (
+                ("Ubuntu-24.04", "dotfiles-e2e"),
+                ("dotfiles-e2e-test", "personal-user"),
+                ("dotfiles-e2e-test", "dotfiles-e2e"),
+            ):
+                with self.subTest(distro=distro, user=user):
+                    completed = subprocess.run(
+                        ["bash", "-s", "--", directory, directory],
+                        input=script,
+                        env={
+                            **os.environ,
+                            "PATH": f"{root}:{os.environ['PATH']}",
+                            "HOME": directory,
+                            "WSL_DISTRO_NAME": distro,
+                            "MOCK_USER": user,
+                            "SUDO_CALLED": str(root / "called"),
+                        },
+                        text=True,
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    self.assertNotEqual(completed.returncode, 0)
+                    self.assertFalse((root / "called").exists())
+
+    def test_refuses_missing_rootfs_or_existing_distro(self):
+        for scenario in (
+            "missing-rootfs",
+            "directory-rootfs",
+            "list-failure",
+            "existing-name",
+        ):
+            with self.subTest(scenario=scenario):
+                report = self.run_harness(scenario)
+                self.assertIsNotNone(report["failure"])
+                self.assertTrue(
+                    all(c["arguments"][0] == "--list" for c in report["calls"])
+                )
+
+    def test_failures_stop_bootstrap_and_always_dispose_owned_distro(self):
+        for scenario in (
+            "import-failure",
+            "partial-import-failure",
+            "first-path-failure",
+            "second-path-failure",
+            "setup-failure",
+            "bootstrap-failure",
+        ):
+            with self.subTest(scenario=scenario):
+                report = self.run_harness(scenario)
+                self.assertIsNotNone(report["failure"])
+                self.assertIn("failed with exit code", report["failure"])
+                self.assertFalse(report["registered"])
+                self.assertFalse(report["installDirExists"])
+                calls = report["calls"]
+                cleanup = [c for c in calls if c["arguments"][0] == "--unregister"]
+                self.assertEqual(len(cleanup), 0 if scenario == "import-failure" else 1)
+                bootstrap = [
+                    c
+                    for c in calls
+                    if c["arguments"][0] == "--distribution"
+                    and c["arguments"][3] == "dotfiles-e2e"
+                ]
+                self.assertEqual(
+                    len(bootstrap), 1 if scenario == "bootstrap-failure" else 0
+                )
+
+    def test_cleanup_failure_is_not_hidden_or_disk_deleted(self):
+        for scenario, command in (
+            ("cleanup-failure", "--unregister"),
+            ("cleanup-list-failure", "--list"),
+        ):
+            with self.subTest(scenario=scenario):
+                report = self.run_harness(scenario)
+                self.assertIn(command, report["failure"])
+                self.assertTrue(report["registered"])
+                self.assertTrue(report["installDirExists"])
 
 
 if __name__ == "__main__":

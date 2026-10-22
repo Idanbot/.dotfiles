@@ -392,9 +392,10 @@ Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
 `-- installed.tsv
 ```
 
-On-machine logs and state use mode `0600`. Persisted text logs have ANSI
-sequences removed and common secret assignments redacted. JSONL events include
-UTC time, run ID, section/stage, level, and message. The newest 20 log pairs are
+On-machine state directories use mode `0700`; logs and state files use `0600`.
+Persisted text logs have ANSI sequences removed and common secret assignments
+redacted. JSONL events include
+UTC time, run ID, section/stage, level, and message. The newest 20 log files are
 retained by default. JSONL fields escape quotes, backslashes, and control
 characters so error messages cannot corrupt the event stream.
 
@@ -412,7 +413,9 @@ dot doctor
 ```
 
 `dot doctor` validates commands, managed configuration, runtime shims, source
-integrity, private state permissions, and the install ownership ledger. Use
+integrity, private state permissions, and the install ownership ledger. It
+defaults to the installed selection; use `--sections` to choose a scope or
+`--all` to inspect every section. Shell syntax is checked even in quick mode. Use
 `--quick` to skip interactive shell and tmux runtime probes, `--json` for a
 JSON-only report, and `--strict` to treat warnings as failures. Failed checks
 include a focused repair command where one is available.
@@ -426,6 +429,10 @@ dot status                 repository, chezmoi, run, and ledger status
 dot diff                   preview managed changes
 dot sync [install flags]   fast-forward pull and reliable install
 dot doctor [flags]         health and acceptance checks
+dot check-local --json     offline, code-only local checks; nothing uploaded
+dot receipt [args]         create or compare a software inventory receipt offline
+dot capture [args]         propose allowlisted settings as a private patch
+dot audit --installed     inspect observed-version CVEs; offline unless --online
 dot privacy                audit telemetry and nonessential traffic controls
 dot profile [name]         read or set the machine profile
 dot logs [run-id]          list or follow bootstrap logs
@@ -461,6 +468,33 @@ replacement. Failed candidate probes leave the original command untouched.
 HashiCorp APT sources using a dedicated `Signed-By` keyring are refreshed against
 the fingerprint in [HashiCorp's packaging guide](https://www.hashicorp.com/official-packaging-guide),
 without changing their suites or mirror choices.
+
+## Private Local Review
+
+These commands are opt-in and are never run against your machine by CI or an
+agent automatically. The local check is read-only, offline, and emits diagnostic
+codes, not configuration text, paths, account names, or command output:
+
+```bash
+dot check-local --json
+dot receipt create --output /tmp/receipt-a.json
+dot receipt compare /tmp/receipt-a.json /tmp/receipt-b.json
+dot capture --list
+dot capture tmux --output /tmp/tmux-settings.patch
+dot audit --installed
+# Explicitly send public software coordinates and versions to OSV:
+dot audit --installed --online --cache-output /tmp/advisories.json
+dot audit --installed --advisories /tmp/advisories.json
+```
+
+Receipts use existing catalog observations without executing tools. They omit
+hostnames, user paths, credentials, and cloud/project contexts, but **do contain
+software versions and selected capabilities**: review before sharing. Stale or
+missing observations stay unknown. Capture exports only listed literal settings,
+never arbitrary shell code, SSH/Git config, or credentials; it does not apply
+the patch. Explicit output files are `0600`, refuse symlinks/overwrite, and are
+never uploaded automatically. See [Local Review](docs/local-review.md) for scope,
+diagnostic codes, and limitations.
 
 Pinned chezmoi externals stay cached until their URL changes. Bootstrap retries
 transient download failures (including HTTP 429) up to four times; checksum and
@@ -899,7 +933,8 @@ Verification is tiered so a green result has a precise meaning:
 | Push/PR CI | Every change | Parallel security/static and Docker behavior suites, selector edge cases, two-pass native/WSL base install, recovery/restore/resume |
 | Agent workspace Docker E2E | Every push/PR | Both workspace backends, all registered agent launchers, MCP toggles, working-directory propagation, and failure recovery fixtures |
 | Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, full WSL-simulated, and two-pass full-native installations |
-| Real WSL2 | Manual, private self-hosted Windows runner | Actual WSL kernel, Windows interop, and target-machine acceptance |
+| Native ARM64 smoke | Monthly or manual, public-repo ARM64 runner | Real checksummed release binaries from a cold base; not full-install acceptance |
+| Real WSL2 | Manual, private self-hosted Windows runner | Disposable imported WSL2 distro; requires trusted Ubuntu 24.04 rootfs via `WSL_E2E_ROOTFS` |
 
 `ci.yml` owns triggers, concurrency, and one final **CI Result**. Two reusable
 workflows contain checks and live acceptance. `tests/suites.json` accounts for

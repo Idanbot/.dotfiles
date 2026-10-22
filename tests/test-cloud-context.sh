@@ -372,4 +372,199 @@ grep -Fq '$azure' "$DOTFILES_DIR/dot_config/starship.toml"
 grep -Fq 'command cloud-context "$@"' "$DOTFILES_DIR/dot_zshrc.tmpl"
 grep -Fq 'command cloud-context --status' "$DOTFILES_DIR/dot_zshrc.tmpl"
 
+mv "$MOCK_BIN/kubectl.disabled" "$MOCK_BIN/kubectl"
+make_mock kubectl '
+case "$*" in
+  "config current-context" | "config get-contexts lab -o name") printf "lab\n" ;;
+  "config view --minify --output jsonpath={..namespace}") printf "team-a\n" ;;
+esac'
+
+# A requested handoff belongs only to this invocation, never the shared files.
+(
+  export XDG_STATE_HOME="$TMP_ROOT/handoff-state"
+  state_root="$XDG_STATE_HOME/dotfiles"
+  mkdir -p "$state_root" "$TMP_ROOT/handoffs"
+  printf 'export AWS_PROFILE=stale-shared\n' >"$state_root/cloud-context.env"
+  shared_before="$(sha256sum "$state_root/cloud-context.env")"
+  output="$TMP_ROOT/handoffs/current.env"
+  CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --load workstation >/dev/null
+  [[ -s "$output" && "$(stat -c '%a' "$output")" == 600 ]]
+  grep -Fq 'export AWS_PROFILE=work' "$output"
+  [[ "$(sha256sum "$state_root/cloud-context.env")" == "$shared_before" ]]
+  rm "$output"
+  CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --test all --yes >/dev/null
+  [[ -s "$output" && ! -e "$state_root/cloud-context-test.env" ]]
+  grep -Fq 'export CLOUD_CONTEXT_TEST_AWS_ACCOUNT=000000000042' "$output"
+  rm "$output"
+  CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --test-clear >/dev/null
+  [[ -s "$output" ]]
+  grep -Fq 'unset CLOUD_CONTEXT_TEST_AWS_ACCOUNT' "$output"
+  rm "$output"
+  rm -rf "$state_root/cloud-context-test"
+  CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --test-clear >/dev/null
+  [[ ! -e "$output" ]]
+  CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --help >/dev/null
+  [[ ! -e "$output" ]]
+  if CLOUD_CONTEXT_ENV_OUTPUT="$output" "$SCRIPT" --test aws </dev/null >/dev/null 2>&1; then
+    printf 'Unconfirmed fixture change succeeded\n' >&2
+    exit 1
+  fi
+  [[ ! -e "$output" ]]
+)
+
+sed -n '/^_cloud_context_source_env() {/,/^alias cctx=/p' \
+  "$DOTFILES_DIR/dot_zshrc.tmpl" >"$TMP_ROOT/wrapper.zsh"
+ln -s "$SCRIPT" "$MOCK_BIN/cloud-context"
+mkdir -p "$TMP_ROOT/no-handoff"
+printf '#!/bin/sh\nexit 0\n' >"$TMP_ROOT/no-handoff/cloud-context"
+chmod +x "$TMP_ROOT/no-handoff/cloud-context"
+wrapper_failures=0
+for scenario in startup read-only provider-only failed no-handoff-aws no-handoff-test successful fixtures; do
+  wrapper_home="$TMP_ROOT/wrapper-$scenario"
+  mkdir -p "$wrapper_home/.config/dotfiles/cloud-contexts"
+  cp "$PROFILE" "$wrapper_home/.config/dotfiles/cloud-contexts/workstation.tsv"
+  if ! HOME="$wrapper_home" XDG_CONFIG_HOME="$wrapper_home/.config" \
+    XDG_STATE_HOME="$wrapper_home/.local/state" \
+    zsh -f -s -- "$TMP_ROOT/wrapper.zsh" "$scenario" "$TMP_ROOT/no-handoff" <<'ZSH'; then
+set -eu
+export AWS_PROFILE=work AWS_DEFAULT_PROFILE=work-default
+export AWS_REGION=eu-west-1 AWS_DEFAULT_REGION=eu-west-1
+# Another terminal writes the shared handoff without changing this shell.
+FZF_PICK=personal command cloud-context --select aws >/dev/null
+if [[ "$2" == startup ]]; then
+  source "$1"
+  [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 ]]
+  exit
+fi
+source "$1"
+export AWS_PROFILE=work AWS_DEFAULT_PROFILE=work-default
+export AWS_REGION=eu-west-1 AWS_DEFAULT_REGION=eu-west-1
+assert_original_aws() {
+  [[ "$AWS_PROFILE" == work && "$AWS_DEFAULT_PROFILE" == work-default &&
+    "$AWS_REGION" == eu-west-1 && "$AWS_DEFAULT_REGION" == eu-west-1 ]]
+}
+case "$2" in
+  read-only)
+    for option in --help help --status status --list list ''; do
+      if [[ -n "$option" ]]; then
+        cloud-context "$option" >/dev/null
+      else
+        cloud-context >/dev/null
+      fi
+      assert_original_aws
+    done
+    cloud-context prompt aws >/dev/null
+    assert_original_aws
+    cloud-context --save unchanged >/dev/null
+    assert_original_aws
+    ;;
+  provider-only)
+    FZF_PICK=project-456 cloud-context --select gcloud >/dev/null
+    assert_original_aws
+    cloud-context --clear gcloud >/dev/null
+    assert_original_aws
+    cloud-context --test-clear >/dev/null
+    assert_original_aws
+    ;;
+  failed)
+    cloud-context --load missing >/dev/null 2>&1 && exit 1
+    [[ $? == 1 ]]
+    assert_original_aws
+    FZF_PICK=missing cloud-context --select aws >/dev/null 2>&1 && exit 1
+    assert_original_aws
+    cloud-context --unknown >/dev/null 2>&1 && exit 1
+    [[ $? == 2 ]]
+    assert_original_aws
+    ;;
+  no-handoff-aws | no-handoff-test)
+    export PATH="$3:$PATH"
+    if [[ "$2" == no-handoff-aws ]]; then
+      cloud-context --recent >/dev/null
+    else
+      printf 'export AWS_PROFILE=stale-fixture\n' >"$XDG_STATE_HOME/dotfiles/cloud-context-test.env"
+      cloud-context --test aws --yes >/dev/null
+    fi
+    assert_original_aws
+    ;;
+  successful)
+    cloud-context --load workstation >/dev/null
+    [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 &&
+      ! -v AWS_DEFAULT_PROFILE ]]
+    FZF_PICK=personal cloud-context --select aws >/dev/null
+    [[ "$AWS_PROFILE" == personal && "$AWS_REGION" == us-east-2 ]]
+    # Identical generated content must still apply to the current caller.
+    export AWS_PROFILE=manual AWS_REGION=manual
+    FZF_PICK=personal cloud-context --select aws >/dev/null
+    [[ "$AWS_PROFILE" == personal && "$AWS_REGION" == us-east-2 ]]
+    cloud-context --clear aws >/dev/null
+    [[ ! -v AWS_PROFILE && ! -v AWS_REGION && ! -v AWS_DEFAULT_REGION ]]
+    ;;
+  fixtures)
+    export KUBECONFIG="$HOME/original kube" CLOUDSDK_CONFIG="$HOME/original gcloud"
+    export AWS_CONFIG_FILE="$HOME/original config" AWS_DEFAULT_PROFILE=''
+    unset AWS_SHARED_CREDENTIALS_FILE AZURE_CONFIG_DIR CLOUD_CONTEXT_TEST_AWS_ACCOUNT
+    cloud-context --test all --yes >/dev/null
+    [[ "$AWS_PROFILE" == cloud-context-test &&
+      "$CLOUD_CONTEXT_TEST_AWS_ACCOUNT" == 000000000042 &&
+      "$KUBECONFIG" == *cloud-context-test/kube/config ]]
+    cloud-context --test-clear aws >/dev/null
+    [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 &&
+      -v AWS_DEFAULT_PROFILE && -z "$AWS_DEFAULT_PROFILE" &&
+      "$AWS_CONFIG_FILE" == "$HOME/original config" &&
+      ! -v AWS_SHARED_CREDENTIALS_FILE && ! -v CLOUD_CONTEXT_TEST_AWS_ACCOUNT &&
+      "$KUBECONFIG" == *cloud-context-test/kube/config ]]
+    cloud-context --test-clear >/dev/null
+    [[ "$KUBECONFIG" == "$HOME/original kube" &&
+      "$CLOUDSDK_CONFIG" == "$HOME/original gcloud" &&
+      ! -v AZURE_CONFIG_DIR && "$AWS_PROFILE" == work &&
+      ! -e "$XDG_STATE_HOME/dotfiles/cloud-context-test.env" &&
+      ! -e "$XDG_STATE_HOME/dotfiles/cloud-context-test" ]]
+    cloud-context --help >/dev/null
+    [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 ]]
+    ;;
+esac
+ZSH
+    printf 'Cloud wrapper regression failed: %s\n' "$scenario" >&2
+    ((wrapper_failures += 1))
+  fi
+done
+[[ "$wrapper_failures" == 0 ]]
+
+# Both real CLI calls finish writing before either wrapper may source its output.
+(
+  export HOME="$TMP_ROOT/concurrent-home" TMPDIR="$TMP_ROOT/handoffs"
+  export XDG_CONFIG_HOME="$HOME/.config" XDG_STATE_HOME="$HOME/.local/state"
+  export REAL_CLOUD_CONTEXT="$SCRIPT" HANDOFF_BARRIER="$TMP_ROOT/barrier"
+  mkdir -p "$TMP_ROOT/concurrent-bin" "$HANDOFF_BARRIER"
+  cat >"$TMP_ROOT/concurrent-bin/cloud-context" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+"$REAL_CLOUD_CONTEXT" "$@"
+printf '%s\n' "${CLOUD_CONTEXT_ENV_OUTPUT:-shared}" >"$HANDOFF_BARRIER/output-$FZF_PICK"
+touch "$HANDOFF_BARRIER/$FZF_PICK"
+until [[ -e "$HANDOFF_BARRIER/work" && -e "$HANDOFF_BARRIER/personal" ]]; do
+  sleep 0.01
+done
+EOF
+  chmod +x "$TMP_ROOT/concurrent-bin/cloud-context"
+  export PATH="$TMP_ROOT/concurrent-bin:$PATH"
+  pids=()
+  for profile in work personal; do
+    timeout 10 zsh -f -c '
+      set -eu
+      source "$1"
+      FZF_PICK="$2" cloud-context --select aws >/dev/null
+      [[ "$AWS_PROFILE" == "$2" ]]
+    ' _ "$TMP_ROOT/wrapper.zsh" "$profile" &
+    pids+=("$!")
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid"
+  done
+  work_output="$(<"$HANDOFF_BARRIER/output-work")"
+  personal_output="$(<"$HANDOFF_BARRIER/output-personal")"
+  [[ "$work_output" != "$personal_output" ]]
+  [[ ! -e "$work_output" && ! -e "$personal_output" ]]
+)
+
 printf 'Cloud context test passed\n'

@@ -3,6 +3,8 @@
 
 import argparse
 from pathlib import Path
+import re
+import shlex
 
 import yaml
 
@@ -20,10 +22,94 @@ def needs(job):
     return {value} if isinstance(value, str) else set(value)
 
 
+def platform_coverage(workflows):
+    arm = workflows["arm64-smoke.yml"]
+    assert set(triggers(arm)) == {"schedule", "workflow_dispatch"}
+    assert triggers(arm)["schedule"] == [{"cron": "29 5 8 * *"}]
+    assert arm["permissions"] == {"contents": "read"}
+    assert arm["concurrency"]["cancel-in-progress"] is False
+    assert all(
+        key in arm["concurrency"]["group"]
+        for key in ("github.event_name", "workflow_dispatch", "github.run_id")
+    )
+    assert set(arm["jobs"]) == {"arm64-smoke"}
+    job = arm["jobs"]["arm64-smoke"]
+    assert job["runs-on"] == "ubuntu-24.04-arm"
+    assert 0 < job["timeout-minutes"] <= 20
+    assert job["if"] == "github.event.repository.private == false"
+    assert not job.get("strategy"), "Periodic ARM smoke is not a full profile matrix"
+    assert job["defaults"]["run"]["shell"] == "bash"
+    assert job.get("continue-on-error", False) is False
+    steps = job["steps"]
+    base = next(step for step in steps if step.get("id") == "base")
+    build = shlex.split(base["run"])
+    assert '[[ "$(uname -m)" == aarch64 ]]' in base["run"]
+    for flag, value in (
+        ("--target", "base"),
+        ("--platform", "linux/arm64"),
+        ("-f", ".github/e2e/Dockerfile.ubuntu-24.04"),
+        ("-t", "dotfiles-arm64-smoke"),
+    ):
+        assert build[build.index(flag) + 1] == value
+    assert build.index("docker") < build.index("--target")
+    smoke = next(step for step in steps if step.get("id") == "smoke")
+    assert "if" not in base and "if" not in smoke
+    run = shlex.split(smoke["run"])
+    assert run[run.index("--platform") + 1] == "linux/arm64"
+    assert "DOTFILES_WSL=false" in run and "dotfiles-arm64-smoke" in run
+    position = run.index("-c")
+    assert run[position - 3 : position] == ["bash", "-euo", "pipefail"]
+    script = run[position + 1]
+    for required in (
+        '"$(uname -m)" == aarch64',
+        '"$(dpkg --print-architecture)" == arm64',
+        "/dotfiles/scripts/install-chezmoi.sh",
+        "install_github_archive eza",
+        "install_github_binary herdr",
+        "package_metadata core eza sha256_arm64",
+        "package_metadata terminal herdr sha256_arm64",
+        '"$HOME/.local/bin/$binary" --version',
+    ):
+        assert required in script, required
+    assert "|| true" not in smoke["run"] and "|| true" not in base["run"]
+    assert steps.index(base) < steps.index(smoke)
+    assert any(
+        "upload-artifact@" in step.get("uses", "") and step.get("if") == "always()"
+        for step in steps
+    )
+
+    wsl = workflows["wsl-e2e.yml"]
+    assert set(triggers(wsl)) == {"workflow_dispatch"}, "Real WSL is opt-in only"
+    assert wsl["permissions"] == {"contents": "read"}
+    assert wsl["concurrency"]["cancel-in-progress"] is False
+    assert set(wsl["jobs"]) == {"wsl"}
+    host = wsl["jobs"]["wsl"]
+    assert host["runs-on"] == ["self-hosted", "windows", "x64", "wsl-ubuntu-24.04"]
+    bootstrap = next(
+        step for step in host["steps"] if "test-wsl.ps1" in step.get("run", "")
+    )
+    assert bootstrap["shell"] == "pwsh"
+    assert bootstrap["env"]["DOTFILES_WSL_ROOTFS"] == "${{ vars.WSL_E2E_ROOTFS }}"
+    assert '-Rootfs "$env:DOTFILES_WSL_ROOTFS"' in bootstrap["run"]
+    for workflow in (arm, wsl):
+        for job in workflow["jobs"].values():
+            assert job.get("continue-on-error", False) is False
+            for step in job["steps"]:
+                assert step.get("continue-on-error", False) is False
+                if "uses" in step:
+                    assert re.fullmatch(
+                        r"(?:actions/(?:checkout|upload-artifact)|step-security/harden-runner)@[0-9a-f]{40}",
+                        step["uses"],
+                    ), (
+                        "Acceptance must not restore validators, install state, or unpinned actions"
+                    )
+
+
 def check(root):
     workflows = {
         path.name: load(path) for path in (root / ".github/workflows").glob("*.yml")
     }
+    platform_coverage(workflows)
     main = workflows["ci.yml"]
     reusable = [
         name for name, wf in workflows.items() if "workflow_call" in triggers(wf)
@@ -163,7 +249,6 @@ def check(root):
     assert canary_steps[0]["if"] == "steps.upgrades.outputs.changed == 'true'"
     assert "--changed true" in canary_steps[0]["run"]
     assert "schedule" in triggers(workflows["native-vm-e2e.yml"])
-    assert set(triggers(workflows["wsl-e2e.yml"])) == {"workflow_dispatch"}
 
     for action in ("validator-image", "audit-python"):
         steps = load(root / f".github/actions/{action}/action.yml")["runs"]["steps"]

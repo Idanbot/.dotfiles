@@ -6,7 +6,6 @@ set -euo pipefail
 DOTFILES_SOURCE_DIR="${DOTFILES_SOURCE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 # shellcheck source=scripts/environment.sh
 source "$DOTFILES_SOURCE_DIR/scripts/environment.sh"
-export PATH="$HOME/.local/bin:$HOME/.local/share/npm/bin:$HOME/.cargo/bin:$HOME/.fzf/bin:/usr/local/go/bin:$PATH"
 
 # Modules are loaded together; their public helpers may call across boundaries.
 # shellcheck source=scripts/lib/logging.sh
@@ -19,3 +18,8 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib/ownership.sh"
 source "$DOTFILES_SOURCE_DIR/scripts/lib/packages.sh"
 # shellcheck source=scripts/lib/runtimes.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib/runtimes.sh"
+
+# Keep preflight's active executable selection; missing managed directories are
+# fallbacks. Installers deliberately prepend a newly selected runtime themselves.
+append_runtime_paths "$HOME/.local/bin" "$(npm_global_prefix)/bin" \
+  "$HOME/.cargo/bin" "$HOME/.fzf/bin" /usr/local/go/bin

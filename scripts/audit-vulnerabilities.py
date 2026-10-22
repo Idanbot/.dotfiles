@@ -11,8 +11,14 @@ import urllib.error
 import urllib.request
 
 import yaml
-from cvss import CVSS2, CVSS3, CVSS4
-from cvss.exceptions import CVSSError
+try:
+    from cvss import CVSS2, CVSS3, CVSS4
+    from cvss.exceptions import CVSSError
+except ImportError:
+    # Offline machine reports remain usable without installing audit extras.
+    # Vector-only findings stay unscored, never "clean" or lower severity.
+    CVSS2 = CVSS3 = CVSS4 = None
+    CVSSError = ValueError
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -167,11 +173,11 @@ def severity(vulnerability):
             try:
                 if re.fullmatch(r"\d+(?:\.\d+)?", raw):
                     score = float(raw)
-                elif raw.startswith("CVSS:4.0/"):
+                elif raw.startswith("CVSS:4.0/") and CVSS4 is not None:
                     score = float(CVSS4(raw).scores()[0])
-                elif raw.startswith(("CVSS:3.0/", "CVSS:3.1/")):
+                elif raw.startswith(("CVSS:3.0/", "CVSS:3.1/")) and CVSS3 is not None:
                     score = float(CVSS3(raw).scores()[0])
-                elif item.get("type") == "CVSS_V2" or raw.startswith(("AV:", "CVSS:2.0/")):
+                elif CVSS2 is not None and (item.get("type") == "CVSS_V2" or raw.startswith(("AV:", "CVSS:2.0/"))):
                     score = float(CVSS2(raw.removeprefix("CVSS:2.0/")).scores()[0])
                 else:
                     continue

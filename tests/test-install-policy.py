@@ -231,6 +231,36 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(candidate.call_args.args[2], node)
         self.assertEqual(output.getvalue(), "7.0.3\n")
 
+    def test_candidate_cli_does_not_propose_an_unselected_node_upgrade(self):
+        args = ["policy", "candidate", "--source", str(ROOT), "--tool", "languages.npm"]
+        node = policy.load_versions(ROOT / "packages.yaml")["languages"]["node"]
+        with patch.object(sys, "argv", args), \
+                patch.object(policy, "upgrade_candidate", return_value="12.3.0") as candidate, \
+                contextlib.redirect_stdout(io.StringIO()):
+            policy.main()
+        self.assertEqual(candidate.call_count, 1)
+        self.assertEqual(candidate.call_args.args[2], node)
+
+    def test_candidate_cli_accepts_the_effective_proposed_node(self):
+        args = ["policy", "candidate", "--source", str(ROOT), "--tool", "languages.typescript",
+                "--node", "27.0.0"]
+        with patch.object(sys, "argv", args), \
+                patch.object(policy, "upgrade_candidate", return_value="7.1.0") as candidate, \
+                contextlib.redirect_stdout(io.StringIO()):
+            policy.main()
+        self.assertEqual(candidate.call_args.args[2], "27.0.0")
+
+    def test_npm_advisory_distinguishes_compatible_and_latest_stable(self):
+        data = {"dist-tags": {"latest": "13.0.0"}, "versions": {
+            "12.1.0": {"engines": {"node": ">=26"}},
+            "13.0.0": {"engines": {"node": ">=27"}},
+        }}
+        with patch.object(policy.software, "catalog", return_value=[self.entry("languages.npm", "12.0.0")]), \
+                patch.object(policy, "get_json", return_value=data):
+            report = policy.recommendations(ROOT)
+        self.assertIn("| languages.npm | 12.0.0 | 12.1.0 | 13.0.0 |", report)
+        self.assertIn("outside policy: major", report)
+
     def test_pypi_candidates_skip_yanked_empty_and_prerelease_versions(self):
         data = {"info": {"version": "9.0.0"}, "releases": {
             "1.1.0": [{"yanked": False}],

@@ -9,7 +9,8 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 registry=(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/section-state.py" --source "$DOTFILES_SOURCE_DIR")
 VALID_SECTIONS="$("${registry[@]}" list | paste -sd, -)"
-SECTIONS="$VALID_SECTIONS"
+SECTIONS=""
+EXPLICIT_SELECTION=false
 ACCEPTANCE=false
 JSON_OUTPUT=false
 QUICK=false
@@ -18,11 +19,22 @@ STRICT=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --sections)
+      [[ $# -ge 2 ]] || {
+        printf 'Missing value for --sections\n' >&2
+        exit 2
+      }
       SECTIONS="${2:-}"
+      EXPLICIT_SELECTION=true
       shift 2
       ;;
     --sections=*)
       SECTIONS="${1#*=}"
+      EXPLICIT_SELECTION=true
+      shift
+      ;;
+    --all)
+      SECTIONS="$VALID_SECTIONS"
+      EXPLICIT_SELECTION=true
       shift
       ;;
     --acceptance)
@@ -42,7 +54,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -h | --help)
-      printf 'Usage: scripts/doctor.sh [--acceptance] [--sections a,b] [--json] [--quick] [--strict]\n'
+      printf 'Usage: scripts/doctor.sh [--acceptance] [--sections a,b | --all] [--json] [--quick] [--strict]\n'
       exit 0
       ;;
     *)
@@ -52,6 +64,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$EXPLICIT_SELECTION" == false ]]; then
+  if ! SECTIONS="$("${registry[@]}" --state "$(managed_state_root)" selected 2>/dev/null)"; then
+    printf 'No installed selection available; run bootstrap or specify --sections a,b or --all\n' >&2
+    exit 2
+  fi
+fi
 if [[ -z "$SECTIONS" ]]; then
   printf 'At least one section is required\n' >&2
   exit 2
@@ -218,13 +236,19 @@ if selected zsh; then
   doctor_step "Shell"
   check_file "$HOME/.zshrc" zsh-config
   check_file "$HOME/.oh-my-zsh/oh-my-zsh.sh" oh-my-zsh
-  if [[ "$QUICK" == false ]] && command -v timeout >/dev/null 2>&1; then
-    if timeout 8 zsh -dfi -c 'source ~/.zshrc; command -v node >/dev/null 2>&1 || true; exit' </dev/null >/dev/null 2>&1; then
-      result pass zsh-startup "interactive config loaded"
-    else
-      result fail zsh-startup "interactive config failed or exceeded 8s" \
-        "run: timeout 8 zsh -dfixc 'source ~/.zshrc'"
+  if timeout 8 zsh -dfn "$HOME/.zshrc" </dev/null >/dev/null 2>&1; then
+    result pass zsh-syntax "configuration syntax is valid"
+    if [[ "$QUICK" == false ]]; then
+      if timeout 8 zsh -dfi -c 'source "$HOME/.zshrc"' </dev/null >/dev/null 2>&1; then
+        result pass zsh-startup "interactive config loaded"
+      else
+        result fail zsh-startup "interactive config failed or exceeded 8s" \
+          "run: timeout 8 zsh -dfi -c 'source ~/.zshrc'"
+      fi
     fi
+  else
+    result fail zsh-syntax "configuration syntax check failed or exceeded 8s" \
+      "run: zsh -n ~/.zshrc"
   fi
 fi
 

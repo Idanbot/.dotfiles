@@ -5,6 +5,8 @@ set -euo pipefail
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 TMP_HOME=$(mktemp -d)
 trap 'rm -rf "$TMP_HOME"' EXIT
+export XDG_CONFIG_HOME="$TMP_HOME/.config" XDG_DATA_HOME="$TMP_HOME/.local/share"
+export XDG_STATE_HOME="$TMP_HOME/.local/state" XDG_CACHE_HOME="$TMP_HOME/.cache"
 
 render_template() {
   local src="$1" dest="$2" is_wsl="${3:-false}"
@@ -38,7 +40,8 @@ render_template "$DOTFILES_DIR/dot_zshrc.tmpl" "$TMP_HOME/.zshrc" false
 render_template "$DOTFILES_DIR/dot_tmux.conf.tmpl" "$TMP_HOME/.tmux.conf" false
 
 if command -v zsh >/dev/null 2>&1; then
-  HOME="$TMP_HOME" ZDOTDIR="$TMP_HOME" zsh -i -c 'true'
+  HOME="$TMP_HOME" ZDOTDIR="$TMP_HOME" zsh -dfn "$TMP_HOME/.zshrc"
+  HOME="$TMP_HOME" ZDOTDIR="$TMP_HOME" zsh -dfi -c 'source "$HOME/.zshrc"'
 else
   echo "zsh not installed; skipping zsh startup"
 fi

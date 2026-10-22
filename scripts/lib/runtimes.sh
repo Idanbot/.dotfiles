@@ -208,10 +208,21 @@ npm_global_prefix() {
   printf '%s\n' "${DOTFILES_NPM_PREFIX:-$HOME/.local/share/npm}"
 }
 
+append_runtime_paths() {
+  local directory
+  for directory in "$@"; do
+    case ":$PATH:" in
+      *":$directory:"*) ;;
+      *) PATH="${PATH:+$PATH:}$directory" ;;
+    esac
+  done
+  export PATH
+}
+
 activate_node_paths() {
   local prefix
   prefix="$(npm_global_prefix)"
-  export PATH="$HOME/.local/bin:$prefix/bin:$PATH"
+  append_runtime_paths "$HOME/.local/bin" "$prefix/bin"
 }
 
 npm_install_global() {

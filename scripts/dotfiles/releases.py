@@ -38,7 +38,12 @@ def candidates(versions, baseline):
     )
 
 
-def latest_compatible(versions, baseline, rule="stable"):
+def latest_compatible(versions, baseline, rule="stable", requested=None):
+    if requested is not None:
+        if not stable(requested) or requested not in versions:
+            raise ValueError("Requested version is not an eligible stable release")
+        # Explicit review may change release lines, but not release eligibility.
+        return requested
     choices = [
         value
         for value in candidates(versions, baseline)

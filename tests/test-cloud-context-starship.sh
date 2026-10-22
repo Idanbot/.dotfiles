@@ -165,19 +165,12 @@ render_module() {
     sed $'s/\033\\[[0-9;]*m//g'
 }
 
-load_context() {
-  local result=0
-  "$SCRIPT" "$@" >/dev/null || result=$?
-  if [[ -r "$XDG_STATE_HOME/dotfiles/cloud-context.env" ]]; then
-    # shellcheck disable=SC1090
-    source "$XDG_STATE_HOME/dotfiles/cloud-context.env"
-  fi
-  if [[ -r "$XDG_STATE_HOME/dotfiles/cloud-context-test.env" ]]; then
-    # shellcheck disable=SC1090
-    source "$XDG_STATE_HOME/dotfiles/cloud-context-test.env"
-  fi
-  return "$result"
-}
+# Exercise the shipped wrapper definitions, not a test-only replay helper.
+sed -n '/^_cloud_context_source_env() {/,/^alias cctx=/p' \
+  "$DOTFILES_DIR/dot_zshrc.tmpl" >"$TMP_ROOT/wrapper.zsh"
+# shellcheck source=/dev/null
+source "$TMP_ROOT/wrapper.zsh"
+load_context() { cloud-context "$@" >/dev/null; }
 
 [[ "$(starship prompt --path "$TMP_ROOT" --status 0 --cmd-duration 0)" != *".aws_account"* ]]
 [[ -z "$(render_module custom.kubernetes_context)" ]]
@@ -204,9 +197,15 @@ FZF_PICK=personal load_context --select aws
 [[ "$(render_module aws)" == *personal* ]]
 [[ "$(render_module aws)" == *us-east-2* ]]
 [[ "$(render_module custom.aws_account)" == *210987654321* ]]
+FZF_PICK=work "$SCRIPT" --select aws >/dev/null
+load_context --help
+load_context --status
+[[ "$(render_module aws)" == *personal* ]]
+[[ "$(render_module custom.aws_account)" == *210987654321* ]]
 FZF_PICK=$'00000000-0000-0000-0000-000000000002\tSandbox' \
   load_context --select azure
 [[ "$(render_module azure)" == *Sandbox* ]]
+[[ "$(render_module aws)" == *personal* ]]
 
 long_context=organization-production-europe-west1-primary-cluster
 sed -i "s/current-context: lab/current-context: $long_context/" "$KUBECONFIG"
@@ -269,17 +268,15 @@ fi
 
 printf 'Cloud context Starship integration test passed\n'
 
-# Run the actual Zsh wrapper: a failing provider must not defer AWS changes.
-sed -n '/^_cloud_context_source_env() {/,/^alias cctx=/p' \
-  "$DOTFILES_DIR/dot_zshrc.tmpl" >"$TMP_ROOT/wrapper.zsh"
+# A partially failed clear must not apply its handoff, now or on a later read.
 zsh -f -c '
   source "$1"
   export AWS_PROFILE=work AWS_REGION=eu-west-1 AWS_DEFAULT_REGION=eu-west-1
   cloud-context --clear >/dev/null 2>&1
   result=$?
   [[ "$result" == 1 ]] || exit 1
-  [[ -z ${AWS_PROFILE:-}${AWS_REGION:-}${AWS_DEFAULT_REGION:-} ]] || exit 1
-  [[ -z "$(starship module aws)" ]] || exit 1
+  [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 ]] || exit 1
+  [[ "$(starship module aws)" == *work* ]] || exit 1
   cloud-context --status >/dev/null
-  [[ -z ${AWS_PROFILE:-}${AWS_REGION:-}${AWS_DEFAULT_REGION:-} ]]
+  [[ "$AWS_PROFILE" == work && "$AWS_DEFAULT_REGION" == eu-west-1 ]]
 ' _ "$TMP_ROOT/wrapper.zsh"

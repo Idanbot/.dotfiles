@@ -150,7 +150,7 @@ def checksum(text, asset):
     raise ValueError(f"No SHA256 found for {asset}")
 
 
-def upgrade_candidate(ident, baseline, node, meta):
+def upgrade_candidate(ident, baseline, node, meta, requested=None):
     policies = json.loads((ROOT / "scripts/update-policy.json").read_text())
     rule = policies.get(ident, "stable")
     entry = {"id": ident, "requested": baseline}
@@ -162,7 +162,7 @@ def upgrade_candidate(ident, baseline, node, meta):
         candidates = releases.release_versions(ident, meta, get_json, node=node)
         if candidates is None:
             candidates = [upstream(entry, meta)[0]]
-    return releases.latest_compatible(candidates, baseline, rule)
+    return releases.latest_compatible(candidates, baseline, rule, requested=requested)
 
 
 def integrity(entry, release, arch):
@@ -447,6 +447,8 @@ def main():
     parser.add_argument("--tool")
     parser.add_argument("--field", default="target")
     parser.add_argument("--baseline")
+    parser.add_argument("--node", help="effective Node version for candidate eligibility")
+    parser.add_argument("--version", help="explicit candidate, still subject to release eligibility")
     args = parser.parse_args()
     ROOT = args.source.resolve()
     software.ROOT = ROOT
@@ -454,10 +456,10 @@ def main():
         packages = load_versions(Path(os.environ.get("DOTFILES_PACKAGES_FILE", ROOT / "packages.yaml")))
         metadata = load_metadata(Path(os.environ.get("DOTFILES_PACKAGES_META_FILE", ROOT / "packages.meta.yaml")))
         group, key = args.tool.split(".")
-        node = (upgrade_candidate("languages.node", str(packages["languages"]["node"]), "", {})
-                if args.tool == "languages.npm" else str(packages.get("languages", {}).get("node", "")))
+        node = args.node if args.node is not None else str(packages.get("languages", {}).get("node", ""))
         print(upgrade_candidate(args.tool, args.baseline or str(packages[group][key]), node,
-                                metadata.get(group, {}).get(key, {})))
+                                metadata.get(group, {}).get(key, {}),
+                                requested=args.version.removeprefix("v") if args.version is not None else None))
         return
     if args.command == "recommendations":
         print(recommendations(ROOT), end="")

@@ -326,24 +326,30 @@ if [[ -r "$HOME/.config/dotfiles/local.zsh" ]]; then
 fi
 
 # Cloud context profiles use provider-native commands. Shell-local AWS
-# selection and isolated test config roots are applied from generated env files.
+# selection and isolated test config roots are local to the invoking shell.
 _cloud_context_source_env() {
   local state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-  [[ -r "$state_root/cloud-context.env" ]] &&
-    source "$state_root/cloud-context.env"
-  [[ -r "$state_root/cloud-context-test.env" ]] &&
-    source "$state_root/cloud-context-test.env"
-  if [[ -r "$state_root/cloud-context-test.env" &&
-    ! -e "$state_root/cloud-context-test/active" ]]; then
-    rm -f "$state_root/cloud-context-test.env"
-    rm -rf "$state_root/cloud-context-test"
-  fi
+  local env_file="$1"
+  source "$env_file" || return
+  case "${2:-}" in
+    -t | --test | --test-clear)
+      if [[ ! -e "$state_root/cloud-context-test/active" ]]; then
+        rm -f "$state_root/cloud-context-test.env"
+        rm -rf "$state_root/cloud-context-test"
+      fi
+      ;;
+  esac
 }
-_cloud_context_source_env
 cloud-context() {
-  local result=0
-  command cloud-context "$@" || result=$?
-  _cloud_context_source_env
+  local result=0 handoff_dir
+  handoff_dir="$(mktemp -d "${TMPDIR:-/tmp}/cloud-context.XXXXXXXX")" || return
+  # An absent per-call output means no shell change, even on success. Never
+  # replay shared state written by another terminal or a previous invocation.
+  CLOUD_CONTEXT_ENV_OUTPUT="$handoff_dir/env" command cloud-context "$@" || result=$?
+  if (( result == 0 )) && [[ -r "$handoff_dir/env" ]]; then
+    _cloud_context_source_env "$handoff_dir/env" "${1:-}" || result=$?
+  fi
+  rm -rf -- "$handoff_dir"
   (( result == 0 )) || return "$result"
   case "${1:-}" in
     -t | --test) command cloud-context --status ;;

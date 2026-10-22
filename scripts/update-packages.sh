@@ -139,6 +139,7 @@ warn() {
   log_warn "$*"
 }
 
+# Callers use conditionals, which suppress errexit inside these helpers.
 github_release_json() {
   local repo="$1" tag="$2" cache safe_repo safe_tag
   safe_repo="${repo//\//_}"
@@ -146,7 +147,10 @@ github_release_json() {
   cache="$WORK_DIR/release-${safe_repo}-${safe_tag}.json"
   if [[ ! -s "$cache" ]]; then
     curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
-      "https://api.github.com/repos/$repo/releases/tags/$tag" >"$cache"
+      "https://api.github.com/repos/$repo/releases/tags/$tag" >"$cache" || {
+      rm -f "$cache"
+      return 1
+    }
   fi
   printf '%s\n' "$cache"
 }
@@ -155,7 +159,7 @@ github_latest_version() {
   local repo="$1" template="${2:-}" tag prefix suffix
   [[ -n "$template" ]] || template='v{version}'
   tag="$(curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
-    "https://api.github.com/repos/$repo/releases/latest" | jq -r .tag_name)"
+    "https://api.github.com/repos/$repo/releases/latest" | jq -r .tag_name)" || return 1
   prefix="${template%%\{version\}*}"
   suffix="${template#*\{version\}}"
   [[ "$tag" == "$prefix"*"$suffix" ]] || return 1
@@ -165,27 +169,20 @@ github_latest_version() {
   printf '%s\n' "$tag"
 }
 
-npm_version() {
-  local package="$1" version="${2:-latest}" encoded
-  encoded="${package//\//%2f}"
-  curl "${CURL_ARGS[@]}" "https://registry.npmjs.org/$encoded/$version" | jq -r .version
-}
-
 npm_integrity() {
   local package="$1" version="$2" encoded
-  encoded="${package//\//%2f}"
+  encoded="${package//\//%2F}"
   curl "${CURL_ARGS[@]}" "https://registry.npmjs.org/$encoded/$version" |
     jq -r '.dist.integrity // ("sha1:" + .dist.shasum)'
-}
-
-pypi_version() {
-  curl "${CURL_ARGS[@]}" "https://pypi.org/pypi/$1/json" | jq -r .info.version
 }
 
 pypi_integrity() {
   local package="$1" version="$2" digest
   digest="$(curl "${CURL_ARGS[@]}" "https://pypi.org/pypi/$package/$version/json" |
-    jq -r '[.urls[].digests.sha256] | sort | join("\n")' | sha256sum | awk '{print $1}')"
+    jq -er '[.urls[].digests.sha256] | select(length > 0) |
+      if all(.[]; type == "string" and test("^[0-9a-fA-F]{64}$"))
+      then sort | join("\n") else error("Missing PyPI SHA256") end' |
+    sha256sum | awk '{print $1}')" || return 1
   printf 'pypi-set:%s\n' "$digest"
 }
 
@@ -203,16 +200,21 @@ render_template() {
 
 github_asset_sha() {
   local repo="$1" tag="$2" asset="$3" json digest url tmp
-  json="$(github_release_json "$repo" "$tag")"
-  digest="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .digest // empty' "$json")"
+  json="$(github_release_json "$repo" "$tag")" || return 1
+  digest="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .digest // empty' "$json")" || return 1
   if [[ "$digest" =~ ^sha256:[0-9a-fA-F]{64}$ ]]; then
     printf '%s\n' "${digest#sha256:}"
     return 0
   fi
-  url="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .browser_download_url // empty' "$json")"
+  url="$(jq -r --arg asset "$asset" '.assets[] | select(.name == $asset) | .browser_download_url // empty' "$json")" || return 1
   [[ -n "$url" ]] || return 1
   tmp="$WORK_DIR/asset-$(sha256sum <<<"$repo/$tag/$asset" | awk '{print $1}')"
-  [[ -s "$tmp" ]] || curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" -o "$tmp" "$url"
+  if [[ ! -s "$tmp" ]]; then
+    curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" -o "$tmp" "$url" || {
+      rm -f "$tmp"
+      return 1
+    }
+  fi
   sha256sum "$tmp" | awk '{print $1}'
 }
 
@@ -245,8 +247,13 @@ pinned_metadata_checksums() {
 external_archive_checksum() {
   local repo="$1" tag="$2" tmp
   tmp="$WORK_DIR/archive-$(sha256sum <<<"$repo/$tag" | awk '{print $1}')"
-  [[ -s "$tmp" ]] || curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
-    -o "$tmp" "https://codeload.github.com/$repo/tar.gz/refs/tags/$tag"
+  if [[ ! -s "$tmp" ]]; then
+    curl "${CURL_ARGS[@]}" "${GITHUB_HEADERS[@]}" \
+      -o "$tmp" "https://codeload.github.com/$repo/tar.gz/refs/tags/$tag" || {
+      rm -f "$tmp"
+      return 1
+    }
+  fi
   sha256sum "$tmp" | awk '{print $1}'
 }
 
@@ -261,44 +268,44 @@ direct_checksums() {
   local id="$1" version="$2" amd arm asset sums base
   case "$id" in
     languages.go)
-      sums="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json&include=all')"
-      amd="$(jq -r --arg asset "go${version}.linux-amd64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")"
-      arm="$(jq -r --arg asset "go${version}.linux-arm64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")"
+      sums="$(curl "${CURL_ARGS[@]}" 'https://go.dev/dl/?mode=json&include=all')" || return 1
+      amd="$(jq -r --arg asset "go${version}.linux-amd64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")" || return 1
+      arm="$(jq -r --arg asset "go${version}.linux-arm64.tar.gz" '[.[] | .files[] | select(.filename == $asset) | .sha256][0] // empty' <<<"$sums")" || return 1
       ;;
     languages.node)
-      sums="$(curl "${CURL_ARGS[@]}" "https://nodejs.org/dist/v${version}/SHASUMS256.txt")"
-      amd="$(checksum_for_asset /dev/stdin "node-v${version}-linux-x64.tar.xz" <<<"$sums")"
-      arm="$(checksum_for_asset /dev/stdin "node-v${version}-linux-arm64.tar.xz" <<<"$sums")"
+      sums="$(curl "${CURL_ARGS[@]}" "https://nodejs.org/dist/v${version}/SHASUMS256.txt")" || return 1
+      amd="$(checksum_for_asset /dev/stdin "node-v${version}-linux-x64.tar.xz" <<<"$sums")" || return 1
+      arm="$(checksum_for_asset /dev/stdin "node-v${version}-linux-arm64.tar.xz" <<<"$sums")" || return 1
       ;;
     languages.java)
       amd="$(curl "${CURL_ARGS[@]}" \
         "https://api.adoptium.net/v3/assets/feature_releases/${version%%.*}/ga?architecture=x64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
         jq -r --arg release "jdk-$version" \
-          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
+          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')" || return 1
       arm="$(curl "${CURL_ARGS[@]}" \
         "https://api.adoptium.net/v3/assets/feature_releases/${version%%.*}/ga?architecture=aarch64&heap_size=normal&image_type=jdk&jvm_impl=hotspot&os=linux&vendor=eclipse" |
         jq -r --arg release "jdk-$version" \
-          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')"
+          '[.[] | select(.release_name == $release)][0].binaries[0].package.checksum // empty')" || return 1
       ;;
     cloud.kubectl)
-      amd="$(curl "${CURL_ARGS[@]}" "https://dl.k8s.io/release/v${version}/bin/linux/amd64/kubectl.sha256")"
-      arm="$(curl "${CURL_ARGS[@]}" "https://dl.k8s.io/release/v${version}/bin/linux/arm64/kubectl.sha256")"
+      amd="$(curl "${CURL_ARGS[@]}" "https://dl.k8s.io/release/v${version}/bin/linux/amd64/kubectl.sha256")" || return 1
+      arm="$(curl "${CURL_ARGS[@]}" "https://dl.k8s.io/release/v${version}/bin/linux/arm64/kubectl.sha256")" || return 1
       ;;
     cloud.helm)
-      amd="$(curl "${CURL_ARGS[@]}" "https://get.helm.sh/helm-v${version}-linux-amd64.tar.gz.sha256sum" | awk '{print $1}')"
-      arm="$(curl "${CURL_ARGS[@]}" "https://get.helm.sh/helm-v${version}-linux-arm64.tar.gz.sha256sum" | awk '{print $1}')"
+      amd="$(curl "${CURL_ARGS[@]}" "https://get.helm.sh/helm-v${version}-linux-amd64.tar.gz.sha256sum" | awk '{print $1}')" || return 1
+      arm="$(curl "${CURL_ARGS[@]}" "https://get.helm.sh/helm-v${version}-linux-arm64.tar.gz.sha256sum" | awk '{print $1}')" || return 1
       ;;
     cloud.terraform)
       base="https://releases.hashicorp.com/terraform/${version}"
-      sums="$(curl "${CURL_ARGS[@]}" "$base/terraform_${version}_SHA256SUMS")"
-      amd="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_amd64.zip" <<<"$sums")"
-      arm="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_arm64.zip" <<<"$sums")"
+      sums="$(curl "${CURL_ARGS[@]}" "$base/terraform_${version}_SHA256SUMS")" || return 1
+      amd="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_amd64.zip" <<<"$sums")" || return 1
+      arm="$(checksum_for_asset /dev/stdin "terraform_${version}_linux_arm64.zip" <<<"$sums")" || return 1
       ;;
     cloud.aws_cli)
       amd="$(curl "${CURL_ARGS[@]}" "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-${version}.zip" |
-        sha256sum | awk '{print $1}')"
+        sha256sum | awk '{print $1}')" || return 1
       arm="$(curl "${CURL_ARGS[@]}" "https://awscli.amazonaws.com/awscli-exe-linux-aarch64-${version}.zip" |
-        sha256sum | awk '{print $1}')"
+        sha256sum | awk '{print $1}')" || return 1
       ;;
     *) return 1 ;;
   esac
@@ -411,17 +418,16 @@ audit_github() {
   add_candidate "$section" "$key" "$latest"
 }
 
-audit_npm() {
-  local section="$1" key="$2" package="$3" latest
+audit_registry() {
+  local section="$1" key="$2" node="$3" latest requested
+  local args=(candidate --source "$DOTFILES_SOURCE_DIR" --tool "$section.$key" --node "$node")
   wanted "$section.$key" || return 0
-  latest="$(npm_version "$package" 2>/dev/null)" || latest=""
-  add_candidate "$section" "$key" "$latest"
-}
-
-audit_pypi() {
-  local section="$1" key="$2" package="$3" latest
-  wanted "$section.$key" || return 0
-  latest="$(pypi_version "$package" 2>/dev/null)" || latest=""
+  requested="$(requested_version "$section.$key" 2>/dev/null || true)"
+  [[ -z "$requested" ]] || args+=(--version "$requested")
+  if ! latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" "${args[@]}" 2>/dev/null)"; then
+    warn "Could not resolve eligible release for $section.$key"
+    return 0
+  fi
   add_candidate "$section" "$key" "$latest"
 }
 
@@ -452,7 +458,8 @@ load_fixture() {
 }
 
 run_live_audit() {
-  local latest section key source reference targets="$WORK_DIR/audit-targets.tsv"
+  local latest section key source reference node proposed_node targets="$WORK_DIR/audit-targets.tsv"
+  node="$(package_version languages node)"
   PYTHONPATH="$DOTFILES_SOURCE_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" \
     /usr/bin/python3 - "$PACKAGES_FILE" "$META_FILE" >"$targets" <<'PYTARGETS'
 import re
@@ -461,6 +468,7 @@ from dotfiles.metadata import load_metadata, load_versions
 
 versions = load_versions(sys.argv[1])
 metadata = load_metadata(sys.argv[2])
+targets = []
 for section, tools in versions.items():
     for key, pin in tools.items():
         meta = metadata.get(section, {}).get(key, {})
@@ -469,29 +477,35 @@ for section, tools in versions.items():
             reference = meta["url"]
         elif not re.match(r"^\d", pin):
             continue
+        elif source == "npm":
+            reference = meta["package"]
         elif section == "languages" or source == "direct":
             source, reference = "candidate", "-"
         elif source in {"github", "apt_or_github", "external"} and meta.get("repo"):
             source, reference = "github", meta["repo"]
-        elif source == "npm":
-            reference = meta["package"]
         elif source in {"pypi", "uv", "uvx"} and meta.get("package"):
             source, reference = "pypi", meta["package"]
         else:
             continue
-        print("\t".join((section, key, source, reference)))
+        targets.append((section, key, source, reference))
+# npm eligibility depends on the selected Node proposal, not YAML ordering.
+for target in sorted(targets, key=lambda item: item[:2] != ("languages", "node")):
+    print("\t".join(target))
 PYTARGETS
   while IFS=$'\t' read -r section key source reference; do
     wanted "$section.$key" || continue
     case "$source" in
       github) audit_github "$section" "$key" "$reference" ;;
-      npm) audit_npm "$section" "$key" "$reference" ;;
-      pypi) audit_pypi "$section" "$key" "$reference" ;;
+      npm | pypi) audit_registry "$section" "$key" "$node" ;;
       install_script) audit_mutable_url "$section" "$key" "$reference" ;;
       candidate)
         latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" candidate \
           --source "$DOTFILES_SOURCE_DIR" --tool "$section.$key" 2>/dev/null)" || latest=""
         add_candidate "$section" "$key" "$latest"
+        if [[ "$section.$key" == languages.node ]]; then
+          proposed_node="$(awk -F '\t' '$1 == "languages.node" { print $5; exit }' "$PLAN")"
+          [[ -z "$proposed_node" ]] || node="$proposed_node"
+        fi
         ;;
     esac
   done <"$targets"

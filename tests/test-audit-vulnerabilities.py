@@ -5,6 +5,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import yaml
 
@@ -200,6 +201,15 @@ class VulnerabilityAuditTests(unittest.TestCase):
         for score in ("CVSS:3.1/invalid", "CVSS:4.0/invalid", "CVSS:2.0/invalid", "11", "-1", "NaN"):
             with self.subTest(score=score):
                 self.assertEqual(audit_module.severity({"severity": [{"score": score}]}), "unspecified")
+
+    def test_optional_cvss_dependency_never_turns_unknown_vectors_into_clean(self):
+        vector = {"severity": [{"type": "CVSS_V3",
+                               "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}]}
+        with patch.multiple(audit_module, CVSS2=None, CVSS3=None, CVSS4=None):
+            self.assertEqual("unspecified", audit_module.severity(vector))
+            vector["database_specific"] = {"severity": "HIGH"}
+            self.assertEqual("high", audit_module.severity(vector))
+            self.assertEqual("critical", audit_module.severity({"severity": [{"score": "9.8"}]}))
 
     def test_tagged_git_candidate_still_vulnerable_is_not_clean(self):
         key = ("GIT", "https://github.com/demo/tool.git", "v1.0.0")

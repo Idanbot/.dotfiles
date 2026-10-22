@@ -7,10 +7,12 @@ CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/cloud-contexts"
 RECENT_PROFILE_ROOT="$CONFIG_ROOT/.recent-profiles"
 RECENT_SELECTION_ROOT="$CONFIG_ROOT/.recent-selections"
 STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-AWS_ENV="$STATE_ROOT/cloud-context.env"
+# The shell wrapper requests a private invocation-local handoff. Direct CLI
+# callers retain the shared files for backwards-compatible manual sourcing.
+AWS_ENV="${CLOUD_CONTEXT_ENV_OUTPUT:-$STATE_ROOT/cloud-context.env}"
 AWS_CACHE="$STATE_ROOT/cloud-context-aws.cache"
 TEST_ROOT="$STATE_ROOT/cloud-context-test"
-TEST_ENV="$STATE_ROOT/cloud-context-test.env"
+TEST_ENV="${CLOUD_CONTEXT_ENV_OUTPUT:-$STATE_ROOT/cloud-context-test.env}"
 TEST_SNAPSHOT="$TEST_ROOT/original-env"
 
 usage() {

@@ -24,7 +24,9 @@
           "tests/test-apply-package-plan.py",
           "tests/test-metadata.py",
           "tests/test-validator-cache.py",
-          "tests/test-config-drift.py"
+          "tests/test-config-drift.py",
+          "scripts/local-review.py",
+          "tests/test-local-review.py"
         ]
       ]
     },
@@ -75,6 +77,12 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-local-review.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [["{root}"]]
+    },
     {
       "path": "tests/test-validator-cache.py",
       "kind": "suite",
