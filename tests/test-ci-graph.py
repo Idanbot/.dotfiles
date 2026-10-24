@@ -165,6 +165,69 @@ class GraphTests(unittest.TestCase):
                 with self.assertRaises((AssertionError, KeyError)):
                     contracts.check(root)
 
+    def test_classification_publication_drift_is_rejected(self):
+        def publish(workflow):
+            return next(
+                step
+                for step in workflow["jobs"]["classify"]["steps"]
+                if step["name"] == "Publish classification check"
+            )
+
+        def checkout(workflow):
+            return next(
+                step
+                for step in workflow["jobs"]["classify"]["steps"]
+                if "checkout@" in step.get("uses", "")
+            )
+
+        mutations = [
+            (
+                "cancel-active-publication",
+                lambda wf: wf["concurrency"].update(**{"cancel-in-progress": True}),
+            ),
+            (
+                "untrusted-source",
+                lambda wf: checkout(wf)["with"].update(
+                    ref="${{ github.event.workflow_run.head_sha }}"
+                ),
+            ),
+            (
+                "write-source-permission",
+                lambda wf: wf["jobs"]["classify"]["permissions"].update(
+                    contents="write"
+                ),
+            ),
+            (
+                "missing-check-permission",
+                lambda wf: wf["jobs"]["classify"]["permissions"].pop("checks"),
+            ),
+            (
+                "wrong-source-run",
+                lambda wf: publish(wf)["env"].update(RUN_ID="${{ github.run_id }}"),
+            ),
+            (
+                "missing-attempt",
+                lambda wf: publish(wf)["env"].pop("RUN_ATTEMPT"),
+            ),
+            (
+                "bypassed-freshness-check",
+                lambda wf: publish(wf).update(run="gh api --method POST check-runs"),
+            ),
+        ]
+        for mutation, mutate in mutations:
+            with (
+                self.subTest(mutation=mutation),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                root = Path(directory)
+                copy_contract_fixture(root)
+                path = root / ".github/workflows/ci-outcome.yml"
+                workflow = contracts.load(path)
+                mutate(workflow)
+                path.write_text(contracts.yaml.safe_dump(workflow))
+                with self.assertRaises((AssertionError, KeyError)):
+                    contracts.check(root)
+
     def test_platform_coverage_mutations_are_rejected(self):
         def step(workflow, identity):
             return next(
