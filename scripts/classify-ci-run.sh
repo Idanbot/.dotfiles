@@ -67,14 +67,20 @@ jq -e '.jobs | type == "array"' "$JOBS_FILE" >/dev/null || {
 }
 
 count_conclusion() {
-  jq --arg conclusion "$1" '[.jobs[] | select(.conclusion == $conclusion)] | length' "$JOBS_FILE"
+  jq --arg conclusion "$1" '[.jobs[] | select(.name != "CI Outcome Classification" and .conclusion == $conclusion)] | length' "$JOBS_FILE"
 }
 
-total="$(jq '.jobs | length' "$JOBS_FILE")"
+total="$(jq '[.jobs[] | select(.name != "CI Outcome Classification")] | length' "$JOBS_FILE")"
 succeeded="$(count_conclusion success)"
-failed="$(jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "action_required" or .conclusion == "startup_failure")] | length' "$JOBS_FILE")"
-cancelled="$(jq '[.jobs[] | select(.conclusion == "cancelled" or .conclusion == "stale")] | length' "$JOBS_FILE")"
-skipped="$(jq '[.jobs[] | select(.conclusion == "skipped" or .conclusion == "neutral")] | length' "$JOBS_FILE")"
+failed="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "action_required" or .conclusion == "startup_failure")] | length' "$JOBS_FILE")"
+cancelled="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "cancelled" or .conclusion == "stale")] | length' "$JOBS_FILE")"
+skipped="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "skipped" or .conclusion == "neutral")] | length' "$JOBS_FILE")"
+actionable_failed="$failed"
+if [[ "$WORKFLOW_CONCLUSION" == cancelled ]]; then
+  actionable_failed="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") |
+    select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "action_required" or .conclusion == "startup_failure") |
+    select(.name != "CI Result" and .name != "Gated release and installer acceptance / Live Acceptance Result")] | length' "$JOBS_FILE")"
+fi
 
 infra_signature=""
 if [[ -n "$LOG_FILE" && -r "$LOG_FILE" ]]; then
@@ -90,12 +96,12 @@ check_conclusion=neutral
 title="CI outcome requires review"
 reason="The workflow conclusion and job conclusions did not match a known state."
 
-if ((failed > 0)) && [[ -z "$infra_signature" ]]; then
+if ((actionable_failed > 0)) && [[ -z "$infra_signature" ]]; then
   classification=code_failure
   check_conclusion=failure
   title="Actionable CI failure"
   reason="At least one job failed, timed out, or could not start without a known runner-outage signature."
-elif ((failed > 0)) && [[ -n "$infra_signature" ]]; then
+elif ((actionable_failed > 0)) && [[ -n "$infra_signature" ]]; then
   classification=infrastructure_failure
   check_conclusion=neutral
   title="Infrastructure failure"
@@ -105,6 +111,9 @@ elif ((cancelled > 0)) || [[ "$WORKFLOW_CONCLUSION" == cancelled || "$WORKFLOW_C
   check_conclusion=neutral
   title="Infrastructure interruption"
   reason="The run was cancelled without an actionable job failure. Re-run it before changing code."
+  if ((failed > actionable_failed)); then
+    reason+=" Aggregate result failures caused by cancellation were excluded."
+  fi
 elif [[ "$WORKFLOW_CONCLUSION" == success ]] && ((total > 0)); then
   classification=success
   check_conclusion=success

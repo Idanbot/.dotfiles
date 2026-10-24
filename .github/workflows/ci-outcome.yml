@@ -8,7 +8,7 @@ on:  # zizmor: ignore[dangerous-triggers] only trusted default-branch code execu
 permissions: {}
 
 concurrency:
-  group: ci-outcome-${{ github.event.workflow_run.id }}
+  group: ci-outcome-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: false
 
 env:
@@ -17,7 +17,6 @@ env:
 jobs:
   classify:
     name: Classify completed CI run
-    if: github.event.workflow_run.conclusion != 'success'
     permissions:
       actions: read  # fetch the completed run's job conclusions and logs
       checks: write  # zizmor: ignore[excessive-permissions] publish the diagnostic check
@@ -38,11 +37,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
             >"$RUNNER_TEMP/jobs.json"
-          gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log \
-            >"$RUNNER_TEMP/run.log" 2>&1 || true
+          if [[ "$RUN_CONCLUSION" != success ]]; then
+            gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log \
+              >"$RUNNER_TEMP/run.log" 2>&1 || true
+          fi
       - name: Classify outcome
         env:
           RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
@@ -59,14 +61,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          conclusion="$(jq -r .conclusion "$RUNNER_TEMP/classification.json")"
-          title="$(jq -r .title "$RUNNER_TEMP/classification.json")"
-          summary="$(jq -r .summary "$RUNNER_TEMP/classification.json")"
-          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
-            -f name='CI Outcome Classification' \
-            -f head_sha="$HEAD_SHA" \
-            -f status=completed \
-            -f conclusion="$conclusion" \
-            -f "output[title]=$title" \
-            -f "output[summary]=$summary" >/dev/null
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || 1 }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: ./scripts/publish-ci-classification.sh "$RUNNER_TEMP/classification.json"

@@ -252,8 +252,27 @@ def check(root):
     assert performance["with"]["if-no-files-found"] == "error"
     assert performance["with"]["path"] == "artifacts/**/performance.json"
 
-    outcome = workflows["ci-outcome.yml"]["jobs"]["classify"]
-    assert outcome["if"] == "github.event.workflow_run.conclusion != 'success'"
+    classification_workflow = workflows["ci-outcome.yml"]
+    assert classification_workflow["concurrency"] == {
+        "group": "ci-outcome-${{ github.event.workflow_run.head_sha }}",
+        "cancel-in-progress": False,
+    }
+    outcome = classification_workflow["jobs"]["classify"]
+    assert "if" not in outcome, "Successful runs must clear stale diagnostic failures"
+    publish = next(
+        step
+        for step in outcome["steps"]
+        if step["name"] == "Publish classification check"
+    )
+    assert (
+        publish["run"]
+        == './scripts/publish-ci-classification.sh "$RUNNER_TEMP/classification.json"'
+    )
+    assert publish["env"]["RUN_ID"] == "${{ github.event.workflow_run.id }}"
+    assert (
+        publish["env"]["RUN_ATTEMPT"]
+        == "${{ github.event.workflow_run.run_attempt || 1 }}"
+    )
     checkout = next(
         step for step in outcome["steps"] if "checkout@" in step.get("uses", "")
     )

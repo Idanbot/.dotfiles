@@ -1075,9 +1075,11 @@ regressions are visible but do not block merges until enforcement is explicitly
 enabled. CI runs also execute Hyperfine benchmarks for installer help, workspace
 help, isolated cloud-context status, agent readiness, and Zsh startup; real
 post-install startup timing uses the same benchmark engine. CI publishes those
-artifacts and, for unsuccessful runs, a separate outcome-classification check so GitHub
-runner interruptions are distinguishable from actionable failures without
-altering the original workflow conclusion.
+artifacts and a separate outcome-classification check for every completed run.
+Successful runs clear stale diagnostic failures for the same commit; older runs
+cannot overwrite newer completed attempts. Cancelled runs with only failed
+aggregate checks are neutral, while genuine failed tests remain actionable.
+Classification never changes the original bootstrap workflow conclusion.
 
 The workspace Docker harness uses synthetic agent commands and a mocked Herdr
 API, so it never authenticates or starts a real agent session. It still invokes

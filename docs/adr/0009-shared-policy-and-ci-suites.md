@@ -70,7 +70,12 @@ job-name prefixes and require all five correlated heavy profiles to pass.
 Keep read-only audits, monthly write-enabled grouped upgrades, native VM, and
 opt-in real WSL distinct. Daily and weekly reports share implementation;
 Monday's weekly report supplies that day's CVE scan. The outcome classifier
-executes only for unsuccessful outcomes using trusted default-branch code.
+uses trusted default-branch code. Amendment, 2026-10-24: classify every completed
+run, including success, so a stale failure cannot survive a successful rerun.
+Serialize publication per commit and reject superseded completed attempts.
+Fetch full logs only for unsuccessful outcomes. Cancellation-related aggregate
+failures are neutral without hiding genuine failed tests or changing the original
+bootstrap conclusion.
 Existing run history and GitHub-managed agent workflows are retained.
 
 ## Validation

@@ -138,7 +138,18 @@ class GraphTests(unittest.TestCase):
                 lambda wf: wf["jobs"]["heavy-e2e"].update(**{"if": "false"}),
             ),
             ("ci-live.yml", lambda wf: wf["jobs"]["base-e2e"].pop("timeout-minutes")),
-            ("ci-outcome.yml", lambda wf: wf["jobs"]["classify"].pop("if")),
+            (
+                "ci-outcome.yml",
+                lambda wf: wf["jobs"]["classify"].update(
+                    **{"if": "github.event.workflow_run.conclusion != 'success'"}
+                ),
+            ),
+            (
+                "ci-outcome.yml",
+                lambda wf: wf["concurrency"].update(
+                    group="ci-outcome-${{ github.event.workflow_run.id }}"
+                ),
+            ),
         ]
         for filename, mutate in mutations:
             with (
