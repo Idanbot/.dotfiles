@@ -72,16 +72,32 @@ preserve_existing_release_binary() {
     fi
     if [[ ! -f "$target" || ! -x "$target" ]]; then
       log_warn "Preserving unowned $binary at $target; update skipped"
+      ((_PRESERVED++)) || true
       return 0
     fi
   fi
   [[ -e "$target" || -L "$target" ]] || return 1
   target_is_owned "$target" && return 1
+  local package
+  package="$(dpkg-query -S "$(readlink -f -- "$target")" 2>/dev/null | head -1 || true)"
+  if [[ -n "$package" ]]; then
+    log_warn "Preserving package-managed $binary at $target (${package%%: /*}); repository version is advisory"
+    log_info "Update $binary through its package manager; binary replacement is not appropriate for this path"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
   binary_replacement_requested "$binary" && return 1
   [[ -f "$target" && -x "$target" ]] || return 1
   [[ -n "${DOTFILES_VERSION_PLAN:-}" || -n "$(extract_version "$current")" ]] || return 1
-  log_warn "Preserving existing $binary ($current) at $target; upgrade skipped because it is unowned or modified"
+  local reason='unowned or modified'
+  if [[ -f "$(managed_state_root)/installed.tsv" ]] &&
+    awk -F '\t' -v target="$target" '$4 == target { found = 1 } END { exit !found }' "$(managed_state_root)/installed.tsv" &&
+    [[ ! -f "$(ownership_stamp "$target")" ]]; then
+    reason='legacy installation without an ownership stamp'
+  fi
+  log_warn "Preserving existing $binary (${current%%$'\n'*}) at $target; upgrade skipped: $reason"
   log_info "To back it up and replace only this binary, rerun with DOTFILES_REPLACE_BINARIES=$binary"
+  ((_PRESERVED++)) || true
   return 0
 }
 
@@ -92,6 +108,7 @@ runtime_is_current() {
       return 1
     fi
     log_warn "Preserving existing $binary with an unknown version; update skipped"
+    ((_PRESERVED++)) || true
     return 0
   fi
   if command_exists "$binary" && version_ge "$current" "$target"; then
@@ -139,7 +156,11 @@ install_github_archive() {
   install_managed_binary "$tmpdir/$member_path" "$binary" "${tag#v}" "github:$repo" "$version_command"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"
-  ((_INSTALLED++)) || true
+  if [[ -n "$current" ]]; then
+    ((_UPGRADED++)) || true
+  else
+    ((_INSTALLED++)) || true
+  fi
 }
 
 install_github_binary() {
@@ -167,7 +188,11 @@ install_github_binary() {
   install_managed_binary "$dest" "$binary" "${tag#v}" "github:$repo" "$version_command"
   rm -rf "$tmpdir"
   log_success "$binary $tag installed"
-  ((_INSTALLED++)) || true
+  if [[ -n "$current" ]]; then
+    ((_UPGRADED++)) || true
+  else
+    ((_INSTALLED++)) || true
+  fi
 }
 
 set_json_boolean_preserving() {

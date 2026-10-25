@@ -45,6 +45,19 @@ read_user() {
 # shellcheck source=../scripts/conflicts.sh
 source "$DOTFILES_DIR/scripts/conflicts.sh"
 
+# Routine generated helper/data updates do not evaluate or print a diff.
+(
+  dotfiles_conflict_show_diff() {
+    printf 'unexpected diff\n'
+    return 99
+  }
+  for path in .config/dotfiles/catalog.json .config/dotfiles/privacy.sh .local/bin/dot .config/rtk/config.toml; do
+    output="$(dotfiles_conflict_preview "$TMP_ROOT/source" "$path")"
+    grep -Fq 'press d to inspect' <<<"$output"
+    ! grep -Fq 'unexpected diff' <<<"$output"
+  done
+)
+
 mkdir -p "$HOME/.ssh"
 printf 'Host review-host\n  ServerAliveInterval 5\n' >"$HOME/.ssh/config"
 printf '[credential]\n  helper = local-helper\n' >"$HOME/.gitconfig"
@@ -78,6 +91,46 @@ grep -Fq 'password = [REDACTED]' <<<"$diff_output"
 ! grep -Fq spaced-secret <<<"$diff_output"
 limited_diff="$(dotfiles_conflict_diff "$TMP_ROOT/source" .zshrc 2)"
 grep -Fq '... 3 more diff line(s)' <<<"$limited_diff"
+
+# A requested preview reaches the controlling terminal, never redirected logs.
+/usr/bin/python3 - "$DOTFILES_DIR" "$TMP_ROOT" <<'PY'
+import errno
+import os
+from pathlib import Path
+import pty
+import subprocess
+import sys
+
+root, fixture = sys.argv[1:]
+logfile = Path(fixture) / "preview.log"
+command = 'source "$1/scripts/conflicts.sh"; log_info() { printf "%s\\n" "$*"; }; dotfiles_conflict_show_diff "$2/source" .zshrc >"$2/preview.log"'
+child, terminal = pty.fork()
+if child == 0:
+    os.execvp("bash", ["bash", "-c", command, "_", root, fixture])
+output = bytearray()
+try:
+    while True:
+        try:
+            part = os.read(terminal, 4096)
+        except OSError as error:
+            if error.errno == errno.EIO:
+                break
+            raise
+        if not part:
+            break
+        output.extend(part)
+finally:
+    os.close(terminal)
+_, status = os.waitpid(child, 0)
+assert os.waitstatus_to_exitcode(status) == 0, output
+assert b"diff-1" in output, output
+assert "diff-1" not in logfile.read_text()
+result = subprocess.run(["bash", "-c", command, "_", root, fixture],
+                        capture_output=True, start_new_session=True, timeout=10)
+assert result.returncode == 0, result.stderr
+assert "Diff omitted" in logfile.read_text()
+assert "diff-1" not in logfile.read_text()
+PY
 
 export CONFLICT_AUTO_APPROVE=false
 CHOICE=s

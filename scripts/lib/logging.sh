@@ -22,6 +22,8 @@ else
 fi
 
 _INSTALLED=0
+_UPGRADED=0
+_PRESERVED=0
 _SKIPPED=0
 _FAILED=0
 _WARNINGS=0
@@ -87,11 +89,11 @@ log_step() {
 
 print_summary() {
   local name="${1:-$(basename "$0")}" total
-  total=$((_INSTALLED + _SKIPPED + _WARNINGS + _FAILED))
+  total=$((_INSTALLED + _UPGRADED + _SKIPPED + _PRESERVED + _FAILED))
   printf '\n%b-- Summary: %s --%b\n' "$BOLD" "$name" "$NC"
-  printf '  %bInstalled:%b %s  %bSkipped:%b %s  %bWarnings:%b %s  %bFailed:%b %s  Total: %s\n' \
-    "$GREEN" "$NC" "$_INSTALLED" "$DIM" "$NC" "$_SKIPPED" \
-    "$YELLOW" "$NC" "$_WARNINGS" "$RED" "$NC" "$_FAILED" "$total"
-  emit_event summary "installed=$_INSTALLED skipped=$_SKIPPED warnings=$_WARNINGS failed=$_FAILED"
+  printf '  %bInstalled:%b %s  %bUpgraded:%b %s  %bSkipped:%b %s  Preserved: %s  %bWarnings:%b %s  %bFailed:%b %s  Total: %s\n' \
+    "$GREEN" "$NC" "$_INSTALLED" "$GREEN" "$NC" "$_UPGRADED" "$DIM" "$NC" "$_SKIPPED" \
+    "$_PRESERVED" "$YELLOW" "$NC" "$_WARNINGS" "$RED" "$NC" "$_FAILED" "$total"
+  emit_event summary "installed=$_INSTALLED upgraded=$_UPGRADED skipped=$_SKIPPED preserved=$_PRESERVED warnings=$_WARNINGS failed=$_FAILED"
   [[ $_FAILED -eq 0 ]]
 }

@@ -148,8 +148,14 @@ bootstrap_elapsed_ms() {
 }
 log_info() { printf '%s %b[INFO]%b  %s\n' "$(timestamp)" "$BLUE" "$NC" "$*"; }
 log_success() { printf '%s %b[OK]%b    %s\n' "$(timestamp)" "$GREEN" "$NC" "$*"; }
-log_warn() { printf '%s %b[WARN]%b  %s\n' "$(timestamp)" "$YELLOW" "$NC" "$*"; }
-log_error() { printf '%s %b[ERROR]%b %s\n' "$(timestamp)" "$RED" "$NC" "$*" >&2; }
+log_warn() {
+  printf '%s %b[WARN]%b  %s\n' "$(timestamp)" "$YELLOW" "$NC" "$*"
+  [[ -z "${EVENT_LOG:-}" ]] || write_event warn "$*"
+}
+log_error() {
+  printf '%s %b[ERROR]%b %s\n' "$(timestamp)" "$RED" "$NC" "$*" >&2
+  [[ -z "${EVENT_LOG:-}" ]] || write_event error "$*"
+}
 log_skip() { printf '%s %b[SKIP]%b  %s\n' "$(timestamp)" "$DIM" "$NC" "$*"; }
 log_step() { printf '\n%b== %s ==%b\n' "$BOLD$CYAN" "$*" "$NC"; }
 log_banner() {
@@ -845,8 +851,38 @@ on_error() {
   if [[ -n "${CHEZMOI_SOURCE:-}" ]]; then
     write_run_summary failure 2>/dev/null || true
   fi
+  print_run_diagnostics || true
   release_bootstrap_lock
   exit "$status"
+}
+
+print_run_diagnostics() {
+  [[ -f "$EVENT_LOG" ]] || return 0
+  printf '\nWarnings and errors for this run (full output: %s):\n' "$LOG_FILE"
+  /usr/bin/python3 - "$EVENT_LOG" <<'PY'
+import json
+import sys
+
+seen = set()
+with open(sys.argv[1], encoding="utf-8") as events:
+    for line in events:
+        try:
+            event = json.loads(line)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(event, dict):
+            continue
+        level = str(event.get("level", "")).lower()
+        if level not in {"warn", "warning", "error", "fail", "high", "low"}:
+            continue
+        item = (level, str(event.get("section", event.get("stage", "unknown"))), str(event.get("message", "")))
+        if item in seen:
+            continue
+        seen.add(item)
+        print(f"  [{level.upper()}] {item[1]}: {item[2]}")
+if not seen:
+    print("  No structured warnings or errors recorded.")
+PY
 }
 
 setup_run_state
@@ -1243,6 +1279,7 @@ log_success "Completed in $(format_bootstrap_duration_ms "$(bootstrap_elapsed_ms
 log_info "Run summary: $RUN_DIR/summary.json"
 log_info "Restore configs: $CHEZMOI_SOURCE/scripts/backup.sh restore ${BACKUP_ID:-<backup-id>}"
 log_info "Authentication remains manual; run 'dot doctor' after signing in to selected tools"
+print_run_diagnostics
 printf '\nNext steps:\n'
 printf '  1. Restart the shell: exec zsh\n'
 printf '  2. Start an agent workspace: dot workspace\n'

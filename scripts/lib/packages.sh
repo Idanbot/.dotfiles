@@ -179,7 +179,12 @@ install_policy_apt() {
   local binary="$1" package="$2" id="$3" current="$4" target versions candidate
   target="$(version_plan_value "$id" target)"
   if [[ -z "$target" ]]; then
-    sudo apt-get install -y "$package"
+    sudo apt-get install -y "$package" || return $?
+    if [[ -n "$current" ]]; then
+      ((_UPGRADED++)) || true
+    else
+      ((_INSTALLED++)) || true
+    fi
     return
   fi
   if command_exists "$binary"; then
@@ -202,7 +207,14 @@ install_policy_apt() {
     log_error "$package $target is not yet available from its signed APT repository; retry after publication"
     return 1
   }
-  sudo apt-get install -y "$package=$candidate"
+  sudo apt-get install -y "$package=$candidate" || return $?
+  if [[ -n "$current" ]]; then
+    ((_UPGRADED++)) || true
+    log_success "$binary upgraded to $target via signed APT repository"
+  else
+    ((_INSTALLED++)) || true
+    log_success "$binary installed at $target via signed APT repository"
+  fi
 }
 
 package_version() {

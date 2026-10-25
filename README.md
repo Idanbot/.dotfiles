@@ -467,6 +467,18 @@ DOTFILES_REPLACE_BINARIES=gh ./scripts/install.sh --source "$PWD" --only core --
 
 Originals are retained under `~/.local/state/dotfiles/binary-backups/` before
 replacement. Failed candidate probes leave the original command untouched.
+Legacy installations without ownership stamps are preserved, not automatically
+adopted. Review `dot preflight` before approving named replacements. Neovim also
+supports `DOTFILES_REPLACE_BINARIES=nvim` with `--only neovim`; the previous
+command is backed up before publication. Package-managed executables should be
+updated through their package manager instead of this override.
+
+Internal helper/catalog conflicts omit automatic diff previews, but still wait
+for your choice. Press `d` to inspect a diff in the terminal. Diff contents are
+not copied to persistent logs. Warnings and errors remain in the full text log
+and structured events; a deduplicated structured diagnostic recap is printed at
+the end of successful or failed runs. Native subprocess diagnostics remain in
+the full text log. Signed APT upgrades are counted separately in section summaries.
 HashiCorp APT sources using a dedicated `Signed-By` keyring are refreshed against
 the fingerprint in [HashiCorp's packaging guide](https://www.hashicorp.com/official-packaging-guide),
 without changing their suites or mirror choices.

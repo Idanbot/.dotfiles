@@ -81,4 +81,19 @@ if runtime_is_current absent-runtime-fixture 3.0.0 ''; then
   printf 'Missing runtime unexpectedly treated as installed\n' >&2
   exit 1
 fi
+
+# Runtime command shims support the same consent/backup migration as binaries.
+printf '#!/bin/sh\necho old\n' >"$HOME/.local/bin/fixture-link"
+chmod +x "$HOME/.local/bin/fixture-link"
+printf '#!/bin/sh\necho new\n' >"$temporary/new-link-target"
+chmod +x "$temporary/new-link-target"
+if managed_link "$temporary/new-link-target" "$HOME/.local/bin/fixture-link" fixture-runtime 2; then
+  printf 'Unapproved legacy link replacement succeeded\n' >&2
+  exit 1
+fi
+DOTFILES_REPLACE_BINARIES=fixture-runtime managed_link "$temporary/new-link-target" "$HOME/.local/bin/fixture-link" fixture-runtime 2
+[[ "$("$HOME/.local/bin/fixture-link")" == new ]]
+backup="$(find "$DOTFILES_STATE_DIR/binary-backups" -name fixture-link -type f)"
+[[ "$(sh "$backup")" == old ]]
+target_is_owned "$HOME/.local/bin/fixture-link"
 printf 'Legacy binary preservation and explicit upgrade tests passed\n'

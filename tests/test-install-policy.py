@@ -43,6 +43,25 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_named_legacy_upgrade_is_explicit_not_silent_adoption(self):
+        with patch.object(policy, "ownership_status", return_value="legacy-no-stamp"), \
+                patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": ""}):
+            self.assertEqual(policy.planned_action(self.entry())[1], "legacy-no-stamp")
+        with patch.object(policy, "ownership_status", return_value="legacy-no-stamp"), \
+                patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": "gh"}):
+            action, ownership = policy.planned_action(self.entry())
+            self.assertEqual(ownership, "explicit-replacement")
+            self.assertIn("back up", action)
+
+    def test_named_unowned_upgrade_does_not_override_distro_ownership(self):
+        for output, expected in [("", "explicit-replacement"), ("fixture-package: /test/gh\n", "distro")]:
+            with self.subTest(expected=expected), \
+                    patch.object(policy, "ownership_status", return_value="unowned"), \
+                    patch.object(policy.subprocess, "run", return_value=subprocess.CompletedProcess(
+                        [], 0 if output else 1, output, "")), \
+                    patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": "gh"}):
+                self.assertEqual(policy.planned_action(self.entry())[1], expected)
+
     def test_stable_rejects_prereleases_and_drafts(self):
         for item in [release("v3.0.0-rc1"), release("v3.0.0", draft=True), release("v3.0.0", prerelease=True)]:
             self.assertEqual(policy.release_version(item), "")

@@ -284,6 +284,9 @@ def planned_action(entry):
     if ownership == "verified-dotfiles":
         return "update verified managed executable; recheck before replacement", ownership
     if ownership != "unowned":
+        names = {*entry.get("commands", []), Path(entry["path"]).name}
+        if names & set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(",")):
+            return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
         return "skip; preserve until explicit backed-up replacement is approved", ownership
     result = subprocess.run(["dpkg-query", "-S", str(Path(entry["path"]).resolve())],
                             capture_output=True, text=True, timeout=5)
@@ -293,6 +296,9 @@ def planned_action(entry):
             return "update via signed APT repository", "apt"
     if result.returncode == 0:
         return "preserve distro package; repository version is advisory, not an APT target", "distro"
+    names = {*entry.get("commands", []), Path(entry["path"]).name}
+    if names & set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(",")):
+        return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
     return "skip; preserve unowned/modified executable", "unowned"
 
 

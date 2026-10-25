@@ -8,6 +8,12 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 log_step "Installing Neovim"
 
 NVIM_VERSION="$(package_version editor neovim 0.12.4)"
+NVIM_CURRENT="$(nvim --version 2>/dev/null | head -1 || true)"
+if runtime_is_current nvim "$NVIM_VERSION" "$NVIM_CURRENT"; then
+  log_info "Keeping the active Neovim installation unchanged"
+  print_summary "Neovim"
+  exit 0
+fi
 case "$(get_arch)" in
   amd64)
     NVIM_ARCH=x86_64
@@ -33,9 +39,18 @@ if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --ver
     "$tmpdir/$asset" "sha256:$NVIM_SHA" "$asset"
   mkdir -p "$tmpdir/app"
   tar -xzf "$tmpdir/$asset" -C "$tmpdir/app" --strip-components=1
+  if runtime_is_current nvim "$NVIM_VERSION" "$(nvim --version 2>/dev/null | head -1 || true)"; then
+    log_info "Neovim selection changed during staging; keeping the active installation"
+    print_summary "Neovim"
+    exit 0
+  fi
   install_managed_app "$tmpdir/app" "$NVIM_ROOT" nvim "$NVIM_VERSION" github:neovim/neovim nvim_probe nvim
   rm -rf "$tmpdir"
-  ((_INSTALLED++)) || true
+  if [[ -n "$NVIM_CURRENT" ]]; then
+    ((_UPGRADED++)) || true
+  else
+    ((_INSTALLED++)) || true
+  fi
   log_success "Neovim $NVIM_VERSION installed"
 else
   log_skip "Neovim $NVIM_VERSION already installed"

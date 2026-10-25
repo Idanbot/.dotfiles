@@ -98,6 +98,84 @@ for application in nvim kitty; do
   done
 done
 
+# Exercise the complete Neovim section, not only the publication helper.
+mkdir -p "$temporary/good-nvim/bin"
+printf '#!/bin/sh\necho "NVIM v99.0.0"\n' >"$temporary/good-nvim/bin/nvim"
+chmod +x "$temporary/good-nvim/bin/nvim"
+tar -czf "$temporary/good-nvim.tar.gz" -C "$temporary" good-nvim
+mkdir -p "$temporary/broken-nvim/bin"
+printf '#!/bin/sh\nif [ "$1" = --version ]; then echo "NVIM v99.0.0"; else exit 37; fi\n' >"$temporary/broken-nvim/bin/nvim"
+chmod +x "$temporary/broken-nvim/bin/nvim"
+tar -czf "$temporary/broken-nvim.tar.gz" -C "$temporary" broken-nvim
+sed '/^source .*scripts\/lib.sh/d' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_07-install-neovim.sh.tmpl" >"$temporary/neovim.sh"
+for scenario in missing legacy modified newer unknown owned approved approved-broken approved-redirected; do
+  (
+    export HOME="$temporary/neovim-$scenario" DOTFILES_STATE_DIR="$temporary/state-$scenario"
+    mkdir -p "$HOME/.local/bin"
+    source "$DOTFILES_DIR/scripts/lib.sh"
+    printf '#!/bin/sh\necho "NVIM v0.12.4"\n' >"$HOME/.local/bin/nvim"
+    chmod +x "$HOME/.local/bin/nvim"
+    case "$scenario" in
+      legacy)
+        record_install nvim 0.12.4 fixture "$HOME/.local/bin/nvim"
+        rm "$(ownership_stamp "$HOME/.local/bin/nvim")"
+        ;;
+      modified)
+        record_install nvim 0.12.4 fixture "$HOME/.local/bin/nvim"
+        printf '# local edit\n' >>"$HOME/.local/bin/nvim"
+        ;;
+      newer) sed -i s/0.12.4/100.0.0/ "$HOME/.local/bin/nvim" ;;
+      unknown) printf '#!/bin/sh\nexit 37\n' >"$HOME/.local/bin/nvim" ;;
+      owned) record_install nvim 0.12.4 fixture "$HOME/.local/bin/nvim" ;;
+      approved | approved-broken | approved-redirected) export DOTFILES_REPLACE_BINARIES=nvim ;;
+    esac
+    if [[ "$scenario" == approved-redirected ]]; then
+      mv "$HOME/.local/bin" "$HOME/external-bin"
+      ln -s "$HOME/external-bin" "$HOME/.local/bin"
+    fi
+    cp -p "$HOME/.local/bin/nvim" "$HOME/original"
+    [[ "$scenario" != missing ]] || rm "$HOME/.local/bin/nvim"
+    export NVIM_FIXTURE="$temporary/good-nvim.tar.gz" NVIM_CALLS="$HOME/downloads"
+    [[ "$scenario" != approved-broken ]] || NVIM_FIXTURE="$temporary/broken-nvim.tar.gz"
+    package_version() { printf '99.0.0\n'; }
+    package_metadata() { printf 'fixture\n'; }
+    download_verified() {
+      printf 'download\n' >>"$NVIM_CALLS"
+      cp "$NVIM_FIXTURE" "$2"
+    }
+    status=0
+    bash -c 'source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; eval "$1"; source "$2"' _ \
+      "$(declare -f package_version package_metadata download_verified)" "$temporary/neovim.sh" >"$HOME/output" 2>&1 || status=$?
+    if [[ "$scenario" == approved-broken || "$scenario" == approved-redirected ]]; then
+      [[ "$status" -ne 0 ]]
+      cmp "$HOME/original" "$HOME/.local/bin/nvim"
+      [[ ! -e "$DOTFILES_STATE_DIR/binary-backups" ]]
+      exit 0
+    fi
+    [[ "$status" == 0 ]]
+    case "$scenario" in
+      missing | owned | approved)
+        [[ -f "$NVIM_CALLS" && -L "$HOME/.local/bin/nvim" ]]
+        target_is_owned "$HOME/.local/bin/nvim"
+        [[ "$(nvim --version)" == 'NVIM v99.0.0' ]]
+        bash -c 'source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; eval "$1"; source "$2"' _ \
+          "$(declare -f package_version package_metadata download_verified)" "$temporary/neovim.sh" >>"$HOME/output"
+        [[ "$(wc -l <"$NVIM_CALLS")" == 1 ]]
+        if [[ "$scenario" == approved ]]; then
+          backup="$(find "$DOTFILES_STATE_DIR/binary-backups" -type f -name nvim)"
+          cmp "$HOME/original" "$backup"
+          [[ "$(stat -c %a "$(dirname "$backup")")" == 700 ]]
+        fi
+        ;;
+      *)
+        cmp "$HOME/original" "$HOME/.local/bin/nvim"
+        [[ ! -e "$NVIM_CALLS" ]]
+        ;;
+    esac
+  )
+done
+
 # Real uv publication records both the environment and command, converges, and
 # refuses a directory modified between the initial decision and the force call.
 (

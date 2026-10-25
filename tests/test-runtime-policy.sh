@@ -119,6 +119,7 @@ sudo() { printf '%s\n' "$*" >>"$temporary/apt-calls"; }
 printf '#!/bin/sh\necho 2.1.0\n' >"$HOME/external/bin/az"
 chmod +x "$HOME/external/bin/az"
 install_policy_apt az azure-cli cloud.azure_cli 2.1.0
+[[ "$_UPGRADED" == 1 ]]
 grep -Fxq 'apt-get install -y azure-cli=2.9.0-2~noble' "$temporary/apt-calls"
 rm "$temporary/apt-calls"
 install_policy_apt az azure-cli cloud.azure_cli 3.0.0
@@ -133,6 +134,21 @@ if install_policy_apt az azure-cli cloud.azure_cli 2.1.0; then
   exit 1
 fi
 [[ ! -e "$temporary/apt-calls" ]]
+
+# Distro ownership never recommends the binary replacement override.
+dpkg-query() { printf 'fixture-package: /fake\n'; }
+DOTFILES_REPLACE_BINARIES=helm preserve_existing_release_binary helm 1.0.0 >"$temporary/distro.log"
+grep -Fq 'package-managed helm' "$temporary/distro.log"
+! grep -Fq 'DOTFILES_REPLACE_BINARIES=' "$temporary/distro.log"
+# A failed package operation is neither successful nor an upgrade outcome.
+dpkg-query() { printf 'azure-cli: /fake\n'; }
+apt-cache() { printf 'azure-cli | 2.9.0-2~noble | repo\n'; }
+sudo() { return 37; }
+upgraded_before="$_UPGRADED"
+status=0
+install_policy_apt az azure-cli cloud.azure_cli 2.1.0 || status=$?
+[[ "$status" == 37 && "$_UPGRADED" == "$upgraded_before" ]]
+unset -f dpkg-query
 
 # Real AWS verifier rejects signature failures and accepts only the pinned key.
 unset -f download_verified

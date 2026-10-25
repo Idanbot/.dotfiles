@@ -154,10 +154,25 @@ dotfiles_conflict_merge_append() (
 )
 
 dotfiles_conflict_show_diff() {
-  local source="$1" rel="$2" limit="${3:-160}" line
-  while IFS= read -r line; do
-    log_info "  $line"
-  done < <(dotfiles_conflict_diff "$source" "$rel" "$limit")
+  local source="$1" rel="$2" limit="${3:-40}" tty_fd
+  # Destination content can contain secrets. Never send diffs through tee or
+  # event logging, even when the user explicitly requests a preview.
+  if { exec {tty_fd}>/dev/tty; } 2>/dev/null; then
+    dotfiles_conflict_diff "$source" "$rel" "$limit" >&"$tty_fd"
+    exec {tty_fd}>&-
+  else
+    log_info "Diff omitted without a controlling terminal; review with: chezmoi diff -- '$HOME/$rel'"
+  fi
+}
+
+dotfiles_conflict_preview() {
+  local source="$1" rel="$2"
+  case "$rel" in
+    .config/dotfiles/* | .local/bin/* | .config/agents/AGENTS.md | .config/rtk/config.toml)
+      log_info "Managed helper/data update: ~/$rel (press d to inspect the diff)"
+      ;;
+    *) dotfiles_conflict_show_diff "$source" "$rel" "${CONFLICT_DIFF_LINES:-40}" ;;
+  esac
 }
 
 dotfiles_conflict_prompt() {
@@ -252,12 +267,12 @@ dotfiles_apply_selected_conflicts() {
         action="$all_action"
       else
         log_warn "Existing destination differs: ~/$rel"
-        dotfiles_conflict_show_diff "$CHEZMOI_SOURCE" "$rel" "${CONFLICT_DIFF_LINES:-160}"
+        dotfiles_conflict_preview "$CHEZMOI_SOURCE" "$rel"
         dotfiles_conflict_prompt "$CHEZMOI_SOURCE" "$rel"
         action="$DOTFILES_CONFLICT_ACTION"
       fi
+      log_info "Conflict decision: ~/$rel -> $action"
     fi
-
     case "$action" in
       replace)
         apply_targets+=("$HOME/$rel")

@@ -4,6 +4,8 @@
 set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+temporary="$(mktemp -d)"
+trap 'rm -rf "$temporary"' EXIT
 FAILED=0
 pass() { printf '  [PASS] %s\n' "$*"; }
 fail() {
@@ -59,6 +61,36 @@ if grep -Fq '[[ -n "$CHEZMOI_STATUS_OUTPUT" ]] || return 0' "$INSTALL"; then
 else
   pass "clean config status still converges checksum-pinned externals"
 fi
+
+# Execute the actual recap and orchestrator loggers, using synthetic events only.
+awk '/^print_run_diagnostics\(\)/ { block = 1 } /^setup_run_state$/ { block = 0 } block' \
+  "$INSTALL" >"$temporary/diagnostics.sh"
+awk '/^log_warn\(\)/ { block = 1 } /^log_skip\(\)/ { block = 0 } block' \
+  "$INSTALL" >"$temporary/loggers.sh"
+(
+  EVENT_LOG="$temporary/events.jsonl" LOG_FILE="$temporary/full.log"
+  export YELLOW='' RED='' NC=''
+  timestamp() { printf '12:00:00'; }
+  write_event() { printf '{"level":"%s","stage":"fixture","message":"%s"}\n' "$1" "$2" >>"$EVENT_LOG"; }
+  source "$temporary/loggers.sh"
+  source "$temporary/diagnostics.sh"
+  log_warn 'preserved fixture' >"$LOG_FILE"
+  log_error 'failed fixture' >>"$LOG_FILE" 2>&1
+  log_warn 'preserved fixture' >>"$LOG_FILE"
+  write_event high 'new major available'
+  write_event low 'patch available'
+  printf 'invalid interrupted event\n[]\n{"level":"info","message":"hidden"}\n' >>"$EVENT_LOG"
+  print_run_diagnostics >"$temporary/recap"
+  [[ "$(grep -Fc 'preserved fixture' "$temporary/recap")" == 1 ]]
+  grep -Fq '[ERROR] fixture: failed fixture' "$temporary/recap"
+  grep -Fq '[HIGH] fixture: new major available' "$temporary/recap"
+  grep -Fq '[LOW] fixture: patch available' "$temporary/recap"
+  grep -Fq 'preserved fixture' "$LOG_FILE"
+  grep -Fq 'failed fixture' "$LOG_FILE"
+  ! grep -Fq hidden "$temporary/recap"
+  : >"$EVENT_LOG"
+  print_run_diagnostics | grep -Fq 'No structured warnings or errors'
+)
 
 [[ "$FAILED" -eq 0 ]] || exit 1
 printf 'Bootstrap safety test passed\n'

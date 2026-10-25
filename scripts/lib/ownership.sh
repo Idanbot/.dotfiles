@@ -131,8 +131,9 @@ install_managed_tree() (
 install_managed_app() (
   local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6"
   shift 6
-  local temporary root path stamp index name committed=false changed=false ledger_fd
+  local temporary root path stamp index name backup committed=false changed=false ledger_fd
   local -a paths=("$destination") names=("$tool")
+  local -a takeovers=()
   managed_operation_lock || return 1
   root="$(managed_state_root)"
   for name in "$@"; do
@@ -140,7 +141,13 @@ install_managed_app() (
     names+=("$name")
   done
   for path in "${paths[@]}"; do
-    assert_owned_target "$path" || return 1
+    if [[ "$path" == "$HOME/.local/bin/"* ]] && binary_replacement_requested "$tool" &&
+      [[ -f "$path" || -L "$path" ]] && ! target_is_owned "$path"; then
+      [[ "$(realpath -m -- "$(dirname "$path")")" == "$(dirname "$path")" ]] || return 1
+      takeovers+=("$path")
+    else
+      assert_owned_target "$path" || return 1
+    fi
   done
   mkdir -p "$(dirname "$destination")" "$HOME/.local/bin" || return 1
   temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-app.XXXXXX")" || return 1
@@ -175,6 +182,14 @@ install_managed_app() (
   trap cleanup_app EXIT
   cp -a -- "$source" "$temporary/new" || return 1
   "$probe" "$temporary/new" || return 1
+  if ((${#takeovers[@]})); then
+    backup="$root/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
+    ensure_private_directory "$backup" || return 1
+    for path in "${takeovers[@]}"; do
+      cp -a -- "$path" "$backup/$(basename "$path")" || return 1
+    done
+    log_warn "Backed up approved $tool command paths to $backup before replacement"
+  fi
   printf '%s\n' "${paths[@]}" >"$temporary/paths"
   touch "$temporary/records"
   for index in "${!paths[@]}"; do
@@ -272,7 +287,7 @@ forget_install() (
 
 managed_link() (
   local target="$1" link="$2" tool="$3" version="$4"
-  local temporary
+  local temporary backup
   managed_operation_lock || return 1
   if [[ -f "$link" && -x "$link" && ! -L "$link" && "$(realpath -m -- "$target")" == "$(realpath -m -- "$link")" ]]; then
     log_skip "Preserving existing executable at $link; no self-link needed"
@@ -282,7 +297,16 @@ managed_link() (
     record_install "$tool" "$version" symlink "$link"
     return
   fi
-  assert_owned_target "$link" || return 1
+  if binary_replacement_requested "$tool" && [[ -f "$link" || -L "$link" ]] && ! target_is_owned "$link"; then
+    [[ "$link" == "$HOME/.local/bin/"* && "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
+    [[ -x "$target" ]] || return 1
+    backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
+    ensure_private_directory "$backup" || return 1
+    cp -a -- "$link" "$backup/$(basename "$link")" || return 1
+    log_warn "Backed up approved $tool command path to $backup before replacement"
+  else
+    assert_owned_target "$link" || return 1
+  fi
   mkdir -p "$(dirname "$link")" || return 1
   temporary="$(mktemp -d "$(dirname "$link")/.dotfiles-link.XXXXXX")" || return 1
   trap 'rm -rf -- "$temporary"' EXIT
