@@ -23,6 +23,7 @@ except ImportError:
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dotfiles import releases  # noqa: E402
+from dotfiles.advisories import scoped_advisory, validate_advisory, validate_advisory_id  # noqa: E402
 from dotfiles.metadata import load_versions  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -208,11 +209,22 @@ def batch_results(response, count, candidate=False):
             raise RuntimeError(f"OSV returned an error in its {label} response")
         if any(not isinstance(item, dict) or not item.get("id") for item in result.get("vulns", [])):
             raise RuntimeError(f"OSV returned a malformed {label} advisory")
+        for item in result.get("vulns", []):
+            validate_advisory_id(item["id"])
         if result.get("next_page_token"):
             context = "candidate response" if candidate else "response"
             action = "advice" if candidate else "audit"
             raise RuntimeError(f"OSV {context} was paginated; refusing a partial {action}")
     return results
+
+
+def fetch_advisory(ident, package, fetch, cache):
+    validate_advisory_id(ident)
+    record = cache[ident] if ident in cache else fetch(VULN + ident)
+    validate_advisory(record, ident)
+    result = scoped_advisory(record, package)
+    cache[ident] = record
+    return result
 
 
 def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_candidates):
@@ -231,10 +243,8 @@ def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_ca
     vulnerability_cache = {}
     for key, result in zip(keys, results):
         for item in result.get("vulns", []):
-            vuln = vulnerability_cache.setdefault(item["id"], None)
-            if vuln is None:
-                vuln = fetch(VULN + item["id"])
-                vulnerability_cache[item["id"]] = vuln
+            vuln = fetch_advisory(item["id"], {"ecosystem": key[0], "name": key[1]},
+                                  fetch, vulnerability_cache)
             for entry in unique[key]:
                 findings.append({"id": entry["id"], "pin": entry["pin"],
                                  "ecosystem": entry["ecosystem"],
@@ -289,9 +299,8 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
         ids = [item["id"] for item in result.get("vulns", [])]
         records = []
         for vuln_id in ids:
-            if vuln_id not in vulnerability_cache:
-                vulnerability_cache[vuln_id] = fetch(VULN + vuln_id)
-            records.append(vulnerability_cache[vuln_id])
+            records.append(fetch_advisory(
+                vuln_id, {"ecosystem": key[0], "name": key[1]}, fetch, vulnerability_cache))
         severities[key] = [severity(item) for item in records]
 
     advice = {}

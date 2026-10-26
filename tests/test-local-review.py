@@ -480,9 +480,14 @@ class LocalReviewTests(unittest.TestCase):
                 "affected": [
                     {
                         "ranges": [
-                            {"events": [{"fixed": "27.0.1"}, {"fixed": self.secret}]}
+                            {"repo": "https://github.com/nodejs/node",
+                             "events": [{"fixed": "27.0.1"}, {"fixed": self.secret}]}
                         ]
-                    }
+                    },
+                    {
+                        "package": {"ecosystem": "npm", "name": "unrelated"},
+                        "ranges": [{"events": [{"fixed": "99.0.0"}]}],
+                    },
                 ],
             }
 
@@ -497,6 +502,12 @@ class LocalReviewTests(unittest.TestCase):
         self.assertNotIn("private-person", serialized)
         self.assertNotIn("secret.example", serialized)
         self.assertEqual(["27.0.1"], cache["tools"][0]["advisories"][0]["fixed"])
+        for invalid in (None, {}, {"id": "CVE-2026-54321"},
+                        {"id": "CVE-2026-12345", "affected": None}):
+            with self.subTest(details=invalid), self.assertRaises(RuntimeError):
+                installed_audit.audit(
+                    ROOT, data, online=True, request=request, fetch=lambda _: invalid
+                )
         with patch.object(installed_audit, "audit_module") as module:
             module.return_value.coordinate.return_value = {"version": "v27.0.0"}
             installed_audit.audit(

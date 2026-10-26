@@ -760,6 +760,8 @@ Verified payloads are cached by checksum under
 concurrent installs share a per-object lock. Set `DOTFILES_DOWNLOAD_CACHE=0`
 to bypass it or `DOTFILES_DOWNLOAD_CACHE_DIR` to relocate it. Use
 `dot cache status` and `dot cache prune [days]` for maintenance.
+Pruning skips busy entries, retains lock files, and removes verification content
+and its digest together under the same lock used by readers.
 Version-specific checksum manifests and AWS ZIP/signature pairs are also cached
 privately under `downloads/verification`. Local cache digests detect corruption;
 payload checksums and AWS vendor signatures are **reverified on every use**.
@@ -790,7 +792,9 @@ it checks the latest compatible and latest stable candidates and recommends
 one only when OSV reports no advisories or a strictly lower known maximum
 severity; cross-policy candidates are marked for compatibility review.
 CVSS v2/v3/v4 vectors are scored with the pinned audit dependency. Candidate
-queries use exact package/tag coordinates; missing results fail closed. npm
+queries use exact package/tag coordinates; missing results, mismatched advisory
+IDs, and malformed details fail closed. Fixes and package-level severity are
+scoped to the queried package or Git repository. npm
 recommendations respect `latest` and Node compatibility, and yanked-only PyPI
 releases are excluded. Otherwise it warns that no safer upgrade was established.
 The weekly

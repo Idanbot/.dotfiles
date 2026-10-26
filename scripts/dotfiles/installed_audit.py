@@ -130,14 +130,9 @@ def audit(
                 name = summary["id"]
                 if not advisory_id(name):
                     raise ReviewError("invalid-advisory-id")
-                if name not in retrieved:
-                    retrieved[name] = fetch(module.VULN + name)
-                vulnerability = retrieved[name]
-                if (
-                    not isinstance(vulnerability, dict)
-                    or vulnerability.get("id") != name
-                ):
-                    raise ReviewError("mismatched-advisory-id")
+                vulnerability = module.fetch_advisory(
+                    name, plans[ident]["package"], fetch, retrieved
+                )
                 findings.append(
                     {
                         "id": name,

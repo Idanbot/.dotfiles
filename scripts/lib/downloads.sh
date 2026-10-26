@@ -18,7 +18,7 @@ retry_command() {
       return "$status"
     fi
 
-    log_warn "$label failed (attempt $attempt/$attempts); retrying in ${delay}s"
+    log_warn "$label failed (attempt $attempt/$attempts); retrying in ${delay}s" >&2
     sleep "$delay"
   done
 }
@@ -97,11 +97,14 @@ go_checksum_from_index() {
 }
 
 go_release_checksum() {
-  local asset="$1" index_file checksum
+  local asset="$1" index_file checksum status
   index_file="$(mktemp)"
-  if ! download 'https://go.dev/dl/?mode=json&include=all' "$index_file"; then
+  if download 'https://go.dev/dl/?mode=json&include=all' "$index_file"; then
+    :
+  else
+    status=$?
     rm -f "$index_file"
-    return 1
+    return "$status"
   fi
   if ! checksum="$(go_checksum_from_index "$index_file" "$asset")"; then
     rm -f "$index_file"

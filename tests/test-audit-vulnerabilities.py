@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Unit tests for the mocked, read-only pinned-version OSV audit."""
 
+from contextlib import redirect_stdout
 import importlib.util
+import io
+import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -14,6 +18,11 @@ spec = importlib.util.spec_from_file_location(
     "audit_vulnerabilities", ROOT / "scripts/audit-vulnerabilities.py")
 audit_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit_module)
+
+
+def advisory(ident, package=None, **fields):
+    return {"id": ident, "affected": [{"package": package or {"ecosystem": "npm", "name": "demo"}}],
+            **fields}
 
 
 class VulnerabilityAuditTests(unittest.TestCase):
@@ -84,7 +93,9 @@ class VulnerabilityAuditTests(unittest.TestCase):
         scripts = self.root / "scripts"
         scripts.mkdir()
         (scripts / "update-policy.json").write_text('{}')
-        vuln = {"id": "STILL-AFFECTED", "database_specific": {"severity": "HIGH"}}
+        vuln = advisory("STILL-AFFECTED", {
+            "ecosystem": "GIT", "name": "https://github.com/demo/tool.git"},
+            database_specific={"severity": "HIGH"})
         for template in ("{version}", "release-{version}-stable"):
             with self.subTest(template=template):
                 (self.root / "packages.yaml").write_text(yaml.safe_dump({"core": {"demo": "1.0.0"}}))
@@ -122,7 +133,8 @@ class VulnerabilityAuditTests(unittest.TestCase):
             "id": "GHSA-test-1234",
             "aliases": ["CVE-2026-12345"],
             "summary": "Example vulnerability",
-            "affected": [{"database_specific": {"severity": "HIGH"},
+            "affected": [{"package": {"ecosystem": "GIT", "name": "https://github.com/gitleaks/gitleaks.git"},
+                          "database_specific": {"severity": "HIGH"},
                           "ranges": [{"events": [
                               {"introduced": "0"}, {"fixed": "abcdef123456"}]}]}],
         }
@@ -181,6 +193,116 @@ class VulnerabilityAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "incomplete batch"):
             audit_module.audit(self.root, request=lambda *_: {"results": []})
 
+    def test_current_and_candidate_advisories_reject_invalid_details(self):
+        package = {"ecosystem": "npm", "name": "demo"}
+        entry = {"id": "demo", "pin": "1.0.0", "version": "1.0.0",
+                 "ecosystem": "npm", "package": package}
+        valid = {"id": "OSV-2026-1", "affected": [{"package": package}],
+                 "database_specific": {"severity": "HIGH"}}
+        invalid = [None, [], {}, {**valid, "id": "OSV-2026-2"},
+                   {"id": valid["id"]}, {**valid, "affected": None},
+                   {**valid, "affected": []}, {**valid, "affected": [None]},
+                   {**valid, "affected": [{"package": package, "ranges": [None]}]},
+                   {**valid, "affected": [{"package": package, "ranges": [{"events": [None]}]}]},
+                   {**valid, "affected": [{"package": package, "ranges": [{"events": []}]}]},
+                   {**valid, "affected": [{"package": package, "ranges": [{"events": [{"fixed": None}]}]}]},
+                   {**valid, "severity": [None]},
+                   {**valid, "aliases": None}, {**valid, "summary": []},
+                   {**valid, "affected": [{"package": {**package, "name": "unrelated"}}]}]
+        for candidate in (False, True):
+            for record in invalid:
+                with self.subTest(candidate=candidate, record=record), self.assertRaises(RuntimeError):
+                    def request(_, payload):
+                        return {"results": [{"vulns": [{"id": valid["id"]}]}]}
+
+                    if candidate:
+                        audit_module.candidate_advice(
+                            self.root, [entry], [{"coordinate": ("npm", "demo", "1.0.0"),
+                                                 "vulnerability": valid}],
+                            request=request, fetch=lambda _: record,
+                            resolve_candidates=lambda *_: [{"version": "1.0.1", "query_version": "1.0.1",
+                                                           "labels": ["latest-compatible"]}],
+                            vulnerability_cache={})
+                    else:
+                        with patch.object(audit_module, "load_pins", return_value=([entry], [])):
+                            audit_module.audit(
+                                self.root, request=request, fetch=lambda _: record,
+                                resolve_candidates=lambda *_: [])
+
+    def test_fix_and_package_severity_are_scoped_to_queried_coordinate(self):
+        package = {"ecosystem": "npm", "name": "demo"}
+        entry = {"id": "demo", "pin": "1.0.0", "version": "1.0.0",
+                 "ecosystem": "npm", "package": package}
+        record = {"id": "OSV-2026-1", "affected": [
+            {"package": package, "database_specific": {"severity": "low"},
+             "ranges": [{"events": [{"fixed": "1.0.1"}]}]},
+            {"package": {**package, "name": "unrelated"},
+             "database_specific": {"severity": "critical"},
+             "ranges": [{"events": [{"fixed": "9.0.0"}]}]},
+        ]}
+        with patch.object(audit_module, "load_pins", return_value=([entry], [])):
+            _, _, findings = audit_module.audit(
+                self.root, request=lambda *_: {"results": [{"vulns": [{"id": record["id"]}]}]},
+                fetch=lambda _: record, resolve_candidates=lambda *_: [])
+        self.assertEqual(findings[0]["fixed"], ["1.0.1"])
+        self.assertEqual(findings[0]["severity"], "low")
+
+    def test_cached_advisory_is_validated_and_scoped_for_each_package(self):
+        first = {"ecosystem": "npm", "name": "first"}
+        second = {"ecosystem": "npm", "name": "second"}
+        entries = [{"id": package["name"], "pin": "1.0.0", "version": "1.0.0",
+                    "ecosystem": "npm", "package": package} for package in (first, second)]
+        record = {"id": "OSV-2026-1", "affected": [
+            {"package": package, "ranges": [{"events": [{"fixed": fixed}]}]}
+            for package, fixed in ((first, "1.0.1"), (second, "2.0.0"))]}
+        calls = []
+        with patch.object(audit_module, "load_pins", return_value=(entries, [])):
+            _, _, findings = audit_module.audit(
+                self.root,
+                request=lambda *_: {"results": [{"vulns": [{"id": record["id"]}]}] * 2},
+                fetch=lambda url: calls.append(url) or record,
+                resolve_candidates=lambda *_: [])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([item["fixed"] for item in findings], [["1.0.1"], ["2.0.0"]])
+        self.assertEqual(len(record["affected"]), 2)
+        with self.assertRaises(RuntimeError):
+            audit_module.fetch_advisory(
+                record["id"], first, lambda _: self.fail("cached data was refetched"),
+                {record["id"]: {**record, "id": "OSV-2026-2"}})
+
+    def test_git_ranges_match_repository_not_unrelated_package_or_repo(self):
+        package = {"ecosystem": "GIT", "name": "https://github.com/demo/tool.git"}
+        record = {"id": "OSV-2026-1", "affected": [{
+            "package": {"ecosystem": "PyPI", "name": "demo-tool"},
+            "ranges": [
+                {"type": "GIT", "repo": "https://github.com/demo/tool/",
+                 "events": [{"fixed": "abc123"}]},
+                {"type": "GIT", "repo": "https://github.com/other/tool",
+                 "events": [{"fixed": "unrelated"}]},
+            ]}]}
+        scoped = audit_module.fetch_advisory(record["id"], package, lambda _: record, {})
+        self.assertEqual(audit_module.fixed_versions(scoped), ["abc123"])
+        pypi = audit_module.fetch_advisory(
+            record["id"], {"ecosystem": "PyPI", "name": "Demo_Tool"}, lambda _: record, {})
+        self.assertEqual(len(pypi["affected"]), 1)
+
+    def test_malformed_response_does_not_overwrite_or_publish_a_report(self):
+        output = self.root / "report.md"
+        output.write_text("previous report\n")
+        def response(request, **kwargs):
+            if request.full_url == audit_module.QUERY:
+                data = {"results": [{"vulns": [{"id": "OSV-2026-1"}]}, {}]}
+            else:
+                data = {"id": "OSV-2026-2"}
+            return io.BytesIO(json.dumps(data).encode())
+        stdout = io.StringIO()
+        with patch.object(sys, "argv", ["audit", "--source", str(self.root), "--output", str(output)]), \
+                patch.object(audit_module.urllib.request, "urlopen", side_effect=response), \
+                redirect_stdout(stdout), self.assertRaises(RuntimeError):
+            audit_module.main()
+        self.assertEqual(output.read_text(), "previous report\n")
+        self.assertEqual(stdout.getvalue(), "")
+
     def test_cvss_vectors_and_package_severity_are_normalized(self):
         vectors = [
             ("CVSS_V3", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", "critical"),
@@ -215,7 +337,7 @@ class VulnerabilityAuditTests(unittest.TestCase):
         key = ("GIT", "https://github.com/demo/tool.git", "v1.0.0")
         entry = {"id": "demo", "pin": "1.0.0", "version": key[2],
                  "package": {"ecosystem": key[0], "name": key[1]}}
-        vuln = {"id": "OLD", "database_specific": {"severity": "HIGH"}}
+        vuln = advisory("OLD", entry["package"], database_specific={"severity": "HIGH"})
         requests = []
 
         def request(_, payload):
@@ -322,7 +444,7 @@ class VulnerabilityAuditTests(unittest.TestCase):
             resolve_candidates=lambda *_: options, vulnerability_cache={})
         self.assertIn("no OSV advisories", clean[key])
 
-        low = {"id": "LOW", "database_specific": {"severity": "LOW"}}
+        low = advisory("LOW", database_specific={"severity": "LOW"})
         reduced = audit_module.candidate_advice(
             self.root, [entry], [finding],
             request=lambda *_: {"results": [{"vulns": [{"id": "LOW"}]}]},
@@ -339,7 +461,7 @@ class VulnerabilityAuditTests(unittest.TestCase):
         advice = audit_module.candidate_advice(
             self.root, [entry], [finding],
             request=lambda *_: {"results": [{"vulns": [{"id": "NEW"}]}]},
-            fetch=lambda _: {"id": "NEW", "database_specific": {"severity": "low"}},
+            fetch=lambda _: advisory("NEW", database_specific={"severity": "low"}),
             resolve_candidates=lambda *_: [
                 {"version": "1.0.1", "query_version": "1.0.1",
                  "labels": ["latest-compatible"]}],

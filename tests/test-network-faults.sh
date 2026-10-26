@@ -100,4 +100,40 @@ download_verified \
   "sha256:$expected" >/dev/null
 cmp "$MOCK_STATE/payload" "$TMP_ROOT/verified.out"
 
+# Command substitutions must capture only data, even after a recovered retry.
+(
+  export DOTFILES_EVENT_LOG="$TMP_ROOT/retry-events.jsonl"
+  index_count_file="$TMP_ROOT/index-attempts"
+  download_once() {
+    local count=0
+    [[ ! -f "$index_count_file" ]] || count="$(<"$index_count_file")"
+    count=$((count + 1))
+    printf '%s\n' "$count" >"$index_count_file"
+    ((count >= ${INDEX_SUCCEED_AFTER:-2})) || return 28
+    printf '[{"files":[{"filename":"go-test.tar.gz","sha256":"%s"}]}]\n' "$expected" >"$2"
+  }
+  checksum="$(go_release_checksum go-test.tar.gz 2>"$TMP_ROOT/retry.stderr")"
+  [[ "$checksum" == "$expected" ]]
+  grep -q '\[WARN\].*retrying' "$TMP_ROOT/retry.stderr"
+  grep -q '"level":"warn"' "$DOTFILES_EVENT_LOG"
+  INDEX_SUCCEED_AFTER=1
+  rm "$index_count_file"
+  checksum="$(go_release_checksum go-test.tar.gz 2>"$TMP_ROOT/immediate.stderr")"
+  [[ "$checksum" == "$expected" && ! -s "$TMP_ROOT/immediate.stderr" ]]
+  INDEX_SUCCEED_AFTER=99
+  rm "$index_count_file"
+  checksum=""
+  if checksum="$(go_release_checksum go-test.tar.gz 2>"$TMP_ROOT/exhausted.stderr")"; then
+    printf 'Exhausted metadata retries unexpectedly succeeded\n' >&2
+    exit 1
+  else
+    [[ "$?" == 28 ]]
+  fi
+  [[ -z "$checksum" && "$(<"$index_count_file")" == 3 ]]
+  grep -q '\[ERROR\].*failed after 3 attempts' "$TMP_ROOT/exhausted.stderr"
+  status=0
+  retry_command fixture 2 0 bash -c 'exit 28' >"$TMP_ROOT/status.stdout" 2>"$TMP_ROOT/status.stderr" || status=$?
+  [[ "$status" == 28 && ! -s "$TMP_ROOT/status.stdout" ]]
+)
+
 printf 'Network fault-injection test passed\n'
