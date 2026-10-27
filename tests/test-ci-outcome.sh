@@ -98,11 +98,17 @@ result="$($CLASSIFIER --jobs "$TMP_ROOT/mixed-cancelled.json" --conclusion cance
 jq -e '.classification == "mixed_failure" and .conclusion == "failure"' <<<"$result" >/dev/null
 for change in \
   '.jobs[0].steps[0].conclusion = "failure"' \
+  '.jobs[0].steps[0] = {name:"Set up job",number:2,conclusion:"failure"}' \
+  '.jobs[0].steps[0] = {name:"Complete job",number:3,conclusion:"failure"}' \
   '.jobs[0].id = 99'; do
   jq "$change" "$TMP_ROOT/jobs.json" >"$TMP_ROOT/ambiguous.json"
   result="$($CLASSIFIER --jobs "$TMP_ROOT/ambiguous.json" --conclusion failure --annotations "$TMP_ROOT/annotations.json")"
   jq -e '.conclusion == "failure"' <<<"$result" >/dev/null
 done
+jq '.jobs[0].steps[0] = {name:"Set up job",number:1,conclusion:"failure"}' \
+  "$TMP_ROOT/jobs.json" >"$TMP_ROOT/setup-outage.json"
+result="$($CLASSIFIER --jobs "$TMP_ROOT/setup-outage.json" --conclusion failure --annotations "$TMP_ROOT/annotations.json")"
+jq -e '.classification == "infrastructure_failure" and .conclusion == "neutral"' <<<"$result" >/dev/null
 for annotations in '{}' '{"11":[]}' '{"11":[{"annotation_level":"failure","message":"fixture: The hosted runner lost communication with the server."}]}'; do
   printf '%s\n' "$annotations" >"$TMP_ROOT/ambiguous-annotations.json"
   result="$($CLASSIFIER --jobs "$TMP_ROOT/jobs.json" --conclusion failure --annotations "$TMP_ROOT/ambiguous-annotations.json")"

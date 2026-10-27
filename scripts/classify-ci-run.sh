@@ -107,7 +107,7 @@ failure_evidence="$(jq -c --argjson annotations "$annotations" --arg workflow "$
       ($job.id | type) == "number" and
       ($job.steps | type) == "array" and
       ([$job.steps[]? | select(failed) |
-        select(.name != "Set up job" and .name != "Complete job")] | length) == 0 and
+        select(.name != "Set up job" or .number != 1)] | length) == 0 and
       any($annotations[($job.id | tostring)][]?;
         type == "object" and .annotation_level == "failure" and
         (.message | type) == "string" and
