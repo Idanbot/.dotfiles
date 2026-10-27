@@ -594,7 +594,9 @@ atomic JSON updates. Serena resolves the project from each agent's working
 directory except in Antigravity, where its agent must activate the current
 project once after enabling Serena. This MCP-only toggle deliberately avoids
 installing persistent hooks or plugins. Neither MCP is authenticated or granted
-extra permissions.
+extra permissions. JSON configuration writes reject symlinks, redirected parent
+directories, and nonregular files. They preserve unrelated settings and publish
+with private permissions; a rejected path must be reviewed manually.
 
 Graphify is installed as a separate, on-demand code knowledge-graph skill for
 OMP through the standard `~/.agents/skills/graphify` location. It does not run
@@ -767,6 +769,12 @@ privately under `downloads/verification`. Local cache digests detect corruption;
 payload checksums and AWS vendor signatures are **reverified on every use**.
 Caching never substitutes a previous verification result for a new verification.
 Mutable release indexes and rustup's unversioned checksum are not cached there.
+Binary, runtime-tree, and command-link publication restores the prior payload,
+ownership stamp, and destination-specific ledger records if publication fails.
+If rollback cannot finish, logs identify a private recovery directory containing
+`records`, plus `previous` and `stamp` when they existed. Keep these together for
+manual restoration before retrying. Handled interrupts attempt rollback;
+SIGKILL and power loss cannot run cleanup traps.
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing
@@ -1096,6 +1104,9 @@ Successful runs clear stale diagnostic failures for the same commit; older runs
 cannot overwrite newer completed attempts. Cancelled runs with only failed
 aggregate checks are neutral, while genuine failed tests remain actionable.
 Classification never changes the original bootstrap workflow conclusion.
+Runner-outage evidence comes from job-scoped GitHub check annotations, never a
+combined log search. Failed test steps and mixed failures remain red; missing
+annotations cannot excuse a failed job.
 
 The workspace Docker harness uses synthetic agent commands and a mocked Herdr
 API, so it never authenticates or starts a real agent session. It still invokes

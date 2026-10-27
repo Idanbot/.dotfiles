@@ -4,7 +4,7 @@
 set -euo pipefail
 
 JOBS_FILE=""
-LOG_FILE=""
+ANNOTATIONS_FILE=""
 WORKFLOW_CONCLUSION=""
 RUN_URL=""
 
@@ -15,7 +15,8 @@ Usage: scripts/classify-ci-run.sh --jobs FILE --conclusion VALUE [options]
 Options:
   --jobs FILE          GitHub Actions jobs API response ({"jobs": [...]})
   --conclusion VALUE   Completed workflow conclusion
-  --logs FILE          Optional combined job log used for runner-outage signatures
+  --annotations FILE   Optional object mapping job IDs to GitHub check annotations
+  --logs FILE          Legacy argument; combined logs never excuse failed jobs
   --run-url URL        Optional workflow URL included in the summary
   -h, --help           Show this help
 
@@ -35,7 +36,10 @@ while (($#)); do
       shift 2
       ;;
     --logs)
-      LOG_FILE="${2:-}"
+      shift 2
+      ;;
+    --annotations)
+      ANNOTATIONS_FILE="${2:-}"
       shift 2
       ;;
     --run-url)
@@ -75,37 +79,64 @@ succeeded="$(count_conclusion success)"
 failed="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "action_required" or .conclusion == "startup_failure")] | length' "$JOBS_FILE")"
 cancelled="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "cancelled" or .conclusion == "stale")] | length' "$JOBS_FILE")"
 skipped="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") | select(.conclusion == "skipped" or .conclusion == "neutral")] | length' "$JOBS_FILE")"
-actionable_failed="$failed"
-if [[ "$WORKFLOW_CONCLUSION" == cancelled ]]; then
-  actionable_failed="$(jq '[.jobs[] | select(.name != "CI Outcome Classification") |
-    select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "action_required" or .conclusion == "startup_failure") |
-    select(.name != "CI Result" and .name != "Gated release and installer acceptance / Live Acceptance Result")] | length' "$JOBS_FILE")"
+annotations='{}'
+if [[ -n "$ANNOTATIONS_FILE" && -r "$ANNOTATIONS_FILE" ]]; then
+  jq -e 'type == "object" and all(.[]; type == "array")' "$ANNOTATIONS_FILE" >/dev/null || {
+    printf 'classify-ci-run: annotations must map job IDs to arrays\n' >&2
+    exit 2
+  }
+  annotations="$(jq -c . "$ANNOTATIONS_FILE")"
 fi
 
-infra_signature=""
-if [[ -n "$LOG_FILE" && -r "$LOG_FILE" ]]; then
-  infra_signature="$({
-    grep -Eim1 \
-      'hosted runner lost communication|runner process is not responding|runner has received a shutdown signal|no available hosted runners|lost communication with the server|runner was terminated by the operating system' \
-      "$LOG_FILE" || true
-  } | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//')"
-fi
+# Platform annotations are scoped to a job. A failed test step always wins over
+# an outage annotation, and missing/ambiguous evidence never excuses a failure.
+failure_evidence="$(jq -c --argjson annotations "$annotations" --arg workflow "$WORKFLOW_CONCLUSION" '
+  def failed: .conclusion == "failure" or .conclusion == "timed_out" or
+    .conclusion == "action_required" or .conclusion == "startup_failure";
+  def aggregate: .name == "CI Result" or
+    .name == "Gated release and installer acceptance / Live Acceptance Result";
+  [.jobs[] | select(.name != "CI Outcome Classification") | select(failed)] as $failed |
+  [$failed[] | select(aggregate | not)] as $leaves |
+  (if ($leaves | length) > 0 or $workflow == "cancelled"
+    then $leaves else $failed end) +
+    [.jobs[] | select(.name != "CI Outcome Classification") |
+      select(.conclusion == "cancelled" or .conclusion == "stale")] |
+  map(. as $job | {
+    failed: ($job | failed),
+    infrastructure: (
+      ($job.id | type) == "number" and
+      ($job.steps | type) == "array" and
+      ([$job.steps[]? | select(failed) |
+        select(.name != "Set up job" and .name != "Complete job")] | length) == 0 and
+      any($annotations[($job.id | tostring)][]?;
+        type == "object" and .annotation_level == "failure" and
+        (.message | type) == "string" and
+        (.message | test("^(The )?(hosted runner lost communication with the server|runner process is not responding|runner has received a shutdown signal|no available hosted runners|runner was terminated by the operating system)|^The runner: [^\\r\\n]+ lost communication with the server"; "i"))))
+  })
+' "$JOBS_FILE")"
+actionable_failed="$(jq '[.[] | select(.failed and (.infrastructure | not))] | length' <<<"$failure_evidence")"
+infrastructure_failed="$(jq '[.[] | select(.infrastructure)] | length' <<<"$failure_evidence")"
 
 classification=unknown
 check_conclusion=neutral
 title="CI outcome requires review"
 reason="The workflow conclusion and job conclusions did not match a known state."
 
-if ((actionable_failed > 0)) && [[ -z "$infra_signature" ]]; then
+if ((actionable_failed > 0 && infrastructure_failed > 0)); then
+  classification=mixed_failure
+  check_conclusion=failure
+  title="Actionable CI failure with infrastructure interruption"
+  reason="$actionable_failed job(s) have actionable or unverified failures; $infrastructure_failed other job(s) have job-scoped runner-outage evidence."
+elif ((actionable_failed > 0)); then
   classification=code_failure
   check_conclusion=failure
   title="Actionable CI failure"
-  reason="At least one job failed, timed out, or could not start without a known runner-outage signature."
-elif ((actionable_failed > 0)) && [[ -n "$infra_signature" ]]; then
+  reason="At least one job failed without trustworthy job-scoped infrastructure-only evidence. Combined logs cannot excuse failures."
+elif ((infrastructure_failed > 0)); then
   classification=infrastructure_failure
   check_conclusion=neutral
   title="Infrastructure failure"
-  reason="A failed job contained a known GitHub-hosted runner outage signature: $infra_signature"
+  reason="All $infrastructure_failed infrastructure-only job(s) have job-scoped GitHub runner-outage annotations and no failed test steps."
 elif ((cancelled > 0)) || [[ "$WORKFLOW_CONCLUSION" == cancelled || "$WORKFLOW_CONCLUSION" == stale ]]; then
   classification=infrastructure_cancelled
   check_conclusion=neutral

@@ -647,6 +647,12 @@
       ]
     },
     {
+      "path": "tests/test-publication-recovery.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [["{root}"]]
+    },
+    {
       "path": "tests/test-package-metadata.sh",
       "kind": "suite",
       "suite": "upgrades",

@@ -79,10 +79,75 @@ result="$($CLASSIFIER \
   --logs "$TMP_ROOT/run.log" \
   --run-url https://example.invalid/run/1)"
 jq -e '
-  .classification == "infrastructure_failure" and
-  .conclusion == "neutral" and
+  .classification == "code_failure" and
+  .conclusion == "failure" and
   (.summary | contains("https://example.invalid/run/1"))
 ' <<<"$result" >/dev/null
+
+printf '%s\n' '{"11":[{"annotation_level":"failure","message":"The hosted runner lost communication with the server."}]}' >"$TMP_ROOT/annotations.json"
+printf '%s\n' '{"jobs":[{"id":11,"name":"runner","conclusion":"failure","steps":[{"name":"tests","conclusion":"cancelled"}]},
+  {"id":12,"name":"CI Result","conclusion":"failure"}]}' >"$TMP_ROOT/jobs.json"
+result="$($CLASSIFIER --jobs "$TMP_ROOT/jobs.json" --conclusion failure --annotations "$TMP_ROOT/annotations.json")"
+jq -e '.classification == "infrastructure_failure" and .conclusion == "neutral"' <<<"$result" >/dev/null
+jq '.jobs += [{id:13,name:"unit tests",conclusion:"failure",steps:[{name:"assertions",conclusion:"failure"}]}]' \
+  "$TMP_ROOT/jobs.json" >"$TMP_ROOT/mixed.json"
+result="$($CLASSIFIER --jobs "$TMP_ROOT/mixed.json" --conclusion failure --annotations "$TMP_ROOT/annotations.json")"
+jq -e '.classification == "mixed_failure" and .conclusion == "failure"' <<<"$result" >/dev/null
+jq '.jobs[0].conclusion = "cancelled"' "$TMP_ROOT/mixed.json" >"$TMP_ROOT/mixed-cancelled.json"
+result="$($CLASSIFIER --jobs "$TMP_ROOT/mixed-cancelled.json" --conclusion cancelled --annotations "$TMP_ROOT/annotations.json")"
+jq -e '.classification == "mixed_failure" and .conclusion == "failure"' <<<"$result" >/dev/null
+for change in \
+  '.jobs[0].steps[0].conclusion = "failure"' \
+  '.jobs[0].id = 99'; do
+  jq "$change" "$TMP_ROOT/jobs.json" >"$TMP_ROOT/ambiguous.json"
+  result="$($CLASSIFIER --jobs "$TMP_ROOT/ambiguous.json" --conclusion failure --annotations "$TMP_ROOT/annotations.json")"
+  jq -e '.conclusion == "failure"' <<<"$result" >/dev/null
+done
+for annotations in '{}' '{"11":[]}' '{"11":[{"annotation_level":"failure","message":"fixture: The hosted runner lost communication with the server."}]}'; do
+  printf '%s\n' "$annotations" >"$TMP_ROOT/ambiguous-annotations.json"
+  result="$($CLASSIFIER --jobs "$TMP_ROOT/jobs.json" --conclusion failure --annotations "$TMP_ROOT/ambiguous-annotations.json")"
+  jq -e '.conclusion == "failure"' <<<"$result" >/dev/null
+done
+result="$($CLASSIFIER --jobs "$TMP_ROOT/jobs.json" --conclusion failure --annotations "$TMP_ROOT/missing-annotations.json")"
+jq -e '.conclusion == "failure"' <<<"$result" >/dev/null
+jq '.jobs |= map(.conclusion = "success")' "$TMP_ROOT/jobs.json" >"$TMP_ROOT/rerun.json"
+result="$($CLASSIFIER --jobs "$TMP_ROOT/rerun.json" --conclusion success --annotations "$TMP_ROOT/annotations.json")"
+jq -e '.classification == "success" and .conclusion == "success"' <<<"$result" >/dev/null
+
+# Exercise the actual workflow collector with paginated jobs and mocked GitHub.
+python3 - "$DOTFILES_DIR" "$TMP_ROOT" <<'PY'
+from pathlib import Path
+import sys
+import yaml
+root, temporary = map(Path, sys.argv[1:])
+workflow = yaml.safe_load((root / ".github/workflows/ci-outcome.yml").read_text())
+step = next(step for step in workflow["jobs"]["classify"]["steps"]
+            if step["name"] == "Fetch jobs and job-scoped infrastructure annotations")
+(temporary / "collect.sh").write_text("set -euo pipefail\n" + step["run"])
+PY
+(
+  gh() {
+    case "$*" in
+      *'/actions/runs/'*)
+        printf '%s\n' '[{"jobs":[{"id":11,"conclusion":"failure","check_run_url":"https://api.github.com/repos/fixture/repository/check-runs/31"}]},{"jobs":[{"id":22,"conclusion":"success"}]}]'
+        ;;
+      *'/check-runs/31/annotations?'*)
+        [[ "${ANNOTATION_FAILURE:-false}" != true ]] || return 37
+        printf '%s\n' '[[{"annotation_level":"failure","message":"The hosted runner lost communication with the server."}]]'
+        ;;
+      *) return 9 ;;
+    esac
+  }
+  export -f gh
+  export RUNNER_TEMP="$TMP_ROOT/collector" RUN_CONCLUSION=failure RUN_ID=1 GITHUB_REPOSITORY=fixture/repository
+  mkdir "$RUNNER_TEMP"
+  bash "$TMP_ROOT/collect.sh"
+  jq -e '.jobs | length == 2' "$RUNNER_TEMP/jobs.json" >/dev/null
+  jq -e '."11"[0].annotation_level == "failure"' "$RUNNER_TEMP/annotations.json" >/dev/null
+  ANNOTATION_FAILURE=true bash "$TMP_ROOT/collect.sh" >"$TMP_ROOT/collector-warning"
+  jq -e '. == {}' "$RUNNER_TEMP/annotations.json" >/dev/null
+  grep -q 'failures will remain actionable' "$TMP_ROOT/collector-warning"
+)
 
 printf '{"invalid":[]}\n' >"$TMP_ROOT/jobs.json"
 if "$CLASSIFIER" --jobs "$TMP_ROOT/jobs.json" --conclusion failure >/dev/null 2>&1; then

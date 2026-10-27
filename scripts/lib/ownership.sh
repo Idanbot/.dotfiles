@@ -55,18 +55,75 @@ assert_owned_target() {
   fi
 }
 
+# Snapshot only this destination's records; rollback must retain unrelated writes.
+snapshot_publication() (
+  local temporary="$1" destination="$2" root stamp ledger_fd
+  if [[ -e "$destination" || -L "$destination" ]]; then
+    cp -a -- "$destination" "$temporary/previous" || return 1
+  fi
+  root="$(managed_state_root)"
+  exec {ledger_fd}>"$root/ledger.lock"
+  flock -x "$ledger_fd" || return 1
+  stamp="$(ownership_stamp "$destination")"
+  [[ ! -f "$stamp" ]] || cp -p -- "$stamp" "$temporary/stamp" || return 1
+  : >"$temporary/records"
+  [[ ! -f "$root/installed.tsv" ]] ||
+    awk -F '\t' -v target="$destination" '$4 == target' "$root/installed.tsv" >"$temporary/records"
+)
+
+restore_publication_metadata() (
+  local temporary="$1" destination="$2" root stamp ledger_fd
+  root="$(managed_state_root)"
+  exec {ledger_fd}>"$root/ledger.lock"
+  flock -x "$ledger_fd" || return 1
+  stamp="$(ownership_stamp "$destination")"
+  if [[ -f "$temporary/stamp" ]]; then
+    cp -p -- "$temporary/stamp" "$temporary/stamp-restore" || return 1
+    mv -Tf -- "$temporary/stamp-restore" "$stamp" || return 1
+  else
+    rm -f -- "$stamp" || return 1
+  fi
+  : >"$temporary/ledger-restore"
+  if [[ -f "$root/installed.tsv" ]]; then
+    awk -F '\t' -v target="$destination" '$4 != target' "$root/installed.tsv" >"$temporary/ledger-restore" || return 1
+  fi
+  cat "$temporary/records" >>"$temporary/ledger-restore" || return 1
+  chmod 600 "$temporary/ledger-restore" || return 1
+  mv -Tf -- "$temporary/ledger-restore" "$root/installed.tsv"
+)
+
+cleanup_publication() {
+  local status="$1" temporary="$2" destination="$3" changed="$4" committed="$5" rollback_failed=false
+  trap '' HUP INT TERM
+  if [[ "$changed" == true && "$committed" == false ]]; then
+    rm -rf -- "$destination" || rollback_failed=true
+    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
+      cp -a -- "$temporary/previous" "$destination" || rollback_failed=true
+    fi
+    restore_publication_metadata "$temporary" "$destination" || rollback_failed=true
+    [[ "$status" != 0 ]] || status=1
+  fi
+  if [[ "$rollback_failed" == true ]]; then
+    log_error "Recovery files retained at $temporary; rollback incomplete for $destination" || true
+    log_error "Keep previous, stamp, and records together; restore the payload and ownership metadata before retrying" || true
+    [[ "$status" != 0 ]] || status=1
+  else
+    rm -rf -- "$temporary" || status=1
+  fi
+  exit "$status"
+}
+
 install_managed_binary() (
   local src="$1" binary="$2" version="${3:-unknown}" owner="${4:-managed-binary}"
   local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest temporary backup="" takeover=false
+  local changed=false committed=false unchanged=false
   local -a smoke
   managed_operation_lock || return 1
   mkdir -p "$bin_dir" || return 1
   dest="$bin_dir/$binary"
   if [[ -f "$dest" && -x "$dest" && ! -L "$dest" ]] && cmp -s "$src" "$dest"; then
-    record_install "$binary" "$version" "$owner" "$dest"
-    return
-  fi
-  if binary_replacement_requested "$binary" && [[ -f "$dest" || -L "$dest" ]] &&
+    unchanged=true
+  elif binary_replacement_requested "$binary" && [[ -f "$dest" || -L "$dest" ]] &&
     ! target_is_owned "$dest"; then
     [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
     takeover=true
@@ -74,7 +131,10 @@ install_managed_binary() (
     assert_owned_target "$dest" || return 1
   fi
   temporary="$(mktemp -d "$bin_dir/.dotfiles-binary.XXXXXX")" || return 1
-  trap 'rm -rf -- "$temporary"' EXIT
+  trap 'cleanup_publication "$?" "$temporary" "$dest" "$changed" "$committed"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   install -m 0755 "$src" "$temporary/new" || return 1
   [[ -s "$temporary/new" ]] || return 1
   if [[ -n "${5:-}" ]]; then
@@ -82,48 +142,39 @@ install_managed_binary() (
     smoke[0]="$temporary/new"
     "${smoke[@]}" >/dev/null 2>&1 || return 1
   fi
-  if [[ -e "$dest" || -L "$dest" ]]; then
-    cp -a -- "$dest" "$temporary/previous" || return 1
-  fi
+  snapshot_publication "$temporary" "$dest" || return 1
   if [[ "$takeover" == true ]]; then
     backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$binary"
     ensure_private_directory "$backup" || return 1
     cp -a -- "$dest" "$backup/$binary" || return 1
     log_warn "Backed up existing $binary to $backup/$binary before approved replacement"
   fi
-  mv -Tf -- "$temporary/new" "$dest" || return 1
-  if ! record_install "$binary" "$version" "$owner" "$dest"; then
-    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
-      mv -Tf -- "$temporary/previous" "$dest"
-    else
-      rm -f -- "$dest"
-    fi
-    return 1
-  fi
+  changed=true
+  [[ "$unchanged" == true ]] || mv -Tf -- "$temporary/new" "$dest" || return 1
+  record_install "$binary" "$version" "$owner" "$dest" || return 1
+  committed=true
 )
 
 install_managed_tree() (
   local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6" temporary
+  local changed=false committed=false
   shift 6
   managed_operation_lock || return 1
   assert_owned_target "$destination" || return 1
   mkdir -p "$(dirname "$destination")" || return 1
   temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-tree.XXXXXX")" || return 1
-  trap 'rm -rf -- "$temporary"' EXIT
+  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   cp -a -- "$source" "$temporary/new" || return 1
   "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
-  if [[ -e "$destination" || -L "$destination" ]]; then
-    mv -T -- "$destination" "$temporary/previous" || return 1
-  fi
-  if ! mv -T -- "$temporary/new" "$destination"; then
-    [[ ! -e "$temporary/previous" ]] || mv -T -- "$temporary/previous" "$destination"
-    return 1
-  fi
-  if ! record_install "$tool" "$version" "$owner" "$destination"; then
-    rm -rf -- "$destination"
-    [[ ! -e "$temporary/previous" ]] || mv -T -- "$temporary/previous" "$destination"
-    return 1
-  fi
+  snapshot_publication "$temporary" "$destination" || return 1
+  changed=true
+  rm -rf -- "$destination" || return 1
+  mv -T -- "$temporary/new" "$destination" || return 1
+  record_install "$tool" "$version" "$owner" "$destination" || return 1
+  committed=true
 )
 
 # Publish an application and its command links as one rollback-capable operation.
@@ -287,17 +338,15 @@ forget_install() (
 
 managed_link() (
   local target="$1" link="$2" tool="$3" version="$4"
-  local temporary backup
+  local temporary backup changed=false committed=false unchanged=false
   managed_operation_lock || return 1
   if [[ -f "$link" && -x "$link" && ! -L "$link" && "$(realpath -m -- "$target")" == "$(realpath -m -- "$link")" ]]; then
     log_skip "Preserving existing executable at $link; no self-link needed"
     return 0
   fi
   if [[ -L "$link" && "$(readlink "$link")" == "$target" ]]; then
-    record_install "$tool" "$version" symlink "$link"
-    return
-  fi
-  if binary_replacement_requested "$tool" && [[ -f "$link" || -L "$link" ]] && ! target_is_owned "$link"; then
+    unchanged=true
+  elif binary_replacement_requested "$tool" && [[ -f "$link" || -L "$link" ]] && ! target_is_owned "$link"; then
     [[ "$link" == "$HOME/.local/bin/"* && "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
     [[ -x "$target" ]] || return 1
     backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
@@ -309,18 +358,14 @@ managed_link() (
   fi
   mkdir -p "$(dirname "$link")" || return 1
   temporary="$(mktemp -d "$(dirname "$link")/.dotfiles-link.XXXXXX")" || return 1
-  trap 'rm -rf -- "$temporary"' EXIT
+  trap 'cleanup_publication "$?" "$temporary" "$link" "$changed" "$committed"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   ln -s -- "$target" "$temporary/new" || return 1
-  if [[ -e "$link" || -L "$link" ]]; then
-    cp -a -- "$link" "$temporary/previous" || return 1
-  fi
-  mv -Tf -- "$temporary/new" "$link" || return 1
-  if ! record_install "$tool" "$version" symlink "$link"; then
-    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
-      mv -Tf -- "$temporary/previous" "$link"
-    else
-      rm -f -- "$link"
-    fi
-    return 1
-  fi
+  snapshot_publication "$temporary" "$link" || return 1
+  changed=true
+  [[ "$unchanged" == true ]] || mv -Tf -- "$temporary/new" "$link" || return 1
+  record_install "$tool" "$version" symlink "$link" || return 1
+  committed=true
 )

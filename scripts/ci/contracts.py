@@ -259,6 +259,11 @@ def check(root):
     }
     outcome = classification_workflow["jobs"]["classify"]
     assert "if" not in outcome, "Successful runs must clear stale diagnostic failures"
+    classify_step = next(
+        step for step in outcome["steps"] if step["name"] == "Classify outcome"
+    )
+    assert '--annotations "$RUNNER_TEMP/annotations.json"' in classify_step["run"]
+    assert "--logs" not in classify_step["run"]
     publish = next(
         step
         for step in outcome["steps"]

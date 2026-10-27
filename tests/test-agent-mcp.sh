@@ -201,4 +201,114 @@ fi
 cmp "$AGY_CONFIG" "$TMP_ROOT/broken-before"
 grep -Eq '^disabled +context-mode +omp$' "$TMP_ROOT/result"
 
+for agent in agy opencode omp; do
+  case "$agent" in
+    agy) config="$AGY_CONFIG" ;;
+    opencode) config="$OPENCODE_CONFIG" ;;
+    omp) config="$OMP_CONFIG" ;;
+  esac
+  printf '{"keep":"fixture"}\n' >"$config"
+  chmod 666 "$config"
+  "$SCRIPT" enable all --agent "$agent" >/dev/null
+  [[ "$(stat -c '%a' "$config")" == 600 ]]
+  gojq -e '.keep == "fixture"' "$config" >/dev/null
+  signature="$(sha256sum "$config")"
+  "$SCRIPT" enable all --agent "$agent" >/dev/null
+  [[ "$(sha256sum "$config")" == "$signature" ]]
+  "$SCRIPT" disable all --agent "$agent" >/dev/null
+  if [[ "$(id -u)" != 0 ]]; then
+    signature="$(sha256sum "$config")"
+    chmod 400 "$config"
+    if "$SCRIPT" enable all --agent "$agent" >/dev/null 2>&1; then exit 1; fi
+    [[ "$(sha256sum "$config")" == "$signature" && "$(stat -c '%a' "$config")" == 400 ]]
+    chmod 600 "$config"
+  fi
+  for redirect in file dangling parent dangling-parent directory; do
+    (
+      directory="$(dirname "$config")"
+      cp "$config" "$TMP_ROOT/original-$agent"
+      rm "$config"
+      case "$redirect" in
+        file)
+          cp "$TMP_ROOT/original-$agent" "$TMP_ROOT/target-$agent"
+          ln -s "$TMP_ROOT/target-$agent" "$config"
+          ;;
+        dangling) ln -s "$TMP_ROOT/missing-$agent" "$config" ;;
+        parent)
+          mv "$directory" "$directory.original"
+          ln -s "$directory.original" "$directory"
+          cp "$TMP_ROOT/original-$agent" "$config"
+          ;;
+        dangling-parent)
+          mv "$directory" "$directory.original"
+          ln -s "$TMP_ROOT/missing-parent-$agent" "$directory"
+          ;;
+        directory) mkdir "$config" ;;
+      esac
+      for action in enable disable; do
+        if "$SCRIPT" "$action" all --agent "$agent" >"$TMP_ROOT/result" 2>&1; then
+          printf 'Unsafe MCP destination accepted: %s %s %s\n' "$agent" "$redirect" "$action" >&2
+          exit 1
+        fi
+      done
+      case "$redirect" in
+        file)
+          [[ -L "$config" ]]
+          cmp "$TMP_ROOT/original-$agent" "$TMP_ROOT/target-$agent"
+          rm "$config"
+          ;;
+        dangling)
+          [[ -L "$config" && ! -e "$TMP_ROOT/missing-$agent" ]]
+          rm "$config"
+          ;;
+        parent | dangling-parent)
+          [[ -L "$directory" && ! -e "$TMP_ROOT/missing-parent-$agent" ]]
+          [[ "$redirect" != parent ]] || cmp "$TMP_ROOT/original-$agent" "$config"
+          rm "$directory"
+          mv "$directory.original" "$directory"
+          ;;
+        directory) rmdir "$config" ;;
+      esac
+      cp "$TMP_ROOT/original-$agent" "$config"
+    )
+  done
+done
+
+# A failed filter/publication must preserve existing content and leave no staging.
+for operation in filter chmod rename; do
+  printf '{"keep":"fixture"}\n' >"$AGY_CONFIG"
+  chmod 600 "$AGY_CONFIG"
+  cp "$AGY_CONFIG" "$TMP_ROOT/before-failure"
+  (
+    case "$operation" in
+      filter)
+        rm "$MOCK_BIN/gojq"
+        printf '#!/bin/sh\nif [ "$1" = -e ]; then exec /usr/bin/gojq "$@"; fi\nexit 9\n' >"$MOCK_BIN/gojq"
+        chmod +x "$MOCK_BIN/gojq"
+        ;;
+      chmod | rename)
+        command_name='chmod'
+        [[ "$operation" != rename ]] || command_name='mv'
+        printf '#!/bin/sh\nexit 9\n' >"$MOCK_BIN/$command_name"
+        /bin/chmod +x "$MOCK_BIN/$command_name"
+        ;;
+    esac
+    if "$SCRIPT" enable serena --agent agy >/dev/null 2>&1; then exit 1; fi
+  )
+  cmp "$AGY_CONFIG" "$TMP_ROOT/before-failure"
+  [[ -z "$(find "$(dirname "$AGY_CONFIG")" -maxdepth 1 -name '*.tmp.*' -print)" ]]
+  rm -f "$MOCK_BIN/gojq" "$MOCK_BIN/chmod" "$MOCK_BIN/mv"
+  ln -s "$(PATH=/usr/bin:/bin command -v gojq)" "$MOCK_BIN/gojq"
+done
+
+rm "$AGY_CONFIG"
+printf '#!/bin/sh\nexit 9\n' >"$MOCK_BIN/mv"
+chmod +x "$MOCK_BIN/mv"
+if "$SCRIPT" enable serena --agent agy >/dev/null 2>&1; then exit 1; fi
+[[ ! -e "$AGY_CONFIG" && -z "$(find "$(dirname "$AGY_CONFIG")" -name '*.tmp.*' -print)" ]]
+rm "$MOCK_BIN/mv"
+printf '{"mcpServers":"FIXTURE_SENSITIVE_VALUE"}\n' >"$AGY_CONFIG"
+if "$SCRIPT" enable serena --agent agy >"$TMP_ROOT/result" 2>&1; then exit 1; fi
+! grep -q FIXTURE_SENSITIVE_VALUE "$TMP_ROOT/result"
+
 printf 'Agent MCP manager test passed\n'

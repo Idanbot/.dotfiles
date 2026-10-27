@@ -182,6 +182,13 @@ class GraphTests(unittest.TestCase):
 
         mutations = [
             (
+                "combined-log-outage-evidence",
+                lambda wf: next(
+                    step for step in wf["jobs"]["classify"]["steps"]
+                    if step["name"] == "Classify outcome"
+                ).update(run='./scripts/classify-ci-run.sh --logs "$RUNNER_TEMP/run.log"'),
+            ),
+            (
                 "cancel-active-publication",
                 lambda wf: wf["concurrency"].update(**{"cancel-in-progress": True}),
             ),

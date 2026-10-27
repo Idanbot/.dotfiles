@@ -33,17 +33,36 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - name: Fetch jobs and available logs
+      - name: Fetch jobs and job-scoped infrastructure annotations
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
-            >"$RUNNER_TEMP/jobs.json"
+          gh api --paginate --slurp \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" \
+            | jq '{jobs: [.[].jobs[]]}' >"$RUNNER_TEMP/jobs.json"
+          printf '{}\n' >"$RUNNER_TEMP/annotations.json"
           if [[ "$RUN_CONCLUSION" != success ]]; then
-            gh run view "$RUN_ID" --repo "$GITHUB_REPOSITORY" --log \
-              >"$RUNNER_TEMP/run.log" 2>&1 || true
+            while read -r job_id check_id; do
+              if gh api --paginate --slurp \
+                "repos/$GITHUB_REPOSITORY/check-runs/$check_id/annotations?per_page=100" \
+                | jq 'add' >"$RUNNER_TEMP/job-annotations.json"; then
+                jq --arg id "$job_id" --slurpfile entries "$RUNNER_TEMP/job-annotations.json" \
+                  '.[$id] = $entries[0]' "$RUNNER_TEMP/annotations.json" \
+                  >"$RUNNER_TEMP/annotations-next.json"
+                mv "$RUNNER_TEMP/annotations-next.json" "$RUNNER_TEMP/annotations.json"
+              else
+                echo '::warning::Job annotations unavailable; failures will remain actionable.'
+              fi
+            done < <(jq -r '
+              .jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or
+                .conclusion == "action_required" or .conclusion == "startup_failure" or
+                .conclusion == "cancelled" or .conclusion == "stale") |
+              select(.id | type == "number") |
+              select(.check_run_url | type == "string") |
+              [.id, (.check_run_url | capture("/check-runs/(?<id>[0-9]+)$").id)] | @tsv
+            ' "$RUNNER_TEMP/jobs.json")
           fi
       - name: Classify outcome
         env:
@@ -53,7 +72,7 @@ jobs:
           ./scripts/classify-ci-run.sh \
             --jobs "$RUNNER_TEMP/jobs.json" \
             --conclusion "$RUN_CONCLUSION" \
-            --logs "$RUNNER_TEMP/run.log" \
+            --annotations "$RUNNER_TEMP/annotations.json" \
             --run-url "$RUN_URL" >"$RUNNER_TEMP/classification.json"
           jq -r '"## " + .title + "\n\n" + .summary' \
             "$RUNNER_TEMP/classification.json" >>"$GITHUB_STEP_SUMMARY"
