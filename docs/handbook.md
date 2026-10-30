@@ -1202,4 +1202,3 @@ Design details and generated references:
 
 Personal configuration repository. Reuse selectively and review every setting
 before applying it to another account or machine.
-
