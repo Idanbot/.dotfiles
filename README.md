@@ -196,4 +196,4 @@ acceptance. CVE reports are advisory and do not certify tools as vulnerability-f
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+See [LICENSE](LICENSE).
