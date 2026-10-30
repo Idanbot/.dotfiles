@@ -798,6 +798,7 @@ setup_run_state() {
   if [[ "$DOTFILES_LOG" != 0 ]]; then
     touch "$LOG_FILE" "$EVENT_LOG"
     chmod 600 "$LOG_FILE" "$EVENT_LOG"
+    [[ "$PROFILE_NAME" != full ]] || export DOTFILES_MANAGER_LOG="$LOG_FILE"
     exec > >(
       tee >(
         sed -u -E \

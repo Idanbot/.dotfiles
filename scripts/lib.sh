@@ -18,6 +18,8 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib/ownership.sh"
 source "$DOTFILES_SOURCE_DIR/scripts/lib/packages.sh"
 # shellcheck source=scripts/lib/runtimes.sh
 source "$DOTFILES_SOURCE_DIR/scripts/lib/runtimes.sh"
+# shellcheck source=scripts/lib/managers.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib/managers.sh"
 
 # Keep preflight's active executable selection; missing managed directories are
 # fallbacks. Installers deliberately prepend a newly selected runtime themselves.

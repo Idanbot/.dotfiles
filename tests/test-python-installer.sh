@@ -33,7 +33,15 @@ case "$*" in
     [ "${FIXTURE_UNAVAILABLE:-0}" = 0 ] || exit 0
     echo 'cpython-99.0.0-linux-x86_64-gnu <download available>'
     ;;
-  'python install 99.0.0') touch "$FIXTURE_ROOT/installed" ;;
+  'python install 99.0.0')
+    touch "$FIXTURE_ROOT/installed"
+    mkdir -p "$HOME/.local/share/uv/python/cpython-99.0.0-linux-x86_64-gnu/bin"
+    printf '#!/bin/sh\necho Python 99.0.0\n' >"$HOME/.local/share/uv/python/cpython-99.0.0-linux-x86_64-gnu/bin/python3"
+    ;;
+  'python dir') echo "$HOME/.local/share/uv/python" ;;
+  'python find --managed-python --no-project 99.0.0')
+    echo "$HOME/.local/share/uv/python/cpython-99.0.0-linux-x86_64-gnu/bin/python3"
+    ;;
   *) exit 1 ;;
 esac
 EOF
@@ -65,6 +73,7 @@ bash "$ROOT/scripts/python-installer.sh" --install
 [[ -e "$temporary/installed" ]]
 [[ "$(wc -l <"$temporary/requests")" == 2 ]]
 [[ "$before" == "$(sha256sum "$HOME/.local/bin/uv")" ]]
+grep -Fq "$HOME/.local/share/uv/python/cpython-99.0.0-linux-x86_64-gnu" "$HOME/.local/state/dotfiles/installed.tsv"
 rm "$temporary/installed"
 if FIXTURE_UNAVAILABLE=1 bash "$ROOT/scripts/python-installer.sh" --install; then
   printf 'Unavailable pinned Python was accepted\n' >&2

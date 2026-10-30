@@ -6,6 +6,7 @@ DOTFILES_SOURCE_DIR="${DOTFILES_SOURCE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 mode="${1:---check}"
 [[ "$mode" == --check || "$mode" == --install ]] || exit 2
+[[ "$mode" != --install ]] || managed_operation_lock
 python_version="$(package_version languages python)"
 uv_version="$(package_version languages uv)"
 if command_exists python3 && version_ge "$(python3 --version 2>/dev/null || true)" "$python_version"; then
@@ -43,7 +44,14 @@ if [[ -z "$uv_command" ]] || ! catalog_has_python "$uv_command"; then
   fi
 fi
 if [[ "$mode" == --install ]]; then
-  "$uv_command" python install "$python_version"
+  run_manager "$uv_command" python install "$python_version"
+  python_root="$("$uv_command" python dir)"
+  python_executable="$("$uv_command" python find --managed-python --no-project "$python_version")"
+  python_target="$(dirname "$(dirname "$(realpath -- "$python_executable")")")"
+  [[ "$python_target" == "$python_root/"* ]] || exit 1
+  /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/manager-scope.py" \
+    python "$python_root" "$HOME/.local/bin" "${python_target##*/}" >/dev/null
+  record_install python "$python_version" uv-python "$python_target"
 else
   log_success "Python $python_version download is available; existing uv and system Python remain untouched"
 fi

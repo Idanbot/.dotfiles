@@ -21,17 +21,21 @@ EOF
 chmod +x "$DOTFILES_NPM_PREFIX/bin/existing-cli"
 
 npm_install_global existing-package 1.0.0 existing-cli
-[[ "$(readlink "$HOME/.local/bin/existing-cli")" == "$DOTFILES_NPM_PREFIX/bin/existing-cli" ]]
+[[ ! -e "$HOME/.local/bin/existing-cli" ]]
 
 cat >"$HOME/test-bin/npm" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' "$*" >"$HOME/npm-args"
-cat >"$DOTFILES_NPM_PREFIX/bin/scripted-cli" <<'SCRIPT'
+package="$DOTFILES_NPM_PREFIX/lib/node_modules/scripted-package"
+mkdir -p "$package"
+printf '{"name":"scripted-package","version":"3.0.0","bin":{"scripted-cli":"cli"}}\n' >"$package/package.json"
+cat >"$package/cli" <<'SCRIPT'
 #!/usr/bin/env bash
 printf 'scripted-cli 3.0.0\n'
 SCRIPT
-chmod +x "$DOTFILES_NPM_PREFIX/bin/scripted-cli"
+chmod +x "$package/cli"
+ln -s "$package/cli" "$DOTFILES_NPM_PREFIX/bin/scripted-cli"
 EOF
 chmod +x "$HOME/test-bin/npm"
 export PATH="$HOME/test-bin:$PATH"

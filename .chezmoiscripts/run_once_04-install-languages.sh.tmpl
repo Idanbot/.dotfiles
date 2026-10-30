@@ -175,7 +175,6 @@ elif uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
 else
   log_info "Installing Python $PYTHON_VERSION with uv"
   bash "$DOTFILES_SOURCE_DIR/scripts/python-installer.sh" --install
-  record_install python "$PYTHON_VERSION" uv-python "$PYTHON_VERSION"
   ((_INSTALLED++)) || true
   log_success "Python $PYTHON_VERSION installed"
 fi

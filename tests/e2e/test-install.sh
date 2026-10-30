@@ -229,6 +229,7 @@ if [[ ",$selected_sections," == *,languages,* ]]; then
   python_path="$(uv python find "$(manifest_version languages python)" 2>/dev/null || command -v python3)"
   assert_version_at_least Python "$(manifest_version languages python)" "$python_path" --version
   assert_version_at_least Java "$(manifest_version languages java | cut -d+ -f1)" java -version
+  /usr/bin/python3 /dotfiles/tests/e2e/test-manager-transactions.py
 fi
 
 if [[ ",$selected_sections," == *,cloud,* ]]; then

@@ -56,6 +56,16 @@ for tool in kubectl serena graphify yt-dlp; do
         return 99
       }
       uv() {
+        case "$*" in
+          'tool dir')
+            printf '%s\n' "$HOME/.local/share/uv/tools"
+            return
+            ;;
+          'tool dir --bin')
+            printf '%s\n' "$HOME/.local/bin"
+            return
+            ;;
+        esac
         printf 'unexpected uv mutation: %s\n' "$*" >&2
         return 99
       }

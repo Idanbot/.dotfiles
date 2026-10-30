@@ -16,6 +16,9 @@
           "scripts/dotfiles",
           "scripts/section-registry.py",
           "scripts/convergence.py",
+          "scripts/manager-scope.py",
+          "tests/test-manager-safety.py",
+          "tests/e2e/test-manager-transactions.py",
           "tests/test-ci-graph.py",
           "tests/test-suite-registry.py",
           "tests/test-section-registry.py",
@@ -63,6 +66,19 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/e2e/test-manager-transactions.py",
+      "kind": "manual",
+      "reason": "Offline native npm/uv transactions require installed language managers",
+      "command": "python3 tests/e2e/test-manager-transactions.py",
+      "covered_by": ["tests/e2e/test-install.sh"]
+    },
+    {
+      "path": "tests/test-manager-safety.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
+    },
     {
       "path": "tests/test-omp-settings.py",
       "kind": "suite",

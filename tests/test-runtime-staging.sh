@@ -177,7 +177,7 @@ for scenario in missing legacy modified newer unknown owned approved approved-br
 done
 
 # Real uv publication records both the environment and command, converges, and
-# refuses a directory modified between the initial decision and the force call.
+# refuses a directory modified before acquiring the mutation lock.
 (
   export HOME="$temporary/uv-home" DOTFILES_STATE_DIR="$temporary/uv-state"
   export DOTFILES_VERSION_PLAN="$temporary/uv-versions.json"
@@ -191,12 +191,18 @@ done
       printf '%s\n' "$HOME/.local/share/uv/tools"
       return
     fi
+    if [[ "$*" == 'tool dir --bin' ]]; then
+      printf '%s\n' "$HOME/.local/bin"
+      return
+    fi
     printf '%s\n' "$*" >>"$UV_FIXTURE_CALLS"
     local root="$HOME/.local/share/uv/tools/fixture-package"
     mkdir -p "$root/bin"
     printf '#!/bin/sh\necho %s\n' "$UV_FIXTURE_VERSION" >"$root/bin/fixture-cli"
     chmod +x "$root/bin/fixture-cli"
     ln -sfn "$root/bin/fixture-cli" "$HOME/.local/bin/fixture-cli"
+    printf '[tool]\nrequirements = [{name = "fixture-package"}]\nentrypoints = [{name = "fixture-cli", install-path = "%s/.local/bin/fixture-cli"}]\n' \
+      "$HOME" >"$root/uv-receipt.toml"
   }
   install_uv_tool fixture-cli fixture-package "$UV_FIXTURE_VERSION"
   assert_owned_target "$HOME/.local/share/uv/tools/fixture-package"

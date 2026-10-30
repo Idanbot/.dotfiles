@@ -87,6 +87,44 @@ log_step() {
   emit_event step "$*"
 }
 
+redact_manager_output() {
+  sed -E -e $'s/\033\\[[0-9;]*[[:alpha:]]//g' \
+    -e 's/((token|password|secret|api[_-]?key)[=:][[:space:]]*)[^[:space:]]+/\1[REDACTED]/Ig'
+}
+
+# Keep native progress noise in the existing run log, not the full-install console.
+run_manager() (
+  # The caller holds the lock; native children must not retain its descriptor.
+  [[ -z "${MANAGED_OPERATION_FD:-}" ]] || exec {MANAGED_OPERATION_FD}>&-
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  if [[ -z "${DOTFILES_MANAGER_LOG:-}" || "${DOTFILES_VERBOSE:-0}" == 1 ]]; then
+    "$@"
+    return
+  fi
+  local output
+  [[ -f "$DOTFILES_MANAGER_LOG" && ! -L "$DOTFILES_MANAGER_LOG" ]] || {
+    log_error "Native manager output requires an existing regular run log"
+    return 1
+  }
+  output="$(mktemp)" || return 1
+  finish_manager_output() {
+    local status="$?"
+    trap '' HUP INT TERM
+    redact_manager_output <"$output" >>"$DOTFILES_MANAGER_LOG" || status=1
+    if [[ "$status" == 0 ]]; then
+      redact_manager_output <"$output" | grep -Ei '(^|[[:space:]])(warning|warn|error)(:|[[:space:]])' || true
+    else
+      redact_manager_output <"$output" | tail -n 15 >&2
+    fi
+    rm -f -- "$output" || status=1
+    exit "$status"
+  }
+  trap finish_manager_output EXIT
+  "$@" >"$output" 2>&1
+)
+
 print_summary() {
   local name="${1:-$(basename "$0")}" total
   total=$((_INSTALLED + _UPGRADED + _SKIPPED + _PRESERVED + _FAILED))

@@ -22,12 +22,36 @@ record_install gemini 0.50.0 npm:@google/gemini-cli "$HOME/.local/share/npm/gemi
 forget_install gemini
 ! grep -q '^gemini' "$DOTFILES_STATE_DIR/installed.tsv"
 
-record_install serena 1.6.1 uv:serena-agent "$HOME/.local/share/uv/tools/serena-agent"
+mkdir -p "$HOME/test-bin"
+cat >"$HOME/test-bin/uv" <<'EOF'
+#!/bin/sh
+case "$*" in
+  'tool dir') echo "$HOME/.local/share/uv/tools" ;;
+  'tool dir --bin') echo "$HOME/.local/bin" ;;
+  'python dir') echo "$HOME/.local/share/uv/python" ;;
+  'python dir --bin') echo "$HOME/.local/bin" ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$HOME/test-bin/uv"
+export PATH="$HOME/test-bin:$PATH"
+prepare_uv_fixture() {
+  local tool="$1" package="$2" root="$HOME/.local/share/uv/tools/$2"
+  mkdir -p "$root/bin"
+  printf '#!/bin/sh\nexit 0\n' >"$root/bin/$tool"
+  chmod +x "$root/bin/$tool"
+  ln -s "$root/bin/$tool" "$HOME/.local/bin/$tool"
+  printf '[tool]\nrequirements = [{name = "%s"}]\nentrypoints = [{name = "%s", install-path = "%s/.local/bin/%s"}]\n' \
+    "$package" "$tool" "$HOME" "$tool" >"$root/uv-receipt.toml"
+  record_install "$tool" 1 "uv:$package" "$root"
+}
+
+prepare_uv_fixture serena serena-agent
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run serena |
   grep -Fq 'would uv tool uninstall serena-agent'
 forget_install serena
 
-record_install graphify 0.9.38 uv:graphifyy "$HOME/.local/share/uv/tools/graphifyy"
+prepare_uv_fixture graphify graphifyy
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run graphify |
   grep -Fq 'would uv tool uninstall graphifyy'
 forget_install graphify
@@ -38,6 +62,9 @@ record_install ponytail 4.9.0 agent-skill:DietrichGebert/ponytail "$HOME/.agents
   grep -Fq "would remove $HOME/.agents/skills/ponytail"
 forget_install ponytail
 
+mkdir -p "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer"
+printf '{"name":"@xynogen/pix-optimizer","version":"1.1.26"}\n' \
+  >"$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json"
 record_install pix-optimizer 1.1.26 omp:@xynogen/pix-optimizer \
   "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer"
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run pix-optimizer |
@@ -53,7 +80,10 @@ record_install distro 1 apt distro-package
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" distro >/dev/null
 grep -q '^distro' "$DOTFILES_STATE_DIR/installed.tsv"
 record_install python 3.14.6 uv-python 3.14.6
-"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run python | grep -Fq 'would uv python uninstall 3.14.6'
+if "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run python; then
+  printf 'Legacy version-only Python receipt authorized removal\n' >&2
+  exit 1
+fi
 
 printf '#!/bin/sh\nprintf "1.0\\n"\n' >"$HOME/good"
 printf '#!/bin/sh\nexit 37\n' >"$HOME/bad"

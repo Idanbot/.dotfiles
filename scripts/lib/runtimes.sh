@@ -251,50 +251,32 @@ activate_node_paths() {
 }
 
 npm_install_global() {
+  managed_operation _npm_install_global "$@"
+}
+
+_npm_install_global() {
   local package="$1" version="$2" binary="$3" allow_scripts="${4:-}"
-  local prefix package_manifest installed_version=""
-  local -a npm_args=(
-    install --global --prefix
-    "$(npm_global_prefix)"
-    --no-audit
-    --no-fund
-  )
-  prefix="$(npm_global_prefix)"
-  package_manifest="$prefix/lib/node_modules/$package/package.json"
-  local active_version
-  active_version="$($binary --version 2>/dev/null || true)"
-  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]] && runtime_is_current "$binary" "$version" "$active_version"; then
-    return 0
-  fi
   activate_node_paths
-  if [[ -f "$package_manifest" ]]; then
-    if command_exists gojq; then
-      installed_version="$(gojq -r '.version // ""' "$package_manifest" 2>/dev/null || true)"
-    elif command_exists node; then
-      installed_version="$(node -e \
-        'process.stdout.write(require(process.argv[1]).version || "")' \
-        "$package_manifest" 2>/dev/null || true)"
-    fi
-  fi
-  [[ -n "$installed_version" ]] ||
-    installed_version="$($binary --version 2>/dev/null || true)"
-  if command_exists "$binary" && version_ge "$installed_version" "$version"; then
-    [[ -x "$prefix/bin/$binary" ]] &&
-      managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary" "$binary" "$version"
-    log_skip "$binary $version already installed or newer"
+  if ! manager_scope npm "$package" "$binary"; then
+    log_warn "Preserving $binary: npm package scope or command bindings could not be verified"
+    ((_PRESERVED++)) || true
     return 0
   fi
-  mkdir -p "$prefix"
-  [[ -n "$allow_scripts" ]] && npm_args+=("--allow-scripts=$allow_scripts")
-  npm "${npm_args[@]}" "${package}@${version}"
-  if [[ ! -x "$prefix/bin/$binary" ]]; then
-    log_error "$binary was not found after installing ${package}@${version}"
-    return 1
+  manager_is_current "$binary" "$version" && return 0
+  if ! manager_assert_owned "npm:$package"; then
+    log_warn "Preserving $binary: npm package or published command is unowned or locally modified"
+    ((_PRESERVED++)) || true
+    return 0
   fi
-  managed_link "$prefix/bin/$binary" "$HOME/.local/bin/$binary" "$binary" "$version"
-  record_install "$binary" "$version" "npm:$package" "$prefix/lib/node_modules/$package"
+  manager_transaction _npm_install_candidate npm "$package" "$binary" "$version" || return 1
   log_success "$binary $version installed"
   ((_INSTALLED++)) || true
+}
+
+_npm_install_candidate() {
+  local -a arguments=(install --global --prefix "$MANAGER_ROOT" --no-audit --no-fund)
+  [[ -z "$allow_scripts" ]] || arguments+=("--allow-scripts=$allow_scripts")
+  run_manager npm "${arguments[@]}" "$package@$version"
 }
 
 omp_install_package() {

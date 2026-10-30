@@ -58,6 +58,88 @@ matches="$(awk -F '\t' -v tool="$TOOL" '$1 == tool' "$LEDGER")"
   exit 0
 }
 
+# Authorize the complete plan before deleting even a shim or a ledger entry.
+declare -A groups=() packages=() roots=() bins=() payloads=() bindings=()
+while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
+  kind="" package=""
+  case "$owner" in
+    npm:*)
+      kind=npm
+      package="${owner#npm:}"
+      ;;
+    uv:*)
+      kind=uv
+      package="${owner#uv:}"
+      ;;
+    uv-python)
+      kind=python
+      package="${target##*/}"
+      ;;
+    uv)
+      kind=uv
+      package="$tool"
+      [[ "$tool" != python ]] || {
+        kind=python
+        package="${target##*/}"
+      }
+      ;;
+    omp:*)
+      kind=omp
+      package="${owner#omp:}"
+      ;;
+    uvx | apt | dpkg) continue ;;
+    agent-skill:*) [[ "$target" == "$HOME/.agents/skills/$tool" ]] && assert_owned_target "$target" || exit 1 ;;
+    *) safe_target "$target" && assert_owned_target "$target" || exit 1 ;;
+  esac
+  [[ -n "$kind" ]] || continue
+  if [[ -z "${groups[$owner]:-}" ]]; then
+    manager_scope "$kind" "$package" "$tool" && manager_assert_owned "$owner" || {
+      printf 'Refusing uninstall: %s package scope or ownership is unverifiable\n' "$tool" >&2
+      exit 1
+    }
+    [[ -d "$MANAGER_TARGET" ]] || {
+      printf 'Package payload is absent: %s\n' "$tool" >&2
+      exit 1
+    }
+    groups[$owner]="$kind" packages[$owner]="$package"
+    roots[$owner]="$MANAGER_ROOT" bins[$owner]="$MANAGER_BINS"
+    payloads[$owner]="$MANAGER_TARGET"
+    bindings[$owner]="$(printf '%s\n' "${MANAGER_PATHS[@]}")"
+  fi
+  grep -Fxq -- "$target" <<<"${bindings[$owner]}" || {
+    printf 'Refusing ledger destination outside the native package scope\n' >&2
+    exit 1
+  }
+done <<<"$matches"
+
+# A manager owns the package as a unit, even when the ledger lists many commands.
+for owner in "${!groups[@]}"; do
+  kind="${groups[$owner]}" package="${packages[$owner]}"
+  if [[ "$DRY_RUN" == true ]]; then
+    case "$kind" in
+      npm) printf 'would npm uninstall %s\n' "$package" ;;
+      uv) printf 'would uv tool uninstall %s\n' "$package" ;;
+      python) printf 'would uv python uninstall %s\n' "$package" ;;
+      omp) printf 'would omp plugin uninstall %s\n' "$package" ;;
+    esac
+    continue
+  fi
+  case "$kind" in
+    npm) run_manager npm uninstall --global --prefix "${roots[$owner]}" --no-audit --no-fund "$package" ;;
+    uv) UV_TOOL_DIR="${roots[$owner]}" UV_TOOL_BIN_DIR="${bins[$owner]}" run_manager uv tool uninstall "$package" ;;
+    python) UV_PYTHON_INSTALL_DIR="${roots[$owner]}" run_manager uv python uninstall "$package" ;;
+    omp) run_manager omp plugin uninstall "$package" ;;
+  esac
+  if [[ -e "${payloads[$owner]}" || -L "${payloads[$owner]}" ]]; then
+    printf 'Manager left the package installed; receipts preserved for %s\n' "$tool" >&2
+    exit 1
+  fi
+  while IFS= read -r target; do
+    # Native managers normally remove these links; clean only verified leftovers.
+    [[ ! -L "$target" || -e "$target" ]] || rm -f -- "$target"
+  done <<<"${bindings[$owner]}"
+done
+
 while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
   case "$owner" in
     uvx)
@@ -71,28 +153,7 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
         continue
       fi
       ;;
-    npm:*)
-      package="${owner#npm:}"
-      prefix="$HOME/.local/share/npm"
-      [[ "$DRY_RUN" == true ]] && printf 'would npm uninstall %s\n' "$package" || npm uninstall --global --prefix "$prefix" "$package"
-      ;;
-    uv-python)
-      [[ "$DRY_RUN" == true ]] && printf 'would uv python uninstall %s\n' "$target" || uv python uninstall "$target"
-      ;;
-    uv | uv:*)
-      if [[ "$owner" == uv && "$tool" == python ]]; then
-        [[ "$DRY_RUN" == true ]] && printf 'would uv python uninstall %s\n' "$_version" || uv python uninstall "$_version"
-        [[ "$DRY_RUN" == true ]] || forget_install "$tool" "$target"
-        continue
-      fi
-      package="${owner#uv:}"
-      [[ "$package" == uv ]] && package="$tool"
-      [[ "$DRY_RUN" == true ]] && printf 'would uv tool uninstall %s\n' "$package" || uv tool uninstall "$package"
-      ;;
-    omp:*)
-      package="${owner#omp:}"
-      [[ "$DRY_RUN" == true ]] && printf 'would omp plugin uninstall %s\n' "$package" || omp plugin uninstall "$package"
-      ;;
+    npm:* | uv-python | uv | uv:* | omp:*) ;;
     agent-skill:*)
       [[ "$target" == "$HOME/.agents/skills/$tool" ]] || {
         printf 'Refusing unsafe agent skill path: %s\n' "$target" >&2

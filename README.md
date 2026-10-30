@@ -798,6 +798,16 @@ If rollback cannot finish, logs identify a private recovery directory containing
 `records`, plus `previous` and `stamp` when they existed. Keep these together for
 manual restoration before retrying. Handled interrupts attempt rollback;
 SIGKILL and power loss cannot run cleanup traps.
+
+Npm package updates and uv tool upgrades verify the package payload and its native
+command bindings under the same mutation lock used by uninstall. Failed manager
+updates restore that package, its commands, and its receipts, leaving unrelated
+packages alone. Uninstall dry runs perform the same ownership checks as removal;
+legacy version-only Python receipts require manual review, not a broad uninstall.
+Manager directories are cached for the run; ownership checks remain fresh.
+Full installs keep native npm/uv progress in the text log while showing warnings
+and a short error tail. Use `DOTFILES_VERBOSE=1` for the full manager output.
+
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and
 checksum report. The weekly audit publishes the same report without changing

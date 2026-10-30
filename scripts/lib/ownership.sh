@@ -5,9 +5,24 @@ managed_operation_lock() {
   local root
   root="$(managed_state_root)"
   ensure_private_directory "$root"
+  if [[ -n "${MANAGED_OPERATION_FD:-}" && "/proc/$BASHPID/fd/$MANAGED_OPERATION_FD" -ef "$root/ownership.lock" ]]; then
+    flock -x "$MANAGED_OPERATION_FD"
+    return
+  fi
   exec {MANAGED_OPERATION_FD}>"$root/ownership.lock"
   chmod 600 "$root/ownership.lock"
   flock -x "$MANAGED_OPERATION_FD"
+}
+
+managed_operation() {
+  local inherited="${MANAGED_OPERATION_FD:-}" status=0
+  local MANAGED_OPERATION_FD="$inherited"
+  managed_operation_lock || return 1
+  "$@" || status=$?
+  if [[ -n "$MANAGED_OPERATION_FD" && "$MANAGED_OPERATION_FD" != "$inherited" ]]; then
+    exec {MANAGED_OPERATION_FD}>&-
+  fi
+  return "$status"
 }
 
 managed_target_digest() {
@@ -58,8 +73,8 @@ assert_owned_target() {
 # Snapshot only this destination's records; rollback must retain unrelated writes.
 snapshot_publication() (
   local temporary="$1" destination="$2" root stamp ledger_fd
-  if [[ -e "$destination" || -L "$destination" ]]; then
-    cp -a -- "$destination" "$temporary/previous" || return 1
+  if [[ "${3:-true}" == true && (-e "$destination" || -L "$destination") ]]; then
+    cp -a --reflink=auto -- "$destination" "$temporary/previous" || return 1
   fi
   root="$(managed_state_root)"
   exec {ledger_fd}>"$root/ledger.lock"
@@ -92,15 +107,21 @@ restore_publication_metadata() (
   mv -Tf -- "$temporary/ledger-restore" "$root/installed.tsv"
 )
 
+restore_publication() {
+  local temporary="$1" destination="$2" failed=false
+  rm -rf -- "$destination" || failed=true
+  if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
+    cp -a --reflink=auto -- "$temporary/previous" "$destination" || failed=true
+  fi
+  restore_publication_metadata "$temporary" "$destination" || failed=true
+  [[ "$failed" == false ]]
+}
+
 cleanup_publication() {
   local status="$1" temporary="$2" destination="$3" changed="$4" committed="$5" rollback_failed=false
   trap '' HUP INT TERM
   if [[ "$changed" == true && "$committed" == false ]]; then
-    rm -rf -- "$destination" || rollback_failed=true
-    if [[ -e "$temporary/previous" || -L "$temporary/previous" ]]; then
-      cp -a -- "$temporary/previous" "$destination" || rollback_failed=true
-    fi
-    restore_publication_metadata "$temporary" "$destination" || rollback_failed=true
+    restore_publication "$temporary" "$destination" || rollback_failed=true
     [[ "$status" != 0 ]] || status=1
   fi
   if [[ "$rollback_failed" == true ]]; then
