@@ -285,13 +285,14 @@ done
 SSH_CONFIG="$DOTFILES_DIR/private_dot_ssh/private_config.tmpl"
 if grep -Fq 'AddKeysToAgent 8h' "$SSH_CONFIG" &&
   grep -Fq 'ControlPath ~/.ssh/cm-%C' "$SSH_CONFIG" &&
-  grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$SSH_CONFIG" &&
-  grep -Fq 'PreferredAuthentications publickey' "$SSH_CONFIG" &&
-  grep -Fq 'PasswordAuthentication no' "$SSH_CONFIG" &&
+  grep -Fq 'ProxyCommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"' "$SSH_CONFIG" &&
+  grep -Fq 'ProxyUseFdpass yes' "$SSH_CONFIG" &&
+  grep -Fq 'PreferredAuthentications publickey,password' "$SSH_CONFIG" &&
+  grep -Fq 'PasswordAuthentication yes' "$SSH_CONFIG" &&
   grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG" &&
   grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG" &&
   ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG" &&
-  ! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"; then
+  ! grep -Eqi 'password[[:space:]]*=' "$SSH_CONFIG"; then
   pass "SSH has clean keyless defaults and delegates Access transport"
 else
   fail "SSH key caching or Cloudflare Access configuration is unsafe or incomplete"

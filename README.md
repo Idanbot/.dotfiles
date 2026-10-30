@@ -227,6 +227,9 @@ Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
 `JAVA_HOME`, system Python, and project environments are not silently replaced.
 Python installs side-by-side through uv rather than replacing Ubuntu's Python.
 Existing explicit per-binary takeover remains opt-in, not an automatic policy.
+Usable legacy, modified, or redirected Nerd Font installations are also preserved
+with a warning, without downloading replacements or adopting ownership. Empty
+protected font destinations require manual review before installation continues.
 
 ### Reviewed Update Lines
 
@@ -355,7 +358,9 @@ unrelated files added later are preserved.
 
 Resume validates the saved source fingerprint and effective options. Changed
 inputs or legacy runs without a plan require a new bootstrap, including conflict
-review; their backups remain available. Final doctor checks run again, while
+review; their backups remain available. Ignored validator caches do not affect
+the fingerprint; unreadable real source files still stop installation. Final
+doctor checks run again, while
 unchanged completed stages are skipped. Each attempt keeps its own summary under
 `runs/<id>/attempts/`, and resumed summaries retain the apply backup ID.
 
@@ -711,11 +716,29 @@ Use `cloudflare-ssh setup t420 --key ~/.ssh/id_ed25519` to select a key
 explicitly. `--yes` approves creation when a key is missing, but `ssh-keygen`
 still prompts for its passphrase.
 
-The managed `rpi4` and `t420` targets use `cloudflared access ssh` as their
-OpenSSH transport. Plain `ssh rpi4` lets Cloudflare open authentication when
-its local session is missing or expired. `cloudflare-ssh connect rpi4` is a
-convenience alias for that same single SSH attempt; it does not reinterpret
-generic SSH errors as expired Access authentication. Access state under
+The managed `rpi4` and `t420` targets share one Cloudflare transport; add future
+aliases to the shared `Host` block. Plain `ssh HOST` and `scp FILE HOST:PATH`
+run native Access login before SSH's handshake timer starts, using
+[OpenSSH FD passing](https://man.openbsd.org/ssh_config#ProxyUseFdpass).
+Browser approval has a separate five-minute limit; SSH then has a 15-second
+connection/handshake limit. Override the former with
+`DOTFILES_ACCESS_LOGIN_TIMEOUT` (1–900 seconds). `ssh -G HOST` never logs in.
+`cloudflare-ssh connect HOST` explicitly preflights the same single connection;
+neither path retries key rejection or network failures as Access expiry.
+
+Valid Access sessions are reused by cloudflared. Missing or expired sessions
+open native browser login only with an interactive terminal. `ssh -o BatchMode=yes`
+and `scp -B` require an existing session and fail without opening a browser.
+Enable **Allow automatic Cloudflared authentication** in each Access application's
+Authentication settings to skip the approval page when an IdP session already
+exists; first-time login still requires approval. This is a
+[Cloudflare dashboard prerequisite](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/cloudflared-authentication/automatic-cloudflared-authentication/),
+not something dotfiles configure or bypass.
+
+SSH tries public keys first, then its normal terminal password prompt if the
+server permits it. Access approval and remote SSH account authorization are
+separate: restore/enroll a key or use the remote account password manually.
+Passwords are never stored, and host-key verification is unchanged. Access state under
 `~/.cloudflared/`, private keys, and `~/.ssh/config.local` remain local and
 untracked. OpenSSH connection multiplexing reuses authenticated connections
 for ten minutes without persisting a password.
@@ -1049,6 +1072,7 @@ a login shell:
 ```
 
 The default is `--profile full --platform native --passes 1`. Two-pass runs also
+exercise the installer's `--full` alias and
 compare file hashes, modes, symlink targets, normalized install records, local
 history/overlays, configuration diffs, and replacement inventories. Volatile
 run timestamps and logs are excluded from convergence checks. The validation

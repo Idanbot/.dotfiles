@@ -32,7 +32,7 @@ if [[ "${1:-}" == -G ]]; then
 elif [[ "${SSH_ALWAYS_FAIL:-0}" == 1 ]]; then
   exit 255
 fi'
-make_mock cloudflared 'exit 0'
+make_mock cloudflared '[[ "${2:-}" != token ]] || printf "opaque-fixture-cache\n"; exit 0'
 make_mock ssh-copy-id 'exit 0'
 make_mock ssh-add 'exit 0'
 make_mock ssh-key-load 'exit 0'
@@ -55,6 +55,7 @@ printf "fixture-private-key\n" >"$key"
 printf "ssh-ed25519 fixture-public-key\n" >"$key.pub"'
 
 export HOME="$TMP_ROOT/home"
+export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
 export PATH="$MOCK_BIN:/usr/bin:/bin"
 export SSH_AUTH_SOCK="$TMP_ROOT/agent.socket"
 touch "$SSH_AUTH_SOCK"
@@ -63,11 +64,14 @@ CLOUDFLARE_SSH="$DOTFILES_DIR/dot_local/bin/executable_cloudflare-ssh"
 SSH_KEY_LOAD="$DOTFILES_DIR/dot_local/bin/executable_ssh-key-load"
 
 "$CLOUDFLARE_SSH" login rpi4
-grep -Fq $'cloudflared\taccess login https://rpi4-ssh.idanbot.uk' "$CALLS"
+grep -Fq $'cloudflared\taccess token --app https://rpi4-ssh.idanbot.uk' "$CALLS"
 
 : >"$CALLS"
-"$CLOUDFLARE_SSH" proxy rpi4-ssh.idanbot.uk
-grep -Fq $'cloudflared\taccess ssh --hostname rpi4-ssh.idanbot.uk' "$CALLS"
+if "$CLOUDFLARE_SSH" proxy rpi4-ssh.idanbot.uk >/dev/null 2>&1; then
+  printf 'FD-pass proxy accepted a non-socket stdout\n' >&2
+  exit 1
+fi
+[[ ! -s "$CALLS" ]]
 
 : >"$CALLS"
 if SSH_ALWAYS_FAIL=1 "$CLOUDFLARE_SSH" connect rpi4 -v; then
@@ -87,7 +91,7 @@ fi
 : >"$CALLS"
 "$CLOUDFLARE_SSH" setup rpi4 --yes
 grep -Fq $'ssh-key-load\t--key '"$HOME"$'/.ssh/id_ed25519' "$CALLS"
-grep -Fq $'cloudflared\taccess login https://rpi4-ssh.idanbot.uk' "$CALLS"
+grep -Fq $'cloudflared\taccess token --app https://rpi4-ssh.idanbot.uk' "$CALLS"
 grep -Fq $'ssh-copy-id\t-i '"$HOME"$'/.ssh/id_ed25519.pub rpi4' "$CALLS"
 grep -Fq $'ssh\t-o BatchMode=yes -o ConnectTimeout=15 rpi4 true' "$CALLS"
 ! grep -Fq $'ssh-keygen\t' "$CALLS"
@@ -97,7 +101,7 @@ new_key="$HOME/.ssh/fresh_ed25519"
 "$CLOUDFLARE_SSH" setup t420 --key "$new_key" --yes
 grep -Fq $'ssh-keygen\t-t ed25519 -a 100 -f '"$new_key" "$CALLS"
 grep -Fq $'ssh-key-load\t--key '"$new_key" "$CALLS"
-grep -Fq $'cloudflared\taccess login https://t420.idanbot.uk' "$CALLS"
+grep -Fq $'cloudflared\taccess token --app https://t420.idanbot.uk' "$CALLS"
 grep -Fq $'ssh-copy-id\t-i '"$new_key"$'.pub t420' "$CALLS"
 grep -Fq $'ssh\t-o BatchMode=yes -o ConnectTimeout=15 t420 true' "$CALLS"
 [[ "$(stat -c '%a' "$new_key")" == 600 ]]
@@ -122,13 +126,15 @@ grep -Fq $'ssh-add\t-D' "$CALLS"
 SSH_CONFIG="$DOTFILES_DIR/private_dot_ssh/private_config.tmpl"
 grep -Fq 'AddKeysToAgent 8h' "$SSH_CONFIG"
 grep -Fq 'ControlPath ~/.ssh/cm-%C' "$SSH_CONFIG"
-grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$SSH_CONFIG"
-grep -Fq 'PreferredAuthentications publickey' "$SSH_CONFIG"
-grep -Fq 'PasswordAuthentication no' "$SSH_CONFIG"
+grep -Fq 'ProxyCommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"' "$SSH_CONFIG"
+grep -Fq 'Host rpi4 t420' "$SSH_CONFIG"
+grep -Fq 'ProxyUseFdpass yes' "$SSH_CONFIG"
+grep -Fq 'PreferredAuthentications publickey,password' "$SSH_CONFIG"
+grep -Fq 'PasswordAuthentication yes' "$SSH_CONFIG"
 grep -Fq 'KbdInteractiveAuthentication no' "$SSH_CONFIG"
 grep -Fq 'ConnectTimeout 15' "$SSH_CONFIG"
 ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG"
-! grep -Eqi 'password(authentication)?[[:space:]]+yes|password[[:space:]]*=' "$SSH_CONFIG"
+! grep -Eqi 'password[[:space:]]*=' "$SSH_CONFIG"
 [[ ! -e "$HOME/.cloudflared" ]]
 [[ ! -e "$HOME/.ssh/known_hosts" ]]
 if find "$HOME" -type f \

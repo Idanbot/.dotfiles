@@ -67,6 +67,7 @@ EOF
   test -f "$HOME/.config/dotfiles/privacy.sh"
   test -f "$HOME/.config/rtk/config.toml"
   test -x "$HOME/.local/bin/cloudflare-ssh"
+  test -f "$HOME/.config/dotfiles/cloudflare_ssh.py"
   test -x "$HOME/.local/bin/git-credential-dotfiles"
   test -x "$HOME/.local/bin/ssh-key-load"
   test -x "$HOME/.local/bin/tmux-cheat-sheet"

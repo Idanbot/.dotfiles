@@ -32,23 +32,21 @@ Host gitlab.com
 Host rpi4
     HostName rpi4-ssh.idanbot.uk
     User idan
-    IdentitiesOnly yes
-    PreferredAuthentications publickey
-    PasswordAuthentication no
-    KbdInteractiveAuthentication no
-    ConnectTimeout 15
-    ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h
 
 # ThinkPad T420 (Cloudflare Access SSH)
 Host t420
     HostName t420.idanbot.uk
     User idan
-    IdentitiesOnly yes
-    PreferredAuthentications publickey
-    PasswordAuthentication no
+
+# Shared Access transport and secure interactive fallback for every managed alias.
+# Add future Cloudflare aliases to this block, rather than duplicating auth logic.
+Host rpi4 t420
+    PreferredAuthentications publickey,password
+    PasswordAuthentication yes
     KbdInteractiveAuthentication no
     ConnectTimeout 15
-    ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h
+    ProxyUseFdpass yes
+    ProxyCommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"
 
 # Add any custom hosts below or use chezmoi templates to customize per machine:
 # {{ "{{" }}- if eq .chezmoi.hostname "your-work-host" {{ "}}" }}

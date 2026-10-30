@@ -13,6 +13,7 @@ if [[ "${DOTFILES_CI_SKIP_BUILD:-false}" != true ]]; then
   docker build --target tests -f "$ROOT/.github/e2e/Dockerfile.ubuntu-24.04" -t "$image" "$ROOT"
 fi
 exec docker run --rm \
+  --init \
   -e DOTFILES_WSL="${DOTFILES_WSL:-false}" \
   -e GITHUB_ACTIONS -e GITHUB_BASE_REF -e GITHUB_TOKEN -e GH_TOKEN \
   -e DOTFILES_E2E_ARTIFACT_DIR=/artifacts/agent-workspace \

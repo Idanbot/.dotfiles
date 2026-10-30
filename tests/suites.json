@@ -28,7 +28,9 @@
           "scripts/local-review.py",
           "scripts/omp-settings.py",
           "tests/test-omp-settings.py",
-          "tests/test-local-review.py"
+          "tests/test-local-review.py",
+          "dot_config/dotfiles/cloudflare_ssh.py",
+          "tests/test-cloudflare-ssh.py"
         ]
       ]
     },
@@ -851,6 +853,12 @@
           "{root}"
         ]
       ]
+    },
+    {
+      "path": "tests/test-cloudflare-ssh.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
     },
     {
       "path": "tests/test-static-policy.sh",

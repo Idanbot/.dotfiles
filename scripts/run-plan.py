@@ -11,17 +11,25 @@ import tempfile
 
 def source_digest(root):
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*")):
+    excluded = {".git", ".github", "docs", "tests", "__pycache__", "artifacts",
+                ".ruff_cache", ".pytest_cache"}
+
+    def unreadable(error):
+        raise error
+
+    # Prune ignored trees before traversal, including caches owned by another UID
+    # in a read-only Docker bind mount. Real source read errors still fail closed.
+    paths = []
+    for directory, names, files in os.walk(root, followlinks=False, onerror=unreadable):
+        names[:] = sorted(name for name in names if name not in excluded)
+        for name in sorted(names + files):
+            if name not in excluded:
+                path = Path(directory) / name
+                if path.is_symlink() or path.is_file():
+                    paths.append(path)
+    for path in sorted(paths):
         relative = path.relative_to(root)
-        if any(part in {".git", ".github", "docs", "tests", "__pycache__", "artifacts"}
-               for part in relative.parts):
-            continue
-        if path.is_symlink():
-            payload = os.readlink(path).encode()
-        elif path.is_file():
-            payload = path.read_bytes()
-        else:
-            continue
+        payload = os.readlink(path).encode() if path.is_symlink() else path.read_bytes()
         digest.update(str(relative).encode() + b"\0" + hashlib.sha256(payload).digest())
     return digest.hexdigest()
 

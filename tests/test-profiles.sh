@@ -18,6 +18,8 @@ for profile in minimal base developer agent cloud full; do
   [[ "$standalone" == "$output" ]]
 done
 
+[[ "$("$INSTALL" --full --print-plan)" == "$("$INSTALL" --profile full --print-plan)" ]]
+
 full_count="$(tr ',' '\n' < <(sed -n 's/^sections=//p' "$DOTFILES_DIR/profiles/full.conf") | wc -l)"
 [[ "$full_count" -eq 17 ]]
 

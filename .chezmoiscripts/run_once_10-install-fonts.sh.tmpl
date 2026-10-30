@@ -14,7 +14,20 @@ if [[ -r "$(managed_state_root)/installed.tsv" ]]; then
   FONT_INSTALLED="$(awk -F '\t' -v target="$FONT_DIR" '$3 == "nerd-fonts" && $4 == target { print $2; exit }' "$(managed_state_root)/installed.tsv")"
 fi
 
-if [[ -z "$FONT_INSTALLED" ]] && { nerd_font_registered "$FONT_NAME" || nerd_font_files_present "$FONT_NAME" "$FONT_DIR"; }; then
+FONT_PARENT="$(dirname "$FONT_DIR")"
+if { [[ -e "$FONT_DIR" || -L "$FONT_DIR" ]] &&
+  { [[ -L "$FONT_DIR" ]] || ! target_is_owned "$FONT_DIR"; }; } ||
+  [[ "$(realpath -m -- "$FONT_PARENT")" != "$FONT_PARENT" ]]; then
+  if nerd_font_registered "$FONT_NAME" || nerd_font_files_present "$FONT_NAME" "$FONT_DIR"; then
+    log_warn "Preserving existing $FONT_NAME Nerd Font: unowned, legacy, modified, or redirected installation"
+    log_info "Requested $FONT_VERSION was not applied; existing fonts and ownership records remain unchanged"
+    ((_PRESERVED++)) || true
+  else
+    log_error "Cannot safely install $FONT_NAME Nerd Font: protected destination has no usable family font files"
+    log_info "Review $FONT_DIR and move it aside manually before retrying; no fonts were replaced"
+    exit 1
+  fi
+elif [[ -z "$FONT_INSTALLED" ]] && { nerd_font_registered "$FONT_NAME" || nerd_font_files_present "$FONT_NAME" "$FONT_DIR"; }; then
   log_skip "Preserving externally installed $FONT_NAME Nerd Font (version not managed)"
 elif [[ "$FONT_INSTALLED" == "$FONT_VERSION" ]] && nerd_font_files_present "$FONT_NAME" "$FONT_DIR"; then
   assert_owned_target "$FONT_DIR"

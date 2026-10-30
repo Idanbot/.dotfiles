@@ -189,7 +189,8 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("user local-user\n", result.stdout)
         self.assertIn("port 2222\n", result.stdout)
-        self.assertIn("cloudflare-ssh proxy", result.stdout)
+        self.assertIn('proxycommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"\n', result.stdout)
+        self.assertIn("proxyusefdpass yes\n", result.stdout)
 
 
 unittest.main(argv=[sys.argv[0]], verbosity=2)

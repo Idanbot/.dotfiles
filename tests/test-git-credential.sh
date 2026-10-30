@@ -116,7 +116,7 @@ SSH_CONFIG="$DOTFILES_DIR/private_dot_ssh/private_config.tmpl"
 HOME="$TMP_ROOT/home" ssh -G -F "$SSH_CONFIG" github.com >/dev/null 2>&1
 HOME="$TMP_ROOT/home" ssh -G -F "$SSH_CONFIG" rpi4 >/dev/null 2>&1
 grep -Fq 'HostName rpi4-ssh.idanbot.uk' "$SSH_CONFIG"
-grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$SSH_CONFIG"
+grep -Fq 'ProxyCommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"' "$SSH_CONFIG"
 
 if git -c safe.directory="$DOTFILES_DIR" -C "$DOTFILES_DIR" ls-files | grep -Eqi \
   '(^|/)(id_(rsa|dsa|ecdsa|ed25519)|[^/]*\.(pem|key|p12|pfx|ppk))$|(^|/)(authorized_keys|known_hosts)$'; then

@@ -10,6 +10,8 @@ source /dotfiles/scripts/lib.sh
 
 PROFILE="${E2E_PROFILE:-base}"
 PASSES="${E2E_PASSES:-2}"
+INSTALL_PROFILE_ARGS=(--profile "$PROFILE")
+[[ "$PROFILE" != full ]] || INSTALL_PROFILE_ARGS=(--full)
 ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}"
 STATE_DIR="$HOME/.local/state/dotfiles"
 CURRENT_PASS=0
@@ -92,7 +94,7 @@ for pass in $(seq 1 "$PASSES"); do
   DOTFILES_LOG_FILE="$ARTIFACT_DIR/bootstrap-pass-${pass}.log" \
     /dotfiles/scripts/install.sh \
     --source /dotfiles \
-    --profile "$PROFILE" \
+    "${INSTALL_PROFILE_ARGS[@]}" \
     --conflict-policy backup \
     --yes
   sha256sum --check --status "$ARTIFACT_DIR/preserved-before.sha256"
@@ -356,10 +358,12 @@ if [[ ",$selected_sections," == *,system,* ]]; then
   command -v ssh-key-load >/dev/null
   ssh-key-load --help >/dev/null
   grep -Fq 'AddKeysToAgent 8h' "$HOME/.ssh/config"
-  grep -Fq 'ProxyCommand %d/.local/bin/cloudflare-ssh proxy %h' "$HOME/.ssh/config"
-  grep -Fq 'PreferredAuthentications publickey' "$HOME/.ssh/config"
+  test -f "$HOME/.config/dotfiles/cloudflare_ssh.py"
+  grep -Fq 'ProxyCommand "$HOME/.local/bin/cloudflare-ssh" proxy "%h" "%n"' "$HOME/.ssh/config"
+  grep -Fq 'ProxyUseFdpass yes' "$HOME/.ssh/config"
+  grep -Fq 'PreferredAuthentications publickey,password' "$HOME/.ssh/config"
   ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$HOME/.ssh/config"
-  grep -Fq 'PasswordAuthentication no' "$HOME/.ssh/config"
+  grep -Fq 'PasswordAuthentication yes' "$HOME/.ssh/config"
 fi
 
 dot doctor --quick --sections "$selected_sections" >/dev/null

@@ -27,6 +27,30 @@ with tempfile.TemporaryDirectory() as temporary:
     assert plan.stat().st_mode & 0o777 == 0o600
     subprocess.run(command + ["--resume"], check=True)
     assert plan.read_bytes() == original
+    for cache_name in (".ruff_cache", ".pytest_cache", "__pycache__"):
+        cache = source / cache_name
+        cache.mkdir()
+        payload = cache / "unreadable"
+        payload.write_text("ephemeral validator cache\n")
+        payload.chmod(0)
+        try:
+            subprocess.run(command + ["--resume"], check=True)
+            cache.chmod(0)
+            subprocess.run(command + ["--resume"], check=True)
+            assert plan.read_bytes() == original
+        finally:
+            cache.chmod(0o700)
+            payload.chmod(0o600)
+    protected = source / "managed-config"
+    protected.write_text("real source must remain readable\n")
+    protected.chmod(0)
+    try:
+        result = subprocess.run(command + ["--resume"], capture_output=True, text=True)
+        assert result.returncode and "Permission denied" in result.stderr
+        assert plan.read_bytes() == original
+    finally:
+        protected.chmod(0o600)
+        protected.unlink()
     options = subprocess.check_output([
         sys.executable, str(root / "scripts/run-plan.py"), "options",
         "--run-dir", str(run)], text=True)
