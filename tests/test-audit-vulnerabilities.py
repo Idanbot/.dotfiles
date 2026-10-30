@@ -170,6 +170,74 @@ class VulnerabilityAuditTests(unittest.TestCase):
         self.assertIn("major upgrade", rendered)
         self.assertNotIn("same-major fix", rendered)
 
+    def test_alias_chains_merge_per_pin_and_retain_all_source_links(self):
+        package = {"ecosystem": "npm", "name": "demo"}
+        entry = {"id": "demo", "pin": "1.0.0", "version": "1.0.0",
+                 "ecosystem": "npm", "package": package}
+        records = [advisory("CVE-2026-10001", package, aliases=["PSF-2026-1"],
+                            database_specific={"severity": "CRITICAL"}),
+                   advisory("PSF-2026-1", package, aliases=["GHSA-demo-1234"]),
+                   advisory("GHSA-demo-1234", package), advisory("OSV-independent", package)]
+        by_id = {record["id"]: record for record in records}
+        with patch.object(audit_module, "load_pins", return_value=([entry], [])):
+            scanned, skipped, findings = audit_module.audit(
+                self.root, request=lambda *_: {"results": [{"vulns": [{"id": key} for key in by_id]}]},
+                fetch=lambda url: by_id[url.rsplit("/", 1)[1]], resolve_candidates=lambda *_: [])
+        self.assertEqual(len(findings), 2)
+        self.assertEqual({finding["severity"] for finding in findings}, {"critical", "unspecified"})
+        report = audit_module.markdown(scanned, skipped, findings, "https://example.test")
+        self.assertIn("Affected pinned entries: **1**", report)
+        self.assertIn("Vulnerable package/version pairs: **1**", report)
+        self.assertIn("Unique vulnerabilities: **2**", report)
+        self.assertIn("Upstream advisory records: **4**", report)
+        for ident in by_id:
+            self.assertIn(f"https://osv.dev/vulnerability/{ident}", report)
+
+    def test_known_alias_severity_can_inform_advice_but_independent_unknown_cannot(self):
+        package = {"ecosystem": "npm", "name": "demo"}
+        entry = {"id": "demo", "pin": "1.0.0", "version": "1.0.0", "package": package, "ecosystem": "npm"}
+        records = {"CVE-2026-10001": advisory("CVE-2026-10001", package,
+                   aliases=["PSF-2026-1"], database_specific={"severity": "CRITICAL"}),
+                   "PSF-2026-1": advisory("PSF-2026-1", package),
+                   "OTHER": advisory("OTHER", package),
+                   "CANDIDATE": advisory("CANDIDATE", package, database_specific={"severity": "HIGH"})}
+        for independent in (False, True):
+            with self.subTest(independent=independent):
+                ids = ["CVE-2026-10001", "PSF-2026-1"] + (["OTHER"] if independent else [])
+                def request(_, payload):
+                    names = ids if payload["queries"][0]["version"] == "1.0.0" else ["CANDIDATE"]
+                    return {"results": [{"vulns": [{"id": ident} for ident in names]}]}
+                with patch.object(audit_module, "load_pins", return_value=([entry], [])):
+                    _, _, findings = audit_module.audit(
+                        self.root, request=request, fetch=lambda url: records[url.rsplit("/", 1)[1]],
+                        resolve_candidates=lambda *_: [{"version": "1.0.1", "query_version": "1.0.1",
+                                                       "labels": ["latest-compatible"]}])
+                self.assertTrue(all(("WARNING:" if independent else "Recommend 1.0.1") in finding["recommendation"]
+                                    for finding in findings))
+
+    def test_alias_counts_and_conflicting_scores_stay_scoped_across_packages(self):
+        packages = [{"ecosystem": "npm", "name": name} for name in ("first", "second")]
+        entries = [{"id": name, "pin": "1.0.0", "version": "1.0.0", "ecosystem": "npm", "package": package}
+                   for name, package in zip(("first", "second", "first-alias"), [*packages, packages[0]])]
+        records = [{"id": ident, "aliases": ["CVE-2026-10001"], "affected": [
+            {"package": package, "database_specific": {"severity": score}}
+            for package, score in zip(packages, scores)]}
+            for ident, scores in (("GHSA-example", ("HIGH", "LOW")),
+                                  ("PSF-example", ("CRITICAL", "MODERATE")))]
+        originals = json.loads(json.dumps(records))
+        with patch.object(audit_module, "load_pins", return_value=(entries, [])):
+            scanned, skipped, findings = audit_module.audit(
+                self.root, request=lambda *_: {"results": [{"vulns": [{"id": record["id"]} for record in records]}] * 2},
+                fetch=lambda url: next(record for record in records if record["id"] == url.rsplit("/", 1)[1]),
+                resolve_candidates=lambda *_: [])
+        self.assertEqual({item["id"]: item["severity"] for item in findings},
+                         {"first": "critical", "first-alias": "critical", "second": "moderate"})
+        report = audit_module.markdown(scanned, skipped, findings, "https://example.test")
+        for label, count in (("Affected pinned entries", 3), ("Vulnerable package/version pairs", 2),
+                             ("Unique vulnerabilities", 1), ("Upstream advisory records", 2)):
+            self.assertIn(f"{label}: **{count}**", report)
+        self.assertEqual(records, originals, "grouping modified the raw advisory cache")
+
     def test_package_fixed_release_is_classified_as_same_major(self):
         rendered = audit_module.markdown(
             [{"id": "x", "pin": "1.2.3", "ecosystem": "npm"}], [], [{

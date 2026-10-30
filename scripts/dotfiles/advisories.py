@@ -29,6 +29,8 @@ def validate_advisory(record, expected_id):
         or any(not isinstance(value, str) for value in record["aliases"])
     ):
         raise RuntimeError("OSV returned malformed advisory aliases")
+    for alias in record.get("aliases", []):
+        validate_advisory_id(alias)
     if "summary" in record and not isinstance(record["summary"], str):
         raise RuntimeError("OSV returned malformed advisory summary")
     for item in [record, *affected]:
@@ -92,3 +94,23 @@ def scoped_advisory(record, package):
     if not matches:
         raise RuntimeError("OSV advisory details do not match the queried package")
     return {**record, "affected": matches}
+
+
+def alias_groups(records):
+    """Connected advisory IDs/aliases, scoped by the caller's package/version."""
+    parents = {}
+
+    def root(ident):
+        parents.setdefault(ident, ident)
+        if parents[ident] != ident:
+            parents[ident] = root(parents[ident])
+        return parents[ident]
+
+    for record in records:
+        ident = record["id"]
+        for alias in record.get("aliases", []):
+            parents[root(alias)] = root(ident)
+    groups = {}
+    for record in records:
+        groups.setdefault(root(record["id"]), {})[record["id"]] = record
+    return [list(group.values()) for group in groups.values()]

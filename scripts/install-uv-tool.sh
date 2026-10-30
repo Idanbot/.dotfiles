@@ -7,14 +7,12 @@ install_uv_tool() {
 _install_uv_tool() {
   local binary="$1" package="$2" version="$3" python="${4:-}"
   if ! manager_scope uv "$package" "$binary"; then
-    log_warn "Preserving $binary: uv environment or command bindings could not be verified"
-    ((_PRESERVED++)) || true
+    manager_preserved "$binary" uv 'environment or command bindings could not be verified'
     return 0
   fi
   manager_is_current "$binary" "$version" && return 0
   if ! manager_assert_owned "uv:$package"; then
-    log_warn "Preserving $binary: uv environment or command is unowned or locally modified"
-    ((_PRESERVED++)) || true
+    manager_preserved "$binary" uv 'environment or command is unowned or locally modified'
     return 0
   fi
   manager_transaction _uv_install_candidate uv "$package" "$binary" "$version" || return 1

@@ -57,7 +57,7 @@ if "install" in args and "uninstall" not in args:
         (target / "uv-receipt.toml").write_text('[tool]\nrequirements = [{name = "' + package + '"}]\nentrypoints = [' + ','.join(entries) + ']\n')
         metadata = target / "lib/python3.12/site-packages" / (package + ".dist-info/METADATA")
         metadata.parent.mkdir(parents=True, exist_ok=True)
-        metadata.write_text("Name: " + package + "\nVersion: " + version + "\n")
+        metadata.write_text("Name: " + package + "\nVersion: " + os.environ.get("METADATA_VERSION", version) + "\n")
     else:
         (target / "package.json").write_text(json.dumps({"name": package, "version": version, "bin": {name: "bin/" + name for name in names}}))
     if os.environ.get("FAIL") == "after": sys.exit(9)
@@ -284,6 +284,15 @@ class ManagerSafetyTests(unittest.TestCase):
             "install_uv_tool review-cli review-package 2.0.0; "
             '[[ $(wc -l < "$HOME/queries") == 2 ]]'
         )
+
+    def test_uv_normalized_date_version_installs_and_converges(self):
+        self.shell(
+            "install_uv_tool review-cli review-package 2026.08.19; "
+            "install_uv_tool review-cli review-package 2026.08.19; "
+            "[[ $_INSTALLED == 1 && $_SKIPPED == 1 && $_FAILED == 0 ]]",
+            METADATA_VERSION="2026.8.19",
+        )
+        self.assertEqual(len(self.manager_calls()), 1)
 
     def test_uv_install_failures_restore_all_previous_paths_and_receipts(self):
         self.seed("uv")

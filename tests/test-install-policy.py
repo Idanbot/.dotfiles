@@ -68,6 +68,32 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(policy.release_version(release("azure-cli-2.99.0")), "2.99.0")
         self.assertGreater(policy.order("25.0.4.1+2"), policy.order("25.0.4.1+1"))
 
+    def test_unsupported_named_takeovers_are_preserved_instead_of_promised(self):
+        for ident, owner, binary in (("ai_tools.serena", "uv", "serena"),
+                                     ("ai_tools.context_mode", "npm", "context-mode"),
+                                     ("languages.java", "dotfiles-runtime", "java"),
+                                     ("languages.rust", "rustup", "rustc")):
+            entry = {**self.entry(ident), "commands": [binary], "path": str(self.home / binary), "owner": owner}
+            for current in ("", "1.0.0"):
+                with self.subTest(ident=ident, current=current), \
+                        patch.object(policy, "ownership_status", return_value="legacy-no-stamp"), \
+                        patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": binary}):
+                    action, ownership = policy.planned_action({**entry, "current": current})
+                    self.assertEqual(ownership, "unsupported-replacement")
+                    self.assertIn("preserve", action)
+                    self.assertIn("manual", action)
+
+    def test_java_activation_migration_is_detected_even_when_the_command_is_owned(self):
+        pointer = self.home / ".local/share/dotfiles/tools/java/current"
+        pointer.parent.mkdir(parents=True)
+        pointer.symlink_to(self.home / "external-jdk")
+        entry = {**self.entry("languages.java"), "path": str(self.home / ".local/bin/java"),
+                 "commands": ["java"], "owner": "dotfiles-runtime"}
+        with patch.object(policy, "ownership_status", return_value="verified-dotfiles"):
+            action, ownership = policy.planned_action(entry)
+        self.assertEqual(ownership, "unsupported-replacement")
+        self.assertIn("activation pointer", action)
+
     def test_major_boundary_searches_maintained_series(self):
         def get(url):
             if url.endswith("/latest"):

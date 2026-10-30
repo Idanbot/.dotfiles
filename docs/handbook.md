@@ -1,0 +1,1205 @@
+# Operations Handbook
+
+[![CI](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
+
+A repeatable, observable development-environment bootstrap for Ubuntu 24.04,
+both native and WSL2. Chezmoi owns configuration deployment; one explicit
+orchestrator owns package installation, recovery, logging, and acceptance.
+
+The repository is public and intentionally contains no credentials, private
+keys, tokens, or encrypted secret payloads.
+
+## Scope and Guarantees
+
+Current targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
+Unsupported platforms fail before configuration is applied.
+
+On a fresh supported Ubuntu machine, one successful `--full` run installs the
+managed tools and deploys the shell, terminal, editor, and agent configuration.
+Internet access and sudo are required. Logins, SSH keys, secrets, and Windows
+terminal/font settings remain manual. Existing unowned or modified software is
+preserved, so an existing machine may need explicit review rather than becoming
+an exact clone. Two-pass tests check convergence; approved updates may still
+change later runs. Recovery is not a whole-machine rollback guarantee.
+
+For supported targets, the project is designed to provide:
+
+- One observable install path for interactive, unattended, CI, native, and WSL runs.
+- A backup before managed configuration overwrites an existing destination.
+- Preservation of shell history, completion caches, credentials, and local overlays.
+- Integrity verification and explicit ownership metadata for downloaded tools.
+- Profile-specific acceptance checks and machine-readable run records.
+- Idempotent convergence: a successful second run should require no corrective work.
+
+Explicit non-goals are Arch/macOS support, unattended authentication, credential
+distribution, GUI validation in Docker, and autonomous agent commits or merges.
+
+## Quick Start
+
+Interactive profile selector:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | bash
+```
+
+Full unattended setup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Idanbot/.dotfiles/main/scripts/install.sh | \
+  bash -s -- --full --yes
+```
+
+Preview without changing the machine:
+
+```bash
+./scripts/install.sh --profile agent --print-plan
+./scripts/install.sh --list-options
+```
+
+After installation:
+
+```bash
+exec zsh
+dot doctor
+dot status
+```
+
+From a checkout, with Docker and Compose v2 installed, try the full setup twice
+and inspect it in an interactive shell without changing the host:
+
+```bash
+./scripts/e2e-shell.sh --profile full --platform native --passes 2
+```
+
+## Tools and Versions
+
+Versions in the README are requested pins, not a report of this machine's installed
+binaries. `distro` uses Ubuntu or the vendor's signed package repository;
+`standalone` tracks the provider installer with its script checksum pinned.
+Profile selection determines which tools are installed. Binary names, ownership,
+and integrity details are listed in [Tool Inventory](tool-inventory.md).
+Install-time rolling policies and preservation rules are described under
+[Installation Preflight](#installation-preflight); the table retains reviewed
+baselines, not floating upstream resolutions.
+Manifest names map to commands such as `github_cli` -> `gh`, `tealdeer` ->
+`tldr`, `ast_grep` -> `ast-grep`/`sg`, `aws_cli` -> `aws`, `gcloud` -> `gcloud`,
+`azure_cli` -> `az`, `claude_cli` -> `claude`, `codex_cli` -> `codex`, and
+`antigravity_cli` -> `agy`. Ubuntu provides `fd` as `fdfind` and `bat` as
+`batcat`; shell integration handles those names without replacing coreutils.
+
+See the [current requested versions](../README.md#tools-and-versions).
+
+## Discover Installed Software
+
+The offline catalog covers every manifest entry: languages, runtimes, agents,
+MCP tools, terminals, databases, fonts, and utilities. It also recognizes optional
+clients such as `psql`, `redis-cli`, Tailscale, and WireGuard without installing them.
+
+```bash
+dot tools refresh                    # Bounded version probes; private JSON snapshot
+dot tools                            # Installed commands, requested/observed versions, paths
+dot tools sql                        # Search names, descriptions, and rich tags
+dot tools --category languages
+dot tools --tag vpn --available       # Include missing candidates
+dot tools --available --pick          # fzf with details preview; Enter shows details only
+dot catalog show database.usql        # Paths, upstream, tags, connection examples
+dot tools --available --json
+```
+
+Queries and previews never execute tools or contact services. Observed versions
+remain snapshots until `refresh`; changed executable paths, symlink targets,
+sizes, or modification times invalidate their cached version. Missing or unsupported probes show `?`, not
+the requested version. Refresh uses a version-command allowlist and three-second
+timeouts. It never attempts authentication or database/VPN connections. It stores
+only paths, version strings, probe status, and a timestamp, not command output or
+credentials, in `~/.local/state/dotfiles/catalog.json` (0600).
+
+Catalog descriptions, per-binary descriptions, synonym tags, and examples live in
+`dot_config/dotfiles/catalog.json`; every executable entry has a tool description
+and command examples with a one-line explanation. Examples are display-only and
+are never executed. Requested versions and ownership come from the existing
+manifests. Search terms are case-insensitive and combined with AND. Package,
+skill, and font entries without executables remain visible with `--available`.
+
+The Version Audit workflow refreshes the single open "Latest stable upgrade
+recommendations" issue weekly (Monday) and supports manual dispatch. It reports
+both the newest version allowed by each tool's configured compatibility policy
+and the latest stable release overall. For example, Java can show the latest
+JDK 25 maintenance release separately from a newer feature release such as JDK
+27, so you can choose a JDK 25 update without mistaking the newest major for the
+recommended target. The issue is only as fresh as the latest successful audit;
+workflow failures are visible in Actions and do not update the report.
+
+## Install Profiles
+
+| Profile | Intended use | Sections beyond the common shell baseline |
+| --- | --- | --- |
+| `minimal` | Repair or small server | Core packages only |
+| `base` | Shell workstation | Zsh and terminal utilities |
+| `developer` | Main development machine | Languages, Atuin, tmux/Herdr, Neovim, system/theme |
+| `agent` | LLM/agent workstation | Developer plus AI CLI harnesses |
+| `cloud` | Infrastructure workstation | Developer plus container/cloud CLIs |
+| `full` | Complete native or WSL setup | All applicable sections |
+
+Selectors can extend or reduce a profile:
+
+```bash
+./scripts/install.sh --with ai,neovim --yes
+./scripts/install.sh --full --without cloud,vscode --yes
+./scripts/install.sh --sections core,languages --yes
+```
+
+`--with` starts from `base`. Profile selections automatically include the
+`languages` dependency for `ai`, `tmux`, and `media`. `--sections` is exact
+expert mode and does not add dependencies.
+
+The common terminal baseline includes `jq`, `gojq`, `pigz`, `zstd`, `curlie`,
+`ast-grep`, `gitleaks`, `bat`, and `eza`. Enhanced tools keep their own command names: standard
+commands such as `cat` and `ls` are not replaced by aliases. The cloud profile
+adds `s5cmd`, `kcat`, `stern`, `helmfile`, `kubectx`, `kubens`, and `kubecolor`;
+database utilities
+include `usql`, `iredis`, and `pgloader`.
+
+When `kubecolor` is installed, interactive Bash and Zsh sessions alias `kubectl`
+to it using the upstream-supported integration. Native kubectl completion is
+preserved, and Zsh/Bash completion is also registered for explicit
+`kubecolor` commands. Scripts continue to resolve the real kubectl binary;
+set `DOTFILES_DISABLE_KUBECOLOR=1` before starting a shell to temporarily use
+plain kubectl interactively.
+
+## Reliability Model
+
+Bootstrap resume checks the effective platform, architecture, and a digest of
+non-secret template settings. Changed inputs require a new run rather than
+reusing stale checkpoints. Ubuntu's `/usr/bin/python3` runs section helpers, so
+an active virtual environment does not need bootstrap dependencies installed.
+Targeted reconciliation includes section-owned chezmoi externals and refuses to
+mark a skipped external conflict as reconciled. Managed font pins upgrade in
+place with rollback; separately installed font families are preserved.
+
+The installer follows one path for local, one-line, CI, native, and WSL runs:
+
+1. Validate the platform and selection.
+2. Create a run ID, private logs, and stage checkpoints.
+3. Install bootstrap prerequisites and a checksum-verified chezmoi release.
+4. Resolve the source checkout, run installation preflight, and freeze version targets.
+5. Calculate pending config changes and back up changed/new destinations.
+6. Apply configuration and checksum-pinned externals without running hidden
+   chezmoi install scripts.
+7. Run selected install sections explicitly with timing and event records.
+8. Run acceptance checks, report available updates, and write a machine-readable summary.
+
+## Installation Preflight
+
+Preflight runs automatically before config application or tool installation.
+The minimal Git/curl/Python/chezmoi prerequisites and source initialization must
+run first on a fresh machine. Preview an existing checkout without installing:
+
+```bash
+dot preflight --sections core,languages,cloud
+dot preflight --sections cloud --json
+/usr/bin/python3 scripts/install-policy.py --sections core,languages
+```
+
+Preflight checks platform/architecture, home permissions, disk headroom, PATH,
+interrupted package operations, and upstream resolution/integrity for rolling
+tools. It shows the detected version/path, target, ownership, and planned action.
+It never authenticates to clouds, changes credentials, or edits project pins.
+Standalone previews do not create run state. Repository/network problems have
+actionable diagnostics; an unresolved rolling version or checksum blocks apply.
+
+| Tools | Installation policy |
+| --- | --- |
+| `gh`, `aws`, `helm`, `terraform`, `cloudflared` | Latest stable in the major configured by the repository baseline; no automatic new majors |
+| `gcloud`, `az` | Latest stable in the installed major, through the vendor's signed APT repository; fresh installs use the latest stable major |
+| Languages and package managers (`go`, Rust/Cargo, Node/npm, TypeScript, Python, Java, uv, Bun) | Repository version is the minimum; preserve and notify when the active version is newer |
+| `kubectl` and other tools | Existing repository/distro policy; kubectl is deliberately not rolling |
+
+Google increments the SDK's first version component frequently: this is still
+treated as the major boundary, so an installed `gcloud` will often require a
+manual upgrade to cross that boundary. Cloudflared's year is its major boundary.
+APT must publish the exact selected upstream version before installation can
+continue; the installer never substitutes a different major when a repo lags.
+
+Unowned/locally modified executables are preserved with a warning and skipped,
+including executables elsewhere on PATH. APT updates are limited to package-owned
+Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
+`JAVA_HOME`, system Python, and project environments are not silently replaced.
+Python installs side-by-side through uv rather than replacing Ubuntu's Python.
+Existing explicit per-binary takeover remains opt-in, not an automatic policy.
+Usable legacy, modified, or redirected Nerd Font installations are also preserved
+with a warning, without downloading replacements or adopting ownership. Empty
+protected font destinations require manual review before installation continues.
+
+### Reviewed Update Lines
+
+Installs use CI-reviewed repository pins, not an untested `latest` lookup for
+languages. The grouped updater follows `scripts/update-policy.json`:
+
+| Component | Proposed automatic updates |
+| --- | --- |
+| Node, TypeScript | Minor/patch within the configured major |
+| Python, Go | Patch within the configured minor/release line |
+| Java | Maintenance updates within the configured feature release |
+| Rust/Cargo | Latest stable together |
+| uv, Bun | Latest stable, including new majors, reviewed through CI |
+| npm | Latest stable compatible with the proposed Node version; installation enforces engine compatibility |
+
+Explicit `--apply TOOL@VERSION` remains available for reviewed release-line
+changes. Project pins, external runtimes, and newer installations are preserved.
+When active uv cannot resolve the pinned Python, preflight checks a verified
+temporary copy of the repository-pinned uv **before applying files**. Installation
+uses that private copy without replacing external uv, uvx, or system Python.
+If the pinned Python is unavailable even there, preflight stops with an actionable
+error instead of silently downgrading Python. A failed optional freshness lookup
+warns rather than blocks when an installed version already satisfies the baseline;
+missing required targets or unverifiable new downloads still fail closed.
+
+Preflight distinguishes missing executables from unknown/timed-out version probes,
+verified ownership from legacy missing stamps or modified files, and distro-managed
+packages from exact download pins. WSL-only exclusions match installation routing.
+HashiCorp key repair runs before the first APT refresh when a source checkout is
+available. APT refresh failures never silently fall back to stale indexes; a remote
+bootstrap without repair helpers stops and identifies the repository to repair.
+
+Each run saves private `versions.json` with exact targets and integrity data;
+resume reuses that plan without contacting upstream again. GitHub release asset
+SHA256 digests/vendor manifests verify rolling downloads; AWS CLI uses its vendor
+PGP signature with a repository-pinned public-key fingerprint and records the
+verified ZIP's SHA256. The checked-in checksums still cover baseline/manual installs.
+
+Every successful run prints a freshness report against releases resolved at
+preflight: yellow **LOW** for a newer minor/patch, red **HIGH** for a newer major.
+These are non-fatal warnings, including intentionally pinned/preserved versions;
+unknown freshness is reported explicitly, never described as current. Tools
+without an upstream resolver require the existing version audit. Text/JSONL logs,
+`versions.json`, and `update-warnings.json` are retained in the run's private state
+and included in CI observability artifacts.
+
+Automatic upgrades never cross the configured major. Review the existing
+version-audit report and accept a new repository baseline when a major upgrade
+is wanted; SDKs whose manifest says `distro` are upgraded across majors manually.
+
+## Configuration Conflicts
+
+Default conflict policy is `backup`. Other policies are explicit:
+
+```bash
+./scripts/install.sh --conflict-policy backup --profile base --yes
+./scripts/install.sh --conflict-policy skip --profile base --yes
+./scripts/install.sh --conflict-policy abort --profile base --yes
+```
+
+- `backup`: preserve pending destinations, then apply with rollback on failure.
+- `skip`: preserve current config, apply only required directories/externals,
+  and continue the selected tool sections.
+- `abort`: stop when any managed config change is pending.
+
+With the default `backup` policy in a terminal, the installer creates the
+transactional backup first, shows a redacted bounded diff for each existing
+modified destination, and asks for a decision:
+
+- `skip` / do nothing: preserve this destination and continue.
+- `replace`: apply the managed version for this destination.
+- `merge` / append: for regular shell config only,
+  apply the managed content first and retain the current local content after a
+  marked block. Repeating the merge does not duplicate the local block, and
+  local content is recoverable through the backup.
+  The destination remains locally modified by design, so later runs can show
+  managed updates and let you merge again or skip the file.
+- `edit` / reviewed merge: open a temporary candidate and managed reference in
+  `$VISUAL` or `$EDITOR` (default `vi`). SSH, Git, and shell candidates must
+  validate and receive confirmation before replacement. SSH/Git do not support
+  append because their precedence rules differ. Use `~/.ssh/config.local` for
+  deliberate local SSH overrides; review effective settings for your hosts.
+- `all replace`: replace this and later conflicts.
+- `keep all`: preserve this and later conflicts.
+- `diff`: show the bounded redacted diff again.
+- `quit`: cancel configuration apply; the backup remains available for restore.
+
+Press `--yes` for deterministic noninteractive replacement after backup. In a
+piped bootstrap, interactive choices are read from the controlling terminal
+even though output is being logged through `tee`. If no controlling terminal is
+available, the installer cancels configuration apply safely and tells you to
+use `--yes` or an explicit conflict policy. Set `DOTFILES_DIFF_LINES` to change
+the preview limit; the default is 160 lines. JSON and other unsupported formats
+intentionally do not offer append merge.
+
+The bootstrap uses target-specific `chezmoi apply` calls after per-file choices,
+so a skipped child cannot be reapplied accidentally through a parent directory.
+When running raw `chezmoi apply`, the separate chezmoi prompt choices mean:
+
+- `diff`: display the proposed change; nothing is written yet.
+- `overwrite`: replace this destination with the managed version.
+- `all-overwrite`: replace this and all later conflicts in the same run.
+- `skip`: preserve this destination and continue.
+- `quit`: stop the apply immediately.
+
+## Recovery and Resume
+
+Recovery commands:
+
+```bash
+./scripts/install.sh --resume
+./scripts/install.sh --resume=<run-id>
+dot backup
+dot backup verify <id>
+dot restore <backup-id>
+```
+
+Backups record files, directories, symlinks, modes, checksums, and paths that
+were previously absent. Restoring therefore also removes files created by a
+failed apply. Every restore first validates the complete manifest and all
+backed-up checksums before changing a destination; inspect a snapshot without
+restoring it with `scripts/backup.sh verify <backup-id>`.
+Restoring `.zshrc` clears its regular bytecode cache so older restored settings
+take effect. A symlinked cache is preserved with a manual-regeneration warning.
+Restore also rejects changed ancestor symlinks and unsafe file-type changes
+before any writes. Previously absent directories are removed only when empty;
+unrelated files added later are preserved.
+
+Resume validates the saved source fingerprint and effective options. Changed
+inputs or legacy runs without a plan require a new bootstrap, including conflict
+review; their backups remain available. Ignored validator caches do not affect
+the fingerprint; unreadable real source files still stop installation. Final
+doctor checks run again, while
+unchanged completed stages are skipped. Each attempt keeps its own summary under
+`runs/<id>/attempts/`, and resumed summaries retain the apply backup ID.
+
+Bootstrap and targeted updates share `scripts/sections.json` and canonical
+fingerprints covering manifest values, checksum metadata, and implementation
+files. Reconciliation respects the saved section selection; use
+`scripts/reconcile-packages.sh --dry-run` to inspect pending work or
+`--sections languages,cloud` for an explicit scope. Targeted installs use the
+same logging, locking, and doctor path as bootstrap.
+
+Managed binary/runtime replacements are staged and smoke-tested before switching
+paths. Existing unowned or locally modified destinations are preserved with an
+error: review and move them aside deliberately before retrying. Older installs
+without ownership fingerprints are not silently assumed safe to replace.
+Go now installs into a versioned user-local directory without deleting system Go.
+
+Stateful bootstrap runs are serialized with `~/.local/state/dotfiles/bootstrap.lock`
+so two terminals cannot race on checkpoints, backups, or the latest-run pointer.
+Restore, backup creation/pruning, and reconciliation use the same lock. Snapshots
+remain hidden until verified and atomically published; failed copies never
+replace `latest`. Backup commands accept `DOTFILES_LOCK_TIMEOUT` in seconds.
+The default is fail-fast; use `--lock-timeout <seconds>` when a scheduled or
+supervised invocation should wait for an active run.
+
+## Logs and Diagnostics
+
+Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
+
+```text
+~/.local/state/dotfiles/
+|-- bootstrap.lock
+|-- logs/
+|   |-- bootstrap-<run-id>.log
+|   `-- bootstrap-<run-id>.jsonl
+|-- runs/<run-id>/
+|   |-- checkpoints/
+|   `-- summary.json
+|-- backups/
+`-- installed.tsv
+```
+
+On-machine state directories use mode `0700`; logs and state files use `0600`.
+Persisted text logs have ANSI sequences removed and common secret assignments
+redacted. JSONL events include
+UTC time, run ID, section/stage, level, and message. The newest 20 log files are
+retained by default. JSONL fields escape quotes, backslashes, and control
+characters so error messages cannot corrupt the event stream.
+
+Console color is enabled for a capable TTY and Windows Terminal on WSL. Control
+it with `DOTFILES_COLOR=always|never|auto` or the standard `NO_COLOR` variable.
+
+Useful commands:
+
+```bash
+dot status
+dot logs
+dot logs <run-id>
+dot doctor
+./scripts/doctor.sh --acceptance --sections core,zsh,terminal --json
+```
+
+`dot doctor` validates commands, managed configuration, runtime shims, source
+integrity, private state permissions, and the install ownership ledger. It
+defaults to the installed selection; use `--sections` to choose a scope or
+`--all` to inspect every section. Shell syntax is checked even in quick mode. Use
+`--quick` to skip interactive shell and tmux runtime probes, `--json` for a
+JSON-only report, and `--strict` to treat warnings as failures. Failed checks
+include a focused repair command where one is available.
+
+## Daily Workflow
+
+The managed `dot` command is the lifecycle entrypoint:
+
+```text
+dot status                 repository, chezmoi, run, and ledger status
+dot diff                   preview managed changes
+dot sync [install flags]   fast-forward pull and reliable install
+dot doctor [flags]         health and acceptance checks
+dot check-local --json     offline, code-only local checks; nothing uploaded
+dot receipt [args]         create or compare a software inventory receipt offline
+dot capture [args]         propose allowlisted settings as a private patch
+dot audit --installed     inspect observed-version CVEs; offline unless --online
+dot privacy                audit telemetry and nonessential traffic controls
+dot profile [name]         read or set the machine profile
+dot logs [run-id]          list or follow bootstrap logs
+dot backup                 list config backups
+dot restore <id>           restore a config backup
+dot cache status           inspect the verified download cache
+dot cache prune [days]     remove verified downloads unused for DAYS
+dot reconcile              run only changed package sections
+dot uninstall <tool>       remove a ledger-owned tool
+dot workspace [directory]  open a backend-aware agent workspace
+dot-agent-status [flags]   show registered agent CLI readiness
+cloud-context [command]    save, load, inspect, or clear cloud CLI contexts
+agent-mcp [command]        enable, disable, or inspect optional MCP servers
+ssh-key-load [flags]       cache an SSH key passphrase in agent memory
+cloudflare-ssh [command]   authenticate and connect through Cloudflare Access
+```
+
+Machine-specific choices live in
+`~/.config/dotfiles/machine.conf` with mode `0600`.
+
+Existing user-local release binaries are preserved when they are unowned or
+locally modified. The installer warns and continues when the current command
+works. To approve a verified upgrade of specific binaries, with a private backup
+of each original:
+
+```bash
+DOTFILES_REPLACE_BINARIES=gh ./scripts/install.sh --source "$PWD" --only core --yes
+# Multiple approved binaries: DOTFILES_REPLACE_BINARIES=gh,eza
+```
+
+Originals are retained under `~/.local/state/dotfiles/binary-backups/` before
+replacement. Failed candidate probes leave the original command untouched.
+Legacy installations without ownership stamps are preserved, not automatically
+adopted. Review `dot preflight` before approving named replacements. Neovim also
+supports `DOTFILES_REPLACE_BINARIES=nvim` with `--only neovim`; the previous
+command is backed up before publication. Package-managed executables should be
+updated through their package manager instead of this override.
+Named takeover is not supported for npm/uv packages, Rust, legacy Java pointers,
+or other unimplemented backends. Preflight warns and preserves them for manual
+migration; ordinary verified managed upgrades remain supported.
+
+Internal helper/catalog conflicts omit automatic diff previews, but still wait
+for your choice. Press `d` to inspect a diff in the terminal. Diff contents are
+not copied to persistent logs. Warnings and errors remain in the full text log
+and structured events; a deduplicated structured diagnostic recap is printed at
+the end of successful or failed runs. Native subprocess diagnostics remain in
+the full text log. Signed APT upgrades are counted separately in section summaries.
+HashiCorp APT sources using a dedicated `Signed-By` keyring are refreshed against
+the fingerprint in [HashiCorp's packaging guide](https://www.hashicorp.com/official-packaging-guide),
+without changing their suites or mirror choices.
+
+## Private Local Review
+
+These commands are opt-in and are never run against your machine by CI or an
+agent automatically. The local check is read-only, offline, and emits diagnostic
+codes, not configuration text, paths, account names, or command output:
+
+```bash
+dot check-local --json
+dot receipt create --output /tmp/receipt-a.json
+dot receipt compare /tmp/receipt-a.json /tmp/receipt-b.json
+dot capture --list
+dot capture tmux --output /tmp/tmux-settings.patch
+dot audit --installed
+# Explicitly send public software coordinates and versions to OSV:
+dot audit --installed --online --cache-output /tmp/advisories.json
+dot audit --installed --advisories /tmp/advisories.json
+```
+
+Receipts use existing catalog observations without executing tools. They omit
+hostnames, user paths, credentials, and cloud/project contexts, but **do contain
+software versions and selected capabilities**: review before sharing. Stale or
+missing observations stay unknown. Capture exports only listed literal settings,
+never arbitrary shell code, SSH/Git config, or credentials; it does not apply
+the patch. Explicit output files are `0600`, refuse symlinks/overwrite, and are
+never uploaded automatically. See [Local Review](local-review.md) for scope,
+diagnostic codes, and limitations.
+Advisory snapshots expire after 7 UTC days by default. Expired or future-dated
+data cannot establish current coverage; `--max-age-days` explicitly changes the
+limit without enabling network access.
+
+Pinned chezmoi externals stay cached until their URL changes. Bootstrap retries
+transient download failures (including HTTP 429) up to four times; checksum and
+configuration errors fail immediately. `DOTFILES_CHEZMOI_ATTEMPTS` and
+`DOTFILES_CHEZMOI_RETRY_DELAY` control the retry limit and delay in seconds.
+Tmux's right status bar shows Kubernetes context and the clock; use
+`dot-agent-status --check` for manual agent readiness checks.
+
+## Agent Workspace
+
+The `agent` profile installs or validates Claude Code, Codex, Antigravity CLI
+(`agy`), OpenCode, and OMP. Codex and Antigravity use their vendors' verified
+standalone installers, OMP uses a checksum-pinned standalone GitHub release,
+and npm packages use a stable user-local Node/npm prefix. Authentication and
+session state are never automated.
+
+Launch the workspace in any project:
+
+```bash
+dot workspace
+dot workspace ~/Code/project
+dot workspace . --backend herdr
+dot workspace . --backend tmux
+dot workspace . --agents codex,claude --restart-agents
+dot workspace . --backend tmux --check
+dot-workspace . --name project-agents --print
+```
+
+`--backend auto` is the default. It remains in Herdr or tmux when invoked from
+inside one, prefers Herdr on a bare terminal when available, and otherwise
+falls back to tmuxp. It never launches one multiplexer inside the other unless
+`--allow-nested` is also passed. Set `DOTFILES_WORKSPACE_BACKEND=herdr` or
+`tmux` for a shell-local default.
+
+Both backends create a main terminal plus Codex, Antigravity, Claude, OpenCode,
+and OMP in the same working directory. Herdr uses one project workspace with a
+tab per agent and reuses an existing workspace with the same name. The tmux
+backend renders a session from the registry and runs pinned tmuxp through
+`uvx`. `--agents` selects a registered subset, `--check` performs a read-only
+preflight, and `--restart-agents` restarts a crashed agent without restarting a
+cleanly exited or interrupted session. `dot-agent-status` shows readiness on
+demand in the terminal; it never starts agents or MCP servers. A
+missing optional agent leaves a usable login shell instead of failing the
+workspace.
+
+Herdr and tmux both use `Ctrl+S` as their normal prefix. Existing tmux
+`send-prefix` support handles an explicitly nested Herdr. An explicitly nested
+tmux session under Herdr receives `Ctrl+B` for that generated session only.
+Implicit nesting remains blocked because Herdr cannot observe agents hidden
+behind an inner tmux process.
+
+Herdr configuration is managed at `~/.config/herdr/config.toml`. It provides
+tmux-style pane navigation, indexed tabs/workspaces/agents, Catppuccin, compact
+priority-sorted agent status, in-app notifications, and popups for lazygit,
+lazydocker, k9s, btop, and `dot doctor`. Worktree shortcuts, nested Herdr, sound,
+and persisted pane history are disabled. Reload a running session after config
+changes with `herdr server reload-config`.
+
+The agent install section also installs Herdr's bundled Claude, Codex,
+OpenCode, and OMP integrations. These add lifecycle/session hooks but do not
+authenticate an agent or copy its credentials. Inspect them with
+`herdr integration status`.
+
+Serena and context-mode are installed as optional MCP runtimes but are
+disconnected from every agent by default. `agent-mcp` changes only the selected
+agents and preserves unrelated configuration:
+
+```bash
+agent-mcp status all
+agent-mcp enable serena
+agent-mcp enable context-mode --agent codex,claude
+agent-mcp disable serena --agent agy,opencode,omp
+agent-mcp disable all
+```
+
+Supported agent names are `codex`, `claude`, `agy`, `opencode`, and `omp`.
+Restart active agent sessions after a change. Codex and Claude are configured
+through their native MCP commands; Antigravity, OpenCode, and OMP receive
+atomic JSON updates. Serena resolves the project from each agent's working
+directory except in Antigravity, where its agent must activate the current
+project once after enabling Serena. This MCP-only toggle deliberately avoids
+installing persistent hooks or plugins. Neither MCP is authenticated or granted
+extra permissions. JSON configuration writes reject symlinks, redirected parent
+directories, and nonregular files. They preserve unrelated settings and publish
+with private permissions; a rejected path must be reviewed manually.
+
+Graphify is installed as a separate, on-demand code knowledge-graph skill for
+OMP through the standard `~/.agents/skills/graphify` location. It does not run
+during bootstrap, index repositories automatically, enable an MCP server, or
+configure an external model backend. In an OMP session, run `/graphify .` for a
+large or unfamiliar repository; generated `graphify-out/` data is ignored in
+this repository.
+
+The AI profile also installs the canonical Ponytail skill into
+`~/.agents/skills/ponytail` only when that skill is missing, preserving any
+existing local copy. OMP receives the pinned Pix Optimizer plugin; use
+`/optimizer` inside OMP to select Caveman, RTK, and Ponytail modes. These modes
+remain user-controlled rather than being enabled by bootstrap. A verified Bun
+runtime is installed alongside OMP because OMP uses it for plugin management.
+Pix settings live in `~/.pi/agent/pix.json` (or `PI_CODING_AGENT_DIR`), with new
+modes initialized off and existing choices preserved. The reviewed Bun override
+in `packages.meta.yaml` keeps Pix's UI dependency compatible with OMP; conflicting
+user overrides require manual review rather than being replaced silently.
+
+RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
+optional shell-output optimizer. Bootstrap does not install its agent hooks;
+run the appropriate `rtk init` command only after reviewing the integration.
+RTK telemetry is disabled in both its managed config and the shared shell
+privacy policy, while local token-savings tracking and failure-only raw output
+retention remain enabled.
+
+`dot privacy` audits the enforced RTK and Claude controls, Antigravity's
+preserved `enableTelemetry` setting, Codex analytics/OTEL settings, and general
+`DO_NOT_TRACK`/OpenTelemetry/HashiCorp controls. Codex's existing user config is
+never overwritten; the audit reports the documented settings when an explicit
+opt-out is still needed. OpenCode sharing and OMP issue submission remain
+explicit user actions rather than passive uploads.
+
+A concise shared policy lives at `~/.config/agents/AGENTS.md`. Symlinks expose
+it as Codex `~/.codex/AGENTS.md`, Claude `~/.claude/CLAUDE.md`, Antigravity
+`~/.gemini/GEMINI.md`, OpenCode `~/.config/opencode/AGENTS.md`, and OMP
+`~/.omp/agent/AGENTS.md`. Repository and directory-level instructions override
+these global defaults. The policy prefers `rg`, `fdfind`/`fd`, `gojq`, `yq`,
+`pigz`, `zstd`, and explicit enhanced commands without replacing core tools.
+
+This is a supervised launcher, not a branch-isolation system. It does not
+create worktrees, coordinate concurrent edits, commit, merge, or push. Use one
+editing agent at a time in a working directory; use the other windows for
+review, diagnosis, research, and test observation. Separate source copies are
+required when concurrent writers are intentional.
+
+## Preserved Local State
+
+The source intentionally does not own shell histories, completion caches,
+credentials, or local overlays. Existing files remain in place across applies.
+
+Local extension points:
+
+```text
+~/.config/dotfiles/local.zsh
+~/.config/dotfiles/local.bash
+~/.config/dotfiles/local.tmux.conf
+~/.config/git/config.local
+~/.ssh/config.local
+```
+
+History paths such as `~/.zsh_history`, `~/.bash_history`, `.zcompdump*`, and
+local Zsh state directories are explicitly ignored. WSL also ignores native
+Kitty configuration.
+
+## SSH and Cloudflare Access
+
+The bootstrap does not save SSH login passwords or private-key passphrases.
+`ssh-agent.service` keeps unlocked keys in memory, and the shell respects a
+working forwarded agent before using the managed runtime socket. Load the
+default Ed25519 key for eight hours, or choose a different lifetime:
+
+```bash
+ssh-key-load
+ssh-key-load --lifetime 2h
+ssh-key-load --list
+ssh-key-load --clear
+```
+
+The managed SSH config intentionally declares no `IdentityFile`. GitHub,
+GitLab, and Cloudflare host mappings are safe to deploy without keys; OpenSSH
+uses standard local identities when they are restored later, while custom
+identity paths belong in the untracked `~/.ssh/config.local` overlay.
+
+The local overlay is included before managed defaults, so it can override a
+specific host without editing managed configuration. Keep only hosts you use;
+the repo already provides `rpi4`, `t420`, `github.com`, and `gitlab.com`.
+For example, a local-only port override (only if your server actually uses it):
+
+```sshconfig
+Host rpi4
+    Port 2222
+```
+
+Additional bastions, private hostnames/IPs, `ProxyJump`, and existing identity
+paths belong in this overlay, never in the public catalog. Validate without
+connecting using `ssh -G rpi4`; then connect normally with `ssh rpi4`.
+No new host mappings, private keys, or local empty files are created automatically.
+
+For a new host, restore an existing private key manually or run the supervised
+setup flow. It can create a passphrase-protected Ed25519 key, keeps the
+passphrase only in `ssh-agent`, authenticates through Access, installs only the
+public key, and verifies the result. The remote account may request its password
+once while installing the public key:
+
+```bash
+cloudflare-ssh setup rpi4
+ssh rpi4
+```
+
+Use `cloudflare-ssh setup t420 --key ~/.ssh/id_ed25519` to select a key
+explicitly. `--yes` approves creation when a key is missing, but `ssh-keygen`
+still prompts for its passphrase.
+
+The managed `rpi4` and `t420` targets share one Cloudflare transport; add future
+aliases to the shared `Host` block. Plain `ssh HOST` and `scp FILE HOST:PATH`
+run native Access login before SSH's handshake timer starts, using
+[OpenSSH FD passing](https://man.openbsd.org/ssh_config#ProxyUseFdpass).
+Browser approval has a separate five-minute limit; SSH then has a 15-second
+connection/handshake limit. Override the former with
+`DOTFILES_ACCESS_LOGIN_TIMEOUT` (1–900 seconds). `ssh -G HOST` never logs in.
+`cloudflare-ssh connect HOST` explicitly preflights the same single connection;
+neither path retries key rejection or network failures as Access expiry.
+
+Valid Access sessions are reused by cloudflared. Missing or expired sessions
+open native browser login only with an interactive terminal. `ssh -o BatchMode=yes`
+and `scp -B` require an existing session and fail without opening a browser.
+Enable **Allow automatic Cloudflared authentication** in each Access application's
+Authentication settings to skip the approval page when an IdP session already
+exists; first-time login still requires approval. This is a
+[Cloudflare dashboard prerequisite](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/non-http/cloudflared-authentication/automatic-cloudflared-authentication/),
+not something dotfiles configure or bypass.
+
+SSH tries public keys first, then its normal terminal password prompt if the
+server permits it. Access approval and remote SSH account authorization are
+separate: restore/enroll a key or use the remote account password manually.
+Passwords are never stored, and host-key verification is unchanged. Access state under
+`~/.cloudflared/`, private keys, and `~/.ssh/config.local` remain local and
+untracked. OpenSSH connection multiplexing reuses authenticated connections
+for ten minutes without persisting a password.
+
+HTTPS Git authentication for `github.com` and `gist.github.com` uses GitHub CLI
+as the primary and exclusive host-specific helper. Run `gh auth login` after a
+fresh bootstrap; switching the active account with `gh auth switch` also
+switches credentials used by Git. Other HTTPS Git hosts use
+`git-credential-dotfiles`, which dispatches to Windows Git Credential Manager
+on WSL when available and otherwise to the managed Linux GCM. If no GCM exists,
+the dispatcher exits silently so Git can use its normal interactive prompt.
+Bootstrap configures these helpers but never logs in or copies authentication
+state.
+
+## Secrets Boundary
+
+SOPS is installed as a tool, but this repository does not configure SOPS/age
+encryption and does not generate an age identity. These remain manual after
+bootstrap:
+
+- SSH and GPG private keys.
+- Git/GitHub credentials and Git Credential Manager authentication.
+- Cloud credentials and profiles for AWS, Google Cloud, Azure, Kubernetes,
+  Terraform backends, and Cloudflare.
+- API tokens, environment files, password-store/keyring content.
+- Claude, Codex, Antigravity, OpenCode, and OMP authentication/session
+  directories.
+- Any future age private key or SOPS recovery material.
+
+The recommended future model is still a secret-free public bootstrap plus a
+separate, opt-in encrypted recovery source. See [Security Model](security-model.md).
+
+## Versions and Supply Chain
+
+- `packages.yaml`: requested versions.
+- `packages.meta.yaml`: source, owner, and integrity policy.
+- `packages.lock`: generated audit view and manifest hashes.
+- `.chezmoiexternal.yaml`: immutable archive refs and SHA256 values.
+- `docs/tool-inventory.md`: generated readable inventory.
+
+Downloads use upstream checksum manifests or repository-pinned SHA256 values.
+Verified payloads are cached by checksum under
+`~/.cache/dotfiles/downloads`; every cache read is revalidated before use and
+concurrent installs share a per-object lock. Set `DOTFILES_DOWNLOAD_CACHE=0`
+to bypass it or `DOTFILES_DOWNLOAD_CACHE_DIR` to relocate it. Use
+`dot cache status` and `dot cache prune [days]` for maintenance.
+Pruning skips busy entries, retains lock files, and removes verification content
+and its digest together under the same lock used by readers.
+Version-specific checksum manifests and AWS ZIP/signature pairs are also cached
+privately under `downloads/verification`. Local cache digests detect corruption;
+payload checksums and AWS vendor signatures are **reverified on every use**.
+Caching never substitutes a previous verification result for a new verification.
+Mutable release indexes and rustup's unversioned checksum are not cached there.
+Binary, runtime-tree, and command-link publication restores the prior payload,
+ownership stamp, and destination-specific ledger records if publication fails.
+If rollback cannot finish, logs identify a private recovery directory containing
+`records`, plus `previous` and `stamp` when they existed. Keep these together for
+manual restoration before retrying. Handled interrupts attempt rollback;
+SIGKILL and power loss cannot run cleanup traps.
+
+Npm package updates and uv tool upgrades verify the package payload and its native
+command bindings under the same mutation lock used by uninstall. Failed manager
+updates restore that package, its commands, and its receipts, leaving unrelated
+packages alone. Uninstall dry runs perform the same ownership checks as removal;
+legacy version-only Python receipts require manual review, not a broad uninstall.
+Manager directories are cached for the run; ownership checks remain fresh.
+Full installs keep native npm/uv progress in the text log while showing warnings
+and a short error tail. Use `DOTFILES_VERBOSE=1` for the full manager output.
+
+APT signing keys are verified by fingerprint. GitHub Actions are pinned by
+commit SHA. Every push and pull request publishes a non-mutating version and
+checksum report. The weekly audit publishes the same report without changing
+the repository and refreshes one standing **Latest stable upgrade recommendations**
+issue, editing its body instead of adding comments or opening per-tool issues.
+This includes newer release lines outside automatic update policy, with explicit
+unknown/manual-review entries where no resolver is available. Once a month, one workflow applies all fully verified updates
+to the stable `automation/grouped-tool-upgrades` branch and creates or refreshes
+one review PR; it never merges automatically. Dependabot likewise groups GitHub
+Actions updates into one monthly PR. The report
+covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`, `stern`, `helmfile`,
+`kubectx`, `kubens`, and `kubecolor`, plus RTK, Serena, context-mode, npm packages, Rust, Python, Java,
+Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
+vendor-signed APT repositories and are upgraded whenever the `cloud` section
+runs.
+
+The **Pinned Version CVE Audit** queries exact repository pins daily
+against OSV, emits GitHub warning annotations, and retains a downloadable
+report. It does not fail bootstrap or change pins. Packages without a reliable
+OSV coordinate are listed explicitly; GitHub release scans cover repository
+tag advisories, not each tool's transitive dependency tree. For affected pins,
+it checks the latest compatible and latest stable candidates and recommends
+one only when OSV reports no advisories or a strictly lower known maximum
+severity; cross-policy candidates are marked for compatibility review.
+CVSS v2/v3/v4 vectors are scored with the pinned audit dependency. Candidate
+queries use exact package/tag coordinates; missing results, mismatched advisory
+IDs, and malformed details fail closed. Fixes and package-level severity are
+scoped to the queried package or Git repository. npm
+recommendations respect `latest` and Node compatibility, and yanked-only PyPI
+releases are excluded. Otherwise it warns that no safer upgrade was established.
+Alias-connected CVE/GHSA/PSF records are grouped per package/version, retaining
+source links and the highest known severity. Counts distinguish affected pins,
+package/version pairs, unique vulnerabilities, and upstream records. Independent
+unscored findings still prevent claims of a lower-severity upgrade.
+The weekly
+version/checksum audit includes the same CVE report and continues to publish
+latest compatible same-major updates and latest stable major suggestions.
+The standalone daily workflow skips Monday because the weekly audit supplies
+that day's CVE scan. Both use the same report script.
+
+Run the all-stable advisory locally without changing pins:
+
+```bash
+/usr/bin/python3 scripts/install-policy.py recommendations
+```
+
+Always-on CI downloads and verifies the release assets and executes the new
+CLIs. It also installs and runs the Ubuntu-managed `gojq`, `pigz`, `zstd`,
+`kcat`, and `pgloader` packages before the installation matrices begin.
+
+Check current versions and integrity values:
+
+```bash
+./scripts/update-packages.sh --check
+```
+
+The report is visible under **Actions > Version Audit** and in the `Version and
+Checksum Report` job on every CI run. Trigger and inspect the standalone audit:
+
+```bash
+gh workflow run version-audit.yml
+gh run list --workflow=version-audit.yml --limit 5
+run_id="$(gh run list --workflow=version-audit.yml --limit 1 \
+  --json databaseId --jq '.[0].databaseId')"
+gh run view "$run_id"
+gh run download "$run_id" --name weekly-version-checksum-cve-report
+```
+
+Run the grouped update workflow early when needed:
+
+```bash
+gh workflow run grouped-upgrades.yml
+```
+
+Accept every fully resolved update, or only selected tools:
+
+```bash
+./scripts/update-packages.sh --apply-all
+./scripts/update-packages.sh --apply core.eza terminal.herdr
+```
+
+The report includes old/candidate versions and integrity deltas. Prefer its
+version-qualified approval commands to avoid accepting a later upstream release.
+Apply updates the manifests, lock file, and generated inventory together.
+
+Regenerate derived files after manual manifest edits:
+
+```bash
+./scripts/generate-package-lock.sh
+./scripts/generate-tool-inventory.sh
+./scripts/generate-keybinding-docs.sh
+```
+
+## Kitty
+
+Kitty is installed from its official checksum-pinned Linux archive instead of
+the older Ubuntu package. Check or accept the latest release with:
+
+```bash
+update-kitty --check
+update-kitty --apply
+```
+
+`--apply` updates the repository version and architecture checksums, installs
+that approved build, and leaves the generated manifest diff for review and
+commit. Install an already-approved version with `./scripts/install-kitty.sh`.
+Kitty checks daily and displays an update notification; updates are not applied
+unattended.
+
+Kitty tabs are displayed vertically on the left:
+
+| Action | Key |
+|--------|-----|
+| New tab in the current directory | `Ctrl+Shift+T` |
+| Close current tab | `Ctrl+Shift+Q` |
+| Next / previous tab | `Ctrl+Shift+Right` / `Ctrl+Shift+Left` |
+| Move tab forward / backward | `Ctrl+Shift+.` / `Ctrl+Shift+,` |
+| Select from all tabs | `Ctrl+Shift+Space` |
+| Jump to tab 1-9 | `Ctrl+Alt+1` through `Ctrl+Alt+9` |
+
+## Cloud Contexts
+
+Starship displays the active Kubernetes context/namespace, AWS profile and
+account ID, Google Cloud project, and Azure subscription. A provider segment is
+hidden when no corresponding context is active. Kubernetes contexts longer
+than 28 characters retain their rightmost characters with a `..` prefix.
+
+`cloud-context` stores context identifiers only. It never copies credentials or
+tokens, and activates saved values through each provider's native CLI:
+
+```bash
+cloud-context                       # show current contexts
+cloud-context --save work           # save identifiers as profile "work"
+cloud-context --load work           # kubectl/gcloud/aws/az native activation
+cloud-context --select gcloud       # fzf-select a project through gcloud
+cloud-context --select aws          # fzf-select a local AWS profile
+cloud-context --select azure        # fzf-select an Azure subscription
+cloud-context --recent              # fzf-load one of five pre-clear snapshots
+cloud-context --clear               # clear all four contexts
+cloud-context --clear kubectl       # also: gcloud, aws, azure
+cloud-context --test aws            # fake one prompt context without credentials
+cloud-context --test all            # fake every prompt context in isolated configs
+cloud-context --test-clear aws       # remove one fake context
+cloud-context --test-clear           # remove all fake contexts
+cloud-context --list
+cloud-context prompt aws --refresh # refresh account after SSO/role changes
+```
+
+AWS profile selection is shell-local, so the managed Zsh wrapper sources only
+`AWS_PROFILE` and region values after load/clear. Kubernetes uses
+`kubectl config`, GCloud uses named configurations and project selection, and
+Azure uses `az account`. Saved profiles are mode `0600` under
+`~/.config/dotfiles/cloud-contexts/`.
+
+Empty saved fields clear the corresponding selection through native commands;
+an empty GCP project clears the project without deleting a named configuration.
+Unavailable providers with empty saved fields are left alone. Partial failures
+remain errors, but successful AWS shell changes take effect immediately.
+The AWS account prompt caches results for at most 30 seconds and invalidates on
+credential environment or configuration-file changes, storing only a digest.
+Server-side SSO/role changes cannot always be detected locally: use
+`cloud-context prompt aws --refresh` to bypass that cache after switching identity.
+
+GCP, AWS, and Azure selectors prioritize the five most recently selected values
+before the full provider-native list. Before each `--clear`, the command stores
+the active identifiers as a short UTC timestamp under `.recent-profiles/` and
+keeps only the newest five. These snapshots contain identifiers, never
+credentials, and `--recent` loads one through the same preflighted native CLI
+path as a named profile.
+
+Test contexts live under `~/.local/state/dotfiles/cloud-context-test/` and use
+temporary `KUBECONFIG`, `CLOUDSDK_CONFIG`, AWS config, and `AZURE_CONFIG_DIR`
+overrides. The Zsh wrapper applies and removes those overrides in the current
+shell, then prints the active fake contexts. `--test` asks before running
+`--test-clear`; automation must opt in with `--yes`. Real provider configuration
+and credentials are not changed.
+
+Loading preflights the saved Kubernetes context, GCloud configuration, AWS
+profile, and cached Azure subscription before changing any provider. Missing
+CLIs or unknown local identifiers fail without applying the profile. A GCloud
+project ID is still accepted by GCloud itself because validating whether the
+remote project exists would require an authenticated network request. Starship
+reads the resulting native provider state on every prompt; missing or cleared
+contexts render no segment. A displayed context is not proof of authentication,
+authorization, or connectivity.
+
+## Verification
+
+Verification is tiered so a green result has a precise meaning:
+
+| Tier | Trigger | Coverage |
+| --- | --- | --- |
+| Push/PR CI | Every change | Parallel security/static and Docker behavior suites, selector edge cases, two-pass native/WSL base install, recovery/restore/resume |
+| Agent workspace Docker E2E | Every push/PR | Both workspace backends, all registered agent launchers, MCP toggles, working-directory propagation, and failure recovery fixtures |
+| Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, full WSL-simulated, and two-pass full-native installations |
+| Native ARM64 smoke | Monthly or manual, public-repo ARM64 runner | Real checksummed release binaries from a cold base; not full-install acceptance |
+| Real WSL2 | Manual, private self-hosted Windows runner | Disposable imported WSL2 distro; requires trusted Ubuntu 24.04 rootfs via `WSL_E2E_ROOTFS` |
+
+`ci.yml` owns triggers, concurrency, and one final **CI Result**. Two reusable
+workflows contain checks and live acceptance. `tests/suites.json` accounts for
+every test; missing and duplicate registrations fail CI. Security checks run
+alongside the validator build. Registered Docker suites start when the shared
+image is ready; live acceptance waits for the complete checks gate. Native and
+WSL behavior remain separate; the common updater tests run once in the required
+`upgrades` suite. ShellCheck retains full source analysis with at most two
+workers. Installation acceptance still uses a minimal, cold base image.
+Every acceptance service retains Compose output and cleanup logs, including
+recovery tests. Successful installation profiles must produce performance
+samples; recovery scenarios do not upload nonexistent install timing files.
+
+Validator compilers and Go module/build caches stay in a separate build stage;
+only `shfmt` and `actionlint` binaries enter the runtime image. Exact cache keys
+include the OS/architecture, Dockerfile, pinned Python requirements, cache
+implementation, and UTC ISO week. A weekly rebuild refreshes distro packages;
+source/config edits do not cause unnecessary image rebuilds. Every suite still
+tests the current checkout, never cached test results.
+
+Only default-branch runs save caches. Pull requests can restore compatible
+entries but do not publish them. Corrupt, stale, missing, or unavailable image
+caches rebuild; corrupt same-run artifacts fail closed. Archives are checked
+against SHA256 and the loaded Docker image ID. Preparation time and image/archive
+sizes appear in the job summary; image artifacts expire after one day.
+
+Daily/weekly CVE jobs reuse pinned public pip downloads, not virtual environments.
+No credentials, cloud context, home directories, install state, or live-E2E
+destinations are cached. This uses GitHub's built-in cache without increasing
+the repository's storage allowance or enabling paid services. GitHub's default
+cache limit is [10 GB with unused entries evicted after seven days](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#usage-limits-and-eviction-policy).
+To force a fresh validator build early, remove its `validators-v1-...` entry
+under **Actions > Caches**, then run CI again.
+
+Drift regressions exercise real Chezmoi decisions after both source and local
+config changes: skip/quit/EOF preservation, explicit replacement, repeatable
+append merges, retargeted symlinks, private file modes, and unchanged histories
+and local overlays. Snapshot traversal fails on unreadable trees rather than
+silently omitting potential drift.
+
+The checks include:
+
+- Gitleaks full-history scan.
+- ShellCheck, shfmt, YAML, templates, and generated-file contracts.
+- Hadolint.
+- Actionlint and Zizmor `--pedantic`.
+- Trivy filesystem/secret/misconfiguration scan.
+- Pull-request dependency review.
+- Python linting, standalone profile equivalence, and package metadata validation.
+
+Required checks gate verified release/external smoke and live installation.
+A shared action retains E2E diagnostics even on failure. The final result rejects
+failed, cancelled, or unexpectedly skipped required jobs; the heavy matrix is
+optional only when not requested. A green push/PR run does not
+mean the scheduled heavy profiles or real-WSL workflow ran; check those tiers
+when changing platform integration or complete install behavior.
+
+Local test commands also execute inside Docker:
+
+```bash
+./scripts/ci/docker-suite.sh static
+./scripts/ci/docker-suite.sh behavior
+./scripts/ci/docker-suite.sh selectors
+./scripts/ci/docker-suite.sh workspace
+./scripts/ci/docker-suite.sh workflow-security
+docker compose -f .github/e2e/compose.yaml --profile selectors run --rm selectors
+docker compose -f .github/e2e/compose.yaml --profile base up --build --abort-on-container-exit
+docker compose -f .github/e2e/compose.yaml --profile recovery run --rm recovery
+docker compose -f .github/e2e/compose.yaml --profile agent run --rm agent
+docker compose -f .github/e2e/compose.yaml --profile workspace run --rm agent-workspace
+```
+
+For manual validation, the wrapper runs a complete native Ubuntu installation,
+executes the acceptance suite, and then leaves the disposable container open at
+a login shell:
+
+```bash
+./scripts/e2e-shell.sh
+```
+
+The default is `--profile full --platform native --passes 1`. Two-pass runs also
+exercise the installer's `--full` alias and
+compare file hashes, modes, symlink targets, normalized install records, local
+history/overlays, configuration diffs, and replacement inventories. Volatile
+run timestamps and logs are excluded from convergence checks. The validation
+result is available inside the shell as `DOTFILES_E2E_STATUS`; `0` means the
+automated checks passed. Exit the shell to delete the container. Redacted logs,
+run summaries, diagnostics, and timing data remain under
+`artifacts/full-false/`. A first full run can take several minutes and consume
+several gigabytes because it installs the complete native workstation profile.
+
+Useful checks inside the validation shell:
+
+```bash
+echo "$DOTFILES_E2E_STATUS"
+dot doctor
+nvim
+tmux
+dot workspace /dotfiles
+```
+
+Useful variants:
+
+```bash
+./scripts/e2e-shell.sh --passes 2             # verify installer idempotency
+./scripts/e2e-shell.sh --profile agent        # smaller agent workstation
+./scripts/e2e-shell.sh --platform wsl         # simulated WSL behavior
+./scripts/e2e-shell.sh --no-build             # reuse the current E2E image
+./scripts/e2e-shell.sh --help
+```
+
+The container validates Ubuntu package and configuration behavior, but it
+cannot prove native GUI integration, physical-device behavior, or Windows/WSL
+interop. The monthly `Native Ubuntu VM Acceptance` workflow covers login-shell,
+fontconfig, Kitty desktop, and systemd integration on an ephemeral Ubuntu host.
+It also restores the first-pass transactional backup, verifies file, symlink,
+mode, and absent-path semantics, then reapplies the desired configuration.
+Windows interoperability remains the real-WSL workflow's responsibility.
+
+E2E artifacts include redacted text logs, JSONL events, run summaries,
+checkpoints, the install ledger, environment context, process/memory/disk data,
+a concise failure report, JUnit XML, and report-only performance budgets for
+Zsh startup, Starship rendering, the first and second installation passes, and
+the full profile's first-pass install. Performance JSON keeps raw millisecond
+values plus seconds, while Markdown and log reports show readable milliseconds,
+seconds, and minute/second forms. CI publishes the formatted performance table
+in the job summary. A rolling 90-day artifact adds latest/previous deltas and
+median/range trends by profile and platform;
+regressions are visible but do not block merges until enforcement is explicitly
+enabled. CI runs also execute Hyperfine benchmarks for installer help, workspace
+help, isolated cloud-context status, agent readiness, and Zsh startup; real
+post-install startup timing uses the same benchmark engine. CI publishes those
+artifacts and a separate outcome-classification check for every completed run.
+Successful runs clear stale diagnostic failures for the same commit; older runs
+cannot overwrite newer completed attempts. Cancelled runs with only failed
+aggregate checks are neutral, while genuine failed tests remain actionable.
+Classification never changes the original bootstrap workflow conclusion.
+Runner-outage evidence comes from job-scoped GitHub check annotations, never a
+combined log search. Failed test steps and mixed failures remain red; missing
+annotations cannot excuse a failed job.
+
+The workspace Docker harness uses synthetic agent commands and a mocked Herdr
+API, so it never authenticates or starts a real agent session. It still invokes
+the managed launchers, renders the actual tmuxp YAML contract, checks the
+resolved Herdr `--cwd` values, toggles both MCP servers across all five agents,
+and records missing-agent and crash/restart behavior. Its artifacts include
+`summary.json`, `summary.md`, `workspace.log`, JSONL case events, backend traces,
+and an agent launch trace.
+
+## Repository Map
+
+```text
+.chezmoiscripts/       explicit section implementations
+.github/e2e/           Docker profile harness
+.github/actions/       shared E2E execution and artifact collection
+.github/workflows/     CI, maintenance, native VM, and real WSL workflows
+dot_* / private_dot_*  chezmoi-managed configuration
+profiles/              machine profile definitions
+scripts/               orchestrator, recovery, doctor, update helpers
+scripts/lib/           internal helpers behind the stable lib.sh interface
+scripts/dotfiles/      validated metadata and shared release policies
+scripts/ci/            Docker suites, results, and shared audit reporting
+tests/                 contracts, units, fixtures, and E2E drivers
+agents.yaml            agent command registry
+packages*.yaml         version and ownership manifests
+```
+
+## Authoritative Documentation
+
+Accepted ADRs and the current implementation are authoritative. Superseded
+phase plans, candidate-path notes, and the old universal-deployment proposal
+have been removed so unimplemented ideas are not mistaken for supported
+behavior. New architectural decisions should extend or supersede an ADR.
+
+Design details and generated references:
+
+- [Architecture](architecture.md)
+- [Reliability](reliability.md)
+- [Security Model](security-model.md)
+- [Implemented Improvements](improvements-2026.md)
+- [ADRs](adr/README.md)
+- [Shared Policy and CI Suites](adr/0009-shared-policy-and-ci-suites.md)
+- [Tool Inventory](tool-inventory.md)
+- [Keybindings](keybindings.md)
+
+## License
+
+Personal configuration repository. Reuse selectively and review every setting
+before applying it to another account or machine.
+

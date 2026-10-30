@@ -81,6 +81,8 @@ lifecycle_state="$TEST_HOME/lifecycle-state"
 lifecycle_source="$TEST_HOME/lifecycle-source"
 mkdir -p "$lifecycle_home" "$lifecycle_state" \
   "$lifecycle_source/.chezmoiscripts" "$lifecycle_source/scripts"
+mkdir -p "$lifecycle_source/scripts/lib"
+cp "$DOTFILES_DIR/scripts/lib/state-lock.sh" "$lifecycle_source/scripts/lib/"
 cp -a "$DOTFILES_DIR/.chezmoiscripts/." "$lifecycle_source/.chezmoiscripts/"
 cp -a "$DOTFILES_DIR/profiles" "$lifecycle_source/"
 cp "$DOTFILES_DIR/.chezmoi.yaml.tmpl" "$lifecycle_source/.chezmoi.yaml.tmpl"

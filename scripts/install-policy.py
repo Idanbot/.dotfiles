@@ -22,6 +22,7 @@ sys.dont_write_bytecode = True
 import catalog as software  # noqa: E402
 from dotfiles import releases  # noqa: E402
 from dotfiles.metadata import load_metadata, load_repository, load_versions  # noqa: E402
+from dotfiles.replacements import replacement_blocker  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 ROLLING = {"core.github_cli", "cloud.aws_cli", "cloud.gcloud", "cloud.helm",
@@ -262,6 +263,18 @@ def ownership_status(path, state):
     return "modified-or-unverifiable"
 
 
+def explicit_replacement(entry, check_package=True):
+    if check_package:
+        result = subprocess.run(["dpkg-query", "-S", str(Path(entry["path"]).resolve())],
+                                capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            return "preserve distro package; use its package manager", "distro"
+    blocker = replacement_blocker(Path(entry["path"]).name, entry.get("owner", "direct"), entry["id"])
+    if blocker:
+        return "skip; preserve unowned installation; " + blocker, "unsupported-replacement"
+    return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
+
+
 def planned_action(entry):
     if not entry["path"]:
         return "install", "missing"
@@ -269,7 +282,7 @@ def planned_action(entry):
         names = {*entry.get("commands", []), Path(entry["path"]).name}
         replacements = set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(","))
         if names & replacements:
-            return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
+            return explicit_replacement(entry)
         return "skip; preserve active executable with unknown version; explicit named replacement required", "unknown-version"
     if entry["current"] and stable(entry["target"]) and order(entry["current"]) >= order(entry["target"]):
         return "skip; preserve equal/newer version", "unchanged"
@@ -277,6 +290,11 @@ def planned_action(entry):
         return "install/update user-local ~/.fzf; preserve distro binary", "side-by-side"
     if entry["id"] == "languages.python":
         return "install side-by-side using verified private uv if needed; keep system Python", "external"
+    if entry["id"] == "languages.java":
+        ready = subprocess.run(["bash", "-c", 'source "$1/scripts/lib.sh"; runtime_activation_ready java',
+                                "activation-check", str(ROOT)], capture_output=True, timeout=30)
+        if ready.returncode:
+            return "skip; preserve activation pointer; manual Java migration required", "unsupported-replacement"
     state = Path(os.environ.get("DOTFILES_STATE_DIR", str(Path.home() / ".local/state/dotfiles")))
     ownership = ownership_status(entry["path"], state)
     if entry["id"] == "cloud.aws_cli" and ownership_status("/usr/local/aws-cli", state) == "verified-dotfiles":
@@ -286,7 +304,7 @@ def planned_action(entry):
     if ownership != "unowned":
         names = {*entry.get("commands", []), Path(entry["path"]).name}
         if names & set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(",")):
-            return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
+            return explicit_replacement(entry)
         return "skip; preserve until explicit backed-up replacement is approved", ownership
     result = subprocess.run(["dpkg-query", "-S", str(Path(entry["path"]).resolve())],
                             capture_output=True, text=True, timeout=5)
@@ -298,7 +316,7 @@ def planned_action(entry):
         return "preserve distro package; repository version is advisory, not an APT target", "distro"
     names = {*entry.get("commands", []), Path(entry["path"]).name}
     if names & set(os.environ.get("DOTFILES_REPLACE_BINARIES", "").split(",")):
-        return "back up and replace explicitly named executable; recheck before replacement", "explicit-replacement"
+        return explicit_replacement(entry, check_package=False)
     return "skip; preserve unowned/modified executable", "unowned"
 
 
@@ -502,7 +520,7 @@ def main():
             tools = list(pool.map(resolve_one, entries))
         for entry in tools:
             entry["action"], entry["ownership"] = planned_action(entry)
-            if entry["ownership"] == "unknown-version":
+            if entry["ownership"] in {"unknown-version", "unsupported-replacement"}:
                 checks.append(("WARN", f"{entry['id']}: {entry['action']}"))
         data = {"schema": 1, "source": str(ROOT), "sections": sections,
                 "resolved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),

@@ -23,16 +23,22 @@ extract_version() {
 }
 
 version_compare() {
-  local left right
+  local left right ordered
   left="$(extract_version "${1:-}")"
   right="$(extract_version "${2:-}")"
   [[ -n "$left" && -n "$right" ]] || return 2
   if [[ "$left" == "$right" ]]; then
     printf '0\n'
-  elif [[ "$(printf '%s\n%s\n' "$left" "$right" | sort -V | head -1)" == "$left" ]]; then
-    printf '%s\n' -1
   else
-    printf '1\n'
+    # Native Python metadata normalizes date versions such as 2026.08.19.
+    ordered="$(printf '%s\n%s\n' "$left" "$right" | LC_ALL=C sort -Vu)"
+    if [[ "$ordered" != *$'\n'* ]]; then
+      printf '0\n'
+    elif [[ "${ordered%%$'\n'*}" == "$left" ]]; then
+      printf '%s\n' -1
+    else
+      printf '1\n'
+    fi
   fi
 }
 
@@ -62,8 +68,25 @@ binary_replacement_requested() {
   [[ ",${DOTFILES_REPLACE_BINARIES:-}," == *",$1,"* ]]
 }
 
+replacement_supported() {
+  PYTHONPATH="$DOTFILES_SOURCE_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" \
+    /usr/bin/python3 -B -m dotfiles.replacements "$1" "${2:-auto}"
+}
+
+runtime_activation_ready() {
+  [[ "$1" == java ]] || return 0
+  local pointer="$HOME/.local/share/dotfiles/tools/java/current"
+  [[ -e "$pointer" || -L "$pointer" ]] || return 0
+  [[ "$(realpath -m -- "$(dirname "$pointer")")" == "$(dirname "$pointer")" ]] && target_is_owned "$pointer"
+}
+
 preserve_existing_release_binary() {
   local binary="$1" current="$2" target="${DOTFILES_BIN_DIR:-$HOME/.local/bin}/$1"
+  if ! runtime_activation_ready "$binary"; then
+    log_warn "Preserving $binary: activation pointer is unowned or modified; manual migration required before an upgrade"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
   # Policy-managed runs must not shadow an executable owned by another installer.
   if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]] && command_exists "$binary"; then
     target="$(command -v "$binary")"
@@ -86,7 +109,14 @@ preserve_existing_release_binary() {
     ((_PRESERVED++)) || true
     return 0
   fi
-  binary_replacement_requested "$binary" && return 1
+  if binary_replacement_requested "$binary"; then
+    if replacement_supported "$binary" 2>/dev/null; then
+      return 1
+    fi
+    log_warn "Preserving $binary: named takeover is unsupported for this backend; manual migration required"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
   [[ -f "$target" && -x "$target" ]] || return 1
   [[ -n "${DOTFILES_VERSION_PLAN:-}" || -n "$(extract_version "$current")" ]] || return 1
   local reason='unowned or modified'
@@ -96,7 +126,11 @@ preserve_existing_release_binary() {
     reason='legacy installation without an ownership stamp'
   fi
   log_warn "Preserving existing $binary (${current%%$'\n'*}) at $target; upgrade skipped: $reason"
-  log_info "To back it up and replace only this binary, rerun with DOTFILES_REPLACE_BINARIES=$binary"
+  if replacement_supported "$binary" 2>/dev/null; then
+    log_info "To back it up and replace only this binary, rerun with DOTFILES_REPLACE_BINARIES=$binary"
+  else
+    log_info "Named takeover is unsupported for $binary's backend; review a manual migration"
+  fi
   ((_PRESERVED++)) || true
   return 0
 }
@@ -104,10 +138,10 @@ preserve_existing_release_binary() {
 runtime_is_current() {
   local binary="$1" target="$2" current="$3"
   if command_exists "$binary" && [[ -z "$(extract_version "$current" || true)" ]]; then
-    if binary_replacement_requested "$binary"; then
+    if binary_replacement_requested "$binary" && replacement_supported "$binary" 2>/dev/null && runtime_activation_ready "$binary"; then
       return 1
     fi
-    log_warn "Preserving existing $binary with an unknown version; update skipped"
+    log_warn "Preserving existing $binary with an unknown version; update skipped (unsupported named takeovers require manual migration)"
     ((_PRESERVED++)) || true
     return 0
   fi
@@ -258,14 +292,12 @@ _npm_install_global() {
   local package="$1" version="$2" binary="$3" allow_scripts="${4:-}"
   activate_node_paths
   if ! manager_scope npm "$package" "$binary"; then
-    log_warn "Preserving $binary: npm package scope or command bindings could not be verified"
-    ((_PRESERVED++)) || true
+    manager_preserved "$binary" npm 'package scope or command bindings could not be verified'
     return 0
   fi
   manager_is_current "$binary" "$version" && return 0
   if ! manager_assert_owned "npm:$package"; then
-    log_warn "Preserving $binary: npm package or published command is unowned or locally modified"
-    ((_PRESERVED++)) || true
+    manager_preserved "$binary" npm 'package or published command is unowned or locally modified'
     return 0
   fi
   manager_transaction _npm_install_candidate npm "$package" "$binary" "$version" || return 1

@@ -5,6 +5,7 @@ set -euo pipefail
 
 STATE_ROOT="${DOTFILES_STATE_DIR:-$HOME/.local/state/dotfiles}"
 BACKUP_ROOT="$STATE_ROOT/backups"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/state-lock.sh"
 
 usage() {
   cat <<'USAGE'
@@ -34,7 +35,7 @@ status_path() {
   printf '%s\n' "$path"
 }
 
-create_backup() {
+create_backup() (
   local status_file="" run_id="manual" id dir manifest line rel target type mode hash
   shift
   while [[ $# -gt 0 ]]; do
@@ -60,7 +61,13 @@ create_backup() {
 
   umask 077
   id="$(date -u '+%Y%m%dT%H%M%S%NZ')-${run_id//[^a-zA-Z0-9._-]/_}"
-  dir="$BACKUP_ROOT/$id"
+  mkdir -p "$BACKUP_ROOT"
+  dir="$(mktemp -d "$BACKUP_ROOT/.pending-$id.XXXXXX")"
+  local latest_temporary="$BACKUP_ROOT/.latest-$id"
+  trap 'rm -rf -- "$dir"; rm -f -- "$latest_temporary"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
   manifest="$dir/manifest.tsv"
   mkdir -p "$dir/files"
   chmod 700 "$STATE_ROOT" "$BACKUP_ROOT" "$dir" "$dir/files"
@@ -101,10 +108,13 @@ create_backup() {
   printf 'run_id=%s\ncreated_at=%s\nhost=%s\n' \
     "$run_id" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$(hostname)" >"$dir/metadata"
   chmod -R go-rwx "$dir"
-  ln -sfn "$id" "$BACKUP_ROOT/latest"
+  verify_backup_id "$id" "$dir"
+  mv -T -- "$dir" "$BACKUP_ROOT/$id"
+  ln -s "$id" "$latest_temporary"
+  mv -Tf -- "$latest_temporary" "$BACKUP_ROOT/latest"
   printf 'backup_id=%s\n' "$id"
-  printf 'backup_path=%s\n' "$dir"
-}
+  printf 'backup_path=%s\n' "$BACKUP_ROOT/$id"
+)
 
 resolve_backup_id() {
   local requested="$1" id
@@ -114,12 +124,13 @@ resolve_backup_id() {
   else
     id="$requested"
   fi
-  [[ "$id" != . && "$id" != .. && "$id" =~ ^[A-Za-z0-9._-]+$ ]] || return 1
+  [[ "$id" != .* && "$id" =~ ^[A-Za-z0-9._-]+$ ]] || return 1
   printf '%s\n' "$id"
 }
 
 verify_backup_id() {
-  local id="$1" dir="$BACKUP_ROOT/$1" manifest="$BACKUP_ROOT/$1/manifest.tsv"
+  local id="$1" dir="${2:-$BACKUP_ROOT/$1}"
+  local manifest="$dir/manifest.tsv"
   local files_root header rel type mode hash extra source parent_real files_real actual
   declare -A seen=()
 
@@ -382,7 +393,7 @@ list_backups() {
     printf 'No backups\n'
     return 0
   }
-  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -r
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%f\n' | sort -r
 }
 
 prune_backups() {
@@ -392,14 +403,19 @@ prune_backups() {
     exit 2
   }
   [[ -d "$BACKUP_ROOT" ]] || return 0
-  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' |
+  find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -printf '%T@ %p\n' |
     sort -nr |
     awk -v keep="$keep" 'NR > keep {sub(/^[^ ]+ /, ""); print}' |
     while IFS= read -r path; do
       rm -rf -- "$path"
       printf 'pruned %s\n' "$(basename "$path")"
     done
+  if [[ -L "$BACKUP_ROOT/latest" && ! -e "$BACKUP_ROOT/latest" ]]; then
+    rm -- "$BACKUP_ROOT/latest"
+  fi
 }
+
+case "${1:-}" in create | restore | prune) state_operation_lock "$STATE_ROOT" ;; esac
 
 case "${1:-}" in
   create) create_backup "$@" ;;

@@ -223,4 +223,40 @@ done
   [[ -f "$HOME/.local/share/uv/tools/fixture-package/modified" ]]
   [[ "$(fixture-cli --version)" == 1.0.1 ]]
 )
+# A legacy activation pointer must be rejected before Java downloads or publication.
+awk '/^JAVA_VERSION=/ {block=1} /^print_summary/ {exit} block' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_04-install-languages.sh.tmpl" >"$temporary/java.sh"
+for approval in '' java; do
+  (
+    export HOME="$temporary/java-${approval:-default}" DOTFILES_STATE_DIR="$temporary/java-state-${approval:-default}"
+    export DOTFILES_REPLACE_BINARIES="$approval"
+    export DOTFILES_VERSION_PLAN="$temporary/java-versions.json"
+    printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
+    mkdir -p "$HOME/.local/bin" "$HOME/.local/share/dotfiles/tools/java/old/bin"
+    root="$HOME/.local/share/dotfiles/tools/java"
+    printf '#!/bin/sh\necho "openjdk version 25.0.3" >&2\n' >"$root/old/bin/java"
+    chmod +x "$root/old/bin/java"
+    ln -s "$root/old" "$root/current"
+    ln -s "$root/current/bin/java" "$HOME/.local/bin/java"
+    export PATH="$HOME/.local/bin:$PATH"
+    source "$DOTFILES_DIR/scripts/lib.sh"
+    record_install java 25.0.3 symlink "$HOME/.local/bin/java"
+    ARCH="$(get_arch)"
+    export ARCH
+    package_version() { printf '25.0.5+1\n'; }
+    package_metadata() {
+      printf 'unexpected metadata after refused migration\n' >&2
+      return 99
+    }
+    download_verified() {
+      printf 'unexpected Java download\n' >&2
+      return 99
+    }
+    before="$(managed_target_digest "$root")"
+    source "$temporary/java.sh"
+    source "$temporary/java.sh"
+    [[ "$(managed_target_digest "$root")" == "$before" && $_PRESERVED == 2 && $_FAILED == 0 ]]
+    [[ ! -e "$root/25.0.5+1" ]]
+  )
+done
 printf 'Runtime staging test passed\n'

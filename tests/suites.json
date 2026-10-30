@@ -19,6 +19,7 @@
           "scripts/manager-scope.py",
           "tests/test-manager-safety.py",
           "tests/e2e/test-manager-transactions.py",
+          "tests/test-backup-lock.py",
           "tests/test-ci-graph.py",
           "tests/test-suite-registry.py",
           "tests/test-section-registry.py",
@@ -66,6 +67,12 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-backup-lock.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
+    },
     {
       "path": "tests/e2e/test-manager-transactions.py",
       "kind": "manual",

@@ -761,6 +761,7 @@ release_bootstrap_lock() {
 
 acquire_bootstrap_lock || exit 1
 trap 'release_bootstrap_lock' EXIT
+export DOTFILES_LOCK_OWNER_PID="$$" DOTFILES_LOCK_HELPER_PID="$LOCK_HELPER_PID"
 
 if [[ -n "$RESUME_REQUEST" ]]; then
   DOTFILES_RUN_ID="$RESOLVED_RESUME_ID"

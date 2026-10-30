@@ -6,6 +6,7 @@ temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 export HOME="$temporary/home" DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
 export DOTFILES_STATE_DIR="$HOME/state"
+export PATH="$HOME/.local/bin:$PATH"
 mkdir -p "$HOME/.local/bin" "$temporary/payload"
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_DIR/scripts/lib.sh"

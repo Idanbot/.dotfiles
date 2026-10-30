@@ -60,6 +60,15 @@ manager_assert_owned() {
   done
 }
 
+manager_preserved() {
+  local binary="$1" backend="$2" reason="$3" blocked
+  if binary_replacement_requested "$binary"; then
+    blocked="$(replacement_supported "$binary" "$backend" 2>&1)" || reason+="; $blocked"
+  fi
+  log_warn "Preserving $binary: $reason"
+  ((_PRESERVED++)) || true
+}
+
 manager_is_current() {
   local binary="$1" version="$2" active current="$MANAGER_VERSION"
   active="$(command -v "$binary" || true)"

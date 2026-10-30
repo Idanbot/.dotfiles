@@ -36,6 +36,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 STATE_ROOT="$(managed_state_root)"
+[[ "$DRY_RUN" == true ]] || state_operation_lock "$STATE_ROOT"
 HASH_DIR="$STATE_ROOT/package-sections"
 RUN_SECTION="${DOTFILES_RUN_SECTION:-$DOTFILES_SOURCE_DIR/scripts/run-section.sh}"
 mkdir -p "$HASH_DIR"
@@ -58,7 +59,10 @@ while IFS= read -r manifest_section; do
     ((changed++)) || true
     log_info "$manifest_section inputs changed"
     if [[ "$DRY_RUN" == false ]]; then
+      # run-section starts the observable installer, which acquires its own lock.
+      state_operation_unlock
       "$RUN_SECTION" "$manifest_section"
+      state_operation_lock "$STATE_ROOT"
       "${state_command[@]}" record "$manifest_section"
     fi
   else

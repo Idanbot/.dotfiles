@@ -23,7 +23,7 @@ except ImportError:
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dotfiles import releases  # noqa: E402
-from dotfiles.advisories import scoped_advisory, validate_advisory, validate_advisory_id  # noqa: E402
+from dotfiles.advisories import alias_groups, scoped_advisory, validate_advisory, validate_advisory_id  # noqa: E402
 from dotfiles.metadata import load_versions  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -223,8 +223,27 @@ def fetch_advisory(ident, package, fetch, cache):
     record = cache[ident] if ident in cache else fetch(VULN + ident)
     validate_advisory(record, ident)
     result = scoped_advisory(record, package)
+    result.pop("source_ids", None)
     cache[ident] = record
     return result
+
+
+def merge_advisories(records):
+    merged = []
+    for group in alias_groups(records):
+        group = sorted(group, key=lambda item: (not item["id"].startswith("CVE-"), item["id"]))
+        primary = group[0]
+        identities = {ident for item in group for ident in [item["id"], *item.get("aliases", [])]}
+        known = [level for item in group if (level := severity(item)) in SEVERITY_RANK]
+        specific = dict(primary.get("database_specific", {}))
+        if known:
+            specific["severity"] = max(known, key=SEVERITY_RANK.get)
+        merged.append({**primary, "aliases": sorted(identities - {primary["id"]}),
+                       "summary": next((item.get("summary") for item in group if item.get("summary")), ""),
+                       "source_ids": sorted({ident for item in group for ident in item.get("source_ids", [item["id"]])}),
+                       "database_specific": specific,
+                       "affected": [affected for item in group for affected in item.get("affected", [])]})
+    return merged
 
 
 def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_candidates):
@@ -242,9 +261,9 @@ def audit(root, request=post_json, fetch=get_json, resolve_candidates=upgrade_ca
     findings = []
     vulnerability_cache = {}
     for key, result in zip(keys, results):
-        for item in result.get("vulns", []):
-            vuln = fetch_advisory(item["id"], {"ecosystem": key[0], "name": key[1]},
-                                  fetch, vulnerability_cache)
+        records = [fetch_advisory(item["id"], {"ecosystem": key[0], "name": key[1]},
+                                 fetch, vulnerability_cache) for item in result.get("vulns", [])]
+        for vuln in merge_advisories(records):
             for entry in unique[key]:
                 findings.append({"id": entry["id"], "pin": entry["pin"],
                                  "ecosystem": entry["ecosystem"],
@@ -301,12 +320,12 @@ def candidate_advice(root, scanned, findings, request, fetch, resolve_candidates
         for vuln_id in ids:
             records.append(fetch_advisory(
                 vuln_id, {"ecosystem": key[0], "name": key[1]}, fetch, vulnerability_cache))
-        severities[key] = [severity(item) for item in records]
+        severities[key] = [severity(item) for item in merge_advisories(records)]
 
     advice = {}
     rank = SEVERITY_RANK
     for key, options in candidates.items():
-        current = list(current_vulns[key].values())
+        current = merge_advisories(list(current_vulns[key].values()))
         current_levels = [severity(item) for item in current]
         current_known = all(level in rank for level in current_levels)
         current_max = max((rank.get(level, 0) for level in current_levels), default=0)
@@ -356,7 +375,10 @@ def markdown(scanned, skipped, findings, upgrade_url):
         "", f"- Pinned entries with mapped OSV coordinates: **{len(scanned)}**",
         f"- Distinct package/version queries: **{len(distinct)}**",
         f"- Pins without reliable OSV coordinates: **{len(skipped)}**",
-        f"- Vulnerable pinned package/version pairs: **{len(findings)}**", ""]
+        f"- Affected pinned entries: **{len({(item['id'], item['pin']) for item in findings})}**",
+        f"- Vulnerable package/version pairs: **{len({item.get('coordinate', (item['id'], item['pin'])) for item in findings})}**",
+        f"- Unique vulnerabilities: **{len(alias_groups([item['vulnerability'] for item in findings]))}**",
+        f"- Upstream advisory records: **{len({ident for item in findings for ident in item['vulnerability'].get('source_ids', [item['vulnerability']['id']])})}**", ""]
     if findings:
         lines += [
             "## Findings", "",
@@ -367,7 +389,8 @@ def markdown(scanned, skipped, findings, upgrade_url):
             ident = vuln.get("id", "OSV")
             aliases = [alias for alias in vuln.get("aliases", [])
                        if alias.startswith(("CVE-", "GHSA-"))]
-            label = ", ".join([ident, *aliases[:2]])
+            sources = list(dict.fromkeys([ident, *vuln.get("source_ids", []), *aliases]))
+            links = ", ".join(f"[{source}](https://osv.dev/vulnerability/{source})" for source in sources)
             fixed = finding["fixed"]
             if finding.get("ecosystem") == "GIT":
                 remediation = (f"{len(fixed)} upstream commit fix(es) listed; "
@@ -383,7 +406,7 @@ def markdown(scanned, skipped, findings, upgrade_url):
             summary = re.sub(r"\s+", " ", vuln.get("summary", ""))[:180].replace("|", "\\|")
             lines.append(
                 f"| {finding['severity']} | {chr(96)}{finding['id']}@{finding['pin']}{chr(96)} | "
-                f"[{label}](https://osv.dev/vulnerability/{ident}) | {summary} | "
+                f"{links} | {summary} | "
                 f"{remediation} | {finding.get('recommendation', 'Not assessed')} |")
         lines += ["", "Review fixes against the repository compatibility policy before changing pins."]
     else:

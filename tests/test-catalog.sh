@@ -7,6 +7,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -30,6 +32,21 @@ class CatalogTests(unittest.TestCase):
     def query(self, *args):
         return subprocess.run([sys.executable, str(root / "scripts/catalog.py"), *args],
                               env=self.env, text=True, capture_output=True, check=True)
+
+    def test_readme_installer_examples_use_supported_flags(self):
+        readme = (root / "README.md").read_text()
+        examples = re.findall(r"\./scripts/(install\.sh|e2e-shell\.sh) ([^\n]+)", readme)
+        self.assertTrue(examples)
+        help_by_script = {}
+        for script, arguments in examples:
+            if script not in help_by_script:
+                help_by_script[script] = subprocess.run(
+                    ["bash", str(root / "scripts" / script), "--help"], env=self.env,
+                    capture_output=True, text=True, check=True, timeout=10).stdout
+            for token in shlex.split(arguments):
+                if token.startswith("--"):
+                    with self.subTest(script=script, flag=token):
+                        self.assertIn(token.split("=", 1)[0], help_by_script[script])
 
     def test_coverage_and_tags(self):
         entries = catalog.catalog()

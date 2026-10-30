@@ -94,7 +94,7 @@ class NativeManagerTests(unittest.TestCase):
         wheels = self.home / "wheels"
         wheels.mkdir()
         self.environment["UV_FIND_LINKS"] = str(wheels)
-        for version in ("1.0.0", "2.0.0", "3.0.0"):
+        for version in ("1.0.0", "2.0.0", "3.0.0", "2026.8.19"):
             distribution = "dotfiles_manager_fixture-" + version + ".dist-info/"
             with zipfile.ZipFile(
                 wheels / f"dotfiles_manager_fixture-{version}-py3-none-any.whl", "w"
@@ -130,6 +130,11 @@ class NativeManagerTests(unittest.TestCase):
         self.assertEqual(self.version(), "2.0.0")
         before = self.receipts()
         self.shell(f"install_uv_tool {BINARY} {PACKAGE} 2.0.0 /usr/bin/python3")
+        self.assertEqual(self.receipts(), before)
+        self.shell(f"install_uv_tool {BINARY} {PACKAGE} 2026.08.19 /usr/bin/python3")
+        self.assertEqual(self.version(), "2026.8.19")
+        before = self.receipts()
+        self.shell(f"install_uv_tool {BINARY} {PACKAGE} 2026.08.19 /usr/bin/python3")
         self.assertEqual(self.receipts(), before)
         self.shell(f'bash "$DOTFILES_SOURCE_DIR/scripts/uninstall-tool.sh" {BINARY}')
         self.assertFalse((self.home / "uv-tools" / PACKAGE).exists())

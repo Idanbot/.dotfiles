@@ -11,6 +11,11 @@ source "$DOTFILES_DIR/scripts/lib.sh"
 [[ ":$PATH:" == *":/usr/local/go/bin:"* ]]
 
 version_equals v1.2.3 'tool 1.2.3'
+version_equals 2026.8.19 2026.08.19
+version_equals 2026.08.19 2026.8.19
+version_ge 2026.08.20 2026.8.19
+[[ "$(version_compare 2026.08.18 2026.8.19)" == -1 ]]
+[[ "$(version_compare 1.2.3-rc1 1.2.3)" != 0 ]]
 version_ge 2.0.0 1.99.9
 version_ge 1.2.3 1.2.3
 ! version_ge 1.2.2 1.2.3
