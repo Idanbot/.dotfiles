@@ -9,23 +9,38 @@ log_step "Installing Terminal Tools"
 require_sudo
 ARCH="$(get_arch)"
 
-# fzf source is a checksum-pinned chezmoi external.
+# fzf source is a checksum-pinned chezmoi external; its installer is never run.
 FZF_VERSION="$(package_version core fzf 0.74.0)"
-if [[ -x "$HOME/.fzf/install" ]]; then
-  if [[ ! -x "$HOME/.fzf/bin/fzf" ]] || ! version_ge "$("$HOME/.fzf/bin/fzf" --version)" "$FZF_VERSION"; then
-    "$HOME/.fzf/install" --all --no-update-rc --no-bash --no-fish
-    version_ge "$("$HOME/.fzf/bin/fzf" --version)" "$FZF_VERSION" || {
-      log_error "fzf did not reach pinned version $FZF_VERSION; check its external source pin"
-      exit 1
-    }
-    record_install fzf "$FZF_VERSION" chezmoi-external "$HOME/.fzf"
-    log_success "fzf installed"
-  else
-    log_skip "fzf already installed"
-  fi
+FZF_BINARY="$HOME/.fzf/bin/fzf"
+if [[ -x "$FZF_BINARY" ]] && version_ge "$("$FZF_BINARY" --version)" "$FZF_VERSION"; then
+  log_skip "fzf already installed or newer"
+elif [[ -e "$FZF_BINARY" || -L "$FZF_BINARY" ]] &&
+  ! target_is_owned "$FZF_BINARY" && ! binary_replacement_requested fzf; then
+  log_warn "Preserving unowned or modified fzf at $FZF_BINARY; requested $FZF_VERSION was not applied"
 else
-  log_error "Checksum-pinned fzf external is missing"
-  exit 1
+  (
+    FZF_ARCH="$(get_arch)"
+    case "$FZF_ARCH" in
+      amd64 | arm64) ;;
+      *)
+        log_error "Unsupported fzf release architecture"
+        exit 1
+        ;;
+    esac
+    tmpdir="$(mktemp -d)"
+    trap 'rm -rf -- "$tmpdir"' EXIT
+    asset="fzf-${FZF_VERSION}-linux_${FZF_ARCH}.tar.gz"
+    release="https://github.com/junegunn/fzf/releases/download/v${FZF_VERSION}"
+    download_verified "$release/$asset" "$tmpdir/$asset" \
+      "$release/fzf_${FZF_VERSION}_checksums.txt" "$asset"
+    tar --no-same-owner -xzf "$tmpdir/$asset" -C "$tmpdir" fzf
+    chmod +x "$tmpdir/fzf"
+    version_ge "$("$tmpdir/fzf" --version)" "$FZF_VERSION"
+    DOTFILES_BIN_DIR="$HOME/.fzf/bin" install_managed_binary \
+      "$tmpdir/fzf" fzf "$FZF_VERSION" github:junegunn/fzf 'fzf --version'
+  )
+  ((_INSTALLED++)) || true
+  log_success "Verified fzf $FZF_VERSION installed"
 fi
 
 apt_install fd-find ripgrep bat btop htop jq gojq pigz zstd

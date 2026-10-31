@@ -127,21 +127,74 @@ done
 
 awk '/^# fzf source/ { block=1 } /^apt_install fd-find/ { exit } block' \
   "$ROOT/.chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl" >"$temporary/fzf.sh"
-printf '#!/bin/sh\necho 1.0.0\n' >"$HOME/.fzf/bin/fzf"
-cat >"$HOME/.fzf/install" <<'SH'
-#!/bin/sh
-[ "${FAIL_FZF:-0}" != 1 ] || exit 0
-printf '#!/bin/sh\necho 99.0.0\n' >"$HOME/.fzf/bin/fzf"
-SH
-chmod +x "$HOME/.fzf/bin/fzf" "$HOME/.fzf/install"
-run_fzf() {
-  bash -c 'source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; package_version() { echo 99.0.0; }; source "$1"' _ "$temporary/fzf.sh"
-}
-if FAIL_FZF=1 run_fzf; then
-  printf 'Stale fzf accepted after an ineffective upgrade\n' >&2
-  exit 1
-fi
-run_fzf
-[[ "$("$HOME/.fzf/bin/fzf" --version)" == 99.0.0 ]]
-run_fzf
+# Exercise the actual call site with real verification/cache helpers. Neither a
+# substituted release nor the source installer may execute before verification.
+for arch in amd64 arm64; do
+  (
+    export arch
+    export HOME="$temporary/fzf-$arch" DOTFILES_STATE_DIR="$temporary/fzf-$arch/state"
+    export XDG_CACHE_HOME="$HOME/cache" DOTFILES_DOWNLOAD_CACHE=1
+    mkdir -p "$HOME/.fzf/bin" "$HOME/fixture"
+    printf '#!/bin/sh\necho vendor-installer-ran >>"$HOME/executed"\n' >"$HOME/.fzf/install"
+    chmod +x "$HOME/.fzf/install"
+    printf '#!/bin/sh\necho payload-ran >>"$HOME/executed"\necho 99.0.0\n' >"$HOME/fixture/fzf"
+    chmod +x "$HOME/fixture/fzf"
+    tar -czf "$HOME/release.tar.gz" -C "$HOME/fixture" fzf
+    printf '%s  fzf-99.0.0-linux_%s.tar.gz\n' "$(sha256_file "$HOME/release.tar.gz")" "$arch" >"$HOME/checksums"
+    printf 'substituted archive\n' >"$HOME/corrupt.tar.gz"
+    package_version() { echo 99.0.0; }
+    get_arch() { printf '%s\n' "$arch"; }
+    download() {
+      printf '%s\n' "$1" >>"$HOME/downloads"
+      case "$1" in
+        */fzf_99.0.0_checksums.txt) cp "$HOME/checksums" "$2" ;;
+        */fzf-99.0.0-linux_"$arch".tar.gz) cp "$HOME/${PAYLOAD:-release}.tar.gz" "$2" ;;
+        *) return 90 ;;
+      esac
+    }
+    run_fzf() {
+      bash -euo pipefail -c 'source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"; eval "$1"; source "$2"' _ \
+        "$(declare -f package_version get_arch download)" "$temporary/fzf.sh"
+    }
+    if PAYLOAD=corrupt run_fzf; then
+      printf 'Unverified fzf payload accepted\n' >&2
+      exit 1
+    fi
+    [[ ! -e "$HOME/executed" && ! -e "$HOME/.fzf/bin/fzf" ]]
+    run_fzf
+    if grep -Fq vendor-installer-ran "$HOME/executed"; then
+      printf 'Source installer unexpectedly executed\n' >&2
+      exit 1
+    fi
+    [[ "$("$HOME/.fzf/bin/fzf" --version)" == 99.0.0 ]]
+    ledger="$(cat "$DOTFILES_STATE_DIR/installed.tsv")"
+    transfers="$(wc -l <"$HOME/downloads")"
+    run_fzf
+    [[ "$(cat "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger" ]]
+    [[ "$(wc -l <"$HOME/downloads")" == "$transfers" ]]
+
+    # A newer local binary remains active without downloading or adoption.
+    printf '#!/bin/sh\necho 100.0.0\n' >"$HOME/.fzf/bin/fzf"
+    run_fzf
+    [[ "$("$HOME/.fzf/bin/fzf")" == 100.0.0 ]]
+    [[ "$(cat "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger" ]]
+    [[ "$(wc -l <"$HOME/downloads")" == "$transfers" ]]
+
+    # Owned older binaries upgrade using the verified cache, without networking.
+    printf '#!/bin/sh\necho 1.0.0\n' >"$HOME/.fzf/bin/fzf"
+    record_install fzf 1.0.0 fixture "$HOME/.fzf/bin/fzf"
+    run_fzf
+    [[ "$("$HOME/.fzf/bin/fzf" --version)" == 99.0.0 ]]
+    [[ "$(wc -l <"$HOME/downloads")" == "$transfers" ]]
+
+    # An unowned symlink must never overwrite its destination, even if older.
+    rm "$HOME/.fzf/bin/fzf"
+    printf '#!/bin/sh\necho 1.0.0\n' >"$HOME/external-fzf"
+    chmod +x "$HOME/external-fzf"
+    ln -s "$HOME/external-fzf" "$HOME/.fzf/bin/fzf"
+    run_fzf
+    [[ -L "$HOME/.fzf/bin/fzf" && "$("$HOME/external-fzf")" == 1.0.0 ]]
+    [[ "$(wc -l <"$HOME/downloads")" == "$transfers" ]]
+  )
+done
 printf 'Managed font and fzf upgrade tests passed\n'

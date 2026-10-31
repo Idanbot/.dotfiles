@@ -27,6 +27,12 @@ export PATH="$DOTFILES_BIN_DIR:$PATH"
 source "$DOTFILES_DIR/scripts/lib.sh"
 
 ARCH="$(get_arch)"
+# Exercise the terminal section's verified fzf path without its vendor installer.
+awk '/^# fzf source/ { block=1 } /^apt_install fd-find/ { exit } block' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl" >"$TMP_HOME/fzf-section.sh"
+source "$TMP_HOME/fzf-section.sh"
+source "$TMP_HOME/fzf-section.sh"
+zsh -dfi -c 'path=("$HOME/.fzf/bin" $path); source "$DOTFILES_SOURCE_DIR/dot_fzf.zsh"; (( $+functions[fzf-history-widget] ))' </dev/null
 case "$ARCH" in
   amd64)
     RELEASE_ARCH=x86_64
