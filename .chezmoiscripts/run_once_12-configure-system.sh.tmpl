@@ -28,7 +28,11 @@ else
 fi
 
 GCM_VERSION="$(package_version system git_credential_manager 2.8.0)"
-if ! is_installed git-credential-manager || ! version_ge "$(git-credential-manager --version 2>/dev/null || true)" "$GCM_VERSION"; then
+GCM_CURRENT="$(git-credential-manager --version 2>/dev/null || true)"
+GCM_BIN_DIR="$(dirname "$(command -v git-credential-manager || printf '%s/git-credential-manager' "$HOME/.local/bin")")"
+if DOTFILES_BIN_DIR="$GCM_BIN_DIR" runtime_is_current git-credential-manager "$GCM_VERSION" "$GCM_CURRENT"; then
+  log_info "Git Credential Manager is current or preserved; credentials and helper settings are unchanged"
+else
   case "$(get_arch)" in
     amd64)
       GCM_ARCH=x64
@@ -46,11 +50,13 @@ if ! is_installed git-credential-manager || ! version_ge "$(git-credential-manag
     "$tmpdir/$asset" "sha256:$GCM_SHA" "$asset"
   sudo dpkg -i "$tmpdir/$asset" || apt_env apt-get -f -y install
   rm -rf "$tmpdir"
+  version_ge "$(git-credential-manager --version 2>/dev/null || true)" "$GCM_VERSION" || {
+    log_error "Git Credential Manager installation did not reach $GCM_VERSION"
+    exit 1
+  }
   record_install git-credential-manager "$GCM_VERSION" dpkg gcm
   ((_INSTALLED++)) || true
   log_success "Git Credential Manager $GCM_VERSION installed"
-else
-  log_skip "Git Credential Manager $GCM_VERSION already installed or newer"
 fi
 
 if is_native && is_installed kitty; then

@@ -318,6 +318,12 @@ omp_install_package() {
   manifest="$root/node_modules/$package/package.json"
   spec="${package}@${version}"
 
+  if [[ -f "$manifest" ]] && ! target_is_owned "$root/node_modules/$package"; then
+    log_warn "Preserving $tool: existing plugin is unowned or modified; compatibility validation requires a reviewed migration"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
+
   if [[ "$package" == @xynogen/pix-optimizer ]]; then
     policy_changed="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
       plugins "$root/package.json" \
@@ -328,13 +334,20 @@ omp_install_package() {
   if [[ -f "$manifest" ]]; then
     installed_version="$(jq -r '.version // empty' "$manifest" 2>/dev/null || true)"
   fi
-  if version_equals "$installed_version" "$version" && [[ "$policy_changed" == unchanged ]]; then
+  if version_equals "$installed_version" "$version" && [[ "$policy_changed" == unchanged ]] && omp_plugin_is_validated "$package"; then
     log_skip "$tool $version already installed in OMP"
     return 0
   fi
 
+  local omp_before omp_after
+  omp_before="$(managed_target_digest "$(command -v omp)")"
   log_info "Installing $tool $version for OMP"
   omp plugin install "$spec" || return 1
+  omp_after="$(managed_target_digest "$(command -v omp)")"
+  [[ "$omp_before" == "$omp_after" ]] || {
+    log_error "OMP changed during plugin validation; retry before certifying compatibility"
+    return 1
+  }
   [[ -f "$manifest" ]] || {
     log_error "$tool package manifest was not created at $manifest"
     return 1
@@ -345,8 +358,41 @@ omp_install_package() {
     return 1
   }
   record_install "$tool" "$version" "omp:$package" "$root/node_modules/$package"
+  local validation temporary
+  validation="$(omp_plugin_validation_path "$package")"
+  temporary="$(mktemp "${validation}.XXXXXX")"
+  omp_plugin_signature "$package" >"$temporary" || {
+    rm -f "$temporary"
+    return 1
+  }
+  chmod 600 "$temporary"
+  mv -f -- "$temporary" "$validation"
   ((_INSTALLED++)) || true
   log_success "$tool $version installed for OMP"
+}
+
+omp_plugin_validation_path() {
+  local key
+  key="$(printf '%s\n%s' "${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}" "$1" | sha256sum | cut -d' ' -f1)"
+  printf '%s/omp-validation-%s.sha256\n' "$(managed_state_root)" "$key"
+}
+
+omp_plugin_signature() {
+  local executable root
+  executable="$(command -v omp)" || return 1
+  [[ -f "$executable" ]] || return 1
+  root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}/node_modules"
+  [[ -f "$root/$1/package.json" ]] || return 1
+  printf '%s\n%s\n%s\n' "$(readlink -f "$executable")" \
+    "$(managed_target_digest "$executable")" "$(managed_target_digest "$root")" | sha256sum | cut -d' ' -f1
+}
+
+omp_plugin_is_validated() {
+  local receipt signature
+  receipt="$(omp_plugin_validation_path "$1")"
+  [[ -f "$receipt" && ! -L "$receipt" ]] || return 1
+  signature="$(omp_plugin_signature "$1")" || return 1
+  [[ "$(<"$receipt")" == "$signature" ]]
 }
 
 initialize_pix_optimizer_state() {

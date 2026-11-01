@@ -4,6 +4,7 @@
 import argparse
 import concurrent.futures
 import datetime
+from email.parser import Parser
 import json
 import os
 import re
@@ -219,6 +220,13 @@ def probe(entry):
         "probe": "unavailable",
     }
     if path and command in PROBES:
+        package_version = server_package_version(command, path)
+        if package_version:
+            record.update(version=package_version, probe="package-metadata")
+            return entry["id"], record
+        if command in {"context-mode", "serena"}:
+            record["probe"] = "metadata-unavailable"
+            return entry["id"], record
         try:
             output = subprocess.run(
                 [path, *PROBES[command]],
@@ -256,7 +264,92 @@ def probe(entry):
             record["probe"] = "failed"
     elif path:
         record["probe"] = "not-supported"
+    record.update(managed_observation(entry))
     return entry["id"], record
+
+
+def server_package_version(command, executable):
+    """Read known server package metadata without starting an MCP server."""
+    if command not in {"context-mode", "serena"}:
+        return None
+    path = Path(executable).resolve()
+    for parent in list(path.parents)[:5]:
+        try:
+            if command == "context-mode":
+                manifest = parent / "package.json"
+                if manifest.is_file() and manifest.stat().st_size < 262144:
+                    data = json.loads(manifest.read_text())
+                    if (
+                        isinstance(data, dict)
+                        and data.get("name") == "context-mode"
+                        and isinstance(data.get("version"), str)
+                        and re.fullmatch(
+                            r"\d+(?:\.\d+)+(?:[-+][\w.-]+)?", data["version"]
+                        )
+                    ):
+                        return data["version"]
+            else:
+                for metadata in parent.glob(
+                    "lib/python*/site-packages/serena_agent-*.dist-info/METADATA"
+                ):
+                    if metadata.stat().st_size < 262144:
+                        data = Parser().parsestr(metadata.read_text())
+                        if data.get("Name", "").replace(
+                            "_", "-"
+                        ) == "serena-agent" and re.fullmatch(
+                            r"\d+(?:\.\d+)+(?:[-+][\w.-]+)?", data.get("Version", "")
+                        ):
+                            return data.get("Version")
+        except (OSError, ValueError, TypeError):
+            continue
+    return None
+
+
+def managed_observation(entry):
+    """Distinguish side-by-side runtimes from whichever executable PATH selects."""
+    ident, requested = entry["id"], entry.get("requested", "")
+    try:
+        if ident == "languages.python" and shutil.which("uv"):
+            found = subprocess.run(
+                ["uv", "python", "find", "--managed-python", "--no-project", requested],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                env={**os.environ, "UV_OFFLINE": "1"},
+            )
+            if found.returncode == 0 and Path(found.stdout.strip()).is_absolute():
+                executable = found.stdout.strip()
+                result = subprocess.run(
+                    [executable, "--version"], capture_output=True, text=True, timeout=3
+                )
+                match = re.search(r"Python (\d+\.\d+\.\d+)", result.stdout)
+                if result.returncode == 0 and match:
+                    return {
+                        "managed_version": match[1],
+                        "managed_source": "uv Python",
+                        "managed_path": executable,
+                    }
+        if ident == "terminal.tmuxp":
+            state = Path(
+                os.environ.get(
+                    "DOTFILES_STATE_DIR", str(Path.home() / ".local/state/dotfiles")
+                )
+            )
+            for line in (state / "installed.tsv").read_text().splitlines():
+                fields = line.split("\t")
+                if (
+                    len(fields) >= 4
+                    and fields[0] == "tmuxp"
+                    and fields[2] == "uvx"
+                    and fields[3] == "tmuxp==" + requested
+                ):
+                    return {
+                        "managed_version": requested,
+                        "managed_source": "uvx request (cache may be evicted)",
+                    }
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return {}
 
 
 def signature(path):
@@ -323,6 +416,8 @@ def view(entries):
             if cached and not current
             else cached.get("probe", "not-refreshed"),
             observed_at=data.get("observed_at") if cached else None,
+            managed_version=cached.get("managed_version") if current else None,
+            managed_source=cached.get("managed_source") if current else None,
         )
     return entries
 
@@ -334,6 +429,8 @@ def details(entry):
         "status",
         "requested",
         "installed_version",
+        "managed_version",
+        "managed_source",
         "probe_status",
         "path",
         "resolved_path",

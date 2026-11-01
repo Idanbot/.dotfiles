@@ -43,6 +43,11 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_python_uv_source_uses_cpython_not_pypi(self):
+        with patch.object(policy, "get_json", return_value=[{"name": "v3.14.9"}]) as fetch:
+            self.assertEqual(policy.upstream({"id": "languages.python"}, {"source": "uv"})[0], "3.14.9")
+        self.assertIn("python/cpython/tags", fetch.call_args.args[0])
+
     def test_named_legacy_upgrade_is_explicit_not_silent_adoption(self):
         with patch.object(policy, "ownership_status", return_value="legacy-no-stamp"), \
                 patch.dict(os.environ, {"DOTFILES_REPLACE_BINARIES": ""}):
@@ -381,6 +386,17 @@ class PolicyTests(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()):
                 result = policy.report([entry])
             self.assertEqual(result[0]["severity"] if result else None, expected)
+
+    def test_vendor_train_and_managed_runtime_reports(self):
+        entry = {**self.entry("cloud.gcloud"), "latest": "591.0.0"}
+        with patch.object(policy.software, "probe", return_value=("gcloud", {"version": "583.0.0"})), \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(policy.report([entry])[0]["severity"], "low")
+        entry = {**self.entry("terminal.tmuxp"), "latest": "1.74.0"}
+        with patch.object(policy.software, "probe", return_value=("tmuxp", {"version": "1.70.0", "managed_version": "1.74.0", "managed_source": "uvx request"})), \
+                contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(policy.report([entry]), [])
+        self.assertIn("active PATH version 1.70.0", output.getvalue())
 
     def test_colors_and_events_are_capability_aware(self):
         output = io.StringIO()

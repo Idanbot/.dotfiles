@@ -192,6 +192,15 @@ def release_versions(ident, meta, fetch, node=None, entry=None):
     """Return available releases, or None when a caller-specific adapter is needed."""
     ecosystem = entry.get("package", {}).get("ecosystem") if entry else None
     source = meta.get("source")
+    if ecosystem == "GIT":
+        return git_versions(entry, fetch)
+    if ident == "languages.python":
+        return [
+            item["name"].removeprefix("v")
+            for item in fetch(
+                "https://api.github.com/repos/python/cpython/tags?per_page=100"
+            )
+        ]
     if (
         ecosystem == "npm"
         or source == "npm"
@@ -214,8 +223,6 @@ def release_versions(ident, meta, fetch, node=None, entry=None):
         return pypi_versions(
             fetch(f"https://pypi.org/pypi/{quote(name, safe='')}/json")
         )
-    if ecosystem == "GIT":
-        return git_versions(entry, fetch)
     if ident == "languages.node":
         return [
             item["version"].removeprefix("v")
@@ -226,12 +233,5 @@ def release_versions(ident, meta, fetch, node=None, entry=None):
             item["version"].removeprefix("go")
             for item in fetch("https://go.dev/dl/?mode=json&include=all")
             if item.get("stable")
-        ]
-    if ident == "languages.python":
-        return [
-            item["name"].removeprefix("v")
-            for item in fetch(
-                "https://api.github.com/repos/python/cpython/tags?per_page=100"
-            )
         ]
     return None

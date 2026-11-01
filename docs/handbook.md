@@ -389,6 +389,14 @@ supervised invocation should wait for an active run.
 
 ## Logs and Diagnostics
 
+Installation diagnostics distinguish managed uv Python and the pinned uvx tmuxp
+request from executables found on PATH. MCP package metadata is read without
+starting servers; unavailable metadata is reported as unknown. Pix compatibility
+receipts apply only to the OMP executable and plugin dependency tree validated by
+native installation. Changed or unowned installations are not silently certified
+or adopted. VS Code inventories have a private five-minute cache;
+`DOTFILES_REFRESH_VSCODE=1` forces a live check.
+
 Every bootstrap is logged unless `DOTFILES_LOG=0` is set:
 
 ```text

@@ -48,15 +48,37 @@ EXTENSIONS=(
   streetsidesoftware.code-spell-checker
 )
 
-INSTALLED_EXTENSIONS=$(code --list-extensions 2>/dev/null)
+cache_root="$(managed_state_root)"
+ensure_private_directory "$cache_root"
+cache="$cache_root/vscode-extensions.list"
+cache_key="$(printf '%s\n' "$(command -v code)" "$(stat -Lc '%s:%Y' "$(command -v code)")" "${EXTENSIONS[@]}" | sha256sum | cut -d' ' -f1)"
+cache_age=300
+if [[ -f "$cache" && ! -L "$cache" ]]; then
+  cache_age=$(($(date +%s) - $(stat -c %Y "$cache")))
+fi
+if [[ "${DOTFILES_REFRESH_VSCODE:-0}" != 1 && "$cache_age" -ge 0 && "$cache_age" -lt 300 && "$(head -1 "$cache")" == "$cache_key" ]]; then
+  INSTALLED_EXTENSIONS="$(tail -n +2 "$cache")"
+  log_info "Using recent VS Code inventory (5-minute TTL; DOTFILES_REFRESH_VSCODE=1 refreshes it)"
+else
+  if ! INSTALLED_EXTENSIONS=$(timeout 45 code --list-extensions); then
+    log_warn "VS Code inventory failed or exceeded 45s; leaving extensions unchanged"
+    print_summary "VS Code Extensions"
+    exit 0
+  fi
+  temporary="$(mktemp "$cache_root/.vscode-extensions.XXXXXX")"
+  printf '%s\n%s\n' "$cache_key" "$INSTALLED_EXTENSIONS" >"$temporary"
+  chmod 600 "$temporary"
+  mv -Tf -- "$temporary" "$cache"
+fi
 
 for ext in "${EXTENSIONS[@]}"; do
-  if echo "$INSTALLED_EXTENSIONS" | grep -qi "$ext"; then
+  if grep -Fxiq -- "$ext" <<<"$INSTALLED_EXTENSIONS"; then
     log_skip "$ext"
   else
     log_info "Installing $ext..."
-    code --install-extension "$ext" --force 2>/dev/null && \
-      log_success "$ext installed" || \
+    rm -f -- "$cache"
+    code --install-extension "$ext" --force 2>/dev/null &&
+      log_success "$ext installed" ||
       log_warn "Failed to install $ext"
   fi
 done

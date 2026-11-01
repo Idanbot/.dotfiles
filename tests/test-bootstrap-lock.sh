@@ -122,6 +122,10 @@ for pass in 1 2; do
   }
   grep -Fq 'Bootstrap Complete' <<<"$lifecycle_output"
   [[ -s "$lifecycle_home/bootstrap-pass-$pass.log" ]]
+  grep -Fq 'Text log:' <<<"$lifecycle_output"
+  [[ "$(tail -1 <<<"$lifecycle_output")" == *'Event log:'* ]]
+  jq -e '.interactive_wait_ms >= 0 and .execution_ms >= 0 and (.interactive_wait_ms + .execution_ms == .duration_ms) and (.event_log | length > 0)' \
+    "$lifecycle_state/runs"/*/summary.json >/dev/null
   assert_no_lock_ipc "$lifecycle_state"
 done
 

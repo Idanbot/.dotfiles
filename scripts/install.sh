@@ -65,6 +65,7 @@ CONFLICT_POLICY_SET=false
 DOCTOR_SET=false
 CURRENT_STAGE="startup"
 RUN_STARTED_NANOS="$(date +%s%N)"
+INTERACTIVE_WAIT_MS=0
 _HANDLING_ERROR=false
 LOCK_HELPER_PID=""
 LOCK_READY_FILE=""
@@ -273,15 +274,18 @@ if interactive_tty_available && [[ -r /dev/tty ]]; then
 fi
 
 read_user() {
-  local prompt="$1" destination="$2" value
+  local prompt="$1" destination="$2" value started status=0
+  started="$(date +%s%N)"
   if [[ "$HAS_CONTROLLING_TTY" == true && -r /dev/tty ]]; then
-    read -r -p "$prompt" value </dev/tty || return 1
+    read -r -p "$prompt" value </dev/tty || status=$?
   elif [[ "${READ_USER_ALLOW_STDIN:-false}" == true || -t 0 ]]; then
-    read -r -p "$prompt" value || return 1
+    read -r -p "$prompt" value || status=$?
   else
     log_error "Interactive input requires a controlling terminal; use --yes or --conflict-policy skip|abort"
     return 1
   fi
+  INTERACTIVE_WAIT_MS=$((${INTERACTIVE_WAIT_MS:-0} + ($(date +%s%N) - started) / 1000000))
+  [[ "$status" == 0 ]] || return "$status"
   printf -v "$destination" '%s' "$value"
 }
 
@@ -847,13 +851,12 @@ on_error() {
   _HANDLING_ERROR=true
   log_error "Stage '$CURRENT_STAGE' failed at installer line $line (exit $status)"
   log_info "Resume after fixing the cause: $0 --resume=$DOTFILES_RUN_ID"
-  log_info "Text log: $LOG_FILE"
-  log_info "Event log: $EVENT_LOG"
   write_event error "failed line=$line exit=$status"
   if [[ -n "${CHEZMOI_SOURCE:-}" ]]; then
     write_run_summary failure 2>/dev/null || true
   fi
   print_run_diagnostics || true
+  print_run_log_paths
   release_bootstrap_lock
   exit "$status"
 }
@@ -861,11 +864,12 @@ on_error() {
 print_run_diagnostics() {
   [[ -f "$EVENT_LOG" ]] || return 0
   printf '\nWarnings and errors for this run (full output: %s):\n' "$LOG_FILE"
-  /usr/bin/python3 - "$EVENT_LOG" <<'PY'
+  /usr/bin/python3 - "$EVENT_LOG" "${DOTFILES_VERBOSE:-0}" <<'PY'
 import json
 import sys
 
 seen = set()
+counts = {}
 with open(sys.argv[1], encoding="utf-8") as events:
     for line in events:
         try:
@@ -881,10 +885,24 @@ with open(sys.argv[1], encoding="utf-8") as events:
         if item in seen:
             continue
         seen.add(item)
-        print(f"  [{level.upper()}] {item[1]}: {item[2]}")
+        counts[level] = counts.get(level, 0) + 1
+        if sys.argv[2] == '1' or level in {'error', 'fail', 'high'}:
+            print(f"  [{level.upper()}] {item[1]}: {item[2]}")
+if seen:
+    print('  ' + ', '.join(f'{count} {level}' for level, count in sorted(counts.items())))
+    print('  Full details are retained in the logs; DOTFILES_VERBOSE=1 expands the recap.')
 if not seen:
     print("  No structured warnings or errors recorded.")
 PY
+}
+
+print_run_log_paths() {
+  if [[ "${DOTFILES_LOG:-1}" == 0 ]]; then
+    log_info 'Text logging disabled (DOTFILES_LOG=0)'
+  else
+    log_info "Text log: $LOG_FILE"
+  fi
+  log_info "Event log: $EVENT_LOG"
 }
 
 setup_run_state
@@ -1213,19 +1231,22 @@ stage_preflight() {
 }
 
 write_run_summary() {
-  local status="$1" duration duration_ms duration_human summary
+  local status="$1" duration duration_ms duration_human summary execution_ms
   duration_ms="$(bootstrap_elapsed_ms)"
   duration=$((duration_ms / 1000))
   duration_human="$(format_bootstrap_duration_ms "$duration_ms")"
+  execution_ms=$((duration_ms - INTERACTIVE_WAIT_MS))
+  ((execution_ms >= 0)) || execution_ms=0
   summary="$RUN_DIR/summary.json"
-  printf '{\n  "run_id": "%s",\n  "status": "%s",\n  "profile": "%s",\n  "platform": "%s",\n  "sections": "%s",\n  "duration_seconds": %s,\n  "duration_ms": %s,\n  "duration_human": "%s",\n  "backup_id": "%s",\n  "log": "%s"\n}\n' \
+  printf '{\n  "run_id": "%s",\n  "status": "%s",\n  "profile": "%s",\n  "platform": "%s",\n  "sections": "%s",\n  "duration_seconds": %s,\n  "duration_ms": %s,\n  "duration_human": "%s",\n  "backup_id": "%s",\n  "log": "%s",\n  "interactive_wait_ms": %s,\n  "execution_ms": %s,\n  "event_log": "%s"\n}\n' \
     "$(json_escape "$DOTFILES_RUN_ID")" "$status" "$(json_escape "${PROFILE_NAME:-custom}")" \
     "$(
       source "$CHEZMOI_SOURCE/scripts/environment.sh"
       get_platform
     )" \
     "$(join_by_comma "${SELECTED_SECTIONS[@]}")" "$duration" "$duration_ms" \
-    "$(json_escape "$duration_human")" "$(json_escape "$BACKUP_ID")" "$(json_escape "$LOG_FILE")" >"$summary"
+    "$(json_escape "$duration_human")" "$(json_escape "$BACKUP_ID")" "$(json_escape "$LOG_FILE")" \
+    "$INTERACTIVE_WAIT_MS" "$execution_ms" "$(json_escape "$EVENT_LOG")" >"$summary"
   chmod 600 "$summary"
   cp -p "$summary" "$RUN_DIR/attempts/$ATTEMPT_ID.json"
 }
@@ -1278,6 +1299,7 @@ rm -f "$STATE_ROOT/runs/latest"
 printf '\n'
 log_banner "Bootstrap Complete"
 log_success "Completed in $(format_bootstrap_duration_ms "$(bootstrap_elapsed_ms)")"
+log_info "Interactive wait: $(format_bootstrap_duration_ms "$INTERACTIVE_WAIT_MS"); remaining elapsed: $(format_bootstrap_duration_ms "$(($(bootstrap_elapsed_ms) - INTERACTIVE_WAIT_MS))")"
 log_info "Run summary: $RUN_DIR/summary.json"
 log_info "Restore configs: $CHEZMOI_SOURCE/scripts/backup.sh restore ${BACKUP_ID:-<backup-id>}"
 log_info "Authentication remains manual; run 'dot doctor' after signing in to selected tools"
@@ -1286,3 +1308,4 @@ printf '\nNext steps:\n'
 printf '  1. Restart the shell: exec zsh\n'
 printf '  2. Start an agent workspace: dot workspace\n'
 printf '  3. Review health: dot doctor\n'
+print_run_log_paths

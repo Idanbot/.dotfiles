@@ -20,17 +20,22 @@ download_verified() {
   cp "$TMP_ROOT/ponytail.tar.gz" "$destination"
 }
 
-OMP_CALLS="$TMP_ROOT/omp-calls"
-omp() {
+export OMP_CALLS="$TMP_ROOT/omp-calls"
+cat >"$HOME/.local/bin/omp" <<'OMP'
+#!/usr/bin/env bash
+set -euo pipefail
   printf '%s\n' "$*" >>"$OMP_CALLS"
   [[ "$1 $2" == 'plugin install' ]]
-  local package="${3%@*}" version="${3##*@}" manifest
+  [[ "${OMP_FORCE_FAIL:-false}" != true ]] || exit 37
+  package="${3%@*}" version="${3##*@}"
+  manifest=""
   manifest="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$package/package.json"
   mkdir -p "$(dirname "$manifest")"
   jq -n --arg name "$package" --arg version "$version" \
     '{name: $name, version: $version, pi: {extensions: ["./src/index.ts"]}}' >"$manifest"
-  [[ "${OMP_FORCE_FAIL:-false}" != true ]] || return 37
-}
+OMP
+chmod +x "$HOME/.local/bin/omp"
+export PATH="$HOME/.local/bin:$PATH"
 
 mkdir -p "$HOME/.agents/skills/ponytail"
 printf '%s\n' keep >"$HOME/.agents/skills/ponytail/local-note"
@@ -51,6 +56,15 @@ grep -Fxq 'plugin install @xynogen/pix-optimizer@1.1.26' "$OMP_CALLS"
 call_count="$(wc -l <"$OMP_CALLS")"
 omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
 [[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
+omp_plugin_is_validated @xynogen/pix-optimizer
+printf '# active OMP changed\n' >>"$HOME/.local/bin/omp"
+if omp_plugin_is_validated @xynogen/pix-optimizer; then
+  printf 'Stale compatibility validation was accepted\n' >&2
+  exit 1
+fi
+omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
+omp_plugin_is_validated @xynogen/pix-optimizer
+call_count="$(wc -l <"$OMP_CALLS")"
 grep -Fq $'pix-optimizer\t1.1.26\tomp:@xynogen/pix-optimizer' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 

@@ -106,6 +106,46 @@ class CatalogTests(unittest.TestCase):
         with patch.object(catalog, "locate", return_value=("wg", "/mock/wg")), patch.object(catalog.subprocess, "run", side_effect=AssertionError("unsafe probe")):
             self.assertEqual(catalog.probe(entry)[1]["probe"], "not-supported")
 
+    def test_server_metadata_avoids_launching_mcp(self):
+        root = Path(self.temp.name) / "context-mode"
+        (root / "bin").mkdir(parents=True)
+        (root / "package.json").write_text(json.dumps({"name": "context-mode", "version": "1.0.169"}))
+        binary = root / "bin/server.js"
+        binary.write_text("must not execute")
+        with patch.object(catalog, "locate", return_value=("context-mode", str(binary))), \
+                patch.object(catalog.subprocess, "run", side_effect=AssertionError("MCP was started")):
+            record = catalog.probe({"id": "ai_tools.context_mode"})[1]
+        self.assertEqual(record["version"], "1.0.169")
+        self.assertEqual(record["probe"], "package-metadata")
+        (root / "package.json").write_text('{}')
+        with patch.object(catalog, "locate", return_value=("context-mode", str(binary))), \
+                patch.object(catalog.subprocess, "run", side_effect=AssertionError("MCP was started")):
+            self.assertEqual(catalog.probe({"id": "ai_tools.context_mode"})[1]["probe"], "metadata-unavailable")
+
+    def test_managed_python_and_tmuxp_are_separate_from_path(self):
+        entry = {"id": "languages.python", "requested": "3.14.9"}
+        with patch.object(catalog.shutil, "which", return_value="/mock/uv"), \
+                patch.object(catalog.subprocess, "run", side_effect=[
+                    subprocess.CompletedProcess([], 0, "/managed/python3\n", ""),
+                    subprocess.CompletedProcess([], 0, "Python 3.14.9\n", "")]):
+            self.assertEqual(catalog.managed_observation(entry)["managed_version"], "3.14.9")
+        self.state.mkdir()
+        (self.state / "installed.tsv").write_text("tmuxp\t1.74.0\tuvx\ttmuxp==1.74.0\n")
+        with patch.dict(os.environ, self.env):
+            result = catalog.managed_observation({"id": "terminal.tmuxp", "requested": "1.74.0"})
+        self.assertEqual(result["managed_version"], "1.74.0")
+        self.assertIn("request", result["managed_source"])
+
+    def test_serena_metadata_is_read_without_executing_launcher(self):
+        root = Path(self.temp.name) / "tools/serena-agent"
+        binary = root / "bin/serena"
+        binary.parent.mkdir(parents=True)
+        binary.write_text("must not execute")
+        metadata = root / "lib/python3.13/site-packages/serena_agent-1.7.0.dist-info/METADATA"
+        metadata.parent.mkdir(parents=True)
+        metadata.write_text("Name: serena-agent\nVersion: 1.7.0\n")
+        self.assertEqual(catalog.server_package_version("serena", str(binary)), "1.7.0")
+
     def test_json_probe_uses_cli_field_not_component_version(self):
         fixtures = [
             ("gcloud", {"bundled-python3-unix": "3.14.0", "Google Cloud SDK": "600.0.0"}, "600.0.0"),

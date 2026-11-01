@@ -420,7 +420,7 @@ def atomic_json(path, data):
         Path(temporary).unlink(missing_ok=True)
 
 
-def say(level, message):
+def say(level, message, section="preflight", quiet=False):
     color = os.environ.get("DOTFILES_COLOR_ACTIVE") == "true" or (
         sys.stdout.isatty() and os.environ.get("TERM") != "dumb")
     color = color and not os.environ.get("NO_COLOR") and os.environ.get("DOTFILES_COLOR") != "never"
@@ -428,34 +428,53 @@ def say(level, message):
     label = f"[{level}]"
     if color:
         label = f"\033[{codes[level]}m{label}\033[0m"
-    print(f"{label} {message}", flush=True)
+    if quiet and os.environ.get("DOTFILES_MANAGER_LOG") and os.environ.get("DOTFILES_VERBOSE") != "1":
+        with open(os.environ["DOTFILES_MANAGER_LOG"], "a") as stream:
+            stream.write(f"[{level}] {message}\n")
+    else:
+        print(f"{label} {message}", flush=True)
     event_log = os.environ.get("DOTFILES_EVENT_LOG")
     if event_log:
         event = {"time": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                  "run_id": os.environ.get("DOTFILES_RUN_ID", "unknown"),
-                 "section": "preflight", "level": level.lower(), "message": message}
+                 "section": section, "level": level.lower(), "message": message}
         with open(event_log, "a") as stream:
             stream.write(json.dumps(event) + "\n")
 
 
 def report(entries):
     warnings = []
-    for entry in entries:
-        _, observed = software.probe(entry)
-        current, latest = observed["version"] or "", entry.get("latest", "")
+    entries = list(entries)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+        observations = list(pool.map(software.probe, entries))
+    for entry, (_, observed) in zip(entries, observations):
+        current, latest = observed.get("managed_version") or observed["version"] or "", entry.get("latest", "")
+        if observed.get("managed_version"):
+            say("INFO", f"{entry['id']}: {observed['managed_source']} {current}; active PATH version {observed['version'] or 'unknown'}", section="update-report")
         if entry.get("resolution_warning"):
             warnings.append(("WARN", f"{entry['id']}: freshness unknown; {entry['resolution_warning']}"))
         elif not current:
             warnings.append(("WARN", f"{entry['id']}: installed version unavailable; latest stable {latest or 'unknown'}"))
         elif latest and order(current) < order(latest):
-            severity = "HIGH" if order(latest)[0] > order(current)[0] else "LOW"
+            vendor_train = entry["id"] in {"cloud.gcloud", "cloud.cloudflared"}
+            severity = "HIGH" if order(latest)[0] > order(current)[0] and not vendor_train else "LOW"
+            note = "vendor release update; review current update policy" if vendor_train else (
+                "new major; review before upgrading" if severity == "HIGH" else "minor/patch update available")
             warnings.append((severity, f"{entry['id']}: installed {current}; latest stable {latest} "
-                             f"({'new major; review before upgrading' if severity == 'HIGH' else 'minor/patch update available'}); "
+                             f"({note}); "
                              f"policy {entry['policy']}, run target {entry['target']}"))
     for level, message in warnings:
-        say(level, message)
+        say(level, message, section="update-report", quiet=level == "LOW")
+    deferred = sum(bool(entry.get("current")) and stable(entry.get("target", ""))
+                   and order(entry["current"]) < order(entry["target"])
+                   and str(entry.get("action", "")).startswith("skip") for entry in entries)
+    if deferred:
+        say("INFO", f"{deferred} preflight targets required preservation/migration review; no automatic ownership adoption or blanket replacement is permitted", section="update-report")
+    if warnings:
+        summary_level = "LOW" if any(level == "LOW" for level, _ in warnings) else "INFO"
+        say(summary_level, f"Freshness advisories: {sum(level == 'HIGH' for level, _ in warnings)} high, {sum(level == 'LOW' for level, _ in warnings)} low, {sum(level == 'WARN' for level, _ in warnings)} unknown; details retained in text/event logs", section="update-report")
     if not warnings:
-        say("INFO", "All checked tools are current (as resolved at preflight)")
+        say("INFO", "Checked update targets are current; active PATH and managed requests are reported separately", section="update-report")
     return [{"severity": level.lower(), "message": message} for level, message in warnings]
 
 

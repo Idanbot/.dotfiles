@@ -80,7 +80,7 @@ awk '/^log_warn\(\)/ { block = 1 } /^log_skip\(\)/ { block = 0 } block' \
   write_event high 'new major available'
   write_event low 'patch available'
   printf 'invalid interrupted event\n[]\n{"level":"info","message":"hidden"}\n' >>"$EVENT_LOG"
-  print_run_diagnostics >"$temporary/recap"
+  DOTFILES_VERBOSE=1 print_run_diagnostics >"$temporary/recap"
   [[ "$(grep -Fc 'preserved fixture' "$temporary/recap")" == 1 ]]
   grep -Fq '[ERROR] fixture: failed fixture' "$temporary/recap"
   grep -Fq '[HIGH] fixture: new major available' "$temporary/recap"
@@ -88,9 +88,25 @@ awk '/^log_warn\(\)/ { block = 1 } /^log_skip\(\)/ { block = 0 } block' \
   grep -Fq 'preserved fixture' "$LOG_FILE"
   grep -Fq 'failed fixture' "$LOG_FILE"
   ! grep -Fq hidden "$temporary/recap"
+  DOTFILES_VERBOSE=0 print_run_diagnostics >"$temporary/compact"
+  ! grep -Fq 'preserved fixture' "$temporary/compact"
+  grep -Fq '1 warn' "$temporary/compact"
   : >"$EVENT_LOG"
   print_run_diagnostics | grep -Fq 'No structured warnings or errors'
 )
 
 [[ "$FAILED" -eq 0 ]] || exit 1
+
+awk '/^read_user\(\)/ { block = 1 } /^read_menu_user\(\)/ { block = 0 } block' \
+  "$INSTALL" >"$temporary/read-user.sh"
+(
+  source "$temporary/read-user.sh"
+  export HAS_CONTROLLING_TTY=false READ_USER_ALLOW_STDIN=true
+  INTERACTIVE_WAIT_MS=0 choice=''
+  read_user 'Fixture choice: ' choice < <(
+    sleep 0.05
+    printf 'r\n'
+  )
+  [[ "$choice" == r && "$INTERACTIVE_WAIT_MS" -ge 30 ]]
+)
 printf 'Bootstrap safety test passed\n'

@@ -5,19 +5,21 @@ ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 export DOTFILES_SOURCE_DIR="$ROOT"
-for tool in kubectl serena graphify yt-dlp; do
+for tool in kubectl serena graphify yt-dlp git-credential-manager; do
   case "$tool" in
     kubectl) section=05-install-containers-cloud start=KUBECTL_VERSION= end=HELM_VERSION= ;;
     serena) section=08-install-ai-tools start=SERENA_VERSION= end=CONTEXT_MODE_VERSION= ;;
     graphify) section=08-install-ai-tools start=GRAPHIFY_VERSION= end=RTK_VERSION= ;;
     yt-dlp) section=09-install-media-tools start=YTDLP_VERSION= end=require_sudo ;;
+    git-credential-manager) section=12-configure-system start=GCM_VERSION= end='if is_native' ;;
   esac
   awk -v start="$start" -v end="$end" '
     index($0, start) == 1 { block = 1 }
     index($0, end) == 1 { exit }
     block
   ' "$ROOT/.chezmoiscripts/run_once_$section.sh.tmpl" >"$temporary/$tool.sh"
-  for scenario in external modified unverifiable managed-unverifiable; do
+  for scenario in external modified unverifiable managed-unverifiable distro; do
+    [[ "$scenario" != distro || "$tool" == git-credential-manager ]] || continue
     (
       export HOME="$temporary/$tool-$scenario" DOTFILES_SECTION=test
       export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_VERSION_PLAN="$HOME/versions.json"
@@ -47,6 +49,10 @@ for tool in kubectl serena graphify yt-dlp; do
         fi
       fi
       export PATH="$HOME/.local/bin:$HOME/external/bin:$PATH"
+      if [[ "$scenario" == distro ]]; then
+        export DOTFILES_REPLACE_BINARIES=git-credential-manager
+        dpkg-query() { printf 'gcm: %s\n' "$2"; }
+      fi
       download_verified() {
         printf 'unexpected download for %s/%s\n' "$tool" "$scenario" >&2
         return 99

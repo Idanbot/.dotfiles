@@ -133,6 +133,10 @@ summaries, checkpoints, and backups. Full installs keep native npm/uv progress i
 the text log; warnings and error summaries remain visible. Use
 `DOTFILES_VERBOSE=1` for full manager output.
 
+Successful runs end with text/event log paths. Timings separate prompt wait from
+remaining elapsed time; compact recaps retain complete advisories in the logs.
+Preserved older tools require reviewed migration, not blanket ownership adoption.
+
 Backup creation, restore, pruning, and reconciliation coordinate with bootstrap's
 state lock. Snapshots become visible only after verification and atomic
 publication. Lock contention fails clearly; `DOTFILES_LOCK_TIMEOUT` allows waiting.
