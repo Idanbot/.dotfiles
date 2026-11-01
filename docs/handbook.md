@@ -936,6 +936,36 @@ Kitty tabs are displayed vertically on the left:
 | Select from all tabs | `Ctrl+Shift+Space` |
 | Jump to tab 1-9 | `Ctrl+Alt+1` through `Ctrl+Alt+9` |
 
+## Kubernetes Resource Picker
+
+`kfzf` is a read-only cross-resource describe picker with fzf-tab completion:
+
+```bash
+kfzf                              # Pick a pod, deployment, StatefulSet, service, or ingress
+kfzf api -n default                # Search within a namespace
+kfzf -t pods,deployments           # Restrict resource types (comma completion supported)
+kfzf --context CONTEXT             # Inspect a context without activating it
+kfzf --refresh                    # Refresh the selected lists
+kfzf default/pods/NAME             # Describe a completed target directly
+```
+
+Tab completes contexts, namespaces, resource types, and namespace/type/name targets.
+The final describe and previews show `full command: kubectl ...`; completion
+output remains machine-readable. A picker pins its context for discovery,
+previews, and execution. Cluster-scoped targets use `_` as their namespace.
+
+Private JSON caches in `${XDG_CACHE_HOME:-~/.cache}/dotfiles/kfzf` contain names,
+types, namespaces, timestamps, and failure metadata only, never object bodies or
+credentials. Keys include kubeconfig identity, context, type, and namespace.
+Contexts (local kubeconfig names) and namespaces have no expiry; deployments
+expire after 31 days, pods and other resources after one day. Consequently new
+objects may not appear until expiry or `--refresh`. A confirmed NotFound marks
+the relevant cache failed and the next invocation refreshes it; authentication
+and permission errors remain visible without being mistaken for missing objects.
+Nothing warms the cache or contacts a cluster at shell startup. Previews omit
+events and requests have bounded timeouts. Describe output can still contain
+sensitive application settings; inspect it locally rather than sharing it blindly.
+
 ## Cloud Contexts
 
 Starship displays the active Kubernetes context/namespace, AWS profile and

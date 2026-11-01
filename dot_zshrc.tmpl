@@ -258,6 +258,8 @@ zstyle ':fzf-tab:*' switch-group '<' '>'
 zstyle ':fzf-tab:*' fzf-flags \
   '--ansi' '--layout=reverse' '--border=rounded' '--height=60%' '--info=inline' '--bind=tab:accept'
 
+[[ ! -r "$HOME/.config/zsh/kfzf.zsh" ]] || source "$HOME/.config/zsh/kfzf.zsh"
+
 # AWS settings
 export AWS_CLI_AUTO_PROMPT="on-partial"
 export AWS_PAGER=""

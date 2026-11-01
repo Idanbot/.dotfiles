@@ -1,0 +1,35 @@
+#compdef kfzf
+
+_kfzf() {
+  local context state state_descr line output
+  local -a values args expl
+  local -A opt_args
+  _arguments -C \
+    '(-n --namespace)'{-n,--namespace}'[Limit to namespace]:namespace:->namespaces' \
+    '(-t --type)'{-t,--type}'[Comma-separated resource types]:types:->types' \
+    '--context[Use a kubeconfig context]:context:->contexts' \
+    '--refresh[Refresh the selected cached lists]' \
+    '(-h --help)'{-h,--help}'[Show help]' \
+    '1:resource:->resources'
+  case "$state" in
+    types)
+      _values -s , 'resource types' pods deployments statefulsets daemonsets \
+        services ingresses jobs cronjobs persistentvolumeclaims nodes
+      ;;
+    contexts | namespaces | resources)
+      [[ -z "${opt_args[--context]}" ]] || args+=(--context "${opt_args[--context]}")
+      [[ -z "${opt_args[-n]:-${opt_args[--namespace]}}" ]] || \
+        args+=(--namespace "${opt_args[-n]:-${opt_args[--namespace]}}")
+      [[ -z "${opt_args[-t]:-${opt_args[--type]}}" ]] || \
+        args+=(--type "${opt_args[-t]:-${opt_args[--type]}}")
+      [[ -z "${opt_args[--refresh]}" ]] || args+=(--refresh)
+      output="$(command kfzf --complete "$state" "${args[@]}")" || return
+      values=("${(@f)output}")
+      [[ -n "$output" ]] || return 1
+      _wanted "kfzf-$state" expl "Kubernetes $state" \
+        compadd -M 'l:|=* r:|=*' -a values
+      ;;
+  esac
+}
+
+_kfzf "$@"

@@ -82,6 +82,7 @@ dot workspace "$PWD"                # Backend-aware agent workspace
 dot-agent-status --check            # Agent readiness, without starting agents
 agent-mcp status                    # Optional MCP integrations; off by default
 cloud-context --recent              # Recent saved cloud contexts
+kfzf -t pods,deployments             # Cached Kubernetes describe picker
 dot privacy                        # Managed telemetry policy audit
 ```
 

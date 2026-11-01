@@ -34,7 +34,9 @@
           "tests/test-omp-settings.py",
           "tests/test-local-review.py",
           "dot_config/dotfiles/cloudflare_ssh.py",
-          "tests/test-cloudflare-ssh.py"
+          "tests/test-cloudflare-ssh.py",
+          "dot_config/dotfiles/kfzf.py",
+          "tests/test-kfzf.py"
         ]
       ]
     },
@@ -67,6 +69,12 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-kfzf.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
+    },
     {
       "path": "tests/test-backup-lock.py",
       "kind": "suite",
