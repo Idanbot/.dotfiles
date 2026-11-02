@@ -266,16 +266,15 @@ sys.exit(item.get("status", 22))
         self.respond("https://fixtures.test/starship-aarch64.tar.gz", "", status=22)
         self.assertEqual(self.run_updater("--apply-all"), 0, self.output)
         self.assertIn("core.starship", self.report)
-        self.assertIn("integrity could not be resolved", self.output)
+        self.assertIn("Skipping core.starship", self.output)
         self.assert_pins(**{"languages.node": "26.12.0", "core.starship": "1.26.0"})
 
-    def test_node_checksum_failure_blocks_the_entire_grouped_apply(self):
+    def test_node_checksum_failure_skips_only_node_in_grouped_apply(self):
         self.candidate_fixture()
         self.responses["https://nodejs.org/dist/v26.12.0/SHASUMS256.txt"]["status"] = 18
-        before = self.snapshot()
-        self.assertNotEqual(self.run_updater("--apply-all"), 0, self.output)
-        self.assertIn("selected updates contain unresolved checksums", self.output)
-        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.run_updater("--apply-all"), 0, self.output)
+        self.assertIn("Skipping languages.node", self.output)
+        self.assert_pins(**{"languages.node": "26.11.1", "languages.npm": "13.0.0"})
 
     def test_explicit_node_governs_every_npm_candidate(self):
         for node, expected in (("26.11.2", "1.1.0"), ("27.0.0", "3.0.0")):
