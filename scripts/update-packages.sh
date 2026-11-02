@@ -584,8 +584,8 @@ apply_plan() {
       "$PLAN" >"$selected"
     awk -F '\t' '$7 ~ /(^| -> )(unresolved|manual-refresh-required)($| -> )/ { print $1 " " $4 " -> " $5 }' \
       "$PLAN" | while read -r id versions; do
-        warn "Skipping $id $versions: integrity metadata is unresolved; review and select only after verifying checksum"
-      done
+      warn "Skipping $id $versions: integrity metadata is unresolved; review and select only after verifying checksum"
+    done
   else
     for target in "${TARGETS[@]}"; do
       target="${target%@*}"

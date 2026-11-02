@@ -256,6 +256,8 @@ sys.exit(item.get("status", 22))
         self.candidate_fixture()
         self.pins["core"]["starship"] = "1.26.0"
         (self.source / "packages.yaml").write_text(yaml.safe_dump(self.pins, sort_keys=False))
+        self.respond("https://api.github.com/repos/starship/starship/releases/latest",
+                     {"tag_name": "v1.27.0"})
         self.respond("https://api.github.com/repos/starship/starship/releases/tags/v1.27.0",
                      {"assets": [
                          {"name": f"starship-{arch}-unknown-linux-gnu.tar.gz",
