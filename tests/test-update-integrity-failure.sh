@@ -252,6 +252,23 @@ sys.exit(item.get("status", 22))
         self.assert_pins(**{"languages.node": "26.12.0", "languages.npm": "13.0.0",
                             "languages.typescript": "7.1.0", "ai_tools.opencode": "2.0.0"})
 
+    def test_apply_all_skips_candidate_with_unresolved_integrity(self):
+        self.candidate_fixture()
+        self.pins["core"]["starship"] = "1.26.0"
+        (self.source / "packages.yaml").write_text(yaml.safe_dump(self.pins, sort_keys=False))
+        self.respond("https://api.github.com/repos/starship/starship/releases/tags/v1.27.0",
+                     {"assets": [
+                         {"name": f"starship-{arch}-unknown-linux-gnu.tar.gz",
+                          "browser_download_url": f"https://fixtures.test/starship-{arch}.tar.gz"}
+                         for arch in ("x86_64", "aarch64")
+                     ]})
+        self.respond("https://fixtures.test/starship-x86_64.tar.gz", "", status=22)
+        self.respond("https://fixtures.test/starship-aarch64.tar.gz", "", status=22)
+        self.assertEqual(self.run_updater("--apply-all"), 0, self.output)
+        self.assertIn("core.starship", self.report)
+        self.assertIn("integrity could not be resolved", self.output)
+        self.assert_pins(**{"languages.node": "26.12.0", "core.starship": "1.26.0"})
+
     def test_node_checksum_failure_blocks_the_entire_grouped_apply(self):
         self.candidate_fixture()
         self.responses["https://nodejs.org/dist/v26.12.0/SHASUMS256.txt"]["status"] = 18

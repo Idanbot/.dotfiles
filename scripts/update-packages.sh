@@ -405,6 +405,11 @@ add_candidate() {
     pair="$(integrity_pair "$id" "$section" "$key" "$current" "$latest")"
     IFS=$'\t' read -r old_integrity new_integrity <<<"$pair"
   fi
+  if [[ "$old_integrity" == unresolved || "$new_integrity" == unresolved ||
+    "$old_integrity" == manual-refresh-required || "$new_integrity" == manual-refresh-required ]]; then
+    warn "Skipping $id $current -> $latest: integrity metadata could not be resolved; use a named update after verifying its checksum"
+    return 0
+  fi
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$id" "$section" "$key" "$current" "$latest" "$integrity" \
     "$old_integrity -> $new_integrity" >>"$PLAN"
