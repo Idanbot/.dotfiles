@@ -77,6 +77,20 @@ cmp "$TMP_ROOT/first" "$TMP_ROOT/second"
 [[ "$(stat -c '%a' "$DOTFILES_DOWNLOAD_CACHE_DIR")" == 700 ]]
 [[ "$(stat -c '%a' "$DOTFILES_DOWNLOAD_CACHE_DIR/sha256/$primary_sha")" == 600 ]]
 
+(
+  package_metadata() {
+    if [[ "$3" == url ]]; then
+      printf 'https://example.invalid/primary\n'
+    else
+      printf '%s\n' "$primary_sha"
+    fi
+  }
+  DOTFILES_DOWNLOAD_CACHE=0 download_vendor_installer codex_cli "$TMP_ROOT/vendor-preflight" >/dev/null
+  DOTFILES_DOWNLOAD_CACHE=0 download_vendor_installer codex_cli "$TMP_ROOT/vendor-execution" >/dev/null
+  cmp "$TMP_ROOT/vendor-preflight" "$TMP_ROOT/vendor-execution"
+  [[ "$(request_count primary)" == 1 ]]
+)
+
 printf 'corrupt\n' >"$DOTFILES_DOWNLOAD_CACHE_DIR/sha256/$primary_sha"
 download_verified https://example.invalid/primary "$TMP_ROOT/recovered" \
   "sha256:$primary_sha" primary >/dev/null

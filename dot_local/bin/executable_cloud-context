@@ -484,6 +484,35 @@ validate_profile_contexts() {
 }
 
 load_profile_file() {
+  local file="$1" name="$2" snapshot
+  [[ -r "$file" ]] || {
+    warn "Cloud context profile not found"
+    return 1
+  }
+  validate_profile_contexts "$(read_value "$file" kubectl_context)" \
+    "$(read_value "$file" gcloud_configuration)" "$(read_value "$file" aws_profile)" \
+    "$(read_value "$file" azure_subscription)" || {
+    warn "Profile '$name' was not loaded; no contexts were changed"
+    return 1
+  }
+  ensure_state_root
+  snapshot="$(mktemp "$STATE_ROOT/context-recovery.XXXXXX")"
+  write_profile_file "$snapshot"
+  if apply_profile_file "$file" "$name"; then
+    rm -f "$snapshot"
+    return 0
+  fi
+  warn "Profile activation failed; restoring previous provider selections"
+  if apply_profile_file "$snapshot" recovery; then
+    rm -f "$snapshot"
+    warn "Previous provider selections restored"
+  else
+    warn "Recovery incomplete; identifier-only snapshot retained at $snapshot; inspect cloud-context --status"
+  fi
+  return 1
+}
+
+apply_profile_file() {
   local file="$1" name="$2" kube gconfig gproject aprofile aregion azure failed=false
   [[ -r "$file" ]] || {
     printf 'Cloud context profile not found: %s\n' "$name" >&2
@@ -496,11 +525,6 @@ load_profile_file() {
   aregion="$(read_value "$file" aws_region)"
   azure="$(read_value "$file" azure_subscription)"
 
-  validate_profile_contexts "$kube" "$gconfig" "$aprofile" "$azure" || {
-    warn "Profile '$name' was not loaded; no contexts were changed"
-    return 1
-  }
-
   if [[ -n "$kube" ]]; then
     kubectl config use-context "$kube" >/dev/null ||
       {
@@ -510,6 +534,7 @@ load_profile_file() {
   elif have kubectl; then
     clear_provider kubectl || failed=true
   fi
+  [[ "$failed" == false ]] || return 1
   if [[ -n "$gconfig" ]]; then
     gcloud config configurations activate "$gconfig" --quiet >/dev/null ||
       {
@@ -517,6 +542,8 @@ load_profile_file() {
         failed=true
       }
   fi
+  # Project changes must never run against a configuration that failed activation.
+  [[ "$failed" == false ]] || return 1
   if [[ -n "$gproject" ]]; then
     gcloud config set project "$gproject" --quiet >/dev/null ||
       {
@@ -526,6 +553,7 @@ load_profile_file() {
   elif have gcloud; then
     clear_provider gcloud || failed=true
   fi
+  [[ "$failed" == false ]] || return 1
   if [[ -n "$azure" ]]; then
     az account set --subscription "$azure" ||
       {

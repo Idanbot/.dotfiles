@@ -23,6 +23,10 @@ make_mock() {
 }
 
 make_mock kubectl '
+if [[ "${KUBE_FAIL_ONCE:-0}" == 1 && "$*" == "config use-context lab" && ! -e "$HOME/kube-failed" ]]; then
+  touch "$HOME/kube-failed"
+  exit 7
+fi
 case "$*" in
   "config current-context")
     if [[ "${KUBECONFIG:-}" == *cloud-context-test* ]]; then
@@ -41,6 +45,13 @@ case "$*" in
     ;;
 esac'
 make_mock gcloud '
+if [[ "${GCP_FAIL_ONCE:-0}" == 1 && "$*" == "config configurations activate work --quiet" && ! -e "$HOME/gcp-failed" ]]; then
+  touch "$HOME/gcp-failed"
+  exit 7
+fi
+if [[ "${GCLOUD_FAIL_ACTIVATE:-0}" == 1 && "$*" == "config configurations activate work --quiet" ]]; then
+  exit 7
+fi
 case "$*" in
   "auth list --filter=status:ACTIVE --format=value(account)")
     [[ "${GCLOUD_NO_ACTIVE:-0}" == 1 ]] || printf "user@example.invalid\n"
@@ -78,6 +89,10 @@ case "$*" in
   "sts get-caller-identity --query Account --output text") printf "%s\n" "${MOCK_ACCOUNT:-123456789012}" ;;
 esac'
 make_mock az '
+if [[ "${AZ_FAIL_ONCE:-0}" == 1 && "$*" == "account set --subscription "* && ! -e "$HOME/az-failed" ]]; then
+  touch "$HOME/az-failed"
+  exit 7
+fi
 case "$*" in
   "account show --query name -o tsv")
     [[ "${AZURE_CONFIG_DIR:-}" == *cloud-context-test* ]] &&
@@ -139,6 +154,28 @@ grep -Fq $'gcloud\tconfig configurations activate work --quiet' "$CALLS"
 grep -Fq $'gcloud\tconfig set project project-123 --quiet' "$CALLS"
 grep -Fq $'az\taccount set --subscription 00000000-0000-0000-0000-000000000001' "$CALLS"
 grep -Fq 'export AWS_PROFILE=work' "$HOME/.local/state/dotfiles/cloud-context.env"
+
+: >"$CALLS"
+if GCLOUD_FAIL_ACTIVATE=1 "$SCRIPT" --load workstation >"$TMP_ROOT/recovery.out" 2>&1; then
+  printf 'Failed GCP activation unexpectedly succeeded\n' >&2
+  exit 1
+fi
+if grep -Fq $'gcloud\tconfig set project' "$CALLS"; then
+  printf 'Failed GCP activation modified a project\n' >&2
+  exit 1
+fi
+grep -Fq 'Recovery incomplete' "$TMP_ROOT/recovery.out"
+snapshot="$(find "$HOME/.local/state/dotfiles" -name 'context-recovery.*' -print -quit)"
+[[ -n "$snapshot" && "$(stat -c '%a' "$snapshot")" == 600 ]]
+rm -f "$snapshot"
+for failure in KUBE_FAIL_ONCE GCP_FAIL_ONCE AZ_FAIL_ONCE; do
+  if env "$failure=1" "$SCRIPT" --load workstation >"$TMP_ROOT/recovery.out" 2>&1; then
+    printf 'Failed provider activation unexpectedly succeeded: %s\n' "$failure" >&2
+    exit 1
+  fi
+  grep -Fq 'Previous provider selections restored' "$TMP_ROOT/recovery.out"
+  [[ -z "$(find "$HOME/.local/state/dotfiles" -name 'context-recovery.*' -print -quit)" ]]
+done
 
 : >"$CALLS"
 FZF_PICK=project-456 "$SCRIPT" --select gcloud >/dev/null

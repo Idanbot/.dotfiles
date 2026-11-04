@@ -106,6 +106,8 @@ and `~/.ssh/config.local`.
 `dot preflight` reports active versions, paths, ownership, and upgrade targets.
 Newer runtimes are preserved. Selected cloud tools follow reviewed update policies;
 checksums/signatures are verified and cached downloads are revalidated.
+Required vendor installer scripts are verified before configuration apply;
+existing preserved tools skip those downloads.
 
 Explicit named replacement is supported only by implemented backends:
 

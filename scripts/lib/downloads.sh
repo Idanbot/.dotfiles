@@ -226,6 +226,14 @@ download_verified_direct() {
   mv -f "$candidate" "$dest"
 }
 
+download_vendor_installer() {
+  local tool="$1" destination="$2"
+  # Both phases use the same content-addressed cache and revalidate every read.
+  DOTFILES_DOWNLOAD_CACHE=1 download_verified \
+    "$(package_metadata ai_tools "$tool" url)" "$destination" \
+    "sha256:$(package_metadata ai_tools "$tool" sha256)" "$tool.sh"
+}
+
 download_verified() {
   local url="$1" dest="$2" checksum_spec="$3" checksum_name
   local expected checksum_file cache_root cache_file cache_candidate lock_file cache_lock_fd status

@@ -27,14 +27,11 @@ fi
 CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
 npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude @anthropic-ai/claude-code
 
-CODEX_INSTALLER_SHA="$(package_metadata ai_tools codex_cli sha256)"
 CODEX_PATH="$(command -v codex 2>/dev/null || true)"
 if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
   tmpdir="$(mktemp -d)"
   log_info "Installing Codex CLI with OpenAI's standalone installer"
-  download_verified \
-    "$(package_metadata ai_tools codex_cli url)" "$tmpdir/codex-install.sh" \
-    "sha256:$CODEX_INSTALLER_SHA" codex-install.sh
+  download_vendor_installer codex_cli "$tmpdir/codex-install.sh"
   retry_command "Codex standalone installer" 4 5 \
     env CODEX_NON_INTERACTIVE=1 sh "$tmpdir/codex-install.sh"
   rm -rf "$tmpdir"
@@ -50,7 +47,6 @@ else
   log_skip "Codex standalone CLI already installed"
 fi
 
-ANTIGRAVITY_INSTALLER_SHA="$(package_metadata ai_tools antigravity_cli sha256)"
 if is_installed agy; then
   log_skip "Antigravity CLI already installed"
 else
@@ -58,9 +54,7 @@ else
   install_home="$HOME"
   mkdir -p "$tmpdir/home"
   log_info "Installing Antigravity CLI with Google's standalone installer"
-  download_verified \
-    "$(package_metadata ai_tools antigravity_cli url)" "$tmpdir/antigravity-install.sh" \
-    "sha256:$ANTIGRAVITY_INSTALLER_SHA" antigravity-install.sh
+  download_vendor_installer antigravity_cli "$tmpdir/antigravity-install.sh"
   # Contain the vendor's shell-profile edits; chezmoi already manages PATH.
   retry_command "Antigravity standalone installer" 4 5 \
     env HOME="$tmpdir/home" bash "$tmpdir/antigravity-install.sh" \

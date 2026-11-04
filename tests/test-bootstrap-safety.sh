@@ -109,4 +109,60 @@ awk '/^read_user\(\)/ { block = 1 } /^read_menu_user\(\)/ { block = 0 } block' \
   )
   [[ "$choice" == r && "$INTERACTIVE_WAIT_MS" -ge 30 ]]
 )
+mkdir -p "$temporary/vendor/scripts"
+cat >"$temporary/vendor/scripts/lib.sh" <<'VENDOR'
+package_metadata() { printf '%s\n' "$3"; }
+log_info() { :; }
+log_error() { :; }
+command() {
+  if [[ "$1" == -v ]]; then
+    [[ "${VENDOR_PRESENT:-0}" == 0 ]] || printf '/fixture/bin/%s\n' "$2"
+    return 0
+  fi
+  builtin command "$@"
+}
+download_vendor_installer() {
+  printf '%s\n' "$1" >>"$VENDOR_CALLS"
+  [[ "${VENDOR_FAIL:-0}" == 0 ]]
+}
+VENDOR
+export VENDOR_CALLS="$temporary/vendor-calls"
+DOTFILES_SOURCE_DIR="$temporary/vendor" bash "$DOTFILES_DIR/scripts/vendor-preflight.sh"
+[[ "$(wc -l <"$VENDOR_CALLS")" == 2 ]]
+: >"$VENDOR_CALLS"
+VENDOR_PRESENT=1 DOTFILES_SOURCE_DIR="$temporary/vendor" bash "$DOTFILES_DIR/scripts/vendor-preflight.sh"
+[[ ! -s "$VENDOR_CALLS" ]]
+if VENDOR_FAIL=1 DOTFILES_SOURCE_DIR="$temporary/vendor" bash "$DOTFILES_DIR/scripts/vendor-preflight.sh"; then
+  printf 'Vendor preflight accepted failed integrity verification\n' >&2
+  exit 1
+fi
+
+# Exercise the actual lock helper across abrupt owner death with a live child.
+awk '/^acquire_bootstrap_lock\(\)/ { block = 1 } /^acquire_bootstrap_lock \|\|/ { block = 0 } block' \
+  "$INSTALL" >"$temporary/lock-functions.sh"
+(
+  export STATE_ROOT="$temporary/lock-state" DOTFILES_LOCK_TIMEOUT=0
+  mkdir -p "$STATE_ROOT"
+  bash -c '
+    source "$1"
+    acquire_bootstrap_lock
+    sleep 2 &
+    echo "$!" >"$STATE_ROOT/child"
+    echo "$BASHPID" >"$STATE_ROOT/owner"
+    wait
+  ' bash "$temporary/lock-functions.sh" &
+  owner=$!
+  for _ in {1..100}; do
+    [[ ! -f "$STATE_ROOT/child" ]] || break
+    sleep 0.02
+  done
+  [[ -f "$STATE_ROOT/child" ]]
+  kill -KILL "$owner"
+  wait "$owner" 2>/dev/null || true
+  if flock -n "$STATE_ROOT/bootstrap.lock" true; then
+    printf 'Owner death released the lock before the mutation child exited\n' >&2
+    exit 1
+  fi
+  flock -w 5 "$STATE_ROOT/bootstrap.lock" true
+)
 printf 'Bootstrap safety test passed\n'

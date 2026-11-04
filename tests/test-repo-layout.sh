@@ -167,10 +167,10 @@ else
   pass "Gemini CLI has been removed"
 fi
 
-if grep -Fq 'ANTIGRAVITY_INSTALLER_SHA="$(package_metadata ai_tools antigravity_cli sha256)"' \
+if grep -Fq 'download_vendor_installer antigravity_cli ' \
   "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
-  grep -Fq '$(package_metadata ai_tools antigravity_cli url)' \
-    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
+  grep -Fq 'package_metadata ai_tools "$tool" sha256' \
+    "$DOTFILES_DIR/scripts/lib/downloads.sh" &&
   grep -Fq 'command: agy' "$DOTFILES_DIR/agents.yaml"; then
   pass "Antigravity uses the verified official agy installer"
 else

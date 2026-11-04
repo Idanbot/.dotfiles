@@ -66,7 +66,7 @@ source <(sed -n '/^verify_installer()/,$p' "$DOTFILES_DIR/tests/test-mutable-ins
 grep -Fxq 'https://example.invalid/reviewed-codex.sh' "$temporary/vendor-urls"
 grep -Fxq 'https://example.invalid/reviewed-agy.sh' "$temporary/vendor-urls"
 for tool in codex_cli antigravity_cli; do
-  grep -Fq "\$(package_metadata ai_tools $tool url)" \
+  grep -Fq "download_vendor_installer $tool " \
     "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
 done
 printf 'Vendor installation and live smoke share metadata URLs and pinned checksums\n'

@@ -705,9 +705,13 @@ acquire_bootstrap_lock() {
   LOCK_RELEASE_FIFO="$STATE_ROOT/.bootstrap-lock-release-$token"
   rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO"
   mkfifo "$LOCK_RELEASE_FIFO"
+  # Open before forking: owner death during acquisition cannot strand an open().
+  exec 8<>"$LOCK_RELEASE_FIFO"
 
   # Keep the lock FD out of tee, sed, chezmoi, and installer child processes.
   (
+    exec 7<"$LOCK_RELEASE_FIFO"
+    exec 8>&-
     exec 9>>"$lock_file"
     chmod 600 "$lock_file"
     if [[ "$DOTFILES_LOCK_TIMEOUT" == 0 ]]; then
@@ -720,13 +724,16 @@ acquire_bootstrap_lock() {
       exit 75
     fi
     printf 'ready\n' >"$LOCK_READY_FILE"
-    IFS= read -r _ <"$LOCK_RELEASE_FIFO" || true
+    # EOF arrives only after the owner and surviving mutation children exit.
+    exec cat <&7 >/dev/null
   ) &
   LOCK_HELPER_PID=$!
 
   deadline=$((SECONDS + DOTFILES_LOCK_TIMEOUT + 5))
   while ((SECONDS <= deadline)); do
-    [[ -f "$LOCK_READY_FILE" ]] && return 0
+    if [[ -f "$LOCK_READY_FILE" ]]; then
+      return 0
+    fi
     if [[ -f "$LOCK_ERROR_FILE" ]]; then
       reason="$(<"$LOCK_ERROR_FILE")"
       if [[ "$reason" == busy ]]; then
@@ -753,7 +760,7 @@ acquire_bootstrap_lock() {
 
 release_bootstrap_lock() {
   if [[ -n "$LOCK_HELPER_PID" ]]; then
-    kill "$LOCK_HELPER_PID" 2>/dev/null || true
+    exec 8>&-
     wait "$LOCK_HELPER_PID" 2>/dev/null || true
   fi
   rm -f "$LOCK_READY_FILE" "$LOCK_ERROR_FILE" "$LOCK_RELEASE_FIFO" 2>/dev/null || true
@@ -805,6 +812,7 @@ setup_run_state() {
     chmod 600 "$LOG_FILE" "$EVENT_LOG"
     [[ "$PROFILE_NAME" != full ]] || export DOTFILES_MANAGER_LOG="$LOG_FILE"
     exec > >(
+      exec 8>&-
       tee >(
         sed -u -E \
           -e $'s/\033\\[[0-9;]*[[:alpha:]]//g' \
@@ -1227,6 +1235,9 @@ stage_preflight() {
     --plan "$DOTFILES_VERSION_PLAN" "${args[@]}"
   if [[ ",$(join_by_comma "${SELECTED_SECTIONS[@]}")," == *,languages,* ]]; then
     DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE" bash "$CHEZMOI_SOURCE/scripts/python-installer.sh" --check
+  fi
+  if [[ ",$(join_by_comma "${SELECTED_SECTIONS[@]}")," == *,ai,* ]]; then
+    DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE" bash "$CHEZMOI_SOURCE/scripts/vendor-preflight.sh"
   fi
 }
 

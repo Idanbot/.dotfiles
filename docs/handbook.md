@@ -808,6 +808,21 @@ privately under `downloads/verification`. Local cache digests detect corruption;
 payload checksums and AWS vendor signatures are **reverified on every use**.
 Caching never substitutes a previous verification result for a new verification.
 Mutable release indexes and rustup's unversioned checksum are not cached there.
+
+Required Codex/Antigravity installer scripts are checksum-verified before configuration
+apply and reused through this cache, with verification repeated before execution.
+Already-preserved tools skip this preflight check. Vendor-script caching remains enabled
+for this handoff even when general download caching is disabled; cache-storage failures
+fall back to a fresh download with the same mandatory checksum verification.
+
+Cloud profile loads stop on the first provider failure and attempt native-command
+restoration of previous selections. Incomplete recovery retains a private identifier-only
+snapshot and reports its path; it never copies credentials. This is best-effort recovery,
+not a transaction across provider CLIs or a restoration of every named configuration.
+
+Bootstrap locking follows owner and mutation-child lifetimes, including abrupt owner
+termination. Logging processes do not keep the lock alive; do not delete lock files
+to bypass a running or recovering installation.
 Binary, runtime-tree, and command-link publication restores the prior payload,
 ownership stamp, and destination-specific ledger records if publication fails.
 If rollback cannot finish, logs identify a private recovery directory containing
