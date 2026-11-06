@@ -87,6 +87,33 @@ for tool in kubectl serena graphify yt-dlp git-credential-manager; do
   done
 done
 
+# The shared decision can veto mutation even when live ownership allows it.
+for binary in git-credential-manager nvim; do
+  (
+    export HOME="$temporary/decision-$binary" DOTFILES_STATE_DIR="$temporary/decision-$binary-state"
+    export DOTFILES_VERSION_PLAN="$temporary/decision-$binary.json"
+    mkdir -p "$HOME/.local/bin"
+    export PATH="$HOME/.local/bin:$PATH"
+    source "$ROOT/scripts/lib.sh"
+    printf '#!/bin/sh\necho 0.0.1\n' >"$HOME/.local/bin/$binary"
+    chmod +x "$HOME/.local/bin/$binary"
+    record_install "$binary" 0.0.1 fixture "$HOME/.local/bin/$binary"
+    id=editor.neovim
+    [[ "$binary" != git-credential-manager ]] || id=system.git_credential_manager
+    jq -n --arg id "$id" --arg path "$HOME/.local/bin/$binary" \
+      '{schema:1,tools:{($id):{decision:{schema:1,operation:"preserve",target:"99.0.0",evidence:{path:$path}}}}}' >"$DOTFILES_VERSION_PLAN"
+    before="$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")"
+    runtime_is_current "$binary" 99.0.0 0.0.1
+    # Stale target/path inputs also fail closed rather than broadening approval.
+    runtime_is_current "$binary" 100.0.0 0.0.1
+    jq --arg id "$id" '.tools[$id].decision.evidence.path = "/changed/fixture"' \
+      "$DOTFILES_VERSION_PLAN" >"$DOTFILES_VERSION_PLAN.tmp"
+    mv "$DOTFILES_VERSION_PLAN.tmp" "$DOTFILES_VERSION_PLAN"
+    runtime_is_current "$binary" 99.0.0 0.0.1
+    [[ "$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")" == "$before" ]]
+  )
+done
+
 # A command introduced after the initial decision must not be shadowed at commit.
 (
   export HOME="$temporary/kubectl-race" DOTFILES_STATE_DIR="$temporary/kubectl-race-state"

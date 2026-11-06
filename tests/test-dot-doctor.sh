@@ -25,6 +25,19 @@ cat >"$TMP_ROOT/bin/chezmoi" <<'EOF'
 EOF
 chmod +x "$TMP_ROOT/bin/chezmoi"
 
+cat >"$TMP_ROOT/bin/gh" <<'EOF'
+#!/bin/sh
+echo 'Unexpected GitHub invocation' >&2
+exit 99
+EOF
+chmod +x "$TMP_ROOT/bin/gh"
+readiness_json="$("$DOTFILES_DIR/scripts/doctor.sh" --readiness --json)"
+python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["advisory"] and not data["network_requested"]; assert all(row["access"] == "unverified" for row in data["results"])' <<<"$readiness_json"
+if "$DOTFILES_DIR/scripts/doctor.sh" --readiness --acceptance >/dev/null 2>&1; then
+  echo 'Advisory readiness bypassed installation acceptance' >&2
+  exit 1
+fi
+
 HOME="$TMP_ROOT/home" \
   DOTFILES_SOURCE_DIR='' \
   DOTFILES_STATE_DIR="$TMP_ROOT/home/.local/state/dotfiles" \

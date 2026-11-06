@@ -789,6 +789,24 @@ separate, opt-in encrypted recovery source. See [Security Model](security-model.
 
 ## Versions and Supply Chain
 
+`dot doctor --readiness [--json]` reports installed/configured/unavailable capabilities
+without executing providers or reading credential contents. Configuration means file
+presence, not valid credentials. `--verify-access` explicitly permits bounded read-only
+native probes (GitHub user API, AWS identity, GCP project listing, Azure group listing,
+Kubernetes pod-read authorization); native credential plugins/refresh may run.
+SSH/Cloudflare and agent authentication remain unverified/manual. Reports discard raw
+stdout/stderr and use generic remediation placeholders. This separate advisory mode
+returns success even for optional/pending access; normal doctor still enforces required
+installation failures. Default installation doctor no longer probes GitHub access.
+
+The version plan includes schema-1 backend decisions (operation, reason, backend,
+target, integrity reference, and ownership/path/version evidence). GCM and Neovim
+consume preservation decisions before downloads; changed target/path inputs fail closed.
+Install/update approval never bypasses live ownership/publication guards. Legacy plans
+without this decision retain those guards, and resume still validates immutable inputs.
+Doctor validates supported decision consistency; other backends remain on existing
+guards pending deliberate migration, not an automatic broad installer rewrite.
+
 `./scripts/install.sh --reviewed-baseline` explicitly disables latest-release discovery
 and uses exact repository pins. Required tools with `distro`/unversioned baselines are
 rejected in this mode; it is not a general offline install or silent outage fallback.

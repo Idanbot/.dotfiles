@@ -57,6 +57,9 @@ printf '#!/bin/sh\necho "NVIM v0.12.0"\n' >"$old/bin/nvim"
 chmod +x "$old/bin/nvim"
 record_install nvim 0.12.0 fixture "$old"
 managed_link "$old/bin/nvim" "$HOME/.local/bin/nvim" nvim 0.12.0
+export DOTFILES_VERSION_PLAN="$temporary/versions.json"
+jq -n --arg nvim "$HOME/.local/bin/nvim" --arg gcm "$HOME/.local/bin/git-credential-manager" \
+  '{schema:1,tools:{"editor.neovim":{decision:{schema:1,operation:"update",target:"99.0.0",evidence:{path:$nvim}}},"system.git_credential_manager":{decision:{schema:1,operation:"preserve",target:"99.0.0",evidence:{path:$gcm}}}}}' >"$DOTFILES_VERSION_PLAN"
 # Seed an unverifiable legacy GCM receipt: it must not authorize replacement.
 printf 'git-credential-manager\t1.0.0\tlegacy\t%s\n' "$HOME/.local/bin/git-credential-manager" >>"$DOTFILES_STATE_DIR/installed.tsv"
 before="$(sha256sum "$HOME/.zsh_history" "$HOME/.config/dotfiles/local.zsh" "$HOME/.local/bin/git-credential-manager")"

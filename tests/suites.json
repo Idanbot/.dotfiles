@@ -16,6 +16,8 @@
           "scripts/dotfiles",
           "scripts/section-registry.py",
           "scripts/convergence.py",
+          "scripts/readiness.py",
+          "tests/test-readiness.py",
           "scripts/manager-scope.py",
           "tests/test-manager-safety.py",
           "tests/e2e/test-manager-transactions.py",
@@ -814,6 +816,12 @@
           "{root}"
         ]
       ]
+    },
+    {
+      "path": "tests/test-readiness.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [["{root}"]]
     },
     {
       "path": "tests/e2e/test-seeded-upgrade.sh",

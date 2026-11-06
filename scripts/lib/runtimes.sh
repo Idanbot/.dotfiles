@@ -137,6 +137,29 @@ preserve_existing_release_binary() {
 
 runtime_is_current() {
   local binary="$1" target="$2" current="$3"
+  local decision_id="" decision reason
+  case "$binary" in
+    git-credential-manager) decision_id=system.git_credential_manager ;;
+    nvim) decision_id=editor.neovim ;;
+  esac
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" && -n "$decision_id" ]]; then
+    decision="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" decision \
+      --plan "$DOTFILES_VERSION_PLAN" --tool "$decision_id" --target "$target" \
+      --active-path "$(command -v "$binary" || true)")" || decision=preserve-stale
+    IFS=$'\t' read -r decision reason <<<"$decision"
+    case "$decision" in
+      noop)
+        log_skip "$binary: run-plan no-op; keeping the active installation"
+        return 0
+        ;;
+      preserve | preserve-stale)
+        [[ "$decision" != preserve-stale ]] || reason='run-plan inputs changed; start a new run to review them'
+        log_warn "Preserving $binary: $reason"
+        ((_PRESERVED++)) || true
+        return 0
+        ;;
+    esac
+  fi
   if command_exists "$binary" && [[ -z "$(extract_version "$current" || true)" ]]; then
     if binary_replacement_requested "$binary" && replacement_supported "$binary" 2>/dev/null && runtime_activation_ready "$binary"; then
       return 1

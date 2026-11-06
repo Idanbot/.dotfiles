@@ -324,6 +324,23 @@ def version_label(entry):
     return f"version unknown (probe: {entry.get('probe', 'unknown')})" if entry["path"] else "missing"
 
 
+def backend_decision(entry, meta):
+    action = entry["action"]
+    if entry["ownership"] == "unchanged":
+        operation = "noop"
+    elif action.startswith(("skip", "preserve")):
+        operation = "preserve"
+    elif entry["ownership"] == "missing":
+        operation = "install"
+    else:
+        operation = "update"
+    return {"schema": 1, "operation": operation, "reason": action,
+            "backend": {"system.git_credential_manager": "dpkg", "editor.neovim": "archive"}.get(entry["id"], meta.get("source", "unknown")),
+            "target": entry["target"], "integrity": entry.get("integrity") or {
+                key: value for key, value in meta.items() if key.startswith("sha256") or key == "integrity"},
+            "evidence": {"ownership": entry["ownership"], "path": entry["path"], "version": entry["current"]}}
+
+
 def recommendations(root):
     """Global stable advisories, including versions outside automatic compatibility lines."""
     packages, metadata = load_repository(root)
@@ -481,7 +498,7 @@ def report(entries):
 def main():
     global ROOT
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["preflight", "report", "get", "recommendations", "candidate"], nargs="?", default="preflight")
+    parser.add_argument("command", choices=["preflight", "report", "get", "decision", "recommendations", "candidate"], nargs="?", default="preflight")
     parser.add_argument("--source", type=Path, default=ROOT)
     parser.add_argument("--sections", default="core,languages,cloud,ai")
     parser.add_argument("--plan", type=Path)
@@ -490,12 +507,29 @@ def main():
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tool")
     parser.add_argument("--field", default="target")
+    parser.add_argument("--active-path", default="")
+    parser.add_argument("--target", default="")
     parser.add_argument("--baseline")
     parser.add_argument("--node", help="effective Node version for candidate eligibility")
     parser.add_argument("--version", help="explicit candidate, still subject to release eligibility")
     args = parser.parse_args()
     ROOT = args.source.resolve()
     software.ROOT = ROOT
+    if args.command == "decision":
+        data = json.loads(args.plan.read_text())
+        entry = data.get("tools", {}).get(args.tool, {})
+        decision = entry.get("decision")
+        if decision is None:
+            # Legacy plans retain live safety guards; never infer ownership.
+            print("live-check")
+        elif (data.get("schema") != 1 or decision.get("schema") != 1
+              or decision.get("operation") not in {"preserve", "noop", "install", "update"}
+              or decision.get("target") != args.target
+              or decision.get("evidence", {}).get("path", "") != (args.active_path or None)):
+            print("preserve-stale")
+        else:
+            print(decision["operation"] + "\t" + str(decision.get("reason", "preservation requested by run plan")).replace("\n", " ").replace("\t", " "))
+        return
     if args.command == "candidate":
         packages = load_versions(Path(os.environ.get("DOTFILES_PACKAGES_FILE", ROOT / "packages.yaml")))
         metadata = load_metadata(Path(os.environ.get("DOTFILES_PACKAGES_META_FILE", ROOT / "packages.meta.yaml")))
@@ -544,6 +578,8 @@ def main():
             tools = list(pool.map(resolve_one, entries))
         for entry in tools:
             entry["action"], entry["ownership"] = planned_action(entry)
+            group, key = entry["id"].split(".")
+            entry["decision"] = backend_decision(entry, metadata.get(group, {}).get(key, {}))
             if entry["ownership"] in {"unknown-version", "unsupported-replacement"}:
                 checks.append(("WARN", f"{entry['id']}: {entry['action']}"))
         data = {"schema": 1, "source": str(ROOT), "sections": sections, "reviewed_baseline": args.reviewed_baseline,

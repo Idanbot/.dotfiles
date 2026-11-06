@@ -103,6 +103,10 @@ and `~/.ssh/config.local`.
 
 ## Installation Preflight
 
+`dot doctor --readiness` gives an offline, identifier-free capability checklist.
+Add `--verify-access` for bounded native read-only probes; these are advisory,
+may contact providers/use configured credential plugins, and never automate login.
+
 `dot preflight` reports active versions, paths, ownership, and upgrade targets.
 Newer runtimes are preserved. Selected cloud tools follow reviewed update policies;
 checksums/signatures are verified and cached downloads are revalidated.

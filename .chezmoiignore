@@ -1,5 +1,6 @@
 # Ignore README and CI files — they're repo metadata, not dotfiles
 README.md
+AGENTS.md
 LICENSE
 packages.yaml
 packages.meta.yaml

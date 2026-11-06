@@ -4,6 +4,16 @@ Status: Accepted, 2026-10-19.
 
 ## Context
 
+Follow-up (2026-11-07): the existing version plan carries a schema-1 `decision`
+with `operation` (`install`, `update`, `preserve`, `noop`), `backend`, `reason`,
+`target`, `integrity` reference and path/version/ownership `evidence`.
+GCM/dpkg and Neovim/archive are the initial consumers. Preservation/no-op cannot
+authorize downloads or ownership adoption; target/path drift preserves and requests
+a new run. Positive approval still requires existing live mutation/digest guards.
+Legacy plans without decisions use those guards, not inferred ownership. Doctor
+checks decision consistency and resume retains immutable-input validation.
+Other backends are intentionally not migrated by this scoped change.
+
 The observable orchestrator and Chezmoi deployment split remain appropriate.
 Repeated manifest readers, release mappings, test lists, and E2E job bodies
 made changes harder to verify. Successful installation passes did not prove

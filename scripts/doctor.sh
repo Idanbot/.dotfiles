@@ -15,9 +15,20 @@ ACCEPTANCE=false
 JSON_OUTPUT=false
 QUICK=false
 STRICT=false
+READINESS=false
+VERIFY_ACCESS=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --readiness)
+      READINESS=true
+      shift
+      ;;
+    --verify-access)
+      READINESS=true
+      VERIFY_ACCESS=true
+      shift
+      ;;
     --sections)
       [[ $# -ge 2 ]] || {
         printf 'Missing value for --sections\n' >&2
@@ -54,7 +65,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -h | --help)
-      printf 'Usage: scripts/doctor.sh [--acceptance] [--sections a,b | --all] [--json] [--quick] [--strict]\n'
+      printf 'Usage: scripts/doctor.sh [--acceptance] [--sections a,b | --all] [--json] [--quick] [--strict] [--readiness [--verify-access]]\n'
       exit 0
       ;;
     *)
@@ -63,6 +74,17 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "$READINESS" == true ]]; then
+  if [[ "$ACCEPTANCE" == true || "$EXPLICIT_SELECTION" == true ]]; then
+    printf 'Readiness is advisory; do not combine it with installation acceptance or section selection\n' >&2
+    exit 2
+  fi
+  args=()
+  [[ "$JSON_OUTPUT" == false ]] || args+=(--json)
+  [[ "$VERIFY_ACCESS" == false ]] || args+=(--verify-access)
+  exec /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/readiness.py" "${args[@]}"
+fi
 
 if [[ "$EXPLICIT_SELECTION" == false ]]; then
   if ! SECTIONS="$("${registry[@]}" --state "$(managed_state_root)" selected 2>/dev/null)"; then
@@ -336,12 +358,8 @@ if selected fonts; then
 fi
 if selected system; then
   doctor_step "System"
-  if gh auth status --active --hostname github.com >/dev/null 2>&1; then
-    result pass github-auth "GitHub CLI has an active github.com account"
-  else
-    result warn github-auth "GitHub authentication is intentionally pending" \
-      "run: gh auth login --hostname github.com --git-protocol https"
-  fi
+  result warn github-auth "Access unverified; authentication remains manual" \
+    "run: dot doctor --readiness --verify-access"
   check_file "$HOME/.ssh/config" ssh-config
 fi
 if selected theme; then
@@ -350,6 +368,26 @@ if selected theme; then
 fi
 
 doctor_step "Source, State & Security"
+if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]]; then
+  if /usr/bin/python3 - "$DOTFILES_VERSION_PLAN" <<'PY'; then
+import json
+import sys
+with open(sys.argv[1]) as handle:
+    plan = json.load(handle)
+for ident in ("system.git_credential_manager", "editor.neovim"):
+    entry = plan.get("tools", {}).get(ident, {})
+    decision = entry.get("decision")
+    if decision is not None:
+        assert decision["schema"] == 1
+        assert decision["operation"] in {"install", "update", "preserve", "noop"}
+        assert decision["target"] == entry["target"]
+        assert decision["reason"] == entry["action"]
+PY
+    result pass install-decisions "Supported backend decisions are internally consistent"
+  else
+    result fail install-decisions "Run-plan decision contract is invalid" "start a new installation run"
+  fi
+fi
 STATE_ROOT="$(managed_state_root)"
 if [[ -e "$DOTFILES_SOURCE_DIR/.git" && -r "$DOTFILES_SOURCE_DIR/packages.yaml" ]]; then
   result pass source-integrity "$DOTFILES_SOURCE_DIR"

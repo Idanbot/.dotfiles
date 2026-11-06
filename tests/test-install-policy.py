@@ -43,6 +43,21 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_backend_decision_is_structured_and_keeps_evidence(self):
+        for ident, backend in [("system.git_credential_manager", "dpkg"), ("editor.neovim", "archive")]:
+            for ownership, action, operation in [("missing", "install", "install"),
+                    ("verified-dotfiles", "update verified executable", "update"),
+                    ("unchanged", "skip; preserve equal/newer version", "noop"),
+                    ("unowned", "skip; preserve existing", "preserve"),
+                    ("distro", "preserve distro package", "preserve")]:
+                entry = {**self.entry(ident), "ownership": ownership, "action": action}
+                decision = policy.backend_decision(entry, {"integrity": "pinned-sha256", "sha256_amd64": "a" * 64})
+                self.assertEqual(decision["operation"], operation)
+                self.assertEqual(decision["backend"], backend)
+                self.assertEqual(decision["target"], entry["target"])
+                self.assertEqual(decision["evidence"]["ownership"], ownership)
+                self.assertEqual(decision["integrity"]["sha256_amd64"], "a" * 64)
+
     def test_vendor_schemes_allow_sdk_and_calendar_rollover(self):
         for ident, old, new in [("cloud.gcloud", "583.0.0", "591.0.0"),
                                 ("cloud.cloudflared", "2026.10.0", "2027.1.0")]:
