@@ -1,4 +1,6 @@
 {
+  "cloud.gcloud": "vendor-sdk",
+  "cloud.cloudflared": "calendar",
   "languages.node": "major",
   "languages.python": "minor",
   "languages.go": "minor",

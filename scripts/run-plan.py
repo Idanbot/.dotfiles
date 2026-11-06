@@ -45,6 +45,7 @@ def main():
     parser.add_argument("--doctor")
     parser.add_argument("--only", default="")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--reviewed-baseline", default="false", choices=["true", "false"])
     parser.add_argument("--platform", default=platform.system())
     parser.add_argument("--arch", default=platform.machine())
     parser.add_argument("--template-data", default="{}")
@@ -52,8 +53,8 @@ def main():
     destination = args.run_dir / "plan.json"
     if args.command == "options":
         data = json.loads(destination.read_text())
-        for key in ("conflict_policy", "doctor", "only"):
-            print(f"{key}\t{data[key]}")
+        for key in ("conflict_policy", "doctor", "only", "reviewed_baseline"):
+            print(f"{key}\t{data.get(key, 'false')}")
         return
     resolved = json.loads(args.template_data)
     allowed = {key: resolved.get(key) for key in
@@ -62,6 +63,7 @@ def main():
             "source_sha256": source_digest(args.source), "sections": args.sections,
             "profile": args.profile, "conflict_policy": args.conflict_policy,
             "doctor": args.doctor, "only": args.only,
+            "reviewed_baseline": args.reviewed_baseline,
             "platform": args.platform, "arch": args.arch,
             "wsl_override": os.environ.get("DOTFILES_WSL", "auto"),
             "template_sha256": hashlib.sha256(json.dumps(allowed, sort_keys=True).encode()).hexdigest()}

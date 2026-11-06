@@ -16,10 +16,25 @@ and standalone package managers may cross majors. npm candidates must support
 the proposed Node runtime and installs enforce the engine requirement. Explicit
 version acceptance remains available to change a release line.
 
-The existing cloud-specific rolling policy and explicit kubectl pin remain.
+The explicit kubectl pin remains. GCloud uses a vendor SDK train and cloudflared
+calendar releases, declared in `scripts/update-policy.json`; stable SDK increments
+and year rollovers are eligible without claiming backward compatibility. Other
+rolling tools retain their same-major boundary. All retain integrity and ownership checks.
 Optional freshness lookup failures warn if the installed version already meets
 the baseline. Required capability, checksum, signature, and APT authentication
 failures remain blocking; there is no unverified or silently downgraded fallback.
+
+An explicit `--reviewed-baseline` run bypasses latest-version discovery and selects
+exact repository pins, reporting freshness unknown. It does not retry a failed
+rolling resolution silently. Tools without an exact numeric repository baseline
+(including distro-valued cloud SDK pins) cannot use this mode; resolve them normally
+or establish a reviewed exact pin first. Artifact availability, checksums, signatures,
+APT authentication and preflight requirements remain blocking. Resume preserves
+the chosen discovery mode and original resolved targets.
+
+CI advisory discovery runs alongside acceptance, behind the same mandatory checks.
+Advisory failure emits a warning rather than skipping release smoke or making
+unverified payloads acceptable. The standing advisory issue/grouped PR stays unchanged.
 
 Before applying configuration, validate that the exact Python pin is downloadable
 with active uv or a temporary, checksum-verified repository-pinned uv. Do not

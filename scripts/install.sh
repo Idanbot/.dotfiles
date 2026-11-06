@@ -55,6 +55,8 @@ MENU_REQUESTED=false
 ONLY_SECTION=""
 SOURCE_OVERRIDE=""
 RESUME_REQUEST=""
+REVIEWED_BASELINE=false
+BASELINE_SET=false
 RUN_DOCTOR=true
 CHEZMOI_SOURCE=""
 CHEZMOI_STATUS_OUTPUT=""
@@ -181,6 +183,7 @@ Profiles and selectors:
 
 Reliability:
   --resume[=<run-id>]       Resume the latest or named interrupted run
+  --reviewed-baseline      Use exact repository pins without upstream discovery
   --conflict-policy <mode>  backup (default), skip, or abort
   --lock-timeout <seconds>  Wait for another bootstrap (default: 0, fail fast)
   --source <path>           Use a local source checkout
@@ -506,6 +509,11 @@ while [[ $# -gt 0 ]]; do
       CONFLICT_AUTO_APPROVE=true
       shift
       ;;
+    --reviewed-baseline)
+      REVIEWED_BASELINE=true
+      BASELINE_SET=true
+      shift
+      ;;
     --resume)
       RESUME_REQUEST=latest
       AUTO_APPROVE=true
@@ -671,6 +679,7 @@ if [[ -n "$RESUME_REQUEST" ]]; then
         conflict_policy) [[ "$CONFLICT_POLICY_SET" == true ]] || DOTFILES_CONFLICT_POLICY="$value" ;;
         doctor) [[ "$DOCTOR_SET" == true ]] || RUN_DOCTOR="$value" ;;
         only) ONLY_SECTION="$value" ;;
+        reviewed_baseline) [[ "$BASELINE_SET" == true ]] || REVIEWED_BASELINE="$value" ;;
       esac
     done <<<"$resume_options"
   fi
@@ -1049,6 +1058,7 @@ prepare_run_plan() {
     --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
     --profile "$PROFILE_NAME" --conflict-policy "$DOTFILES_CONFLICT_POLICY" \
     --doctor "$RUN_DOCTOR" --only "$ONLY_SECTION" \
+    --reviewed-baseline "$REVIEWED_BASELINE" \
     --platform "$(get_platform)" --arch "$(get_arch)" \
     --template-data "$template_data" "${args[@]}"
 }
@@ -1229,6 +1239,7 @@ stage_doctor() {
 
 stage_preflight() {
   local -a args=()
+  [[ "$REVIEWED_BASELINE" != true ]] || args+=(--reviewed-baseline)
   [[ -z "$RESUME_REQUEST" ]] || args+=(--resume)
   /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/install-policy.py" preflight \
     --source "$CHEZMOI_SOURCE" --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \

@@ -43,6 +43,45 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_vendor_schemes_allow_sdk_and_calendar_rollover(self):
+        for ident, old, new in [("cloud.gcloud", "583.0.0", "591.0.0"),
+                                ("cloud.cloudflared", "2026.10.0", "2027.1.0")]:
+            with self.subTest(ident=ident), patch.object(policy.software, "probe", return_value=(None, {
+                    "version": old, "path": "/fixture/tool"})), \
+                    patch.object(policy, "upstream", return_value=(new, {})) as upstream, \
+                    patch.object(policy, "integrity", return_value="sha256:" + "a" * 64):
+                result = policy.resolve(self.entry(ident, old), {}, "amd64")
+                self.assertEqual(result["target"], new)
+                self.assertIsNone(upstream.call_args.args[2])
+
+    def test_reviewed_baseline_does_not_contact_discovery(self):
+        with patch.object(policy.software, "probe", return_value=(None, {
+                "version": "9.0.0", "path": "/fixture/gh"})), \
+                patch.object(policy, "upstream", side_effect=AssertionError("network discovery")):
+            result = policy.resolve(self.entry(), {}, "amd64", reviewed_baseline=True)
+            self.assertEqual(result["target"], "2.0.0")
+            self.assertIn("freshness unknown", result["resolution_warning"])
+            result = policy.resolve(self.entry(requested="distro"), {}, "amd64", reviewed_baseline=True)
+            self.assertIn("exact repository version", result["error"])
+
+    def test_reviewed_baseline_resume_preserves_plan_without_discovery(self):
+        plan = self.home / "versions.json"
+        base = ["install-policy", "preflight", "--source", str(ROOT), "--plan", str(plan), "--json"]
+        with patch.object(policy, "host_checks", return_value=[]), \
+                patch.object(policy, "selected", return_value=[self.entry()]), \
+                patch.object(policy.software, "probe", return_value=(None, {"version": "9.0.0", "path": "/fixture/gh"})), \
+                patch.object(policy, "upstream", side_effect=AssertionError("discovery")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            with patch.object(sys, "argv", base + ["--reviewed-baseline"]):
+                policy.main()
+            before = plan.read_bytes()
+            with patch.object(sys, "argv", base + ["--reviewed-baseline", "--resume"]):
+                policy.main()
+            self.assertEqual(plan.read_bytes(), before)
+            with patch.object(sys, "argv", base + ["--resume"]):
+                with self.assertRaisesRegex(ValueError, "discovery mode changed"):
+                    policy.main()
+
     def test_python_uv_source_uses_cpython_not_pypi(self):
         with patch.object(policy, "get_json", return_value=[{"name": "v3.14.9"}]) as fetch:
             self.assertEqual(policy.upstream({"id": "languages.python"}, {"source": "uv"})[0], "3.14.9")
@@ -427,11 +466,11 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(result["target"], kubectl["requested"])
         self.assertEqual(result["policy"], "repo-minimum")
 
-    def test_gcloud_installed_major_is_not_crossed(self):
+    def test_gcloud_sdk_train_is_not_a_semver_major(self):
         entry = self.entry("cloud.gcloud", "distro", "578.0.1")
         with patch.object(policy, "get_json", return_value={"version": "600.0.0"}), \
                 patch.object(policy.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "google-cloud-cli | 578.0.2-0 | signed repo\ngoogle-cloud-cli | 600.0.0-0 | repo\n", "")):
-            self.assertEqual(policy.upstream(entry, {}, 578)[0], "578.0.2")
+            self.assertEqual(policy.upstream(entry, {}, 578)[0], "600.0.0")
             self.assertEqual(policy.upstream(entry, {})[0], "600.0.0")
 
     def test_aws_major_advisory_is_not_limited_to_v2_changelog(self):

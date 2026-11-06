@@ -55,6 +55,7 @@ with tempfile.TemporaryDirectory() as temporary:
         sys.executable, str(root / "scripts/run-plan.py"), "options",
         "--run-dir", str(run)], text=True)
     assert "conflict_policy\tskip" in options and "doctor\tfalse" in options
+    assert "reviewed_baseline\tfalse" in options
     for option, value in [("--sections", "ai"), ("--profile", "full"),
                           ("--conflict-policy", "replace"), ("--doctor", "true")]:
         changed = command.copy()
@@ -68,7 +69,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert plan.read_bytes() == original
     assert json.loads(original)["schema"] == 2
     manifest.write_text("version: 1\n")
-    for option, value in [("--platform", "changed-platform"), ("--arch", "changed-arch"),
+    for option, value in [("--reviewed-baseline", "true"), ("--platform", "changed-platform"), ("--arch", "changed-arch"),
                           ("--template-data", '{"sessionizer_dirs":"~/Different"}')]:
         result = subprocess.run(command + [option, value, "--resume"], capture_output=True, text=True)
         assert result.returncode and "Resume inputs changed" in result.stderr

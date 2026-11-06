@@ -108,6 +108,8 @@ Newer runtimes are preserved. Selected cloud tools follow reviewed update polici
 checksums/signatures are verified and cached downloads are revalidated.
 Required vendor installer scripts are verified before configuration apply;
 existing preserved tools skip those downloads.
+For discovery outages, `--reviewed-baseline` uses exact repository pins and reports
+freshness unknown; it never bypasses integrity checks or supports unpinned tools.
 
 Explicit named replacement is supported only by implemented backends:
 

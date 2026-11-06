@@ -217,7 +217,7 @@ def check(root):
     )
 
     live = workflows["ci-live.yml"]["jobs"]
-    assert needs(live["github-release-tools"]) == {"version-report"}
+    assert needs(live["github-release-tools"]) == set()
     for name in ("base-e2e", "recovery-e2e"):
         assert needs(live[name]) == {"github-release-tools"}
     assert needs(live["heavy-e2e"]) == {"base-e2e", "recovery-e2e"}

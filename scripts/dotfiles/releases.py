@@ -5,7 +5,19 @@ at import time and needs no audit-only dependencies.
 """
 
 import re
+import json
+from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote
+
+
+@lru_cache(maxsize=8)
+def update_rules(path=None):
+    return json.loads(Path(path or Path(__file__).resolve().parents[1] / "update-policy.json").read_text())
+
+
+def release_scheme(ident):
+    return update_rules().get(ident, "semver")
 
 
 def version(value):

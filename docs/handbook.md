@@ -789,6 +789,22 @@ separate, opt-in encrypted recovery source. See [Security Model](security-model.
 
 ## Versions and Supply Chain
 
+`./scripts/install.sh --reviewed-baseline` explicitly disables latest-release discovery
+and uses exact repository pins. Required tools with `distro`/unversioned baselines are
+rejected in this mode; it is not a general offline install or silent outage fallback.
+Artifact downloads and all trust checks remain mandatory. Resume restores this mode
+and the saved targets. GCloud SDK increments and cloudflared calendar/year rollovers
+follow the shared vendor-specific policy, not SemVer-major warning heuristics.
+CI advisory discovery runs independently of verified release/installation acceptance.
+
+The Docker behavior suite includes `tests/e2e/test-seeded-upgrade.sh`: synthetic older
+Neovim (owned 0.12.0) and GCM (legacy 1.0.0), interrupted archive transfer, two real
+section passes, preservation of newer/modified tools and local overlay/history, and
+owner-death lock recovery. It uses no live downloads, credentials or host inventory.
+This representative migration fixture is not a full archived historical installation.
+Its section logs and duration summary are retained under the suite's
+`seeded-upgrade/` artifact directory; the existing image is reused with a 120s limit.
+
 - `packages.yaml`: requested versions.
 - `packages.meta.yaml`: source, owner, and integrity policy.
 - `packages.lock`: generated audit view and manifest hashes.

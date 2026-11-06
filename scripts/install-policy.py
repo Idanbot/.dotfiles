@@ -93,19 +93,6 @@ def upstream(entry, meta, major=None):
         return max(versions, key=order), {}
     if ident == "cloud.gcloud":
         latest = str(get_json("https://dl.google.com/dl/cloudsdk/channels/rapid/components-2.json")["version"])
-        # Google increments the first component for SDK releases. Do not cross
-        # an installed major, even though it is not a conventional SemVer major.
-        if major is not None and order(latest)[0] != major:
-            cached = subprocess.run(["apt-cache", "madison", "google-cloud-cli"],
-                                    capture_output=True, text=True, timeout=10)
-            candidates = [entry["current"]]
-            for line in cached.stdout.splitlines():
-                fields = line.split("|")
-                if len(fields) >= 2:
-                    candidate = fields[1].strip().split("-")[0]
-                    if stable(candidate) and order(candidate)[0] == major:
-                        candidates.append(candidate)
-            return max(candidates, key=order), {}
         return latest, {}
     if ident == "cloud.kubectl":
         return fetch("https://dl.k8s.io/release/stable.txt").strip().removeprefix("v"), {}
@@ -211,11 +198,19 @@ def selected(root, sections):
         and (stable(entry["requested"]) or entry["id"] in ROLLING)]
 
 
-def resolve(entry, meta, arch):
+def resolve(entry, meta, arch, reviewed_baseline=False):
     _, observed = software.probe(entry)
     entry = {**entry, "current": observed["version"] or "", "path": observed["path"],
              "probe": observed.get("probe", "unknown"),
              "target": entry["requested"], "policy": "same-major" if entry["id"] in ROLLING else "repo-minimum"}
+    scheme = releases.release_scheme(entry["id"])
+    entry["release_scheme"] = scheme
+    if reviewed_baseline:
+        entry["policy"] = "reviewed-baseline"
+        entry["resolution_warning"] = "Discovery disabled explicitly; freshness unknown; using repository pin"
+        if not stable(entry["requested"]):
+            entry["error"] = "Reviewed-baseline mode requires an exact repository version for this tool"
+        return entry
     try:
         latest, _ = upstream(entry, meta)
         if not stable(latest):
@@ -223,7 +218,10 @@ def resolve(entry, meta, arch):
         entry["latest"] = latest
         if entry["id"] in ROLLING:
             baseline = entry["requested"] if stable(entry["requested"]) else entry["current"] or latest
-            target, release = upstream(entry, meta, order(baseline)[0])
+            boundary = None if scheme in {"vendor-sdk", "calendar"} else order(baseline)[0]
+            target, release = upstream(entry, meta, boundary)
+            if boundary is None:
+                entry["policy"] = scheme
             # Never regress below the tested repository baseline.
             if stable(entry["requested"]) and order(target) < order(entry["requested"]):
                 raise ValueError("Upstream latest is older than the repository baseline")
@@ -347,6 +345,8 @@ def recommendations(root):
             def delta(target):
                 if order(target) <= order(baseline):
                     return ""
+                if rule in {"vendor-sdk", "calendar"}:
+                    return f"{rule} release update available"
                 if order(target)[0] != order(baseline)[0]:
                     unit = "major"
                 elif order(target)[1] != order(baseline)[1]:
@@ -456,7 +456,7 @@ def report(entries):
         elif not current:
             warnings.append(("WARN", f"{entry['id']}: installed version unavailable; latest stable {latest or 'unknown'}"))
         elif latest and order(current) < order(latest):
-            vendor_train = entry["id"] in {"cloud.gcloud", "cloud.cloudflared"}
+            vendor_train = releases.release_scheme(entry["id"]) in {"vendor-sdk", "calendar"}
             severity = "HIGH" if order(latest)[0] > order(current)[0] and not vendor_train else "LOW"
             note = "vendor release update; review current update policy" if vendor_train else (
                 "new major; review before upgrading" if severity == "HIGH" else "minor/patch update available")
@@ -486,6 +486,7 @@ def main():
     parser.add_argument("--sections", default="core,languages,cloud,ai")
     parser.add_argument("--plan", type=Path)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--reviewed-baseline", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--tool")
     parser.add_argument("--field", default="target")
@@ -518,6 +519,8 @@ def main():
         return
     sections = args.sections.split(",")
     checks = host_checks(Path.home(), sections)
+    if args.reviewed_baseline:
+        checks.append(("WARN", "Reviewed-baseline mode: discovery disabled; freshness unknown; exact repository pins and mandatory integrity checks remain in force"))
     if args.resume and args.plan and not args.plan.is_file() and not (args.plan.parent / "checkpoints/preflight.done").exists():
         # A failure before preflight produced a plan may resolve for the first
         # time. A previously completed stage must never silently re-resolve.
@@ -528,20 +531,22 @@ def main():
         data = json.loads(args.plan.read_text())
         if data.get("schema") != 1 or data.get("sections") != sections or data.get("source") != str(ROOT):
             raise ValueError("Version plan inputs changed; start a new installation run")
+        if data.get("reviewed_baseline", False) != args.reviewed_baseline:
+            raise ValueError("Version plan discovery mode changed; start a new installation run")
     else:
         metadata = load_metadata(ROOT / "packages.meta.yaml")
         entries = selected(ROOT, sections)
         arch = "amd64" if platform.machine() == "x86_64" else "arm64"
         def resolve_one(entry):
             group, key = entry["id"].split(".")
-            return resolve(entry, metadata.get(group, {}).get(key, {}), arch)
+            return resolve(entry, metadata.get(group, {}).get(key, {}), arch, args.reviewed_baseline)
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
             tools = list(pool.map(resolve_one, entries))
         for entry in tools:
             entry["action"], entry["ownership"] = planned_action(entry)
             if entry["ownership"] in {"unknown-version", "unsupported-replacement"}:
                 checks.append(("WARN", f"{entry['id']}: {entry['action']}"))
-        data = {"schema": 1, "source": str(ROOT), "sections": sections,
+        data = {"schema": 1, "source": str(ROOT), "sections": sections, "reviewed_baseline": args.reviewed_baseline,
                 "resolved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                 "tools": {entry["id"]: entry for entry in tools}}
     for entry in data["tools"].values():

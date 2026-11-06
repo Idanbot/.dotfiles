@@ -34,6 +34,14 @@ def copy_contract_fixture(root):
 
 
 class GraphTests(unittest.TestCase):
+    def test_advisory_outage_cannot_skip_acceptance(self):
+        live = contracts.load(ROOT / ".github/workflows/ci-live.yml")["jobs"]
+        self.assertFalse(contracts.needs(live["github-release-tools"]))
+        discovery = next(step for step in live["version-report"]["steps"] if step.get("id") == "discovery")
+        self.assertTrue(discovery["continue-on-error"])
+        self.assertTrue(any(step.get("if") == "steps.discovery.outcome == 'failure'"
+                            for step in live["version-report"]["steps"]))
+
     def test_repository_contracts(self):
         contracts.check(ROOT)
 

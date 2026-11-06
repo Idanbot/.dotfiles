@@ -816,6 +816,13 @@
       ]
     },
     {
+      "path": "tests/e2e/test-seeded-upgrade.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "timeout_seconds": 120,
+      "invocations": [["{root}"]]
+    },
+    {
       "path": "tests/test-secret-boundary.sh",
       "kind": "suite",
       "suite": "behavior",
