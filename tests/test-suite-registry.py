@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = (
     Path(sys.argv.pop(1)).resolve()
@@ -22,6 +23,41 @@ spec.loader.exec_module(runner)
 
 
 class RegistryTests(unittest.TestCase):
+    def test_native_shards_cover_every_command_once(self):
+        data = runner.registry(ROOT)
+        for suite in ("behavior", "static", "selectors"):
+            with self.subTest(suite=suite):
+                complete = runner.commands(data, suite, ROOT)
+                first = runner.commands(data, suite, ROOT, partition=(1, 2))
+                second = runner.commands(data, suite, ROOT, partition=(2, 2))
+                def encode(rows):
+                    return {json.dumps(row) for row in rows}
+                self.assertTrue(first and second)
+                self.assertFalse(encode(first) & encode(second))
+                self.assertEqual(encode(first) | encode(second), encode(complete))
+                self.assertEqual(len(first) + len(second), len(complete))
+
+    def test_wsl_smoke_is_explicit_and_bounded(self):
+        data = runner.registry(ROOT)
+        platform = runner.commands(data, "behavior", ROOT, scope="platform")
+        paths = {row[0] for row in platform}
+        self.assertIn("tests/test-environment.sh", paths)
+        self.assertIn("tests/test-section-preservation.sh", paths)
+        self.assertLessEqual(len(paths), 12)
+        self.assertLess(len(platform), len(runner.commands(data, "behavior", ROOT)))
+        with self.assertRaisesRegex(ValueError, "no platform"):
+            runner.commands(data, "upgrades", ROOT, scope="platform")
+        data["suites"]["behavior"]["platform_smoke"] = ["tests/missing.sh"]
+        with patch.object(runner.json, "loads", return_value=data):
+            with self.assertRaisesRegex(ValueError, "invalid platform"):
+                runner.registry(ROOT)
+
+    def test_invalid_shards_are_rejected(self):
+        self.assertEqual(runner.shard("1/2"), (1, 2))
+        for value in ("0/2", "3/2", "1/0", "1/17", "bad", "1/2/3"):
+            with self.subTest(value=value), self.assertRaises(runner.argparse.ArgumentTypeError):
+                runner.shard(value)
+
     def test_real_registry_is_complete(self):
         data = runner.registry(ROOT)
         self.assertGreaterEqual(len(data["tests"]), 76)
@@ -82,7 +118,7 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test-one.sh").write_text("exit 19\n")
+            (root / "tests/test-one.sh").write_text("echo failure-detail; exit 19\n")
             (root / "tests/test-two.sh").write_text("echo second-test-ran\n")
             (root / "tests/suites.json").write_text(
                 json.dumps(
@@ -128,6 +164,15 @@ class RegistryTests(unittest.TestCase):
                 all(item["duration_seconds"] >= 0 for item in report["results"])
             )
             self.assertTrue((root / "results/junit.xml").exists())
+            quiet = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/ci/run-tests.py"), "--root", str(root),
+                 "--output", str(root / "quiet"), "--quiet", "unit"],
+                capture_output=True, text=True,
+            )
+            self.assertNotEqual(quiet.returncode, 0)
+            self.assertIn("failure-detail", quiet.stdout)
+            self.assertNotIn("second-test-ran", quiet.stdout)
+            self.assertIn("second-test-ran", (root / "quiet/002.log").read_text())
 
 
 if __name__ == "__main__":

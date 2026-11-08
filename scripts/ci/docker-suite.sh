@@ -9,6 +9,8 @@ mkdir -p "$ROOT/artifacts"
 image="${DOTFILES_CI_IMAGE:-dotfiles-ci-tests}"
 platform=native
 [[ "${DOTFILES_WSL:-false}" != true ]] || platform=wsl-simulated
+runner_args=()
+[[ "${GITHUB_ACTIONS:-false}" != true ]] || runner_args+=(--quiet)
 if [[ "${DOTFILES_CI_SKIP_BUILD:-false}" != true ]]; then
   docker build --target tests -f "$ROOT/.github/e2e/Dockerfile.ubuntu-24.04" -t "$image" "$ROOT"
 fi
@@ -27,4 +29,4 @@ exec docker run --rm \
       /dotfiles/scripts/ci/prepare-validators.sh
     fi
     python3 /dotfiles/scripts/ci/run-tests.py "$@"
-  ' bash "$suite" "$@"
+  ' bash "$suite" "${runner_args[@]}" "$@"

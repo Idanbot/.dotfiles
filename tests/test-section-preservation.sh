@@ -5,10 +5,9 @@ ROOT="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 temporary="$(mktemp -d)"
 trap 'rm -rf "$temporary"' EXIT
 export DOTFILES_SOURCE_DIR="$ROOT"
-for tool in kubectl serena graphify yt-dlp git-credential-manager; do
+for tool in kubectl graphify yt-dlp git-credential-manager; do
   case "$tool" in
     kubectl) section=05-install-containers-cloud start=KUBECTL_VERSION= end=HELM_VERSION= ;;
-    serena) section=08-install-ai-tools start=SERENA_VERSION= end=CONTEXT_MODE_VERSION= ;;
     graphify) section=08-install-ai-tools start=GRAPHIFY_VERSION= end=RTK_VERSION= ;;
     yt-dlp) section=09-install-media-tools start=YTDLP_VERSION= end=require_sudo ;;
     git-credential-manager) section=12-configure-system start=GCM_VERSION= end='if is_native' ;;
@@ -23,8 +22,7 @@ for tool in kubectl serena graphify yt-dlp git-credential-manager; do
     (
       export HOME="$temporary/$tool-$scenario" DOTFILES_SECTION=test
       export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_VERSION_PLAN="$HOME/versions.json"
-      mkdir -p "$HOME/.local/bin" "$HOME/external/bin" "$HOME/.serena"
-      printf 'existing Serena config\n' >"$HOME/.serena/serena_config.yml"
+      mkdir -p "$HOME/.local/bin" "$HOME/external/bin"
       printf '{"tools":{}}\n' >"$DOTFILES_VERSION_PLAN"
       source "$ROOT/scripts/lib.sh"
       RELEASE_ARCH="$(get_arch)"

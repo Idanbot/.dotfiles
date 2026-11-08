@@ -48,7 +48,42 @@ def registry(root):
                 raise ValueError(f"missing caller or covered test: {entry}")
         else:
             raise ValueError(f"unknown test kind: {entry}")
+    for name, suite in data["suites"].items():
+        platform = suite.get("platform_smoke", [])
+        paths = {entry["path"] for entry in entries if entry.get("suite") == name}
+        if not isinstance(platform, list) or not all(isinstance(path, str) for path in platform) or len(set(platform)) != len(platform) or not set(platform) <= paths:
+            raise ValueError(f"invalid platform smoke selection: {name}")
     return data
+
+
+def shard(value):
+    try:
+        index, total = map(int, value.split("/"))
+        if 1 <= index <= total <= 16:
+            return index, total
+    except (ValueError, TypeError):
+        pass
+    raise argparse.ArgumentTypeError("shard must be INDEX/TOTAL with 1 <= INDEX <= TOTAL <= 16")
+
+
+def commands(data, suite, root, scope="all", partition=(1, 1)):
+    selected = data["suites"][suite].get("platform_smoke", [])
+    if scope == "platform" and not selected:
+        raise ValueError(f"no platform smoke tests registered for {suite}")
+    plan = []
+    for entry in data["tests"]:
+        if entry.get("suite") != suite or (scope == "platform" and entry["path"] not in selected):
+            continue
+        for invocation in entry["invocations"]:
+            executable = "python3" if entry["path"].endswith(".py") else "bash"
+            argv = [executable, str(root / entry["path"])] + [
+                arg.replace("{root}", str(root)) for arg in invocation
+            ]
+            plan.append((entry["path"], argv, entry.get("timeout_seconds", 600)))
+    if scope == "all":
+        plan.extend((" ".join(command), command, 600) for command in data["suites"][suite].get("checks", []))
+    index, total = partition
+    return plan[index - 1::total]
 
 
 def main():
@@ -59,6 +94,9 @@ def main():
     )
     parser.add_argument("--validate", action="store_true")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--quiet", action="store_true", help="retain successful output only in log artifacts")
+    parser.add_argument("--scope", choices=("all", "platform"), default="all")
+    parser.add_argument("--shard", type=shard, default=(1, 1), metavar="INDEX/TOTAL")
     parser.add_argument(
         "--output", type=Path, help="directory for JSON, JUnit, and per-command logs"
     )
@@ -76,6 +114,12 @@ def main():
         return
     if args.suite not in data["suites"]:
         parser.error(f"choose a suite: {', '.join(data['suites'])}")
+    try:
+        plan = commands(data, args.suite, root, args.scope, args.shard)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if not plan:
+        parser.error("empty test selection; check scope and shard")
     if not args.list and not Path("/.dockerenv").exists():
         parser.error("run suites inside Docker; use scripts/ci/docker-suite.sh")
     output = args.output or (
@@ -86,7 +130,8 @@ def main():
     results = []
 
     def execute(name, argv, timeout=600):
-        print("+ " + " ".join(argv), flush=True)
+        if args.list or not args.quiet:
+            print("+ " + " ".join(argv), flush=True)
         if args.list:
             return
         output.mkdir(parents=True, exist_ok=True)
@@ -109,7 +154,8 @@ def main():
                 stream.write(str(error) + "\n")
                 code = 127
         elapsed = round(time.monotonic() - started, 3)
-        print(logfile.read_text(errors="replace"), end="", flush=True)
+        if code != 0 or not args.quiet:
+            print(logfile.read_text(errors="replace"), end="", flush=True)
         status = "success" if code == 0 else "failure"
         print(f"[{status.upper()}] {name}: {elapsed:.3f}s (exit {code})", flush=True)
         results.append(
@@ -123,22 +169,15 @@ def main():
             }
         )
 
-    for entry in data["tests"]:
-        if entry.get("suite") != args.suite:
-            continue
-        for invocation in entry["invocations"]:
-            executable = "python3" if entry["path"].endswith(".py") else "bash"
-            argv = [executable, str(root / entry["path"])] + [
-                arg.replace("{root}", str(root)) for arg in invocation
-            ]
-            execute(entry["path"], argv, entry.get("timeout_seconds", 600))
-    for command in data["suites"][args.suite].get("checks", []):
-        execute(" ".join(command), command)
+    for name, argv, timeout in plan:
+        execute(name, argv, timeout)
     if not args.list:
         failed = [item for item in results if item["status"] != "success"]
         output.mkdir(parents=True, exist_ok=True)
         report = {
             "suite": args.suite,
+            "scope": args.scope,
+            "shard": {"index": args.shard[0], "total": args.shard[1]},
             "status": "failure" if failed else "success",
             "duration_seconds": round(
                 sum(item["duration_seconds"] for item in results), 3

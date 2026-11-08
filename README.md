@@ -80,7 +80,7 @@ dot tools sql                      # Find tools by name, purpose, or tags
 dot tools --available --pick        # fzf catalog with details and examples
 dot workspace "$PWD"                # Backend-aware agent workspace
 dot-agent-status --check            # Agent readiness, without starting agents
-agent-mcp status                    # Optional MCP integrations; off by default
+agent-mcp status                    # Inspect manually configured MCP integrations
 cloud-context --recent              # Recent saved cloud contexts
 kfzf -t pods,deployments             # Cached Kubernetes describe picker
 dot privacy                        # Managed telemetry policy audit
@@ -176,7 +176,7 @@ commands, examples, tags, and observed paths/versions.
 | terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.76.0 |
 | system | `git_credential_manager` 3.0.2 |
 | fonts | `nerd_font` FiraMono, `nerd_font_version` 3.5.1 |
-| ai_tools | `claude_cli` 2.1.319, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.5, `omp` 18.18.1, `bun` 1.4.4, `serena` 1.7.0, `context_mode` 1.0.169, `graphify` 0.9.104, `rtk` 0.51.0, `ponytail` 5.3.3, `pix_optimizer` 1.3.5 |
+| ai_tools | `claude_cli` 2.1.319, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.5, `omp` 18.18.1, `bun` 1.4.4, `graphify` 0.9.104, `rtk` 0.51.0, `ponytail` 5.3.3, `pix_optimizer` 1.3.5 |
 | media | `yt_dlp` 2026.10.26, `rmpc` 0.11.0, `cava` distro |
 <!-- tool-versions:end -->
 
@@ -196,9 +196,10 @@ Check `DOTFILES_E2E_STATUS`; zero means validation passed. Exit to remove the
 container. Logs, convergence reports, and timings remain under `artifacts/`.
 WSL here is simulated; real WSL uses the separate opt-in Windows workflow.
 
-Every push/PR runs security/static checks, behavior/selector tests, two-pass base
-installs, and recovery acceptance. Heavy profiles run weekly, manually, and for
-grouped upgrade canaries. [Full verification reference](docs/handbook.md#verification).
+Every push/PR runs security/static checks, parallel native behavior shards,
+focused WSL checks, a native two-pass base install, and recovery acceptance.
+Extended WSL/resume tests and heavy profiles run weekly, on heavy manual dispatch,
+and for grouped upgrade canaries. [Verification reference](docs/handbook.md#verification).
 Outcome classification explains CI failures; it does not replace installation
 acceptance. CVE reports are advisory and do not certify tools as vulnerability-free.
 

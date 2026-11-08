@@ -24,6 +24,18 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
-docker compose -p "$project" -f .github/e2e/compose.yaml --profile "$profile" \
-  up --build --abort-on-container-exit --exit-code-from "$service" "$service" \
-  2>&1 | tee "artifacts/$service-compose.log"
+log="artifacts/$service-compose.log"
+if [[ "${GITHUB_ACTIONS:-false}" == true ]]; then
+  if docker compose -p "$project" -f .github/e2e/compose.yaml --profile "$profile" \
+    up --build --abort-on-container-exit --exit-code-from "$service" "$service" >"$log" 2>&1; then
+    printf 'Acceptance passed: %s (full output retained in %s)\n' "$service" "$log"
+  else
+    status=$?
+    tail -n 100 "$log"
+    exit "$status"
+  fi
+else
+  docker compose -p "$project" -f .github/e2e/compose.yaml --profile "$profile" \
+    up --build --abort-on-container-exit --exit-code-from "$service" "$service" \
+    2>&1 | tee "$log"
+fi

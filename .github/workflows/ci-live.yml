@@ -14,42 +14,6 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  version-report:
-    name: Version and Checksum Report
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - name: Harden runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
-        with:
-          egress-policy: audit
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Check latest versions and checksums
-        id: discovery
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPGRADE_REPORT: ${{ runner.temp }}/dotfiles-upgrade-report.md
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y python3-yaml
-          ./scripts/update-packages.sh --check --report "$UPGRADE_REPORT"
-          cat "$UPGRADE_REPORT" >>"$GITHUB_STEP_SUMMARY"
-      - name: Classify unavailable advisory discovery
-        if: steps.discovery.outcome == 'failure'
-        run: |
-          echo '::warning::Advisory discovery unavailable; freshness is unknown.' \
-            'Artifact verification and installation acceptance remain mandatory.'
-      - name: Upload upgrade report
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: version-checksum-report
-          path: ${{ runner.temp }}/dotfiles-upgrade-report.md
-          retention-days: 14
-
   github-release-tools:
     name: Verified Release Asset Smoke
     runs-on: ubuntu-24.04
@@ -79,14 +43,13 @@ jobs:
 
   base-e2e:
     name: base-e2e (${{ matrix.service }})
-    needs: [github-release-tools]
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        service: [base-native, base-wsl-simulated]
+        service: [base-native]
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -106,14 +69,13 @@ jobs:
 
   recovery-e2e:
     name: recovery-e2e (${{ matrix.service }})
-    needs: [github-release-tools]
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        service: [recovery, failure-resume]
+        service: [recovery]
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -131,17 +93,43 @@ jobs:
           service: ${{ matrix.service }}
           artifact: recovery-e2e-${{ matrix.service }}
 
+  extended-e2e:
+    name: Extended ${{ matrix.service }} E2E
+    if: inputs.heavy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      max-parallel: 2
+      matrix:
+        service: [base-wsl-simulated, failure-resume]
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run acceptance and retain reports
+        uses: ./.github/actions/e2e
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          service: ${{ matrix.service }}
+          artifact: extended-e2e-${{ matrix.service }}
+
   heavy-e2e:
     name: Live ${{ matrix.service }} E2E
     if: inputs.heavy
-    needs: [base-e2e, recovery-e2e]
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
-      fail-fast: false
-      max-parallel: 2
+      fail-fast: true
+      max-parallel: 3
       matrix:
-        service: [developer, agent, cloud, full, full-native]
+        service: [full-native, full, developer, agent, cloud]
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -163,9 +151,12 @@ jobs:
     name: Rolling Performance History
     if: >-
       always() &&
+      inputs.heavy &&
       needs.base-e2e.result == 'success' &&
+      needs.extended-e2e.result == 'success' &&
+      needs.heavy-e2e.result == 'success' &&
       github.event_name != 'pull_request'
-    needs: [base-e2e, heavy-e2e]
+    needs: [base-e2e, extended-e2e, heavy-e2e]
     permissions:
       actions: read  # download this run's and prior performance artifacts
       contents: read
@@ -238,7 +229,7 @@ jobs:
   result:
     name: Live Acceptance Result
     if: always()
-    needs: [version-report, github-release-tools, base-e2e, recovery-e2e, heavy-e2e, performance-history]
+    needs: [github-release-tools, base-e2e, recovery-e2e, extended-e2e, heavy-e2e, performance-history]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -253,8 +244,8 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
         run: |
           optional=()
-          [[ "$HEAVY_REQUIRED" == true ]] || optional+=(heavy-e2e)
-          [[ "$EVENT_NAME" != pull_request ]] || optional+=(performance-history)
+          [[ "$HEAVY_REQUIRED" == true ]] || optional+=(heavy-e2e extended-e2e)
+          [[ "$HEAVY_REQUIRED" == true && "$EVENT_NAME" != pull_request ]] || optional+=(performance-history)
           python3 scripts/ci/result.py \
-            --required version-report github-release-tools base-e2e recovery-e2e heavy-e2e performance-history \
+            --required github-release-tools base-e2e recovery-e2e extended-e2e heavy-e2e performance-history \
             --optional "${optional[@]}"

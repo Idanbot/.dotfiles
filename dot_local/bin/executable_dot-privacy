@@ -83,6 +83,6 @@ fi
 
 printf '\nOpenCode does not upload code/context unless sharing is explicitly used.\n'
 printf 'OMP issue reporting is explicit; its install ID is local until a report is submitted.\n'
-printf 'Serena and context-mode operate locally; Graphify uses no backend until configured.\n'
+printf 'Bootstrap installs no MCP servers; Graphify uses no backend until configured.\n'
 printf '\nSummary: %d failure(s), %d warning(s)\n' "$failures" "$warnings"
 ((failures == 0))

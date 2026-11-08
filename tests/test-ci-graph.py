@@ -34,13 +34,86 @@ def copy_contract_fixture(root):
 
 
 class GraphTests(unittest.TestCase):
-    def test_advisory_outage_cannot_skip_acceptance(self):
+    def test_live_result_requires_extended_acceptance_only_when_requested(self):
+        jobs = contracts.load(ROOT / ".github/workflows/ci-live.yml")["jobs"]
+        command = jobs["result"]["steps"][-1]["run"]
+        for heavy, event in ((False, "push"), (True, "schedule"), (True, "pull_request")):
+            with self.subTest(heavy=heavy, event=event):
+                states = {name: {"result": "success"} for name in contracts.needs(jobs["result"])}
+                if not heavy:
+                    for name in ("heavy-e2e", "extended-e2e", "performance-history"):
+                        states[name]["result"] = "skipped"
+                elif event == "pull_request":
+                    states["performance-history"]["result"] = "skipped"
+
+                def run():
+                    return subprocess.run(
+                        ["bash", "-euo", "pipefail", "-c", command], cwd=ROOT,
+                        env={**os.environ, "CI_NEEDS": json.dumps(states),
+                             "HEAVY_REQUIRED": str(heavy).lower(), "EVENT_NAME": event},
+                        capture_output=True, text=True,
+                    )
+
+                self.assertEqual(run().returncode, 0)
+                required = "extended-e2e" if heavy else "base-e2e"
+                for invalid in ("failure", "cancelled", "skipped"):
+                    states[required]["result"] = invalid
+                    self.assertNotEqual(run().returncode, 0, invalid)
+
+    def test_hosted_e2e_logs_are_quiet_without_hiding_failure_or_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            docker = root / "docker"
+            docker.write_text('''#!/bin/bash
+if [[ "$*" == *" down --volumes"* ]]; then echo cleanup-complete; exit 0; fi
+echo acceptance-detail
+exit "$FIXTURE_EXIT"
+''')
+            docker.chmod(0o755)
+            for status in (0, 37):
+                completed = subprocess.run(
+                    ["bash", str(ROOT / "scripts/ci/e2e.sh"), "base-native"], cwd=root,
+                    env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                         "GITHUB_ACTIONS": "true", "FIXTURE_EXIT": str(status)},
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(completed.returncode, status, completed.stderr)
+                self.assertIn("acceptance-detail", (root / "artifacts/base-native-compose.log").read_text())
+                self.assertIn("cleanup-complete", (root / "artifacts/base-native-cleanup.log").read_text())
+                if status:
+                    self.assertIn("acceptance-detail", completed.stdout)
+                else:
+                    self.assertNotIn("acceptance-detail", completed.stdout)
+
+    def test_advisory_discovery_is_outside_acceptance(self):
         live = contracts.load(ROOT / ".github/workflows/ci-live.yml")["jobs"]
         self.assertFalse(contracts.needs(live["github-release-tools"]))
-        discovery = next(step for step in live["version-report"]["steps"] if step.get("id") == "discovery")
-        self.assertTrue(discovery["continue-on-error"])
-        self.assertTrue(any(step.get("if") == "steps.discovery.outcome == 'failure'"
-                            for step in live["version-report"]["steps"]))
+        self.assertNotIn("version-report", live)
+        self.assertTrue(all("version-report" not in contracts.needs(job) for job in live.values()))
+        weekly = contracts.load(ROOT / ".github/workflows/version-audit.yml")
+        self.assertTrue(any("maintenance-audit.sh weekly" in step.get("run", "")
+                            for step in weekly["jobs"]["report"]["steps"]))
+
+    def test_shard_and_platform_scheduling_drift_is_rejected(self):
+        for mutation in ("duplicate-shard", "unfiltered-wsl", "missing-scope-argument"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_contract_fixture(root)
+                path = root / ".github/workflows/ci-checks.yml"
+                workflow = contracts.load(path)
+                job = workflow["jobs"]["contracts"]
+                if mutation == "duplicate-shard":
+                    row = next(item for item in job["strategy"]["matrix"]["include"] if item.get("shard") == "2/2")
+                    row["shard"] = "1/2"
+                elif mutation == "unfiltered-wsl":
+                    row = next(item for item in job["strategy"]["matrix"]["include"] if item["wsl"] == "true")
+                    row.pop("scope")
+                else:
+                    step = next(item for item in job["steps"] if "CI_SUITE" in item.get("env", {}))
+                    step["run"] = './scripts/ci/docker-suite.sh "$CI_SUITE"'
+                path.write_text(contracts.yaml.safe_dump(workflow))
+                with self.assertRaises(AssertionError):
+                    contracts.check(root)
 
     def test_repository_contracts(self):
         contracts.check(ROOT)
@@ -141,6 +214,7 @@ class GraphTests(unittest.TestCase):
         mutations = [
             ("ci.yml", lambda wf: wf["jobs"]["live"].update(needs=[])),
             ("ci.yml", lambda wf: wf["jobs"]["result"].update(needs=["checks"])),
+            ("ci.yml", lambda wf: wf["jobs"]["live"]["with"].update(heavy="github.head_ref == 'automation/grouped-tool-upgrades'")),
             (
                 "ci-live.yml",
                 lambda wf: wf["jobs"]["heavy-e2e"].update(**{"if": "false"}),

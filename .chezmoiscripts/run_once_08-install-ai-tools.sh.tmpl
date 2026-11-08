@@ -108,17 +108,6 @@ install_github_archive bun oven-sh/bun "bun-v$BUN_VERSION" \
   "bun-linux-$BUN_ARCH.zip" "bun-linux-$BUN_ARCH/bun" \
   "sha256:$BUN_SHA256" 'bun --version'
 
-SERENA_VERSION="$(package_version ai_tools serena 1.6.1)"
-install_uv_tool serena serena-agent "$SERENA_VERSION" 3.13
-if [[ ! -f "$HOME/.serena/serena_config.yml" ]]; then
-  log_info "Initializing Serena's local language-server configuration"
-  serena init
-fi
-
-CONTEXT_MODE_VERSION="$(package_version ai_tools context_mode 1.0.169)"
-npm_install_global context-mode "$CONTEXT_MODE_VERSION" context-mode \
-  context-mode,better-sqlite3
-
 GRAPHIFY_VERSION="$(package_version ai_tools graphify 0.9.38)"
 install_uv_tool graphify graphifyy "$GRAPHIFY_VERSION" 3.13
 
@@ -157,14 +146,14 @@ for agent in claude codex agy opencode omp; do
   fi
 done
 
-for mcp_runtime in serena context-mode graphify rtk agent-mcp; do
-  if is_installed "$mcp_runtime"; then
-    log_success "$mcp_runtime optional runtime is available"
+for runtime in graphify rtk agent-mcp; do
+  if is_installed "$runtime"; then
+    log_success "$runtime optional runtime is available"
   else
-    log_error "$mcp_runtime optional runtime is unavailable"
+    log_error "$runtime optional runtime is unavailable"
   fi
 done
-log_info "Optional MCP servers are disabled by default; use 'agent-mcp enable <server>'"
+log_info "MCP servers are not installed or enabled; existing local MCP settings are preserved"
 log_info "Graphify is available on demand in OMP; run '/graphify .' inside an agent session"
 log_info "RTK is installed without hooks; its telemetry is disabled by policy"
 log_info "Ponytail is available as an on-demand shared skill"

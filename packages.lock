@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 8aa0f4028e2be1f666f533efce21835d2781ba74a1a9c8e8a0349bda52a343ed
-  metadata: 7a7ead6383b917ceb417cb2db3c94a80b68f5aba1a7135f4c7ac73547980fc53
+  packages: 722ead530a3e7f6dec6bd15fc114726673c55fa85c629cff7d20036372b6d4e3
+  metadata: a7fded446e5737c9b5479e645653ed9d03b5b93c100d2d3ec22b6884a64cfcbc
 
 tools:
   - section: bootstrap
@@ -711,22 +711,6 @@ tools:
     sha256_amd64: e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76
     sha256_arm64: baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e
     integrity: pinned-sha256
-  - section: ai_tools
-    name: serena
-    version: 1.7.0
-    source: uv
-    owner: uv
-    package: serena-agent
-    binary: serena
-    integrity: pypi
-  - section: ai_tools
-    name: context_mode
-    version: 1.0.169
-    source: npm
-    owner: npm
-    package: context-mode
-    binary: context-mode
-    integrity: npm-registry
   - section: ai_tools
     name: graphify
     version: 0.9.104

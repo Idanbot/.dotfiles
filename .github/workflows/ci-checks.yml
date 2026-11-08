@@ -97,6 +97,7 @@ jobs:
 
   dependency-review:
     name: Dependency Review
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -113,12 +114,9 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
-      - name: Non-PR event
-        if: github.event_name != 'pull_request'
-        run: echo "Dependency review applies to pull requests"
 
   contracts:
-    name: Docker ${{ matrix.suite }} (${{ matrix.platform }})
+    name: Docker ${{ matrix.id || matrix.suite }} (${{ matrix.platform }})
     needs: [test-image]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -127,8 +125,9 @@ jobs:
       matrix:
         include:
           - {suite: static, platform: native, wsl: "false"}
-          - {suite: behavior, platform: native, wsl: "false"}
-          - {suite: behavior, platform: wsl-simulated, wsl: "true"}
+          - {suite: behavior, id: behavior-1, shard: "1/2", platform: native, wsl: "false"}
+          - {suite: behavior, id: behavior-2, shard: "2/2", platform: native, wsl: "false"}
+          - {suite: behavior, scope: platform, platform: wsl-simulated, wsl: "true"}
           - {suite: upgrades, platform: native, wsl: "false"}
           - {suite: selectors, platform: native, wsl: "false"}
           - {suite: workspace, platform: native, wsl: "false"}
@@ -156,16 +155,19 @@ jobs:
       - name: Run registered suite
         env:
           CI_SUITE: ${{ matrix.suite }}
+          CI_SCOPE: ${{ matrix.scope || 'all' }}
+          CI_SHARD: ${{ matrix.shard || '1/1' }}
+          CI_RESULTS_DIR: /artifacts/ci/${{ matrix.id || matrix.suite }}-${{ matrix.platform }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOTFILES_CI_IMAGE: dotfiles-ci-tests
           DOTFILES_CI_SKIP_BUILD: "true"
           DOTFILES_WSL: ${{ matrix.wsl }}
-        run: ./scripts/ci/docker-suite.sh "$CI_SUITE"
+        run: ./scripts/ci/docker-suite.sh "$CI_SUITE" --scope "${CI_SCOPE:-all}" --shard "${CI_SHARD:-1/1}"
       - name: Upload diagnostics and benchmarks
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: contracts-${{ matrix.suite }}-${{ matrix.platform }}
+          name: contracts-${{ matrix.id || matrix.suite }}-${{ matrix.platform }}
           path: artifacts/
           if-no-files-found: ignore
           retention-days: 30

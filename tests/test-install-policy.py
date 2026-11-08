@@ -43,6 +43,15 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_default_ai_plan_has_no_mcp_install_targets_or_requirements(self):
+        targets = {entry["id"] for entry in policy.selected(ROOT, ["ai"])}
+        self.assertNotIn("ai_tools.serena", targets)
+        self.assertNotIn("ai_tools.context_mode", targets)
+        self.assertIn("ai_tools.omp", targets)
+        commands = json.loads((ROOT / "scripts/sections.json").read_text())["ai"]["commands"]
+        self.assertNotIn("serena", commands)
+        self.assertNotIn("context-mode", commands)
+
     def test_backend_decision_is_structured_and_keeps_evidence(self):
         for ident, backend in [("system.git_credential_manager", "dpkg"), ("editor.neovim", "archive")]:
             for ownership, action, operation in [("missing", "install", "install"),

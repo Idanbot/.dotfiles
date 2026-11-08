@@ -81,8 +81,6 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | ai_tools | opencode | 1.19.5 | npm | npm | npm-registry |
 | ai_tools | omp | 18.18.1 | github | dotfiles-binary | pinned-sha256 |
 | ai_tools | bun | 1.4.4 | github | dotfiles-binary | pinned-sha256 |
-| ai_tools | serena | 1.7.0 | uv | uv | pypi |
-| ai_tools | context_mode | 1.0.169 | npm | npm | npm-registry |
 | ai_tools | graphify | 0.9.104 | pypi | uv | pypi |
 | ai_tools | rtk | 0.51.0 | github | dotfiles-binary | pinned-sha256 |
 | ai_tools | ponytail | 5.3.3 | github | agent-skill | pinned-sha256 |

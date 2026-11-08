@@ -585,18 +585,6 @@ ai_tools:
     sha256_amd64: e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76
     sha256_arm64: baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e
     integrity: pinned-sha256
-  serena:
-    source: uv
-    owner: uv
-    package: serena-agent
-    binary: serena
-    integrity: pypi
-  context_mode:
-    source: npm
-    owner: npm
-    package: context-mode
-    binary: context-mode
-    integrity: npm-registry
   graphify:
     source: pypi
     owner: uv

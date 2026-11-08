@@ -42,7 +42,19 @@
         ]
       ]
     },
-    "behavior": {},
+    "behavior": {
+      "platform_smoke": [
+        "tests/test-environment.sh",
+        "tests/test-profiles.sh",
+        "tests/test-interactive-startup.sh",
+        "tests/test-git-credential.sh",
+        "tests/test-system-configuration.sh",
+        "tests/test-runtime-policy.sh",
+        "tests/test-telemetry-policy.sh",
+        "tests/test-section-preservation.sh",
+        "tests/test-chezmoi-apply.sh"
+      ]
+    },
     "selectors": {},
     "workspace": {},
     "release": {},

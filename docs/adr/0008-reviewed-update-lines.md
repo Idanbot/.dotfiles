@@ -32,8 +32,8 @@ or establish a reviewed exact pin first. Artifact availability, checksums, signa
 APT authentication and preflight requirements remain blocking. Resume preserves
 the chosen discovery mode and original resolved targets.
 
-CI advisory discovery runs alongside acceptance, behind the same mandatory checks.
-Advisory failure emits a warning rather than skipping release smoke or making
+CI advisory discovery runs in separate scheduled/manual maintenance workflows,
+not on every acceptance run. Advisory failures cannot skip release smoke or make
 unverified payloads acceptable. Failed weekly audits mark the standing advisory
 issue incomplete, with a UTC timestamp and source revision; the grouped PR stays unchanged.
 

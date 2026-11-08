@@ -572,13 +572,16 @@ OMP in the same working directory. `--agents` selects a subset, `--check` valida
 commands, and `--restart-agents` explicitly restarts crashed agents. Missing optional
 agents leave a usable shell. The tmux prefix remains `Ctrl+S`.
 
-Serena and context-mode are installed as optional MCP runtimes but are
-disconnected from every agent by default. `agent-mcp` changes only the selected
-agents and preserves unrelated configuration:
+Bootstrap does not install MCP servers, including Serena and context-mode, or
+register MCPs with Codex, Cursor, Claude, or any other agent. Existing local
+servers/configurations are preserved, not silently disabled or uninstalled.
+To opt in, manually install a server you trust, then explicitly enable it for
+the intended agents. `agent-mcp` never installs servers and preserves unrelated
+configuration:
 
 ```bash
 agent-mcp status all
-agent-mcp enable serena
+agent-mcp enable serena --agent omp
 agent-mcp enable context-mode --agent codex,claude
 agent-mcp disable serena --agent agy,opencode,omp
 agent-mcp disable all
@@ -900,7 +903,7 @@ to the stable `automation/grouped-tool-upgrades` branch and creates or refreshes
 one review PR; it never merges automatically. Dependabot likewise groups GitHub
 Actions updates into one monthly PR. The report
 covers pinned GitHub/direct downloads including `ast-grep`, `gitleaks`, `s5cmd`, `stern`, `helmfile`,
-`kubectx`, `kubens`, and `kubecolor`, plus RTK, Serena, context-mode, npm packages, Rust, Python, Java,
+`kubectx`, `kubens`, and `kubecolor`, plus RTK, npm packages, Rust, Python, Java,
 Node, and AWS CLI. Google Cloud CLI and Azure CLI are rolling tools from their
 vendor-signed APT repositories and are upgraded whenever the `cloud` section
 runs.
@@ -941,7 +944,7 @@ Run the all-stable advisory locally without changing pins:
 
 Always-on CI downloads and verifies the release assets and executes the new
 CLIs. It also installs and runs the Ubuntu-managed `gojq`, `pigz`, `zstd`,
-`kcat`, and `pgloader` packages before the installation matrices begin.
+`kcat`, and `pgloader` packages alongside the independent installation jobs.
 
 Check current versions and integrity values:
 
@@ -949,8 +952,9 @@ Check current versions and integrity values:
 ./scripts/update-packages.sh --check
 ```
 
-The report is visible under **Actions > Version Audit** and in the `Version and
-Checksum Report` job on every CI run. Trigger and inspect the standalone audit:
+The report is visible under **Actions > Version Audit** and in the standing
+upgrade issue #34; routine bootstrap CI does not duplicate it. Trigger and inspect
+the standalone audit:
 
 ```bash
 gh workflow run version-audit.yml
@@ -1115,9 +1119,9 @@ Verification is tiered so a green result has a precise meaning:
 
 | Tier | Trigger | Coverage |
 | --- | --- | --- |
-| Push/PR CI | Every change | Parallel security/static and Docker behavior suites, selector edge cases, two-pass native/WSL base install, recovery/restore/resume |
-| Agent workspace Docker E2E | Every push/PR | Both workspace backends, all registered agent launchers, MCP toggles, working-directory propagation, and failure recovery fixtures |
-| Heavy Docker E2E | Weekly or manual | Live `developer`, `agent`, `cloud`, full WSL-simulated, and two-pass full-native installations |
+| Push/PR CI | Every change | Parallel security/static, two native behavior shards, focused WSL contracts, selectors, native two-pass base install, and cold recovery/restore |
+| Agent workspace Docker E2E | Every push/PR | tmux, all registered agent launchers, explicit MCP toggle fixtures, working-directory propagation, and failure recovery |
+| Extended/heavy Docker E2E | Weekly, explicit heavy dispatch, or grouped-upgrade canary | Two-pass WSL base, interrupted-install resume, all five heavy profiles including full native/WSL, and performance history outside PRs |
 | Native ARM64 smoke | Monthly or manual, public-repo ARM64 runner | Real checksummed release binaries from a cold base; not full-install acceptance |
 | Real WSL2 | Manual, private self-hosted Windows runner | Disposable imported WSL2 distro; requires trusted Ubuntu 24.04 rootfs via `WSL_E2E_ROOTFS` |
 
@@ -1126,12 +1130,20 @@ workflows contain checks and live acceptance. `tests/suites.json` accounts for
 every test; missing and duplicate registrations fail CI. Security checks run
 alongside the validator build. Registered Docker suites start when the shared
 image is ready; live acceptance waits for the complete checks gate. Native and
-WSL behavior remain separate; the common updater tests run once in the required
+WSL checks run only the platform-sensitive tests listed in the behavior suite's
+`platform_smoke` selection; native shards cover every behavior test exactly once.
+The common updater tests run once in the required
 `upgrades` suite. ShellCheck retains full source analysis with at most two
 workers. Installation acceptance still uses a minimal, cold base image.
 Every acceptance service retains Compose output and cleanup logs, including
 recovery tests. Successful installation profiles must produce performance
 samples; recovery scenarios do not upload nonexistent install timing files.
+Independent live jobs start together after the checks gate. Large profile jobs
+run three at a time and cancel matrix siblings on failure. Advisory version/CVE
+discovery remains in its separate scheduled/manual workflows, not every bootstrap
+run. Routine runs skip rolling-history aggregation, but retain native timing
+samples for the extended run. Hosted success logs show concise results; complete
+per-command/Compose output remains in artifacts and failures show diagnostics.
 
 Validator compilers and Go module/build caches stay in a separate build stage;
 only `shfmt` and `actionlint` binaries enter the runtime image. Exact cache keys

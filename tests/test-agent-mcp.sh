@@ -311,4 +311,80 @@ printf '{"mcpServers":"FIXTURE_SENSITIVE_VALUE"}\n' >"$AGY_CONFIG"
 if "$SCRIPT" enable serena --agent agy >"$TMP_ROOT/result" 2>&1; then exit 1; fi
 ! grep -q FIXTURE_SENSITIVE_VALUE "$TMP_ROOT/result"
 
+# Run the real AI section with inert installers and synthetic agent homes.
+/usr/bin/python3 - "$DOTFILES_DIR" "$TMP_ROOT" <<'PY'
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+root, temporary = map(Path, sys.argv[1:])
+fixture = temporary / "bootstrap"
+(fixture / "scripts").mkdir(parents=True)
+library = r'''set -euo pipefail
+record() { printf '%s\n' "$*" >>"$BOOTSTRAP_CALLS"; }
+log_step() { :; }
+log_info() { :; }
+log_skip() { :; }
+log_success() { :; }
+log_warn() { :; }
+log_error() { printf '%s\n' "$*" >&2; exit 99; }
+activate_node_paths() { :; }
+is_installed() { command -v "$1" >/dev/null 2>&1; }
+npm_global_prefix() { printf '%s/npm\n' "$HOME"; }
+forget_install() { :; }
+package_version() { printf '1.0.0\n'; }
+package_metadata() { printf 'fixture\n'; }
+package_release_field() { printf 'fixture.tar.gz\n'; }
+get_arch() { printf 'amd64\n'; }
+set_json_boolean_preserving() { :; }
+npm_install_global() { record "npm-package $*"; }
+install_github_binary() { record "binary $*"; }
+install_github_archive() { record "archive $*"; }
+install_github_agent_skill() { record "skill $*"; }
+omp_install_package() { record "omp-package $*"; }
+initialize_pix_optimizer_state() { :; }
+print_summary() { :; }
+'''
+(fixture / "scripts/lib.sh").write_text(library)
+(fixture / "scripts/install-uv-tool.sh").write_text(
+    'install_uv_tool() { record "uv-package $*"; }\n'
+)
+paths = (".codex/config.toml", ".claude.json", ".cursor/mcp.json",
+         ".gemini/config/mcp_config.json", ".config/opencode/opencode.json",
+         ".omp/agent/mcp.json")
+for existing in (False, True):
+    home = fixture / ("existing-home" if existing else "fresh-home")
+    binary = home / "bin"
+    binary.mkdir(parents=True)
+    calls = home / "calls"
+    calls.touch()
+    for name in ("npm", "claude", "codex", "agy", "opencode", "omp", "graphify",
+                 "rtk", "agent-mcp", "serena", "context-mode"):
+        command = binary / name
+        command.write_text('#!/bin/bash\nprintf "%s %s\\n" "${0##*/}" "$*" >>"$BOOTSTRAP_CALLS"\n')
+        command.chmod(0o755)
+    if existing:
+        for name in paths:
+            path = home / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('SYNTHETIC_UNRELATED_CONFIG\n')
+    before = {name: (home / name).read_bytes() if (home / name).exists() else None for name in paths}
+    result = subprocess.run(
+        ["bash", str(root / ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl")],
+        env={**os.environ, "HOME": str(home), "DOTFILES_SOURCE_DIR": str(fixture),
+             "PATH": f"{binary}:/usr/bin:/bin", "BOOTSTRAP_CALLS": str(calls)},
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+    observations = calls.read_text()
+    assert "serena" not in observations and "context-mode" not in observations, observations
+    assert " mcp " not in observations and "agent-mcp " not in observations, observations
+    assert "omp-package @xynogen/pix-optimizer" in observations, observations
+    for name, previous in before.items():
+        current = (home / name).read_bytes() if (home / name).exists() else None
+        assert current == previous, name
+print("Default AI installation never installs/enables MCPs and preserves existing configurations")
+PY
+
 printf 'Agent MCP manager test passed\n'

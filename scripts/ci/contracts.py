@@ -130,6 +130,7 @@ def check(root):
     assert "push" in concurrency["cancel-in-progress"]
     assert "pull_request" in concurrency["cancel-in-progress"]
     heavy = main["jobs"]["live"]["with"]["heavy"]
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in heavy
     assert all(
         key in heavy
         for key in ("schedule", "run_heavy_e2e", "automation/grouped-tool-upgrades")
@@ -138,6 +139,9 @@ def check(root):
     checks = workflows["ci-checks.yml"]["jobs"]
     for name in ("gitleaks", "hadolint", "trivy", "dependency-review", "test-image"):
         assert not needs(checks[name]), f"{name} must start without a live dependency"
+        if name != "dependency-review":
+            assert "if" not in checks[name], f"{name} cannot be skipped"
+    assert checks["dependency-review"]["if"] == "github.event_name == 'pull_request'"
     assert needs(checks["contracts"]) == {"test-image"}
     matrix = checks["contracts"]["strategy"]["matrix"]["include"]
     suites = {entry["suite"] for entry in matrix}
@@ -155,14 +159,18 @@ def check(root):
         for entry in matrix
         if entry["suite"] == "behavior"
     } == {("native", "false"), ("wsl-simulated", "true")}
-    expected_matrix = {(suite, "native", "false") for suite in suites} | {
-        ("behavior", "wsl-simulated", "true")
+    expected_matrix = {(suite, "native", "false", "all", "1/1") for suite in suites - {"behavior"}} | {
+        ("behavior", "native", "false", "all", "1/2"),
+        ("behavior", "native", "false", "all", "2/2"),
+        ("behavior", "wsl-simulated", "true", "platform", "1/1"),
     }
     actual_matrix = [
-        (entry["suite"], entry["platform"], entry["wsl"]) for entry in matrix
+        (entry["suite"], entry["platform"], entry["wsl"], entry.get("scope", "all"), entry.get("shard", "1/1"))
+        for entry in matrix
     ]
     assert len(actual_matrix) == len(expected_matrix)
     assert set(actual_matrix) == expected_matrix
+    assert len({(entry.get("id", entry["suite"]), entry["platform"]) for entry in matrix}) == len(matrix)
     registry = json.loads((root / "tests/suites.json").read_text())
     updater_paths = {
         "tests/test-package-metadata.sh",
@@ -195,6 +203,9 @@ def check(root):
     assert "if" not in suite_step
     assert suite_step["env"]["CI_SUITE"] == "${{ matrix.suite }}"
     assert suite_step["env"]["DOTFILES_WSL"] == "${{ matrix.wsl }}"
+    assert suite_step["env"]["CI_SCOPE"] == "${{ matrix.scope || 'all' }}"
+    assert suite_step["env"]["CI_SHARD"] == "${{ matrix.shard || '1/1' }}"
+    assert '--scope "${CI_SCOPE:-all}" --shard "${CI_SHARD:-1/1}"' in suite_step["run"]
     upload = next(
         step
         for step in checks["contracts"]["steps"]
@@ -216,17 +227,29 @@ def check(root):
     )
 
     live = workflows["ci-live.yml"]["jobs"]
+    assert "version-report" not in live, "Advisory discovery belongs to the weekly audit, not every acceptance run"
     assert needs(live["github-release-tools"]) == set()
     for name in ("base-e2e", "recovery-e2e"):
-        assert needs(live[name]) == {"github-release-tools"}
-    assert needs(live["heavy-e2e"]) == {"base-e2e", "recovery-e2e"}
+        assert not needs(live[name]), "Independent cold installs must run alongside release smoke"
+    assert live["base-e2e"]["strategy"]["matrix"]["service"] == ["base-native"]
+    assert live["recovery-e2e"]["strategy"]["matrix"]["service"] == ["recovery"]
+    assert not needs(live["extended-e2e"])
+    assert live["extended-e2e"]["if"] == "inputs.heavy"
+    assert set(live["extended-e2e"]["strategy"]["matrix"]["service"]) == {"base-wsl-simulated", "failure-resume"}
+    assert not needs(live["heavy-e2e"])
     assert live["heavy-e2e"]["if"] == "inputs.heavy"
     assert live["heavy-e2e"]["name"] == "Live ${{ matrix.service }} E2E"
     assert {"full", "full-native"} <= set(
         live["heavy-e2e"]["strategy"]["matrix"]["service"]
     )
+    assert live["heavy-e2e"]["strategy"]["max-parallel"] == 3
+    assert live["heavy-e2e"]["strategy"]["fail-fast"] is True
+    assert "inputs.heavy" in live["performance-history"]["if"]
     assert live["result"]["if"] == "always()"
     assert needs(live["result"]) == set(live) - {"result"}
+    result_run = "\n".join(step.get("run", "") for step in live["result"]["steps"])
+    assert "optional+=(heavy-e2e extended-e2e)" in result_run
+    assert '"$HEAVY_REQUIRED" == true && "$EVENT_NAME" != pull_request' in result_run
     services = load(root / ".github/e2e/compose.yaml")["services"]
     for name in ("base-native", "base-wsl-simulated", "full", "full-native"):
         assert services[name]["environment"]["E2E_PASSES"] == "2"

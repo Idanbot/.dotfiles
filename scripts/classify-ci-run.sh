@@ -94,6 +94,7 @@ failure_evidence="$(jq -c --argjson annotations "$annotations" --arg workflow "$
   def failed: .conclusion == "failure" or .conclusion == "timed_out" or
     .conclusion == "action_required" or .conclusion == "startup_failure";
   def aggregate: .name == "CI Result" or
+    .name == "Acceptance / Live Acceptance Result" or
     .name == "Gated release and installer acceptance / Live Acceptance Result";
   [.jobs[] | select(.name != "CI Outcome Classification") | select(failed)] as $failed |
   [$failed[] | select(aggregate | not)] as $leaves |

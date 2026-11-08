@@ -90,6 +90,16 @@ Existing run history and GitHub-managed agent workflows are retained.
 
 ## Validation
 
+Amendment (2026-11-08): routine CI splits native behavior into two deterministic,
+disjoint command shards and runs an explicit, validated WSL platform-smoke subset.
+The checks gate remains mandatory before cold installs. Release smoke, native
+two-pass base, and recovery start in parallel. WSL two-pass base and interrupted
+resume move to scheduled/explicit heavy runs and grouped-upgrade canaries; all
+five existing heavy profiles remain required there, with three concurrent workers
+and fail-fast cancellation. Only extended non-PR runs aggregate performance
+history. Separate maintenance workflows own advisory discovery. Successful hosted
+logs are concise; full outputs and failure diagnostics remain available.
+
 Docker fixtures cover CVE coordinates/scores/compatibility, failed checksums
 with no mutation, metadata-driven releases, external-tool preservation,
 helper fingerprints, standalone profiles, and CI failure/skip semantics.

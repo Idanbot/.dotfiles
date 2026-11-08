@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       run_heavy_e2e:
-        description: Run developer, agent, cloud, full WSL-simulated, and full-native two-pass installs
+        description: Run extended WSL/recovery checks and all five heavy install profiles
         required: false
         default: false
         type: boolean
@@ -24,11 +24,11 @@ concurrency:
 
 jobs:
   checks:
-    name: Static, security, behavior, and selectors
+    name: Checks
     uses: ./.github/workflows/ci-checks.yml
 
   live:
-    name: Gated release and installer acceptance
+    name: Acceptance
     needs: [checks]
     uses: ./.github/workflows/ci-live.yml
     permissions:
@@ -37,7 +37,9 @@ jobs:
     with:
       heavy: >-
         ${{ github.event_name == 'schedule' || inputs.run_heavy_e2e == true ||
-            (github.event_name == 'pull_request' && github.head_ref == 'automation/grouped-tool-upgrades') }}
+            (github.event_name == 'pull_request' &&
+             github.event.pull_request.head.repo.full_name == github.repository &&
+             github.head_ref == 'automation/grouped-tool-upgrades') }}
 
   result:
     name: CI Result

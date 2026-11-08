@@ -134,6 +134,15 @@ print('isolated 1.2.3')
         self.assertIn("shell history", atuin["description"])
         self.assertEqual(atuin["binary_descriptions"]["atuin"], "Shell history database, sync client, and search UI")
 
+    def test_mcp_servers_are_unmanaged_inventory_only(self):
+        manifest, metadata = catalog.load_repository(root)
+        entries = {entry["id"]: entry for entry in catalog.catalog()}
+        for name in ("serena", "context_mode"):
+            self.assertNotIn(name, manifest["ai_tools"])
+            self.assertNotIn(name, metadata["ai_tools"])
+            self.assertEqual(entries[f"ai_tools.{name}"]["requested"], "unmanaged")
+            self.assertEqual(entries[f"ai_tools.{name}"]["owner"], "unmanaged")
+
     def test_offline_search_filters_and_details(self):
         result = json.loads(self.query("postgresql", "--available", "--json").stdout)
         self.assertIn("database.usql", [entry["id"] for entry in result])

@@ -31,6 +31,8 @@ assert_classification infrastructure_cancelled neutral cancelled \
   '[{"name":"Docker behavior","conclusion":"cancelled"},{"name":"CI Result","conclusion":"failure"}]'
 assert_classification infrastructure_cancelled neutral cancelled \
   '[{"name":"Gated release and installer acceptance / Live Acceptance Result","conclusion":"failure"},{"name":"CI Result","conclusion":"failure"}]'
+assert_classification infrastructure_cancelled neutral cancelled \
+  '[{"name":"Acceptance / Live Acceptance Result","conclusion":"failure"},{"name":"CI Result","conclusion":"failure"}]'
 assert_classification code_failure failure cancelled \
   '[{"name":"Docker behavior","conclusion":"failure"},{"name":"CI Result","conclusion":"failure"}]'
 assert_classification code_failure failure failure \
@@ -54,6 +56,8 @@ assert_classification unknown neutral success '[]'
 assert_classification unknown neutral failure '[]'
 assert_classification code_failure failure cancelled \
   '[{"name":"Custom CI Result","conclusion":"failure"}]'
+assert_classification code_failure failure cancelled \
+  '[{"name":"Other / Live Acceptance Result","conclusion":"failure"}]'
 
 printf '%s\n' '{"jobs":[
   {"name":"tests","conclusion":"success"},

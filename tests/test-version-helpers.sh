@@ -25,7 +25,7 @@ version_major_matches 'openjdk 21.0.8' 21
 [[ "$(version_compare 1.2.3 1.2.3)" == 0 ]]
 [[ "$(package_version languages node)" == 26.* ]]
 [[ "$(package_version languages npm)" == 12.* ]]
-[[ "$(package_version languages rust)" == 1.97.1 ]]
+[[ "$(package_version languages rust)" == "$(package_version languages cargo)" ]]
 [[ "$(package_version languages java)" == 25.* ]]
 
 PARSER_STDERR="$(mktemp)"

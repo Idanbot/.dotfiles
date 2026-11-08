@@ -17,13 +17,14 @@ Usage:
 Agents: codex, claude, agy, opencode, omp, all
 
 Examples:
-  agent-mcp enable serena
+  agent-mcp enable serena --agent omp
   agent-mcp enable context-mode --agent codex,claude
   agent-mcp disable all --agent omp
   agent-mcp status all
 
-Servers are installed but disabled until explicitly enabled. Restart active
-agent sessions after changing their MCP configuration.
+Bootstrap does not install or configure MCP servers. Install a server yourself
+before explicitly enabling it for the intended agents. Restart active agent
+sessions after changing their MCP configuration.
 EOF
 }
 
@@ -44,7 +45,7 @@ contains() {
 
 ensure_runtime() {
   command -v "$1" >/dev/null 2>&1 ||
-    die "$1 is not installed; apply the dotfiles agent profile first"
+    die "$1 is not installed; install it explicitly before enabling this integration"
 }
 
 assert_json_destination() {
