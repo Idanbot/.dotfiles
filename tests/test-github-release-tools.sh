@@ -82,9 +82,10 @@ install_github_binary tldr dbrgn/tealdeer "v$TEALDEER_VERSION" \
   'tldr --version'
 
 STARSHIP_VERSION="$(package_version core starship 1.26.0)"
+STARSHIP_ASSET="$(package_release_field core starship "$STARSHIP_VERSION" "$ARCH" asset)"
 install_github_archive starship starship/starship "v$STARSHIP_VERSION" \
-  "starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz" starship \
-  "https://github.com/starship/starship/releases/download/{tag}/starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz.sha256" \
+  "$STARSHIP_ASSET" starship \
+  "https://github.com/starship/starship/releases/download/{tag}/$STARSHIP_ASSET.sha256" \
   'starship --version'
 
 CURLIE_VERSION="$(package_version core curlie 1.8.2)"

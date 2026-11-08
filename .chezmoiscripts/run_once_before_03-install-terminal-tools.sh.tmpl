@@ -84,10 +84,11 @@ install_github_archive \
   'lazygit --version'
 
 STARSHIP_VERSION="$(package_version core starship 1.26.0)"
+STARSHIP_ASSET="$(package_release_field core starship "$STARSHIP_VERSION" "$ARCH" asset)"
 install_github_archive \
   starship starship/starship "v${STARSHIP_VERSION#v}" \
-  "starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz" starship \
-  "https://github.com/starship/starship/releases/download/{tag}/starship-${RELEASE_ARCH}-unknown-linux-gnu.tar.gz.sha256" \
+  "$STARSHIP_ASSET" starship \
+  "https://github.com/starship/starship/releases/download/{tag}/$STARSHIP_ASSET.sha256" \
   'starship --version'
 
 SOPS_VERSION="$(package_version core sops 3.13.2)"

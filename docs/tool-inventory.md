@@ -17,7 +17,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | eza | 0.23.5 | github | dotfiles-binary | pinned-sha256 |
 | core | lazygit | 0.66.1 | github | dotfiles-binary | upstream-checksum |
 | core | btop | 1.4.7 | apt | apt | apt-signature |
-| core | starship | 1.26.0 | github | dotfiles-binary | upstream-checksum |
+| core | starship | 1.27.0 | github | dotfiles-binary | upstream-checksum |
 | core | github_cli | 2.102.0 | github | dotfiles-binary | pinned-sha256 |
 | core | jq | distro | apt | apt | apt-signature |
 | core | gojq | distro | apt | apt | apt-signature |
@@ -35,7 +35,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | core | tealdeer | 1.9.0 | github | dotfiles-binary | upstream-checksum |
 | core | curlie | 1.8.2 | github | dotfiles-binary | upstream-checksum |
 | core | trippy | 0.13.0 | github | dotfiles-binary | pinned-sha256 |
-| core | ast_grep | 0.50.0 | github | dotfiles-binary | pinned-sha256 |
+| core | ast_grep | 0.51.1 | github | dotfiles-binary | pinned-sha256 |
 | core | gitleaks | 8.30.1 | github | dotfiles-binary | pinned-sha256 |
 | languages | go | 1.27.2 | direct | dotfiles-runtime | upstream-checksum |
 | languages | rust | 1.97.1 | rustup | rustup | upstream-checksum |
@@ -43,9 +43,9 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | languages | node | 26.11.1 | node-dist | dotfiles-runtime | upstream-checksum |
 | languages | npm | 12.2.0 | npm | node-runtime | npm-registry |
 | languages | typescript | 7.0.2 | npm | npm | npm-registry |
-| languages | python | 3.14.9 | uv | uv | uv-managed |
+| languages | python | 3.14.10 | uv | uv | uv-managed |
 | languages | java | 25.0.4.1+1 | github | dotfiles-runtime | pinned-sha256 |
-| languages | uv | 0.13.5 | github | dotfiles-binary | upstream-checksum |
+| languages | uv | 0.13.6 | github | dotfiles-binary | upstream-checksum |
 | history | atuin | 18.23.0 | github | dotfiles-binary | upstream-checksum |
 | editor | neovim | 0.12.6 | github | dotfiles-runtime | pinned-sha256 |
 | database | usql | 0.21.4 | github | dotfiles-binary | pinned-sha256 |

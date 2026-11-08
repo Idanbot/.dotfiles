@@ -24,6 +24,7 @@ data['core']['github_cli'].update({
     'arch_arm64': 'a64',
 })
 data['ai_tools']['codex_cli']['url'] = 'https://example.invalid/reviewed-codex.sh'
+data['core']['starship']['arch_arm64'] = 'reviewed-arm-target'
 data['ai_tools']['antigravity_cli']['url'] = 'https://example.invalid/reviewed-agy.sh'
 path.write_text(yaml.safe_dump(data, sort_keys=False))
 PY
@@ -53,6 +54,20 @@ grep -Fq 'github_cli: "2.999.0"' "$DOTFILES_SOURCE_DIR/packages.yaml"
 grep -Fq '0000000000000000000000000000000000000000000000000000000000000002' \
   "$DOTFILES_SOURCE_DIR/packages.meta.yaml"
 printf 'One metadata edit controls release discovery and both architecture checksums\n'
+
+# The installer must use the same architecture mapping as upgrade discovery.
+# shellcheck source=scripts/lib.sh
+source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
+for ARCH in amd64 arm64; do
+  expected="$(package_release_field core starship "$(package_version core starship)" "$ARCH" asset)"
+  install_github_archive() {
+    [[ "$4" == "$expected" && "$6" == *"/$expected.sha256" ]]
+  }
+  for script in .chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl tests/test-github-release-tools.sh; do
+    source <(awk '/^STARSHIP_VERSION=/ { block=1 } block { print; if (/starship --version/) exit }' "$DOTFILES_DIR/$script")
+  done
+done
+printf 'Starship install and updater share AMD64/ARM64 release metadata\n'
 
 # The smoke check and section must use the same reviewed vendor URL and digest.
 # shellcheck source=scripts/lib.sh

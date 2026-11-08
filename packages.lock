@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: 16dbce03604e0715122ddd21630c411ea78a4b1663f62f5bd5efa902c4b096f5
-  metadata: f18d5ac504594777f03a2a272ddb0792bf35a2815cd046d37f9ca6707c42d8f3
+  packages: 9de0ca04dc6a982e8e44af4452f2059ec879d058540a9d0d8aeb6d8fbcfc6175
+  metadata: 622444eb84e5c87ede735755ab1821ee4dfd94e520fa9fbcaa8e9d307b31b39e
 
 tools:
   - section: bootstrap
@@ -92,15 +92,15 @@ tools:
     integrity: apt-signature
   - section: core
     name: starship
-    version: 1.26.0
+    version: 1.27.0
     source: github
     owner: dotfiles-binary
     repo: starship/starship
     binary: starship
     tag_template: "v{version}"
-    asset_template: "starship-{arch}-unknown-linux-gnu.tar.gz"
-    arch_amd64: x86_64
-    arch_arm64: aarch64
+    asset_template: "starship-{arch}.tar.gz"
+    arch_amd64: x86_64-unknown-linux-gnu
+    arch_arm64: aarch64-unknown-linux-musl
     integrity: upstream-checksum
   - section: core
     name: github_cli
@@ -261,7 +261,7 @@ tools:
     integrity: pinned-sha256
   - section: core
     name: ast_grep
-    version: 0.50.0
+    version: 0.51.1
     source: github
     owner: dotfiles-binary
     repo: ast-grep/ast-grep
@@ -270,8 +270,8 @@ tools:
     asset_template: "app-{arch}-unknown-linux-gnu.zip"
     arch_amd64: x86_64
     arch_arm64: aarch64
-    sha256_amd64: 0fd3f489639abb8465a914b74b8779171577582318d8a940d00399f59dba81c5
-    sha256_arm64: 3a4ad22dd1dca7a4900a173de65885578617af57fa13dd93b8d345d6b352770e
+    sha256_amd64: 42514f77ae0c8a25d7d32154d31d3e7e16f3ab894f8ce76ce417de234ee49157
+    sha256_arm64: db02fae2d8eace5fc40c55242068882452dd03eab38a1d950d5fd981cf112926
     integrity: pinned-sha256
   - section: core
     name: gitleaks
@@ -330,7 +330,7 @@ tools:
     integrity: npm-registry
   - section: languages
     name: python
-    version: 3.14.9
+    version: 3.14.10
     source: uv
     owner: uv
     integrity: uv-managed
@@ -346,7 +346,7 @@ tools:
     integrity: pinned-sha256
   - section: languages
     name: uv
-    version: 0.13.5
+    version: 0.13.6
     source: github
     owner: dotfiles-binary
     repo: astral-sh/uv

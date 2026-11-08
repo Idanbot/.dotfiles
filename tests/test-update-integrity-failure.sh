@@ -271,6 +271,19 @@ sys.exit(item.get("status", 22))
         self.assertIn("Skipping core.starship", self.output)
         self.assert_pins(**{"languages.node": "26.12.0", "core.starship": "1.26.0"})
 
+    def test_starship_uses_published_architecture_assets(self):
+        self.pins["core"]["starship"] = "1.26.0"
+        (self.source / "packages.yaml").write_text(yaml.safe_dump(self.pins, sort_keys=False))
+        for version in ("1.26.0", "1.27.0"):
+            self.respond(f"https://api.github.com/repos/starship/starship/releases/tags/v{version}",
+                         {"assets": [
+                         {"name": f"starship-{arch}.tar.gz", "digest": f"sha256:{SHA}"}
+                         for arch in ("x86_64-unknown-linux-gnu", "aarch64-unknown-linux-musl")
+                         ]})
+        self.assertEqual(self.run_updater("--apply", "core.starship@1.27.0"), 0, self.output)
+        self.assert_pins(**{"core.starship": "1.27.0"})
+        self.assertIn("`1.26.0` -> `1.27.0`", self.report)
+
     def test_node_checksum_failure_skips_only_node_in_grouped_apply(self):
         self.candidate_fixture()
         self.responses["https://nodejs.org/dist/v26.12.0/SHASUMS256.txt"]["status"] = 18

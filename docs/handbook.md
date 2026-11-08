@@ -928,6 +928,10 @@ version/checksum audit includes the same CVE report and continues to publish
 latest compatible same-major updates and latest stable major suggestions.
 The standalone daily workflow skips Monday because the weekly audit supplies
 that day's CVE scan. Both use the same report script.
+Reports include a UTC timestamp, source revision, and completion status. A failed
+weekly stage replaces stale issue results with an explicit incomplete report and
+fails the job. Successful stages remain visible; failed partial output is discarded.
+Preview without publishing: `scripts/ci/maintenance-audit.sh weekly /tmp/dotfiles-audit.md --no-publish`.
 
 Run the all-stable advisory locally without changing pins:
 

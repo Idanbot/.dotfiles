@@ -34,7 +34,8 @@ the chosen discovery mode and original resolved targets.
 
 CI advisory discovery runs alongside acceptance, behind the same mandatory checks.
 Advisory failure emits a warning rather than skipping release smoke or making
-unverified payloads acceptable. The standing advisory issue/grouped PR stays unchanged.
+unverified payloads acceptable. Failed weekly audits mark the standing advisory
+issue incomplete, with a UTC timestamp and source revision; the grouped PR stays unchanged.
 
 Before applying configuration, validate that the exact Python pin is downloadable
 with active uv or a temporary, checksum-verified repository-pinned uv. Do not

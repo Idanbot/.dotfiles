@@ -167,8 +167,8 @@ commands, examples, tags, and observed paths/versions.
 | Category | Tools and Requested Versions |
 | --- | --- |
 | bootstrap | `chezmoi` 2.73.1 |
-| core | `bubblewrap` distro, `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.26.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.50.0, `gitleaks` 8.30.1 |
-| languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.9, `java` 25.0.4.1+1, `uv` 0.13.5 |
+| core | `bubblewrap` distro, `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.27.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.51.1, `gitleaks` 8.30.1 |
+| languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.10, `java` 25.0.4.1+1, `uv` 0.13.6 |
 | history | `atuin` 18.23.0 |
 | editor | `neovim` 0.12.6 |
 | database | `usql` 0.21.4, `iredis` 1.16.1, `pgloader` distro |
