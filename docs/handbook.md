@@ -136,7 +136,7 @@ workflow failures are visible in Actions and do not update the report.
 | --- | --- | --- |
 | `minimal` | Repair or small server | Core packages only |
 | `base` | Shell workstation | Zsh and terminal utilities |
-| `developer` | Main development machine | Languages, Atuin, tmux/Herdr, Neovim, system/theme |
+| `developer` | Main development machine | Languages, Atuin, tmux, Neovim, system/theme |
 | `agent` | LLM/agent workstation | Developer plus AI CLI harnesses |
 | `cloud` | Infrastructure workstation | Developer plus container/cloud CLIs |
 | `full` | Complete native or WSL setup | All applicable sections |
@@ -462,7 +462,7 @@ dot cache status           inspect the verified download cache
 dot cache prune [days]     remove verified downloads unused for DAYS
 dot reconcile              run only changed package sections
 dot uninstall <tool>       remove a ledger-owned tool
-dot workspace [directory]  open a backend-aware agent workspace
+dot workspace [directory]  open a tmux agent workspace
 dot-agent-status [flags]   show registered agent CLI readiness
 cloud-context [command]    save, load, inspect, or clear cloud CLI contexts
 agent-mcp [command]        enable, disable, or inspect optional MCP servers
@@ -554,47 +554,20 @@ Launch the workspace in any project:
 ```bash
 dot workspace
 dot workspace ~/Code/project
-dot workspace . --backend herdr
 dot workspace . --backend tmux
 dot workspace . --agents codex,claude --restart-agents
 dot workspace . --backend tmux --check
 dot-workspace . --name project-agents --print
 ```
 
-`--backend auto` is the default. It remains in Herdr or tmux when invoked from
-inside one, prefers Herdr on a bare terminal when available, and otherwise
-falls back to tmuxp. It never launches one multiplexer inside the other unless
-`--allow-nested` is also passed. Set `DOTFILES_WORKSPACE_BACKEND=herdr` or
-`tmux` for a shell-local default.
+The workspace uses tmux and pinned tmuxp through `uvx`. `--backend auto`
+and `--backend tmux` both select tmux. Existing named sessions are preserved;
+no additional multiplexer or agent integrations are installed.
 
-Both backends create a main terminal plus Codex, Antigravity, Claude, OpenCode,
-and OMP in the same working directory. Herdr uses one project workspace with a
-tab per agent and reuses an existing workspace with the same name. The tmux
-backend renders a session from the registry and runs pinned tmuxp through
-`uvx`. `--agents` selects a registered subset, `--check` performs a read-only
-preflight, and `--restart-agents` restarts a crashed agent without restarting a
-cleanly exited or interrupted session. `dot-agent-status` shows readiness on
-demand in the terminal; it never starts agents or MCP servers. A
-missing optional agent leaves a usable login shell instead of failing the
-workspace.
-
-Herdr and tmux both use `Ctrl+S` as their normal prefix. Existing tmux
-`send-prefix` support handles an explicitly nested Herdr. An explicitly nested
-tmux session under Herdr receives `Ctrl+B` for that generated session only.
-Implicit nesting remains blocked because Herdr cannot observe agents hidden
-behind an inner tmux process.
-
-Herdr configuration is managed at `~/.config/herdr/config.toml`. It provides
-tmux-style pane navigation, indexed tabs/workspaces/agents, Catppuccin, compact
-priority-sorted agent status, in-app notifications, and popups for lazygit,
-lazydocker, k9s, btop, and `dot doctor`. Worktree shortcuts, nested Herdr, sound,
-and persisted pane history are disabled. Reload a running session after config
-changes with `herdr server reload-config`.
-
-The agent install section also installs Herdr's bundled Claude, Codex,
-OpenCode, and OMP integrations. These add lifecycle/session hooks but do not
-authenticate an agent or copy its credentials. Inspect them with
-`herdr integration status`.
+The registry defines a main terminal plus Codex, Antigravity, Claude, OpenCode and
+OMP in the same working directory. `--agents` selects a subset, `--check` validates
+commands, and `--restart-agents` explicitly restarts crashed agents. Missing optional
+agents leave a usable shell. The tmux prefix remains `Ctrl+S`.
 
 Serena and context-mode are installed as optional MCP runtimes but are
 disconnected from every agent by default. `agent-mcp` changes only the selected
@@ -789,6 +762,46 @@ separate, opt-in encrypted recovery source. See [Security Model](security-model.
 
 ## Versions and Supply Chain
 
+### Isolated Catalog Probes
+
+Ordinary catalog queries read receipts/cached observations without executing tools.
+`dot tools refresh --isolated` uses the distro Bubblewrap launcher (installed with
+core packages), all namespaces including isolated networking, a cleared environment,
+read-only system binaries/libraries and the selected executable, a temporary home,
+and a three-second timeout. Host home, credentials, sockets and host `/proc` are not
+mounted. It skips managed-runtime discovery that would execute uv outside isolation.
+This protects against probe side effects, not a compromised kernel or sandbox runner.
+See the [Bubblewrap interface](https://github.com/containers/bubblewrap/blob/main/bwrap.xml).
+
+If namespaces are blocked (possible under WSL/container policy), the launcher is
+missing, or a tool needs unmounted runtime files, the observation stays unverified.
+There is no unrestricted retry. Ordinary `refresh` retains its explicit existing
+behavior; the snapshot records whether isolation was requested and shows unknowns.
+Docker tests cover unsupported isolation and no-fallback; the live isolation fixture
+checks network reachability, private-file visibility and read-only system mounts.
+
+### Workspace Presets
+
+The existing agent registry defines `workspace.presets.review` (Codex/Claude) and
+`implementation` (Codex/Antigravity/OpenCode/OMP). The tmux launcher uses these subsets.
+`dot workspace . --preset review --plan` emits JSON desired agents and observed
+additions/extra windows when native read-only inspection is available. Missing or
+unrecognized backend state is unknown, not evidence of absence. Extra windows are
+always preserved, and inspection never starts a server or agent. Queries are bounded.
+`--print` still renders the existing backend plan. Presets and `--agents` are mutually
+exclusive; custom presets belong in a locally selected registry.
+
+Omit `--plan` to create/attach. Default session names include the preset so review
+and implementation sessions can coexist. An explicitly named existing workspace is
+focused/attached without reconciliation; use `--plan` to review drift. Automatic
+pane removal, agent restart and replacing an existing layout are not implemented.
+
+Full bootstrap stages display numbered, terminal-capability-aware progress. Failure
+guidance distinguishes missing commands, APT failures and connectivity errors while
+keeping the original exit status and final text/event log paths. Section selection
+is computed once within preflight. No automatic fallback disables TLS, checksums,
+signatures, ownership checks or signed APT authentication.
+
 `dot doctor --readiness [--json]` reports installed/configured/unavailable capabilities
 without executing providers or reading credential contents. Configuration means file
 presence, not valid credentials. `--verify-access` explicitly permits bounded read-only
@@ -951,7 +964,7 @@ Accept every fully resolved update, or only selected tools:
 
 ```bash
 ./scripts/update-packages.sh --apply-all
-./scripts/update-packages.sh --apply core.eza terminal.herdr
+./scripts/update-packages.sh --apply core.eza terminal.tmuxp
 ```
 
 The report includes old/candidate versions and integrity deltas. Prefer its
@@ -1241,11 +1254,10 @@ Runner-outage evidence comes from job-scoped GitHub check annotations, never a
 combined log search. Failed test steps and mixed failures remain red; missing
 annotations cannot excuse a failed job.
 
-The workspace Docker harness uses synthetic agent commands and a mocked Herdr
-API, so it never authenticates or starts a real agent session. It still invokes
-the managed launchers, renders the actual tmuxp YAML contract, checks the
-resolved Herdr `--cwd` values, toggles both MCP servers across all five agents,
-and records missing-agent and crash/restart behavior. Its artifacts include
+The workspace Docker harness uses synthetic agent commands and a tmuxp contract
+fixture; it never authenticates or starts a real agent session. It invokes managed
+launchers, checks rendered tmuxp YAML, working-directory propagation, MCP toggles
+and missing-agent/crash handling. Its artifacts include
 `summary.json`, `summary.md`, `workspace.log`, JSONL case events, backend traces,
 and an agent launch trace.
 

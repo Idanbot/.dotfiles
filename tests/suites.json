@@ -471,16 +471,6 @@
       ]
     },
     {
-      "path": "tests/test-herdr-config.sh",
-      "kind": "suite",
-      "suite": "static",
-      "invocations": [
-        [
-          "{root}"
-        ]
-      ]
-    },
-    {
       "path": "tests/test-hyperfine-benchmark.sh",
       "kind": "suite",
       "suite": "behavior",

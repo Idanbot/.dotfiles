@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercise both agent workspace backends and optional MCP state in Docker.
+# Exercise tmux agent workspaces and optional MCP state in Docker.
 
 set -Eeuo pipefail
 
@@ -13,8 +13,6 @@ DOTFILES_AGENT_REGISTRY="$XDG_CONFIG_HOME/dotfiles/agents.yaml"
 MOCK_AGENT_STATE="$TMP_ROOT/mock-agents"
 AGENT_RUN_LOG="$ARTIFACT_DIR/agent-launches.tsv"
 WORKSPACE_BACKEND_LOG="$ARTIFACT_DIR/tmuxp-backend.tsv"
-HERDR_BACKEND_LOG="$ARTIFACT_DIR/herdr-backend.tsv"
-HERDR_BACKEND_STATE="$TMP_ROOT/herdr"
 TMUX_BACKEND_LOG="$ARTIFACT_DIR/tmux.tsv"
 LOG_FILE="$ARTIFACT_DIR/workspace.log"
 EVENT_LOG="$ARTIFACT_DIR/workspace-events.jsonl"
@@ -40,12 +38,10 @@ mkdir -p \
   "$HOME/.gemini/config" \
   "$HOME/.omp/agent" \
   "$DOTFILES_STATE_DIR" \
-  "$MOCK_AGENT_STATE" \
-  "$HERDR_BACKEND_STATE"
-chmod 700 "$HOME" "$DOTFILES_STATE_DIR" "$MOCK_AGENT_STATE" "$HERDR_BACKEND_STATE"
+  "$MOCK_AGENT_STATE"
+chmod 700 "$HOME" "$DOTFILES_STATE_DIR" "$MOCK_AGENT_STATE"
 : >"$AGENT_RUN_LOG"
 : >"$WORKSPACE_BACKEND_LOG"
-: >"$HERDR_BACKEND_LOG"
 : >"$LOG_FILE"
 : >"$EVENT_LOG"
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -54,8 +50,8 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 source "$DOTFILES_DIR/scripts/performance-format.sh"
 
 export HOME XDG_CONFIG_HOME DOTFILES_STATE_DIR DOTFILES_AGENT_REGISTRY
-export MOCK_AGENT_STATE AGENT_RUN_LOG WORKSPACE_BACKEND_LOG HERDR_BACKEND_LOG
-export HERDR_BACKEND_STATE TMUX_BACKEND_LOG
+export MOCK_AGENT_STATE AGENT_RUN_LOG WORKSPACE_BACKEND_LOG
+export TMUX_BACKEND_LOG
 export PATH="$HOME/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 event() {
@@ -94,7 +90,7 @@ finalize() {
     printf -- '- Result: `%s`\n' "$result"
     printf -- '- Cases: `%s/%s` passed\n' "$PASSED" "$TOTAL"
     printf -- '- Duration: `%s`\n' "$(format_duration_ms "$elapsed_ms")"
-    printf -- '- Backends: tmuxp command contract and Herdr API fixture\n'
+    printf -- '- Backends: tmuxp command contract\n'
     printf -- '- Agent launch trace: `%s`\n' "$(basename "$AGENT_RUN_LOG")"
   } >"$SUMMARY_MD" || true
   chmod -R u=rwX,go=rX "$ARTIFACT_DIR" 2>/dev/null || true
@@ -272,88 +268,14 @@ EOF
   grep -Fq 'tmuxp==1.74.0 tmuxp load -y' "$WORKSPACE_BACKEND_LOG"
 }
 
-test_herdr_backend() {
-  cat >"$HOME/bin/herdr" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-log="${HERDR_BACKEND_LOG:?}"
-state="${HERDR_BACKEND_STATE:?}"
-printf '%s\t%s\n' "$PWD" "$*" >>"$log"
-case "${1:-}:${2:-}" in
-  workspace:list)
-    if [[ -e "$state/created" ]]; then
-      cwd="$(<"$state/workdir")"
-      encoded_cwd="$(jq -Rn --arg value "$cwd" '$value')"
-      printf '{"result":{"workspaces":[{"workspace_id":"workspace-1","label":"docker-herdr","cwd":%s}]}}\n' "$encoded_cwd"
-    else
-      printf '%s\n' '{"result":{"workspaces":[]}}'
-    fi
-    ;;
-  workspace:create)
-    cwd=""
-    label=""
-    while (($#)); do
-      case "$1" in
-        --cwd) cwd="${2:-}"; shift 2 ;;
-        --label) label="${2:-}"; shift 2 ;;
-        *) shift ;;
-      esac
-    done
-    printf '%s\n' "$cwd" >"$state/workdir"
-    touch "$state/created"
-    printf '{"result":{"workspace":{"workspace_id":"workspace-1","label":"%s"},"tab":{"tab_id":"tab-root"}}}\n' "$label"
-    ;;
-  tab:create)
-    cwd=""
-    label=""
-    while (($#)); do
-      case "$1" in
-        --cwd) cwd="${2:-}"; shift 2 ;;
-        --label) label="${2:-}"; shift 2 ;;
-        *) shift ;;
-      esac
-    done
-    printf '%s\n' "$cwd" >"$state/pane-$label.cwd"
-    printf '{"result":{"root_pane":{"pane_id":"pane-%s"}}}\n' "$label"
-    ;;
-  pane:run)
-    pane_id="${3:-}"
-    launch_command="${4:-}"
-    cwd="$(<"$state/$pane_id.cwd")"
-    (cd "$cwd" && bash -c "$launch_command")
-    ;;
-  workspace:focus | tab:focus | tab:rename)
-    ;;
-  *)
-    printf 'unexpected Herdr command: %s\n' "$*" >&2
-    exit 2
-    ;;
-esac
-EOF
-  chmod 755 "$HOME/bin/herdr"
-  HERDR_ENV=1 dot-workspace "$WORKSPACE_DIR" \
-    --backend herdr --name docker-herdr
-  [[ "$(wc -l <"$AGENT_RUN_LOG")" -eq 10 ]]
-  grep -Fq "workspace create --cwd $WORKSPACE_DIR --label docker-herdr --focus" \
-    "$HERDR_BACKEND_LOG"
-  for agent in codex antigravity claude opencode omp; do
-    grep -Fq "tab create --workspace workspace-1 --cwd $WORKSPACE_DIR --label $agent --no-focus" \
-      "$HERDR_BACKEND_LOG"
-  done
-  HERDR_ENV=1 dot-workspace "$WORKSPACE_DIR" \
-    --backend herdr --name docker-herdr
-  [[ "$(wc -l <"$AGENT_RUN_LOG")" -eq 10 ]]
-  grep -Fq 'workspace focus workspace-1' "$HERDR_BACKEND_LOG"
-}
-
 test_directory_propagation() {
   local agent count
-  [[ "$(wc -l <"$AGENT_RUN_LOG")" -eq 10 ]]
+  [[ "$(wc -l <"$AGENT_RUN_LOG")" -eq "$(yq -r '.workspace.agents | length' "$DOTFILES_AGENT_REGISTRY")" ]]
   for agent in codex agy claude opencode omp; do
     count="$(awk -F '\t' -v agent="$agent" -v directory="$WORKSPACE_DIR" \
       '$1 == agent && $2 == directory {count += 1} END {print count + 0}' \
       "$AGENT_RUN_LOG")"
-    [[ "$count" -eq 2 ]]
+    [[ "$count" -eq 1 ]]
   done
 }
 
@@ -393,7 +315,6 @@ printf 'workspace=%s\nartifacts=%s\n' "$WORKSPACE_DIR" "$ARTIFACT_DIR"
 run_case 'agent CLI preflight' test_agent_preflight
 run_case 'MCP enable and disable' test_mcp_toggles
 run_case 'tmuxp backend execution' test_tmuxp_backend
-run_case 'Herdr backend execution and reuse' test_herdr_backend
 run_case 'working-directory propagation' test_directory_propagation
 run_case 'missing and crashing agent handling' test_mocked_failures
 printf '\nAgent workspace E2E: %s/%s passed, %s failed\n' "$PASSED" "$TOTAL" "$FAILED"

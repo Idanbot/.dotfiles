@@ -116,7 +116,7 @@ behavior in a separate credential-free, network-isolated container.
 MCP disable verifies native absence and aggregates failures across agents;
 already-absent servers remain idempotent. Running agents may still need a restart.
 Workspace names include a canonical-directory hash, and reuse verifies the
-directory on both tmux and Herdr. Explicit name collisions fail instead of
+directory in tmux. Explicit name collisions fail instead of
 switching agents into another checkout.
 
 Monthly grouped upgrades explicitly dispatch a heavy canary and correlate its
@@ -134,8 +134,8 @@ not automatic.
 1. Static: syntax, formatting, schemas, policies, generated files.
 2. Unit/fixture: versions, environment, profiles, routing, ledger, workspaces,
    backup/restore, failure/resume.
-3. Release smoke: real checksummed assets, Herdr server/workspace reuse, and all external archives.
-4. Workspace Docker E2E: both backend launch contracts, all registered agent
+3. Release smoke: real checksummed assets and all external archives.
+4. Workspace Docker E2E: tmux launch contracts, all registered agent
    commands, MCP toggles, directory propagation, and mocked failures.
 5. Base E2E: clean native and simulated-WSL install, two passes.
 6. Heavy E2E: developer, agent, cloud, full WSL-simulated, and two-pass full-native profiles.

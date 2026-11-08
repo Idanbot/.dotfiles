@@ -1,5 +1,8 @@
 # Agent workspace registry. Authentication and agent state are never managed.
 workspace:
+  presets:
+    review: [codex, claude]
+    implementation: [codex, antigravity, opencode, omp]
   agents:
     - codex
     - antigravity

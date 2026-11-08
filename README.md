@@ -53,7 +53,7 @@ Docker cannot prove GUI, physical-device, or Windows interoperability behavior.
 | --- | --- |
 | `minimal` | Core packages |
 | `base` | Shell and terminal utilities |
-| `developer` | Languages, history, tmux/Herdr, Neovim, system and theme |
+| `developer` | Languages, history, tmux, Neovim, system and theme |
 | `agent` | Developer setup plus AI tools |
 | `cloud` | Developer setup plus container/cloud tools |
 | `full` | All applicable sections |
@@ -102,6 +102,10 @@ and `~/.ssh/config.local`.
 [Conflict choices and overlay behavior](docs/handbook.md#configuration-conflicts).
 
 ## Installation Preflight
+
+Use `dot tools refresh --isolated` for sandboxed version probes (unavailable
+isolation never falls back to unrestricted execution). Workspace presets are
+available with `dot workspace . --preset review --plan`; omit `--plan` to launch.
 
 `dot doctor --readiness` gives an offline, identifier-free capability checklist.
 Add `--verify-access` for bounded native read-only probes; these are advisory,
@@ -163,13 +167,13 @@ commands, examples, tags, and observed paths/versions.
 | Category | Tools and Requested Versions |
 | --- | --- |
 | bootstrap | `chezmoi` 2.73.1 |
-| core | `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.26.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.50.0, `gitleaks` 8.30.1 |
+| core | `bubblewrap` distro, `fzf` 0.74.5, `fd` 10.4.2, `ripgrep` 15.1.0, `bat` 0.26.1, `eza` 0.23.5, `lazygit` 0.66.1, `btop` 1.4.7, `starship` 1.26.0, `github_cli` 2.102.0, `jq` distro, `gojq` distro, `yq` distro, `pigz` distro, `zstd` distro, `htop` distro, `zoxide` distro, `direnv` distro, `git-delta` distro, `hyperfine` distro, `duf` distro, `sops` 3.13.3, `lazydocker` 0.25.2, `tealdeer` 1.9.0, `curlie` 1.8.2, `trippy` 0.13.0, `ast_grep` 0.50.0, `gitleaks` 8.30.1 |
 | languages | `go` 1.27.2, `rust` 1.97.1, `cargo` 1.97.1, `node` 26.11.1, `npm` 12.2.0, `typescript` 7.0.2, `python` 3.14.9, `java` 25.0.4.1+1, `uv` 0.13.5 |
 | history | `atuin` 18.23.0 |
 | editor | `neovim` 0.12.6 |
 | database | `usql` 0.21.4, `iredis` 1.16.1, `pgloader` distro |
 | cloud | `docker` distro, `kubectl` 1.37.1, `helm` 4.3.0, `terraform` 1.16.5, `ansible` distro, `k9s` 0.51.0, `aws_cli` 2.37.12, `gcloud` distro, `azure_cli` distro, `cloudflared` 2026.10.0, `s5cmd` 2.3.0, `kcat` distro, `stern` 1.34.0, `helmfile` 1.8.1, `kubectx` 0.11.0, `kubens` 0.11.0, `kubecolor` 0.8.0, `radar` 1.16.0 |
-| terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.74.0, `herdr` 0.9.3 |
+| terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.74.0 |
 | system | `git_credential_manager` 3.0.1 |
 | fonts | `nerd_font` FiraMono, `nerd_font_version` 3.5.1 |
 | ai_tools | `claude_cli` 2.1.296, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.0, `omp` 18.12.6, `bun` 1.4.3, `serena` 1.7.0, `context_mode` 1.0.169, `graphify` 0.9.86, `rtk` 0.51.0, `ponytail` 5.1.0, `pix_optimizer` 1.3.5 |

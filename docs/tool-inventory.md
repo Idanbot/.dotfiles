@@ -9,6 +9,7 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | Section | Tool | Version | Source | Owner | Integrity |
 |---------|------|---------|--------|-------|-----------|
 | bootstrap | chezmoi | 2.73.1 | apt_or_github | bootstrap | upstream-checksum |
+| core | bubblewrap | distro | apt | apt | apt-signature |
 | core | fzf | 0.74.5 | external | chezmoi-external | pinned-sha256 |
 | core | fd | 10.4.2 | apt | apt | apt-signature |
 | core | ripgrep | 15.1.0 | apt | apt | apt-signature |
@@ -71,7 +72,6 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | terminal | kitty | 0.49.2 | github | dotfiles-binary | pinned-sha256 |
 | terminal | tmux | distro | apt | apt | apt-signature |
 | terminal | tmuxp | 1.74.0 | uvx | ephemeral | pypi |
-| terminal | herdr | 0.9.3 | github | dotfiles-binary | pinned-sha256 |
 | system | git_credential_manager | 3.0.1 | github | dpkg | pinned-sha256 |
 | fonts | nerd_font | FiraMono | github | dotfiles-assets | upstream-checksum |
 | fonts | nerd_font_version | 3.5.1 | github | dotfiles-assets | upstream-checksum |

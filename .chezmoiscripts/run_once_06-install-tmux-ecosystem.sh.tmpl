@@ -9,30 +9,6 @@ log_step "Installing Terminal Multiplexers"
 require_sudo
 apt_install tmux
 
-HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
-case "$(get_arch)" in
-  amd64)
-    HERDR_ASSET=herdr-linux-x86_64
-    ;;
-  arm64)
-    HERDR_ASSET=herdr-linux-aarch64
-    ;;
-esac
-HERDR_SHA256="$(package_metadata terminal herdr "sha256_$(get_arch)")"
-install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" "$HERDR_ASSET" herdr \
-  "sha256:$HERDR_SHA256" 'herdr --version'
-
-mkdir -p "$HOME/.zfunc"
-completion_tmp="$HOME/.zfunc/_herdr.tmp"
-if herdr completion zsh >"$completion_tmp"; then
-  mv "$completion_tmp" "$HOME/.zfunc/_herdr"
-  chmod 0644 "$HOME/.zfunc/_herdr"
-  log_success "Herdr zsh completion generated"
-else
-  rm -f "$completion_tmp"
-  log_warn "Herdr zsh completion generation failed"
-fi
-
 TMUXP_VERSION="$(package_version terminal tmuxp 1.74.0)"
 if ! is_installed uvx; then
   log_error "uvx is required for reproducible tmuxp workspaces; include the languages section"

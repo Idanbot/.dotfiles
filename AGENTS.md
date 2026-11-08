@@ -29,7 +29,7 @@ Never claim full native/real WSL acceptance from mocks or simulated WSL tests.
 The tracker is GitHub: `Idanbot/.dotfiles`. Use `gh`; keep commits under the user's
 configured identity and add no AI co-author. Use existing bug/enhancement, area,
 priority and triage labels rather than inventing a parallel tracker.
-Issues #35/#49 are backlog maps; #34 is the singleton upgrade/CVE advisory.
+Issues #35/#49 retain historical reliability maps; #34 is the singleton upgrade/CVE advisory.
 Close only completed scope; leave umbrella issues open for remaining items.
 
 Read [architecture](docs/architecture.md), [ADRs](docs/adr/) and the

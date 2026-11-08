@@ -39,9 +39,9 @@
     "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py", "scripts/keys/aws-cli.asc"]
   },
   "tmux": {
-    "order": 60, "description": "tmux, tmuxp, and Herdr", "dependencies": ["languages"],
-    "script": ".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl", "manifest": ["terminal.tmux", "terminal.tmuxp", "terminal.herdr"], "externals": [".tmux/plugins"],
-    "commands": ["tmux", "herdr", "dot-workspace", "dot-agent-launch"],
+    "order": 60, "description": "tmux and tmuxp", "dependencies": ["languages"],
+    "script": ".chezmoiscripts/run_once_06-install-tmux-ecosystem.sh.tmpl", "manifest": ["terminal.tmux", "terminal.tmuxp"], "externals": [".tmux/plugins"],
+    "commands": ["tmux", "dot-workspace", "dot-agent-launch"],
     "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
   },
   "neovim": {

@@ -165,4 +165,23 @@ awk '/^acquire_bootstrap_lock\(\)/ { block = 1 } /^acquire_bootstrap_lock \|\|/ 
   fi
   flock -w 5 "$STATE_ROOT/bootstrap.lock" true
 )
+awk '/^run_stage\(\)/ { block = 1 } /^bootstrap_download\(\)/ { block = 0 } block' \
+  "$INSTALL" >"$temporary/run-stage.sh"
+(
+  source "$temporary/run-stage.sh"
+  CHECKPOINT_DIR="$temporary/checkpoints"
+  mkdir -p "$CHECKPOINT_DIR"
+  # Used by the sourced run_stage function.
+  # shellcheck disable=SC2034
+  SELECTED_SECTIONS=(detect)
+  export STAGE_NUMBER=0 RESUME_REQUEST='' ONLY_SECTION='' RUN_DOCTOR=false
+  log_step() { printf '%s\n' "$*"; }
+  log_success() { :; }
+  write_event() { :; }
+  format_bootstrap_duration_seconds() { printf '%ss' "$1"; }
+  stage_injection_matches() { return 1; }
+  run_stage fixture true >"$temporary/stage-output"
+  grep -Fq '[1/6] fixture' "$temporary/stage-output"
+  [[ -f "$CHECKPOINT_DIR/fixture.done" ]]
+)
 printf 'Bootstrap safety test passed\n'

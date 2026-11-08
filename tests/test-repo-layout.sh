@@ -23,7 +23,7 @@ required=(
   profiles/minimal.conf profiles/base.conf profiles/developer.conf profiles/agent.conf
   profiles/cloud.conf profiles/full.conf agents.yaml .chezmoiversion
   .github/e2e/compose.yaml tests/e2e/test-install.sh tests/e2e/test-agent-workspace.sh tests/test-e2e-shell.sh
-  tests/test-external-tools.sh tests/test-herdr-config.sh tests/test-tmux-config.sh tests/test-update-packages.sh
+  tests/test-external-tools.sh tests/test-tmux-config.sh tests/test-update-packages.sh
   tests/test-mutable-installers.sh
   tests/test-kitty.sh tests/test-kubecolor.sh tests/test-cloud-context.sh tests/test-cloud-context-starship.sh tests/test-dot-doctor.sh
   tests/test-e2e-report.sh tests/test-performance-format.sh tests/test-performance-report.sh tests/test-performance-history.sh
@@ -42,7 +42,7 @@ required=(
   dot_local/bin/executable_git-credential-dotfiles
   dot_local/bin/executable_cloudflare-ssh dot_local/bin/executable_ssh-key-load
   dot_local/bin/executable_tmux-help
-  dot_config/herdr/config.toml dot_config/dotfiles/agents.yaml.tmpl
+  dot_config/dotfiles/agents.yaml.tmpl
   dot_config/agents/AGENTS.md dot_codex/symlink_AGENTS.md
   dot_claude/symlink_CLAUDE.md dot_config/opencode/symlink_AGENTS.md
   dot_gemini/symlink_GEMINI.md dot_omp/agent/symlink_AGENTS.md
@@ -298,37 +298,10 @@ else
   fail "SSH key caching or Cloudflare Access configuration is unsafe or incomplete"
 fi
 
-if grep -Fq 'prefix = "ctrl+s"' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
-  grep -Fq 'set -g prefix C-s' "$DOTFILES_DIR/dot_tmux.conf.tmpl"; then
-  pass "Herdr and tmux share the Ctrl+S prefix"
+if grep -Fq 'set -g prefix C-s' "$DOTFILES_DIR/dot_tmux.conf.tmpl"; then
+  pass "tmux uses the Ctrl+S prefix"
 else
-  fail "Herdr and tmux must both use Ctrl+S"
-fi
-
-if grep -Fq 'allow_nested = false' "$DOTFILES_DIR/dot_config/herdr/config.toml" &&
-  grep -Fq -- '--allow-nested' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" &&
-  grep -Fq -- 'herdr pane run' "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" &&
-  ! grep -Fq -- 'herdr agent start "$agent" --workspace' \
-    "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
-  pass "workspace nesting is guarded and explicitly opt-in"
-else
-  fail "workspace nesting policy is incomplete"
-fi
-
-if grep -Fq 'launch_args+=(--registry "$REGISTRY" "$agent")' \
-  "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"; then
-  pass "Herdr agent panes receive the resolved registry path"
-else
-  fail "Herdr agent panes can lose the registry when HOME is reset"
-fi
-
-if grep -Fq 'for integration in claude codex opencode omp; do' \
-  "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" &&
-  grep -Fq 'herdr integration install "$integration"' \
-    "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"; then
-  pass "Herdr installs the supported agent integrations"
-else
-  fail "Herdr integration installation is incomplete"
+  fail "tmux prefix is missing"
 fi
 
 for preserved in \

@@ -278,7 +278,6 @@ if selected tmux; then
   doctor_step "Terminal Multiplexers"
   check_file "$HOME/.tmux.conf" tmux-config
   check_file "$HOME/.config/tmuxp/agent-workspace.yaml" agent-workspace
-  check_file "$HOME/.config/herdr/config.toml" herdr-config
   check_file "$HOME/.config/dotfiles/agents.yaml" agent-registry
   if [[ "$QUICK" == false ]]; then
     TMUX_CHECK_CONFIG="$(mktemp)"
@@ -294,16 +293,6 @@ if selected tmux; then
   elif [[ "$QUICK" == false ]]; then
     result fail tmux-config "tmux rejected configuration" \
       "run: tmux -L dotfiles-debug -f ~/.tmux.conf start-server"
-  fi
-  if command -v herdr >/dev/null 2>&1 && [[ "$(herdr --version 2>/dev/null)" == herdr* ]]; then
-    result pass herdr-runtime "binary and managed configuration available"
-    if herdr integration status >/dev/null 2>&1; then
-      result pass herdr-integrations "integration status is readable"
-    else
-      result warn herdr-integrations "run herdr integration status"
-    fi
-  else
-    result fail herdr-runtime "Herdr version check failed"
   fi
 fi
 

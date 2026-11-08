@@ -5,6 +5,7 @@ bootstrap:
   chezmoi: "2.73.1"
 
 core:
+  bubblewrap: "distro"
   fzf: "0.74.5"
   fd: "10.4.2"
   ripgrep: "15.1.0"
@@ -80,7 +81,6 @@ terminal:
   kitty: "0.49.2"
   tmux: distro
   tmuxp: "1.74.0"
-  herdr: "0.9.3"
 
 system:
   git_credential_manager: "3.0.1"

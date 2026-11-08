@@ -2,8 +2,8 @@
 # Regenerate with: ./scripts/generate-package-lock.sh
 
 generated_from:
-  packages: b58e011be724c1398a82f30bb6d2d5a0fc8f8b1ebea629d08efbfc9b031e90fb
-  metadata: ff9c750e05f2e49d185bc74e1e745e83ec88d87c6e799271edade4c925b465cf
+  packages: 16dbce03604e0715122ddd21630c411ea78a4b1663f62f5bd5efa902c4b096f5
+  metadata: f18d5ac504594777f03a2a272ddb0792bf35a2815cd046d37f9ca6707c42d8f3
 
 tools:
   - section: bootstrap
@@ -17,6 +17,14 @@ tools:
     arch_amd64: amd64
     arch_arm64: arm64
     integrity: upstream-checksum
+  - section: core
+    name: bubblewrap
+    version: distro
+    source: apt
+    owner: apt
+    package: bubblewrap
+    binary: bwrap
+    integrity: apt-signature
   - section: core
     name: fzf
     version: 0.74.5
@@ -609,20 +617,6 @@ tools:
     package: tmuxp
     binary: tmuxp
     integrity: pypi
-  - section: terminal
-    name: herdr
-    version: 0.9.3
-    source: github
-    owner: dotfiles-binary
-    repo: ogulcancelik/herdr
-    binary: herdr
-    tag_template: "v{version}"
-    asset_template: "herdr-linux-{arch}"
-    arch_amd64: x86_64
-    arch_arm64: aarch64
-    sha256_amd64: 18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7
-    sha256_arm64: 4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0
-    integrity: pinned-sha256
   - section: system
     name: git_credential_manager
     version: 3.0.1

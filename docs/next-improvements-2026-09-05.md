@@ -47,7 +47,7 @@ credentials, or workspaces.
 | 6 | Private immutable run plan, changed-input refusal, persistent backup ID, per-attempt summaries, doctor rerun | Plan tests cover source/options/legacy refusal; lifecycle tests exercise post-apply and post-doctor failure, resume, and backup retention; minimal-install failure/resume passes. |
 | 7 | Native MCP absence verified; partial errors aggregated instead of suppressed | Stateful mocks cover failed removal, already-absent state, malformed/read-only config, and unrelated entries. |
 | 8 | Staged binary/Go/Node/Java replacement, ownership fingerprints, ledger locks, retained APT rows, UV runtime routing | Ownership tests cover bad probes, local changes, unowned paths, failed ledger/link writes, self-links, stale stamps, and concurrent writers. |
-| 9 | Canonical-path suffixes and directory validation before workspace reuse | Mocked tmux/Herdr tests cover basename/sanitization collisions, symlink aliases, and explicit-name mismatch. |
+| 9 | Canonical-path suffixes and directory validation before workspace reuse | Mocked tmux tests cover basename/sanitization collisions, symlink aliases, and explicit-name mismatch. |
 | 10 | One monthly PR explicitly dispatches and tracks a commit-correlated heavy canary | Seventeen mocked GH scenarios cover create/refresh, missing jobs, wrong SHA, supersession, approval, timeout, and publication failure. |
 
 ### Deliberate Boundaries
@@ -228,7 +228,7 @@ each case in a correctly isolated strict-mode process and collect its status.
 Keep expected-failure checks explicit. Add a deliberate-broken-fixture test so
 the harness itself proves it can fail. Preserve diagnostics and accurate failed
 case counts when a case aborts. Keep the current mocked contract suite, but do
-not treat it as proof of live tmuxp/Herdr or authenticated-agent behavior.
+not treat it as proof of live tmuxp or authenticated-agent behavior.
 
 **Acceptance:** deliberately break the first, middle, and last assertion in a
 case. Each must produce nonzero suite status and a failed JSON/event entry.
@@ -310,11 +310,8 @@ correct ledger must survive failure; no unrelated path may be removed.
 
 ## 9. Identify Workspaces by Canonical Project Directory
 
-**Evidence: static review; no live Herdr/tmux session changed.**
-[dot-workspace](../dot_local/bin/executable_dot-workspace#L101) derives its default
-name from the directory basename. Its
-[Herdr reuse path](../dot_local/bin/executable_dot-workspace#L368) matches only
-that label and focuses the existing workspace without comparing directories.
+**Historical finding; addressed by canonical path hashing and directory checks.**
+The tmux workspace launcher must not identify projects by basename alone.
 
 For example, `/work/api` and `/personal/api` both become `api-agents`. Opening
 the second can focus agents in the first repository. Sanitizing punctuation
@@ -325,7 +322,7 @@ collision because subsequent agent work can happen in the wrong checkout.
 workspace identity. Preserve same-directory reuse; use a short path-derived
 suffix to disambiguate default names. Explicit `--name` collisions should ask
 or fail with the two paths rather than silently focusing another project.
-Apply the same identity contract to both supported backends.
+Apply this identity contract to every tmux workspace.
 
 **Acceptance:** extend [test-agent-workspace.sh](../tests/test-agent-workspace.sh)
 and the Docker workspace suite with equal basenames, sanitized-name collisions,

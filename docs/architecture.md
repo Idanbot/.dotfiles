@@ -121,26 +121,19 @@ reviewed upstream fingerprint while preserving repository definitions.
 `agents.yaml` is the single command and workspace-order registry. Chezmoi
 materializes it at `~/.config/dotfiles/agents.yaml` for runtime use.
 
-`dot-workspace` resolves `auto`, `herdr`, or `tmux` before launching anything.
-Auto stays in the active multiplexer, prefers Herdr from a bare terminal, and
-falls back to tmuxp when Herdr is unavailable. Cross-multiplexer nesting is
-rejected unless `--allow-nested` is explicit.
-
-The Herdr backend creates or focuses one named project workspace, keeps its
-root terminal tab, and creates one agent tab per registry entry through Herdr's
-JSON CLI. The tmux backend renders the same registry into a tmuxp YAML session
-and runs the pinned tmuxp version through `uvx`. Missing agent commands degrade
-to a login shell in either backend. See ADR 0006.
+The workspace launcher uses tmux and renders the agent registry into a tmuxp YAML
+session, loaded with a pinned tmuxp through `uvx`. Presets select declared subsets;
+read-only previews report observable drift. Existing sessions are preserved and
+missing optional commands leave a shell. See ADR 0006.
 
 ## Test Architecture
 
 Fast contracts validate parsing, templates, policies, workspace routing,
-Herdr configuration, ownership, recovery, selectors, and generated files.
-The Docker workspace harness invokes both backend paths with synthetic agent
+tmux configuration, ownership, recovery, selectors, and generated files.
+The Docker workspace harness invokes the tmux path with synthetic agent
 CLIs, validates MCP toggles, working-directory propagation, and crash/missing
 agent behavior while retaining structured artifacts. Network release smoke
-tests execute real downloaded binaries, create a real Herdr workspace twice,
-and apply all chezmoi externals. Docker E2E executes the same installer path as
+tests execute real downloaded binaries and apply all chezmoi externals. Docker E2E executes the same installer path as
 users, twice, on native and WSL-simulated modes. A monthly ephemeral Ubuntu VM
 separately validates login-shell, desktop, fontconfig, and systemd host
 integration.

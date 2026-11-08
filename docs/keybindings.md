@@ -1,6 +1,6 @@
 # Keybindings
 
-Generated from tmux, Herdr, and zsh config. Regenerate with:
+Generated from tmux, Kitty, and zsh config. Regenerate with:
 
 ```bash
 ./scripts/generate-keybinding-docs.sh
@@ -41,63 +41,6 @@ Generated from tmux, Herdr, and zsh config. Regenerate with:
 | prefix+M-o | `display-popup -w 70% -h 30% -d "#{pane_current_path}" -E 'bash -lc "command -v explorer.exe >/dev/null && { explorer.exe .; printf \"Opened current directory in Windows Explorer.\"; } \|\| printf \"explorer.exe not found\"; printf \"\\n\\nPress enter to close...\"; read -r _"'` |
 | prefix+M-h | `display-popup -w 80% -h 80% -E 'bash -lc "command -v btop >/dev/null && exec btop \|\| { printf \"btop not found\\n\\nPress enter to close...\"; read -r _; }"'` |
 | prefix+y | `setw synchronize-panes \; display-message "synchronize-panes #{?synchronize-panes,on,off}"` |
-
-## Herdr
-
-| Key | Action |
-|-----|--------|
-| ctrl+s | `prefix` |
-| prefix+? | `help` |
-| prefix+s | `settings` |
-| prefix+q | `detach` |
-| prefix+shift+r | `reload_config` |
-| prefix+o | `open_notification_target` |
-| prefix+w | `workspace_picker` |
-| prefix+g | `goto` |
-| prefix+shift+n | `new_workspace` |
-| prefix+shift+w | `rename_workspace` |
-| prefix+shift+d | `close_workspace` |
-| prefix+shift+left | `previous_workspace` |
-| prefix+shift+right | `next_workspace` |
-| prefix+alt+1..9 | `focus_agent` |
-| prefix+c | `new_tab` |
-| prefix+shift+t | `rename_tab` |
-| prefix+p | `previous_tab` |
-| prefix+n | `next_tab` |
-| prefix+1..9 | `switch_tab` |
-| prefix+shift+1..9 | `switch_workspace` |
-| prefix+shift+x | `close_tab` |
-| prefix+shift+p | `rename_pane` |
-| prefix+e | `edit_scrollback` |
-| prefix+[ | `copy_mode` |
-| prefix+h | `focus_pane_left` |
-| prefix+j | `focus_pane_down` |
-| prefix+k | `focus_pane_up` |
-| prefix+l | `focus_pane_right` |
-| prefix+shift+h | `swap_pane_left` |
-| prefix+shift+j | `swap_pane_down` |
-| prefix+shift+k | `swap_pane_up` |
-| prefix+shift+l | `swap_pane_right` |
-| prefix+tab | `cycle_pane_next` |
-| prefix+shift+tab | `cycle_pane_previous` |
-| prefix+backtick | `last_pane` |
-| prefix+v | `split_vertical` |
-| prefix+minus | `split_horizontal` |
-| prefix+x | `close_pane` |
-| prefix+z | `zoom` |
-| prefix+r | `resize_mode` |
-| prefix+b | `toggle_sidebar` |
-| shift+k | `navigate_workspace_up` |
-| shift+j | `navigate_workspace_down` |
-| h | `navigate_pane_left` |
-| j | `navigate_pane_down` |
-| k | `navigate_pane_up` |
-| l | `navigate_pane_right` |
-| prefix+alt+g | `open lazygit` |
-| prefix+alt+d | `open lazydocker` |
-| prefix+alt+k | `open k9s` |
-| prefix+alt+h | `open btop` |
-| prefix+alt+o | `run dotfiles doctor` |
 
 ## Kitty
 

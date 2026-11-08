@@ -5,16 +5,7 @@ set -euo pipefail
 
 DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 TMP_HOME="$(mktemp -d)"
-server_pid=""
-cleanup() {
-  herdr server stop >/dev/null 2>&1 || true
-  if [[ -n "$server_pid" ]]; then
-    kill "$server_pid" 2>/dev/null || true
-    wait "$server_pid" 2>/dev/null || true
-  fi
-  rm -rf "$TMP_HOME"
-}
-trap cleanup EXIT
+trap 'rm -rf "$TMP_HOME"' EXIT
 export HOME="$TMP_HOME"
 export DOTFILES_BIN_DIR="$TMP_HOME/bin"
 export DOTFILES_STATE_DIR="$TMP_HOME/state"
@@ -41,7 +32,6 @@ case "$ARCH" in
     CLOUD_ARCH=amd64
     S5CMD_ARCH=64bit
     OMP_ARCH=x64
-    HERDR_ARCH=x86_64
     RTK_ARCH=x86_64-unknown-linux-musl
     ;;
   arm64)
@@ -51,7 +41,6 @@ case "$ARCH" in
     CLOUD_ARCH=arm64
     S5CMD_ARCH=arm64
     OMP_ARCH=arm64
-    HERDR_ARCH=aarch64
     RTK_ARCH=aarch64-unknown-linux-gnu
     ;;
   *)
@@ -62,7 +51,6 @@ esac
 EZA_SHA="$(package_metadata core eza "sha256_$ARCH")"
 OMP_SHA="$(package_metadata ai_tools omp "sha256_$ARCH")"
 RTK_SHA="$(package_metadata ai_tools rtk "sha256_$ARCH")"
-HERDR_SHA="$(package_metadata terminal herdr "sha256_$ARCH")"
 
 EZA_VERSION="$(package_version core eza 0.23.4)"
 install_github_archive eza eza-community/eza "v$EZA_VERSION" \
@@ -193,10 +181,6 @@ RTK_VERSION="$(package_version ai_tools rtk 0.45.0)"
 install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" \
   "rtk-${RTK_ARCH}.tar.gz" rtk "sha256:$RTK_SHA" 'rtk --version'
 
-HERDR_VERSION="$(package_version terminal herdr 0.7.4)"
-install_github_binary herdr ogulcancelik/herdr "v$HERDR_VERSION" \
-  "herdr-linux-$HERDR_ARCH" herdr "sha256:$HERDR_SHA" 'herdr --version'
-
 AST_GREP_VERSION="$(package_version core ast_grep 0.45.0)"
 install_github_archive ast-grep ast-grep/ast-grep "$AST_GREP_VERSION" \
   "app-${AST_GREP_ARCH}-unknown-linux-gnu.zip" ast-grep \
@@ -211,7 +195,7 @@ install_github_archive gitleaks gitleaks/gitleaks "v$GITLEAKS_VERSION" \
 
 for binary in \
   eza lazygit lazydocker sops tldr starship curlie helmfile kubectx kubens stern \
-  kubectl-radar omp bun rtk herdr ast-grep gitleaks; do
+  kubectl-radar omp bun rtk ast-grep gitleaks; do
   "$DOTFILES_BIN_DIR/$binary" --version >/dev/null
 done
 s5cmd version >/dev/null
@@ -220,40 +204,4 @@ kubecolor --kubecolor-version >/dev/null
 
 [[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 20 ]]
 
-HERDR_CONFIG_PATH="$TMP_HOME/herdr-config.toml"
-cp "$DOTFILES_DIR/dot_config/herdr/config.toml" "$HERDR_CONFIG_PATH"
-export HERDR_CONFIG_PATH
-export SHELL=/bin/bash
-herdr server >"$TMP_HOME/herdr-server.out" 2>&1 &
-server_pid=$!
-for _ in {1..100}; do
-  herdr workspace list >/dev/null 2>&1 && break
-  sleep 0.1
-done
-herdr workspace list >/dev/null
-
-mkdir -p "$(dirname "$DOTFILES_AGENT_REGISTRY")" "$HOME/.config/tmuxp" "$HOME/workspace-smoke"
-cp "$DOTFILES_DIR/agents.yaml" "$DOTFILES_AGENT_REGISTRY"
-cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/agent-workspace.yaml"
-for agent in codex antigravity claude opencode omp; do
-  sed -i "s/command: $agent/command: missing-$agent/" "$DOTFILES_AGENT_REGISTRY"
-done
-sed -i 's/command: agy/command: missing-antigravity/' "$DOTFILES_AGENT_REGISTRY"
-ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" "$DOTFILES_BIN_DIR/dot-agent-launch"
-
-HERDR_ENV=1 "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \
-  "$HOME/workspace-smoke" --name release-smoke
-HERDR_ENV=1 "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \
-  "$HOME/workspace-smoke" --name release-smoke
-
-workspaces="$(herdr workspace list)"
-[[ "$(jq '[.result.workspaces[] | select(.label == "release-smoke")] | length' <<<"$workspaces")" -eq 1 ]]
-workspace_id="$(jq -r '.result.workspaces[] | select(.label == "release-smoke") | .workspace_id' <<<"$workspaces")"
-workspace="$(herdr workspace get "$workspace_id")"
-[[ "$(jq -r '.result.workspace.tab_count' <<<"$workspace")" -eq 6 ]]
-[[ "$(jq -r '.result.workspace.pane_count' <<<"$workspace")" -eq 6 ]]
-
-herdr server stop >/dev/null
-wait "$server_pid" 2>/dev/null || true
-[[ ! -e "$DOTFILES_DIR/dot_config/herdr/release-notes.json" ]]
 printf 'GitHub release tool smoke passed\n'

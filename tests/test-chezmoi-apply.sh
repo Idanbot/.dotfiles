@@ -59,7 +59,6 @@ EOF
   test -f "$HOME/.zshrc"
   test -f "$HOME/.tmux.conf"
   test -f "$HOME/.gitconfig"
-  test -f "$HOME/.config/herdr/config.toml"
   test -f "$HOME/.config/dotfiles/agents.yaml"
   test -f "$HOME/.config/agents/AGENTS.md"
   test -x "$HOME/.local/bin/agent-mcp"
@@ -74,7 +73,6 @@ EOF
   test -x "$HOME/.local/bin/tmux-help"
   test -x "$HOME/.local/bin/tmux-kube-status"
   test ! -e "$HOME/.ssh/sockets"
-  grep -Fq 'prefix = "ctrl+s"' "$HOME/.config/herdr/config.toml"
   grep -Fq 'workspace:' "$HOME/.config/dotfiles/agents.yaml"
   for instruction_path in \
     "$HOME/.codex/AGENTS.md" \

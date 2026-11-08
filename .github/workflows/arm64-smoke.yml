@@ -48,7 +48,7 @@ jobs:
             -v "$GITHUB_WORKSPACE:/dotfiles:ro" dotfiles-arm64-smoke \
             bash -euo pipefail -c '
               [[ "$(uname -m)" == aarch64 && "$(dpkg --print-architecture)" == arm64 ]]
-              for binary in chezmoi eza herdr; do
+              for binary in chezmoi eza sops; do
                 if command -v "$binary"; then exit 1; fi
               done
               sudo apt-get update -qq
@@ -64,14 +64,12 @@ jobs:
                 "$(package_release_field core eza "$version" arm64 asset)" ./eza \
                 "sha256:$(package_metadata core eza sha256_arm64)" "eza --version"
 
-              version="$(package_version terminal herdr)"
-              install_github_binary herdr \
-                "$(package_release_field terminal herdr "$version" arm64 repo)" \
-                "$(package_release_field terminal herdr "$version" arm64 tag)" \
-                "$(package_release_field terminal herdr "$version" arm64 asset)" herdr \
-                "sha256:$(package_metadata terminal herdr sha256_arm64)" "herdr --version"
+              version="$(package_version core sops)"
+              install_github_binary sops getsops/sops "v$version" "sops-v$version.linux.arm64" sops \
+                "https://github.com/getsops/sops/releases/download/v$version/sops-v$version.checksums.txt" \
+                "sops --version"
 
-              for binary in chezmoi eza herdr; do
+              for binary in chezmoi eza sops; do
                 "$HOME/.local/bin/$binary" --version
               done
             ' 2>&1 | tee artifacts/arm64/smoke.log

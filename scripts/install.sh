@@ -66,6 +66,7 @@ ATTEMPT_ID="$(date -u '+%Y%m%dT%H%M%S%NZ')"
 CONFLICT_POLICY_SET=false
 DOCTOR_SET=false
 CURRENT_STAGE="startup"
+STAGE_NUMBER=0
 RUN_STARTED_NANOS="$(date +%s%N)"
 INTERACTIVE_WAIT_MS=0
 _HANDLING_ERROR=false
@@ -868,6 +869,14 @@ on_error() {
   _HANDLING_ERROR=true
   log_error "Stage '$CURRENT_STAGE' failed at installer line $line (exit $status)"
   log_info "Resume after fixing the cause: $0 --resume=$DOTFILES_RUN_ID"
+  case "$status" in
+    126 | 127) log_info "A required command is missing or not executable; review the failing command and PATH in the text log" ;;
+    100) log_info "APT failed; review signed repositories, held packages and package conflicts before resuming" ;;
+    5 | 6 | 7 | 28) log_info "Check DNS, proxy and upstream connectivity; never disable TLS or integrity verification to retry" ;;
+  esac
+  if [[ "$CURRENT_STAGE" == preflight ]]; then
+    log_info "Preflight stopped before configuration apply; keep existing setup and resolve the reported target or integrity failure"
+  fi
   write_event error "failed line=$line exit=$status"
   if [[ -n "${CHEZMOI_SOURCE:-}" ]]; then
     write_run_summary failure 2>/dev/null || true
@@ -938,15 +947,19 @@ stage_injection_matches() {
 run_stage() {
   local stage="$1"
   shift
-  local checkpoint="$CHECKPOINT_DIR/$stage.done" started elapsed
+  local checkpoint="$CHECKPOINT_DIR/$stage.done" started elapsed total
   CURRENT_STAGE="$stage"
+  STAGE_NUMBER=$((STAGE_NUMBER + 1))
   if [[ -n "$RESUME_REQUEST" && -f "$checkpoint" && "$stage" != doctor && "$stage" != preflight && "$stage" != update-report ]]; then
     log_skip "Resuming: $stage already completed"
     write_event skip "checkpoint hit"
     return 0
   fi
 
-  log_step "$stage"
+  total=$((${#SELECTED_SECTIONS[@]} + 4))
+  [[ -n "$ONLY_SECTION" ]] || total=$((total + 1))
+  [[ "$RUN_DOCTOR" != true ]] || total=$((total + 1))
+  log_step "[$STAGE_NUMBER/$total] $stage"
   write_event start "stage started"
   if stage_injection_matches before; then
     log_error "Injected failure before $stage"
@@ -1239,15 +1252,17 @@ stage_doctor() {
 
 stage_preflight() {
   local -a args=()
+  local selected
+  selected="$(join_by_comma "${SELECTED_SECTIONS[@]}")"
   [[ "$REVIEWED_BASELINE" != true ]] || args+=(--reviewed-baseline)
   [[ -z "$RESUME_REQUEST" ]] || args+=(--resume)
   /usr/bin/python3 "$CHEZMOI_SOURCE/scripts/install-policy.py" preflight \
-    --source "$CHEZMOI_SOURCE" --sections "$(join_by_comma "${SELECTED_SECTIONS[@]}")" \
+    --source "$CHEZMOI_SOURCE" --sections "$selected" \
     --plan "$DOTFILES_VERSION_PLAN" "${args[@]}"
-  if [[ ",$(join_by_comma "${SELECTED_SECTIONS[@]}")," == *,languages,* ]]; then
+  if [[ ",$selected," == *,languages,* ]]; then
     DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE" bash "$CHEZMOI_SOURCE/scripts/python-installer.sh" --check
   fi
-  if [[ ",$(join_by_comma "${SELECTED_SECTIONS[@]}")," == *,ai,* ]]; then
+  if [[ ",$selected," == *,ai,* ]]; then
     DOTFILES_SOURCE_DIR="$CHEZMOI_SOURCE" bash "$CHEZMOI_SOURCE/scripts/vendor-preflight.sh"
   fi
 }

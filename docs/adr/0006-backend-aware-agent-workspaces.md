@@ -1,49 +1,23 @@
-# ADR 0006: Backend-Aware Agent Workspaces
+# ADR 0006: Tmux Agent Workspaces
 
-Status: Accepted
-
-Supersedes: [ADR 0005](0005-agent-workspaces.md)
-
-## Context
-
-The tmuxp-only launcher is reproducible, but running it from a Herdr pane hides
-the actual agent processes behind tmux. Herdr then cannot provide agent state,
-attention routing, or notifications. Giving both multiplexers the same prefix
-also makes accidental nesting difficult to operate.
+Status: accepted; updated 2026-11-08.
 
 ## Decision
 
-`dot workspace` supports `auto`, `herdr`, and `tmux` backends. Auto routing:
+Use tmux as the single workspace implementation. Render the common agent registry
+and optional presets into tmuxp YAML and run the pinned tmuxp through uvx.
+Both legacy `--backend auto` and `--backend tmux` select tmux.
 
-1. Uses Herdr when already inside a Herdr-managed pane.
-2. Uses tmuxp when already inside tmux.
-3. Prefers Herdr on a bare terminal when the binary is available.
-4. Falls back to tmuxp when Herdr is unavailable.
+Names include a canonical-directory hash and optional preset suffix. Explicit
+name collisions with another directory fail. Existing same-directory sessions
+are attached/focused without replacing user panes or restarting agents.
 
-Cross-multiplexer launches fail unless `--allow-nested` is explicit. Both
-multiplexers keep `Ctrl+S` as their normal prefix. Tmux's native `send-prefix`
-supports Herdr beneath tmux. A generated tmuxp session explicitly nested under
-Herdr uses `Ctrl+B` for that session only.
+`--print` renders YAML; `--plan` inspects desired/current window labels without
+mutation. Unavailable inspection is unknown, not evidence of absent sessions.
+The standard prefix is Ctrl+S. Agent authentication and state remain manual.
 
-Both backends consume the managed copy of `agents.yaml`. Herdr creates one
-project workspace with a terminal tab and one tab per agent. Tmuxp creates one
-session with a terminal window and one window per agent. Existing named
-workspaces/sessions are reused. `--agents` can select a registered subset,
-`--check` performs a read-only preflight, and `--restart-agents` enables
-crash-only restarts. Missing agent commands leave a login shell. Tmux status
-shows the compact readiness count from `dot-agent-status`; it never starts an
-agent or MCP server.
+## Verification
 
-## Consequences
-
-Herdr retains direct visibility of agents during normal Herdr operation. Tmuxp
-remains available for terminal-first and recovery workflows without requiring
-Herdr. Backend behavior is deterministic and testable through `--print`.
-
-The launcher still does not create worktrees, coordinate concurrent writers,
-commit, merge, push, authenticate agents, or manage agent session data. The
-Docker workspace harness keeps these boundaries testable without credentials:
-it uses synthetic agent commands and a Herdr API fixture to verify both backend
-contracts, MCP state transitions, current-directory propagation, and degraded
-missing/crashing agent behavior. Release smoke remains responsible for testing
-the real Herdr binary and downloaded assets.
+Docker fixtures exercise registry paths, presets, working directories with spaces,
+name collisions, reuse, missing/crashing agents and non-mutating drift previews.
+No user session is modified by tests.

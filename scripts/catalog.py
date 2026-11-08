@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Offline discovery catalog; explicit refresh probes versions, never connects."""
+"""Passive receipt catalog; explicit refresh probes versions, optionally isolated."""
 
 import argparse
 import concurrent.futures
@@ -19,6 +19,7 @@ from dotfiles.metadata import load_repository
 
 ROOT = Path(__file__).resolve().parent.parent
 COMMANDS = {
+    "bubblewrap": ["bwrap"],
     "github_cli": ["gh"],
     "aws_cli": ["aws"],
     "azure_cli": ["az"],
@@ -94,7 +95,6 @@ PROBES = {
         "kubectl-radar",
         "kitty",
         "tmuxp",
-        "herdr",
         "git-credential-manager",
         "claude",
         "codex",
@@ -118,6 +118,7 @@ PROBES = {
 }
 PROBES.update(
     {
+        "bwrap": ["--version"],
         "kubectl": ["version", "--client", "-o", "json"],
         "helm": ["version", "--short"],
         "go": ["version"],
@@ -210,7 +211,25 @@ def locate(entry):
     return None, None
 
 
-def probe(entry):
+def isolated_command(path, arguments):
+    """Minimal filesystem view: no host home, credentials, sockets or network."""
+    sandbox = shutil.which("bwrap")
+    if not sandbox:
+        return None
+    args = [sandbox, "--unshare-all", "--die-with-parent", "--new-session", "--cap-drop", "ALL", "--clearenv",
+            "--ro-bind", "/usr", "/usr", "--dir", "/proc", "--dev", "/dev",
+            "--tmpfs", "/tmp", "--dir", "/home/probe", "--dir", "/probe",
+            "--setenv", "HOME", "/home/probe", "--setenv", "PATH", "/usr/bin:/bin",
+            "--setenv", "NO_COLOR", "1", "--chdir", "/tmp"]
+    for directory in ("/bin", "/lib", "/lib64"):
+        if Path(directory).exists():
+            args += ["--ro-bind", directory, directory]
+    executable = str(Path(path).resolve())
+    args += ["--ro-bind", executable, "/probe/tool", "--", "/probe/tool", *arguments]
+    return args
+
+
+def probe(entry, isolated=False):
     command, path = locate(entry)
     record = {
         "path": path,
@@ -219,6 +238,13 @@ def probe(entry):
         "version": None,
         "probe": "unavailable",
     }
+    if isolated and path and command in PROBES:
+        invocation = isolated_command(path, PROBES[command])
+        if invocation is None:
+            record["probe"] = "isolation-unavailable"
+            return entry["id"], record
+    else:
+        invocation = [path, *PROBES.get(command, [])]
     if path and command in PROBES:
         package_version = server_package_version(command, path)
         if package_version:
@@ -229,15 +255,17 @@ def probe(entry):
             return entry["id"], record
         try:
             output = subprocess.run(
-                [path, *PROBES[command]],
+                invocation,
                 check=False,
                 capture_output=True,
+                stdin=subprocess.DEVNULL if isolated else None,
                 text=True,
                 timeout=3,
-                env={**os.environ, "NO_COLOR": "1", "CHECKPOINT_DISABLE": "1"},
+                env={"PATH": "/usr/bin:/bin", "NO_COLOR": "1"} if isolated else
+                    {**os.environ, "NO_COLOR": "1", "CHECKPOINT_DISABLE": "1"},
             )
             if output.returncode != 0:
-                record["probe"] = "failed"
+                record["probe"] = "isolation-or-probe-failed" if isolated else "failed"
             else:
                 text = output.stdout + output.stderr
                 if command in {"gcloud", "az", "kubectl", "terraform"}:
@@ -264,7 +292,8 @@ def probe(entry):
             record["probe"] = "failed"
     elif path:
         record["probe"] = "not-supported"
-    record.update(managed_observation(entry))
+    if not isolated:
+        record.update(managed_observation(entry))
     return entry["id"], record
 
 
@@ -366,11 +395,12 @@ def signature(path):
     return None
 
 
-def refresh(entries):
+def refresh(entries, isolated=False):
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
-        records = dict(pool.map(probe, entries))
+        records = dict(pool.map(lambda entry: probe(entry, isolated=True) if isolated else probe(entry), entries))
     data = {
         "schema": 1,
+        "isolation_requested": isolated,
         "observed_at": datetime.datetime.now(datetime.UTC).isoformat(),
         "entries": records,
     }
@@ -386,6 +416,9 @@ def refresh(entries):
         if os.path.exists(temporary):
             os.unlink(temporary)
     print(f"Refreshed {len(entries)} entries: {path}")
+    if isolated:
+        unverified = sum(record.get("version") is None for record in records.values())
+        print(f"Isolation requested: {unverified} entries unverified; no unrestricted fallback was used")
 
 
 def view(entries):
@@ -467,13 +500,14 @@ def main():
         help="include missing candidates and non-executable packages",
     )
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--isolated", action="store_true", help="refresh using enforced network/filesystem isolation; never fall back to host execution")
     parser.add_argument(
         "--pick", action="store_true", help="fzf picker with read-only details preview"
     )
     args = parser.parse_args()
     entries = catalog()
     if args.query == ["refresh"]:
-        refresh(entries)
+        refresh(entries, isolated=args.isolated)
         return 0
     entries = view(entries)
     if args.query and args.query[0] == "show":

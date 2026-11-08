@@ -12,6 +12,12 @@ bootstrap:
     integrity: upstream-checksum
 
 core:
+  bubblewrap:
+    source: apt
+    owner: apt
+    package: bubblewrap
+    binary: bwrap
+    integrity: apt-signature
   fzf:
     source: external
     owner: chezmoi-external
@@ -497,18 +503,6 @@ terminal:
     package: tmuxp
     binary: tmuxp
     integrity: pypi
-  herdr:
-    source: github
-    owner: dotfiles-binary
-    repo: ogulcancelik/herdr
-    tag_template: "v{version}"
-    asset_template: "herdr-linux-{arch}"
-    arch_amd64: x86_64
-    arch_arm64: aarch64
-    binary: herdr
-    sha256_amd64: 18a8dc65f1c2fa485884344356dea1cfd911c6f06cf46fa78e193f4087f4dba7
-    sha256_arm64: 4de7aa3e25678812e92960de64f7c2aaa1bca1f0f80a3c5e559837e231e1f5c0
-    integrity: pinned-sha256
 
 system:
   git_credential_manager:

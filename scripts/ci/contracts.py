@@ -66,9 +66,8 @@ def platform_coverage(workflows):
         '"$(dpkg --print-architecture)" == arm64',
         "/dotfiles/scripts/install-chezmoi.sh",
         "install_github_archive eza",
-        "install_github_binary herdr",
+        "install_github_binary sops",
         "package_metadata core eza sha256_arm64",
-        "package_metadata terminal herdr sha256_arm64",
         '"$HOME/.local/bin/$binary" --version',
     ):
         assert required in script, required

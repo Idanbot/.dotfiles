@@ -9,9 +9,11 @@ import os
 from pathlib import Path
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -23,6 +25,68 @@ spec.loader.exec_module(catalog)
 
 
 class CatalogTests(unittest.TestCase):
+    def test_real_isolation_blocks_network_and_host_files_when_available(self):
+        invocation = catalog.isolated_command(sys.executable, ["-c", "print('sandbox-ready')"])
+        if invocation is None:
+            if os.environ.get("DOTFILES_REQUIRE_ISOLATION") == "1":
+                self.fail("Required Bubblewrap is missing")
+            self.skipTest("Bubblewrap unavailable; refusal path tested separately")
+        available = subprocess.run(invocation, capture_output=True, timeout=5)
+        if available.returncode:
+            if os.environ.get("DOTFILES_REQUIRE_ISOLATION") == "1":
+                self.fail("Required namespace isolation unavailable")
+            self.skipTest("Namespaces blocked; refusal path tested separately")
+        private = Path(self.temp.name) / "private"
+        private.write_text("synthetic-secret")
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            code = '''import os,pathlib,socket,sys
+assert os.environ['HOME'] == '/home/probe'
+assert 'SYNTHETIC_SECRET' not in os.environ
+assert not pathlib.Path(sys.argv[1]).exists()
+try:
+ pathlib.Path('/usr/probe-write').write_text('forbidden')
+except OSError: pass
+else: raise AssertionError('host filesystem writable')
+try:
+ socket.create_connection(('127.0.0.1',int(sys.argv[2])),timeout=.2)
+except OSError: pass
+else: raise AssertionError('host network reachable')
+print('isolated 1.2.3')
+'''
+            args = catalog.isolated_command(sys.executable, ["-c", code, str(private), str(listener.getsockname()[1])])
+            result = subprocess.run(args, capture_output=True, timeout=5, env={**os.environ, "SYNTHETIC_SECRET": "hidden"})
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(private.read_text(), "synthetic-secret")
+        hanging = catalog.isolated_command(sys.executable, ["-c",
+            "import subprocess,time;subprocess.Popen(['sleep','60']);time.sleep(60)"])
+        started = time.monotonic()
+        with self.assertRaises(subprocess.TimeoutExpired):
+            subprocess.run(hanging, capture_output=True, timeout=.2)
+        self.assertLess(time.monotonic() - started, 3)
+
+    def test_isolation_unavailable_never_executes_the_tool(self):
+        with patch.object(catalog, "locate", return_value=("gh", "/fixture/gh")), \
+                patch.object(catalog.shutil, "which", return_value=None), \
+                patch.object(catalog.subprocess, "run", side_effect=AssertionError("unrestricted execution")), \
+                patch.object(catalog, "managed_observation", side_effect=AssertionError("managed process")):
+            self.assertEqual(catalog.probe({"id": "core.github_cli"}, isolated=True)[1]["probe"], "isolation-unavailable")
+
+    def test_isolation_failure_has_no_host_fallback(self):
+        with patch.object(catalog, "locate", return_value=("gh", "/fixture/gh")), \
+                patch.object(catalog.shutil, "which", return_value="/usr/bin/bwrap"), \
+                patch.object(catalog.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "namespace blocked")) as run, \
+                patch.object(catalog, "managed_observation", side_effect=AssertionError("managed process")):
+            result = catalog.probe({"id": "core.github_cli"}, isolated=True)[1]
+            self.assertEqual(result["probe"], "isolation-or-probe-failed")
+            self.assertEqual(run.call_count, 1)
+            args = run.call_args.args[0]
+            self.assertIn("--unshare-all", args)
+            self.assertIn("--clearenv", args)
+            self.assertNotIn("--share-net", args)
+            self.assertEqual(run.call_args.kwargs["env"], {"PATH": "/usr/bin:/bin", "NO_COLOR": "1"})
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
