@@ -25,13 +25,15 @@ retry_command() {
 
 download_once() {
   local url="$1" dest="$2" partial status
+  local -a headers=()
+  [[ -z "${3:-}" ]] || headers=(-H "Accept: $3")
   partial="${dest}.part.$$"
   rm -f "$partial"
   if command_exists curl; then
     if curl --proto '=https' --tlsv1.2 \
       --connect-timeout 20 --max-time 180 \
       --retry 2 --retry-all-errors --retry-delay 1 --retry-max-time 60 \
-      -fsSL -o "$partial" "$url"; then
+      "${headers[@]}" -fsSL -o "$partial" "$url"; then
       mv -f "$partial" "$dest"
       return 0
     else
@@ -49,8 +51,39 @@ download_once() {
     return 1
   fi
   rm -f "$partial"
+  # GitHub's browser download route can fail while its asset API is healthy.
+  if [[ "$status" == 22 && "$url" =~ ^https://github.com/([^/]+/[^/]+)/releases/download/([^/]+)/([^/?]+)$ ]]; then
+    if github_release_download "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}" "$dest"; then
+      return 0
+    fi
+  fi
   return "$status"
 }
+
+github_release_download() (
+  local repo="$1" tag="$2" asset="$3" dest="$4" metadata asset_url
+  command_exists curl && command_exists python3 || return 1
+  metadata="$(mktemp)"
+  trap 'rm -f "$metadata"' EXIT
+  download_once "https://api.github.com/repos/$repo/releases/tags/$tag" "$metadata" || return 1
+  asset_url="$(
+    python3 - "$metadata" "$repo" "$asset" <<'PY'
+import json
+import re
+import sys
+
+with open(sys.argv[1]) as stream:
+    release = json.load(stream)
+prefix = f"https://api.github.com/repos/{sys.argv[2]}/releases/assets/"
+matches = [item.get("url", "") for item in release.get("assets", [])
+           if item.get("name") == sys.argv[3]]
+if len(matches) != 1 or not re.fullmatch(re.escape(prefix) + r"[0-9]+", matches[0]):
+    sys.exit(1)
+print(matches[0])
+PY
+  )" || return 1
+  download_once "$asset_url" "$dest" application/octet-stream
+)
 
 download() {
   local url="$1" dest="$2"

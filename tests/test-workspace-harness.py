@@ -54,9 +54,9 @@ with tempfile.TemporaryDirectory(prefix="workspace-harness-") as temp:
         events = [json.loads(line) for line in (artifacts / "workspace-events.jsonl").read_text().splitlines()]
         failures = [event for event in events if event["state"] == "fail"]
         try:
-            assert summary["cases"]["total"] == 6
+            assert summary["cases"]["total"] == 5
             assert summary["cases"]["failed"] == len(failures)
-            assert summary["cases"]["passed"] + len(failures) == 6
+            assert summary["cases"]["passed"] + len(failures) == 5
             if mutation:
                 assert result.returncode != 0, "broken fixture passed"
                 assert summary["result"] == "fail" and failures

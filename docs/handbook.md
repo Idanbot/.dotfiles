@@ -538,6 +538,9 @@ Pinned chezmoi externals stay cached until their URL changes. Bootstrap retries
 transient download failures (including HTTP 429) up to four times; checksum and
 configuration errors fail immediately. `DOTFILES_CHEZMOI_ATTEMPTS` and
 `DOTFILES_CHEZMOI_RETRY_DELAY` control the retry limit and delay in seconds.
+When GitHub's browser route returns an HTTP error, curl downloads retry through
+its public asset API. This fallback uses no account token and does not bypass the
+caller's checksum or signature verification; unavailable API access still fails closed.
 Tmux's right status bar shows Kubernetes context and the clock; use
 `dot-agent-status --check` for manual agent readiness checks.
 

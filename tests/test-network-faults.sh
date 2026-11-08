@@ -17,8 +17,13 @@ set -euo pipefail
 
 dest=""
 url=""
+accept=""
 while (($#)); do
   case "$1" in
+    -H)
+      accept="$2"
+      shift 2
+      ;;
     -o)
       dest="$2"
       shift 2
@@ -39,6 +44,22 @@ count=$((count + 1))
 printf '%s\n' "$count" >"$count_file"
 
 case "$key" in
+  fixture.tar.gz)
+    printf 'failed browser download\n' >"$dest"
+    exit 22
+    ;;
+  v1)
+    printf '{"assets":[{"name":"fixture.tar.gz","url":"%s"}]}\n' \
+      "${MOCK_ASSET_URL:-https://api.github.com/repos/fixture/tool/releases/assets/123}" >"$dest"
+    ;;
+  123)
+    [[ "$accept" == 'Accept: application/octet-stream' ]] || exit 22
+    case "${MOCK_ASSET_MODE:-valid}" in
+      valid) cp "$MOCK_CURL_STATE/payload" "$dest" ;;
+      corrupt) printf 'corrupt fallback\n' >"$dest" ;;
+      failed) printf 'partial fallback\n' >"$dest"; exit 22 ;;
+    esac
+    ;;
   transient)
     ((count >= 3)) || exit 22
     cp "$MOCK_CURL_STATE/payload" "$dest"
@@ -99,6 +120,30 @@ download_verified \
   "$TMP_ROOT/verified.out" \
   "sha256:$expected" >/dev/null
 cmp "$MOCK_STATE/payload" "$TMP_ROOT/verified.out"
+
+# Exercise the real GitHub fallback, including the caller's mandatory digest check.
+export DOTFILES_DOWNLOAD_CACHE=0
+release_url=https://github.com/fixture/tool/releases/download/v1/fixture.tar.gz
+download_verified "$release_url" "$TMP_ROOT/fallback.out" "sha256:$expected" >/dev/null
+cmp "$MOCK_STATE/payload" "$TMP_ROOT/fallback.out"
+[[ "$(<"$MOCK_STATE/123.count")" == 1 ]]
+for MOCK_ASSET_MODE in corrupt failed; do
+  export MOCK_ASSET_MODE
+  printf 'previous verified file\n' >"$TMP_ROOT/fallback.out"
+  if download_verified "$release_url" "$TMP_ROOT/fallback.out" "sha256:$expected" >/dev/null 2>&1; then
+    printf 'Unsafe GitHub fallback unexpectedly succeeded\n' >&2
+    exit 1
+  fi
+  grep -Fxq 'previous verified file' "$TMP_ROOT/fallback.out"
+done
+unset MOCK_ASSET_MODE
+export MOCK_ASSET_URL=https://untrusted.invalid/payload
+if download_once "$release_url" "$TMP_ROOT/rejected.out" >/dev/null 2>&1; then
+  printf 'Untrusted asset API URL unexpectedly accepted\n' >&2
+  exit 1
+fi
+[[ ! -e "$TMP_ROOT/rejected.out" ]]
+unset MOCK_ASSET_URL
 
 # Command substitutions must capture only data, even after a recovered retry.
 (
