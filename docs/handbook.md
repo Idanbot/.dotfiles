@@ -391,7 +391,7 @@ supervised invocation should wait for an active run.
 
 Installation diagnostics distinguish managed uv Python and the pinned uvx tmuxp
 request from executables found on PATH. MCP package metadata is read without
-starting servers; unavailable metadata is reported as unknown. Pix compatibility
+starting servers; unavailable metadata is reported as unknown. OMP compatibility
 receipts apply only to the OMP executable and plugin dependency tree validated by
 native installation. Changed or unowned installations are not silently certified
 or adopted. VS Code inventories have a private five-minute cache;
@@ -607,14 +607,14 @@ this repository.
 
 The AI profile also installs the canonical Ponytail skill into
 `~/.agents/skills/ponytail` only when that skill is missing, preserving any
-existing local copy. OMP receives the pinned Pix Optimizer plugin; use
-`/optimizer` inside OMP to select Caveman, RTK, and Ponytail modes. These modes
-remain user-controlled rather than being enabled by bootstrap. A verified Bun
-runtime is installed alongside OMP because OMP uses it for plugin management.
-Pix settings live in `~/.pi/agent/pix.json` (or `PI_CODING_AGENT_DIR`), with new
-modes initialized off and existing choices preserved. The reviewed Bun override
-in `packages.meta.yaml` keeps Pix's UI dependency compatible with OMP; conflicting
-user overrides require manual review rather than being replaced silently.
+existing local copy. It also installs the checksum-pinned Caveman skill and
+OMP-native `omp-ponytail-caveman` plugin. Use `/ponytail` and `/caveman` in OMP
+to inspect or change modes; upstream defaults are Ponytail full and Caveman ultra.
+A verified Bun runtime is installed alongside OMP for plugin management.
+Bootstrap uninstalls retired Pix Optimizer through OMP and removes its old
+bootstrap compatibility override. Historical Pix settings are left inert;
+unrelated plugins and user settings are preserved. Marketplace commands for
+Claude Code are not used to configure OMP.
 
 RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
 optional shell-output optimizer. Bootstrap does not install its agent hooks;

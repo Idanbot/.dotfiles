@@ -11,13 +11,20 @@ export DOTFILES_OMP_PLUGIN_ROOT="$HOME/.omp/plugins"
 mkdir -p "$HOME/.local/bin" "$TMP_ROOT/fixture/ponytail-4.9.0/skills/ponytail"
 printf '%s\n' '# Ponytail fixture' >"$TMP_ROOT/fixture/ponytail-4.9.0/skills/ponytail/SKILL.md"
 tar -czf "$TMP_ROOT/ponytail.tar.gz" -C "$TMP_ROOT/fixture" ponytail-4.9.0
+mkdir -p "$TMP_ROOT/fixture/caveman-4.1.0/skills/caveman"
+printf '%s\n' '# Caveman fixture' >"$TMP_ROOT/fixture/caveman-4.1.0/skills/caveman/SKILL.md"
+tar -czf "$TMP_ROOT/caveman.tar.gz" -C "$TMP_ROOT/fixture" caveman-4.1.0
 
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_DIR/scripts/lib.sh"
 
 download_verified() {
-  local _url="$1" destination="$2" _checksum="$3" _name="$4"
-  cp "$TMP_ROOT/ponytail.tar.gz" "$destination"
+  local url="$1" destination="$2" _checksum="$3" _name="$4"
+  case "$url" in
+    */juliusbrussee/caveman/*) cp "$TMP_ROOT/caveman.tar.gz" "$destination" ;;
+    */DietrichGebert/ponytail/*) cp "$TMP_ROOT/ponytail.tar.gz" "$destination" ;;
+    *) return 1 ;;
+  esac
 }
 
 export OMP_CALLS="$TMP_ROOT/omp-calls"
@@ -25,8 +32,13 @@ cat >"$HOME/.local/bin/omp" <<'OMP'
 #!/usr/bin/env bash
 set -euo pipefail
   printf '%s\n' "$*" >>"$OMP_CALLS"
-  [[ "$1 $2" == 'plugin install' ]]
   [[ "${OMP_FORCE_FAIL:-false}" != true ]] || exit 37
+  if [[ "$1 $2" == 'plugin uninstall' ]]; then
+    [[ "${OMP_KEEP_PLUGIN:-false}" != true ]] || exit 0
+    rm -rf "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$3"
+    exit 0
+  fi
+  [[ "$1 $2" == 'plugin install' ]]
   package="${3%@*}" version="${3##*@}"
   manifest=""
   manifest="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$package/package.json"
@@ -48,78 +60,86 @@ grep -Fq $'ponytail\t4.9.0\tagent-skill:DietrichGebert/ponytail' \
 printf '%s\n' '# Keep local copy' >"$HOME/.agents/skills/ponytail/SKILL.md"
 install_github_agent_skill ponytail DietrichGebert/ponytail 4.9.0 fixture-sha
 grep -Fq '# Keep local copy' "$HOME/.agents/skills/ponytail/SKILL.md"
+install_github_agent_skill caveman juliusbrussee/caveman 4.1.0 fixture-sha
+grep -Fxq '# Caveman fixture' "$HOME/.agents/skills/caveman/SKILL.md"
+printf '%s\n' '# Local Caveman choice' >"$HOME/.agents/skills/caveman/SKILL.md"
+caveman_digest="$(managed_target_digest "$HOME/.agents/skills/caveman")"
+install_github_agent_skill caveman juliusbrussee/caveman 4.1.0 fixture-sha
+[[ "$(managed_target_digest "$HOME/.agents/skills/caveman")" == "$caveman_digest" ]]
 
-omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
-grep -Fxq 'plugin install @xynogen/pix-optimizer@1.1.26' "$OMP_CALLS"
-[[ "$(jq -r .version "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/@xynogen/pix-optimizer/package.json")" == 1.1.26 ]]
+omp_install_package omp-ponytail-caveman 0.3.4 ponytail-caveman
+grep -Fxq 'plugin install omp-ponytail-caveman@0.3.4' "$OMP_CALLS"
+[[ "$(jq -r .version "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/omp-ponytail-caveman/package.json")" == 0.3.4 ]]
 
 call_count="$(wc -l <"$OMP_CALLS")"
-omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
+omp_install_package omp-ponytail-caveman 0.3.4 ponytail-caveman
 [[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
-omp_plugin_is_validated @xynogen/pix-optimizer
+omp_plugin_is_validated omp-ponytail-caveman
 printf '# active OMP changed\n' >>"$HOME/.local/bin/omp"
-if omp_plugin_is_validated @xynogen/pix-optimizer; then
+if omp_plugin_is_validated omp-ponytail-caveman; then
   printf 'Stale compatibility validation was accepted\n' >&2
   exit 1
 fi
-omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer
-omp_plugin_is_validated @xynogen/pix-optimizer
+omp_install_package omp-ponytail-caveman 0.3.4 ponytail-caveman
+omp_plugin_is_validated omp-ponytail-caveman
 call_count="$(wc -l <"$OMP_CALLS")"
-grep -Fq $'pix-optimizer\t1.1.26\tomp:@xynogen/pix-optimizer' \
+grep -Fq $'ponytail-caveman\t0.3.4\tomp:omp-ponytail-caveman' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 
 export OMP_FORCE_FAIL=true
-if omp_install_package @xynogen/pix-optimizer 1.1.27 pix-optimizer; then
+if omp_install_package omp-ponytail-caveman 0.3.5 ponytail-caveman; then
   printf 'Native extension validation failure was ignored\n' >&2
   exit 1
 fi
 unset OMP_FORCE_FAIL
-grep -Fq $'pix-optimizer\t1.1.26\tomp:@xynogen/pix-optimizer' \
+grep -Fq $'ponytail-caveman\t0.3.4\tomp:omp-ponytail-caveman' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 call_count="$(wc -l <"$OMP_CALLS")"
 
-initialize_pix_optimizer_state
-pix_state="$HOME/.pi/agent/pix.json"
-jq -e '.optimizer | .caveman == "off" and .rtk == "off" and .ponytail == "off"' "$pix_state" >/dev/null
-[[ "$(stat -c %a "$pix_state")" == 600 ]]
-jq -n '{optimizer: {caveman: "full", rtk: "on", ponytail: "lite"}, other: "keep"}' >"$pix_state"
-initialize_pix_optimizer_state
-jq -e '.other == "keep" and .optimizer.caveman == "full" and .optimizer.rtk == "on" and .optimizer.ponytail == "lite"' "$pix_state" >/dev/null
-
+retired="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/@xynogen/pix-optimizer"
+mkdir -p "$retired"
+printf '{}' >"$retired/package.json"
+record_install pix-optimizer 1.3.5 omp:@xynogen/pix-optimizer "$retired"
 plugin_settings="$DOTFILES_OMP_PLUGIN_ROOT/package.json"
-jq -e '.overrides["@xynogen/pix-pretty"] == "1.30.0"' "$plugin_settings" >/dev/null
-[[ "$(stat -c %a "$plugin_settings")" == 600 ]]
-jq '.overrides["@xynogen/pix-pretty"] = "1.32.0" | .other = "keep"' \
-  "$plugin_settings" >"$TMP_ROOT/settings.json"
-cp "$TMP_ROOT/settings.json" "$plugin_settings"
-if omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer; then
-  printf 'Conflicting user override was not refused\n' >&2
+printf '%s\n' '{"dependencies":{"other":"2.0.0"},"overrides":{"@xynogen/pix-pretty":"1.30.0","other":"3.0.0"}}' >"$plugin_settings"
+mkdir -p "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/other"
+printf '%s\n' keep >"$DOTFILES_OMP_PLUGIN_ROOT/node_modules/other/local-file"
+settings_digest="$(managed_target_digest "$plugin_settings")"
+other_digest="$(managed_target_digest "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/other")"
+export OMP_FORCE_FAIL=true
+if remove_retired_omp_optimizer; then
+  printf 'Uninstall failure was ignored\n' >&2
   exit 1
 fi
-cmp "$TMP_ROOT/settings.json" "$plugin_settings"
+unset OMP_FORCE_FAIL
+[[ -d "$retired" ]]
+grep -q '^pix-optimizer' "$DOTFILES_STATE_DIR/installed.tsv"
+[[ "$(managed_target_digest "$plugin_settings")" == "$settings_digest" ]]
+export OMP_KEEP_PLUGIN=true
+if remove_retired_omp_optimizer; then
+  printf 'Incomplete uninstall was ignored\n' >&2
+  exit 1
+fi
+unset OMP_KEEP_PLUGIN
+remove_retired_omp_optimizer
+[[ ! -e "$retired" ]]
+[[ "$(managed_target_digest "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/other")" == "$other_digest" ]]
+jq -e '.dependencies.other == "2.0.0" and .overrides == {"other":"3.0.0"}' "$plugin_settings" >/dev/null
+[[ -f "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/omp-ponytail-caveman/package.json" ]]
+! grep -q '^pix-optimizer' "$DOTFILES_STATE_DIR/installed.tsv"
+call_count="$(wc -l <"$OMP_CALLS")"
+settings_digest="$(managed_target_digest "$plugin_settings")"
+remove_retired_omp_optimizer
 [[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
+[[ "$(managed_target_digest "$plugin_settings")" == "$settings_digest" ]]
 
-rm "$plugin_settings"
-ln -s "$TMP_ROOT/settings.json" "$plugin_settings"
-if omp_install_package @xynogen/pix-optimizer 1.1.26 pix-optimizer; then
-  printf 'Symlinked plugin settings were not refused\n' >&2
+redirected="$TMP_ROOT/redirected-plugins"
+ln -s "$DOTFILES_OMP_PLUGIN_ROOT" "$redirected"
+if DOTFILES_OMP_PLUGIN_ROOT="$redirected" remove_retired_omp_optimizer; then
+  printf 'Redirected plugin directory was accepted\n' >&2
   exit 1
 fi
-[[ -L "$plugin_settings" ]]
-
-rm "$pix_state"
-mkdir -p "$HOME/.omp/agent"
-jq -n '{caveman: "full", rtk: "on", ponytail: "lite"}' >"$HOME/.omp/agent/optimizer.json"
-initialize_pix_optimizer_state
-jq -e '.optimizer.caveman == "full" and .optimizer.rtk == "on"' "$pix_state" >/dev/null
-[[ -f "$HOME/.omp/agent/optimizer.json" ]]
-rm "$pix_state"
-ln -s "$TMP_ROOT/settings.json" "$pix_state"
-if initialize_pix_optimizer_state; then
-  printf 'Symlinked Pix settings were not refused\n' >&2
-  exit 1
-fi
-[[ -L "$pix_state" ]]
+[[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
 
 # Exercise the actual installer block so metadata migrations cannot empty its asset.
 awk '/^RTK_VERSION=/ { block = 1 } /^PONYTAIL_VERSION=/ { exit } block' \

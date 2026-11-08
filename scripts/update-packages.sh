@@ -330,9 +330,9 @@ integrity_pair() {
     printf '%s\t%s\n' "$old" "$new"
     return 0
   fi
-  if [[ "$id" == ai_tools.ponytail ]]; then
+  if [[ "$(metadata_value "$section" "$key" owner)" == agent-skill ]]; then
     old="$(pinned_metadata_checksums "$section" "$key")" || old=unresolved
-    if new="$(external_archive_checksum DietrichGebert/ponytail "v$latest")"; then
+    if new="$(external_archive_checksum "$(metadata_value "$section" "$key" repo)" "v$latest")"; then
       new="sha256:$new"
     else
       new=unresolved

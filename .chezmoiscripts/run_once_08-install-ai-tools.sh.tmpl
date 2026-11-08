@@ -126,9 +126,11 @@ PONYTAIL_SHA256="$(package_metadata ai_tools ponytail sha256)"
 install_github_agent_skill ponytail DietrichGebert/ponytail \
   "$PONYTAIL_VERSION" "$PONYTAIL_SHA256"
 
-PIX_OPTIMIZER_VERSION="$(package_version ai_tools pix_optimizer 1.1.26)"
-omp_install_package @xynogen/pix-optimizer "$PIX_OPTIMIZER_VERSION" pix-optimizer
-initialize_pix_optimizer_state
+install_github_agent_skill caveman juliusbrussee/caveman \
+  "$(package_version ai_tools caveman 4.1.0)" "$(package_metadata ai_tools caveman sha256)"
+remove_retired_omp_optimizer
+omp_install_package omp-ponytail-caveman \
+  "$(package_version ai_tools ponytail_caveman 0.3.4)" ponytail-caveman
 
 # OMP discovers the standard Agent Skills location. Registration is passive:
 # no repository graph, hook, MCP server, or external backend is configured.
@@ -157,7 +159,7 @@ log_info "MCP servers are not installed or enabled; existing local MCP settings 
 log_info "Graphify is available on demand in OMP; run '/graphify .' inside an agent session"
 log_info "RTK is installed without hooks; its telemetry is disabled by policy"
 log_info "Ponytail is available as an on-demand shared skill"
-log_info "Pix Optimizer is available in OMP; run '/optimizer' to choose modes"
+log_info "Ponytail/Caveman is available in OMP; use '/ponytail' and '/caveman' to choose modes"
 
 log_info "Agent authentication and session state are intentionally left to the user"
 

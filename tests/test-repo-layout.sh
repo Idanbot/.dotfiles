@@ -238,7 +238,7 @@ if ! grep -Eq 'SERENA_VERSION|CONTEXT_MODE_VERSION|agent-mcp enable|mcp add' "$A
   grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER" &&
   grep -Fq 'install_github_archive bun oven-sh/bun' "$AI_INSTALLER" &&
   grep -Fq 'install_github_agent_skill ponytail DietrichGebert/ponytail' "$AI_INSTALLER" &&
-  grep -Fq 'omp_install_package @xynogen/pix-optimizer' "$AI_INSTALLER"; then
+  grep -Fq 'omp_install_package omp-ponytail-caveman' "$AI_INSTALLER"; then
   pass "standalone agent tools are versioned without installing or enabling MCPs"
 else
   fail "optional agent context or optimization tool installation contracts are incomplete"

@@ -1,11 +1,10 @@
 #!/usr/bin/python3
-"""Prepare native OMP/Pix settings without replacing user choices."""
+"""Remove the retired bootstrap Pix compatibility override, preserving user settings."""
 
 import argparse
 import json
 import os
 from pathlib import Path
-import re
 import stat
 import tempfile
 
@@ -37,45 +36,17 @@ def read_object(path):
     return data
 
 
-def prepare(path, mode, overrides=None, legacy=None):
+def prepare(path):
     path = path.expanduser().absolute()
     data = read_object(path)
     original = json.dumps(data, sort_keys=True)
-    if mode == "plugins":
-        if not isinstance(overrides, dict) or not overrides:
-            raise ValueError("invalid-overrides")
-        for name, version in overrides.items():
-            if not re.fullmatch(r"@[a-z0-9-]+/[a-z0-9-]+", name) or not (
-                isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version)
-            ):
-                raise ValueError("invalid-override")
-        existing = data.setdefault("overrides", {})
-        if not isinstance(existing, dict):
-            raise ValueError("overrides-not-object")
-        if any(
-            name in existing and existing[name] != version
-            for name, version in overrides.items()
-        ):
-            raise ValueError("conflicting-user-override-review-package-json")
-        existing.update(overrides)
-        data.setdefault("private", True)
-    else:
-        optimizer = data.setdefault("optimizer", {})
-        if not isinstance(optimizer, dict):
-            raise ValueError("optimizer-not-object")
-        if any(key not in optimizer for key in ("caveman", "rtk", "ponytail")):
-            previous = read_object(legacy.expanduser().absolute()) if legacy else {}
-            allowed = {
-                "caveman": {"off", "lite", "full", "ultra", "micro"},
-                "rtk": {"off", "on"},
-                "ponytail": {"off", "lite", "full", "ultra"},
-            }
-            for key, values in allowed.items():
-                if key not in optimizer:
-                    value = previous.get(key, "off")
-                    if not isinstance(value, str) or value not in values:
-                        raise ValueError("invalid-legacy-choice")
-                    optimizer[key] = value
+    existing = data.get("overrides", {})
+    if not isinstance(existing, dict):
+        raise ValueError("overrides-not-object")
+    if existing.get("@xynogen/pix-pretty") == "1.30.0":
+        del existing["@xynogen/pix-pretty"]
+        if not existing:
+            data.pop("overrides", None)
     if json.dumps(data, sort_keys=True) == original:
         return False
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -94,20 +65,10 @@ def prepare(path, mode, overrides=None, legacy=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("plugins", "optimizer"))
     parser.add_argument("path", type=Path)
-    parser.add_argument("--overrides")
-    parser.add_argument("--legacy", type=Path)
     args = parser.parse_args()
     try:
-        changed = prepare(
-            args.path,
-            args.mode,
-            json.loads(args.overrides, object_pairs_hook=object_pairs)
-            if args.overrides
-            else None,
-            args.legacy,
-        )
+        changed = prepare(args.path)
     except (OSError, ValueError):
         parser.exit(
             1,

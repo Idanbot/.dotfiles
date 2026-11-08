@@ -343,7 +343,7 @@ install_github_binary() { record "binary $*"; }
 install_github_archive() { record "archive $*"; }
 install_github_agent_skill() { record "skill $*"; }
 omp_install_package() { record "omp-package $*"; }
-initialize_pix_optimizer_state() { :; }
+remove_retired_omp_optimizer() { :; }
 print_summary() { :; }
 '''
 (fixture / "scripts/lib.sh").write_text(library)
@@ -380,7 +380,7 @@ for existing in (False, True):
     observations = calls.read_text()
     assert "serena" not in observations and "context-mode" not in observations, observations
     assert " mcp " not in observations and "agent-mcp " not in observations, observations
-    assert "omp-package @xynogen/pix-optimizer" in observations, observations
+    assert "omp-package omp-ponytail-caveman" in observations, observations
     for name, previous in before.items():
         current = (home / name).read_bytes() if (home / name).exists() else None
         assert current == previous, name

@@ -176,7 +176,7 @@ commands, examples, tags, and observed paths/versions.
 | terminal | `kitty` 0.49.2, `tmux` distro, `tmuxp` 1.76.0 |
 | system | `git_credential_manager` 3.0.2 |
 | fonts | `nerd_font` FiraMono, `nerd_font_version` 3.5.1 |
-| ai_tools | `claude_cli` 2.1.319, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.5, `omp` 18.18.1, `bun` 1.4.4, `graphify` 0.9.104, `rtk` 0.51.0, `ponytail` 5.3.3, `pix_optimizer` 1.3.5 |
+| ai_tools | `claude_cli` 2.1.319, `codex_cli` standalone, `antigravity_cli` standalone, `opencode` 1.19.5, `omp` 18.18.1, `bun` 1.4.4, `graphify` 0.9.104, `rtk` 0.51.0, `ponytail` 5.3.3, `caveman` 4.1.0, `ponytail_caveman` 0.3.4 |
 | media | `yt_dlp` 2026.10.26, `rmpc` 0.11.0, `cava` distro |
 <!-- tool-versions:end -->
 

@@ -609,13 +609,17 @@ ai_tools:
     repo: DietrichGebert/ponytail
     integrity: pinned-sha256
     sha256: a1409db9ef8ba2556aed6aa3766c381cd633c9f2f9d1c4515fec44df5bb446a3
-  pix_optimizer:
+  caveman:
+    source: github
+    owner: agent-skill
+    repo: juliusbrussee/caveman
+    integrity: pinned-sha256
+    sha256: f0e69649ed920d5e98cc4decf7f3943f9bc3926384cfa5426872447cc0a5fb42
+  ponytail_caveman:
     source: npm
     owner: omp-plugin
-    package: "@xynogen/pix-optimizer"
+    package: omp-ponytail-caveman
     integrity: npm-registry
-    # Newer pix-pretty imports hyperlink(), absent from OMP's Pi TUI shim.
-    dependency_overrides: '{"@xynogen/pix-pretty":"1.30.0"}'
 
 media:
   yt_dlp:

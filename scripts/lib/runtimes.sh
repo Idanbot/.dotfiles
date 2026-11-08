@@ -336,7 +336,7 @@ _npm_install_candidate() {
 
 omp_install_package() {
   local package="$1" version="$2" tool="$3"
-  local root manifest installed_version="" spec policy_changed=unchanged
+  local root manifest installed_version="" spec
   root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
   manifest="$root/node_modules/$package/package.json"
   spec="${package}@${version}"
@@ -347,17 +347,10 @@ omp_install_package() {
     return 0
   fi
 
-  if [[ "$package" == @xynogen/pix-optimizer ]]; then
-    policy_changed="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
-      plugins "$root/package.json" \
-      --overrides "$(package_metadata ai_tools pix_optimizer dependency_overrides)")" || return 1
-    initialize_pix_optimizer_state || return 1
-  fi
-
   if [[ -f "$manifest" ]]; then
     installed_version="$(jq -r '.version // empty' "$manifest" 2>/dev/null || true)"
   fi
-  if version_equals "$installed_version" "$version" && [[ "$policy_changed" == unchanged ]] && omp_plugin_is_validated "$package"; then
+  if version_equals "$installed_version" "$version" && omp_plugin_is_validated "$package"; then
     log_skip "$tool $version already installed in OMP"
     return 0
   fi
@@ -418,10 +411,26 @@ omp_plugin_is_validated() {
   [[ "$(<"$receipt")" == "$signature" ]]
 }
 
-initialize_pix_optimizer_state() {
-  local directory="${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}"
+remove_retired_omp_optimizer() {
+  local root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
+  local package=@xynogen/pix-optimizer
+  [[ "$(realpath -m -- "$root")" == "$root" &&
+  "$(realpath -m -- "$root/node_modules")" == "$root/node_modules" ]] || {
+    log_error "Preserving redirected OMP plugin directory; review before removing Pix Optimizer"
+    return 1
+  }
+  if [[ -e "$root/node_modules/$package" || -L "$root/node_modules/$package" ]]; then
+    log_info "Removing retired Pix Optimizer through OMP"
+    omp plugin uninstall "$package" || return 1
+    [[ ! -e "$root/node_modules/$package" && ! -L "$root/node_modules/$package" ]] || {
+      log_error "OMP did not remove Pix Optimizer; retry its native uninstall"
+      return 1
+    }
+  fi
+  forget_install pix-optimizer
+  # Remove only the compatibility override previously introduced by bootstrap.
   /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
-    optimizer "$directory/pix.json" --legacy "$HOME/.omp/agent/optimizer.json" >/dev/null
+    "$root/package.json" >/dev/null
 }
 
 install_github_agent_skill() {

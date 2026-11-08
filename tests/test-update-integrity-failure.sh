@@ -128,7 +128,8 @@ sys.exit(item.get("status", 22))
 
     def test_external_archives(self):
         for ident, repo in (("core.fzf", "junegunn/fzf"),
-                            ("ai_tools.ponytail", "DietrichGebert/ponytail")):
+                            ("ai_tools.ponytail", "DietrichGebert/ponytail"),
+                            ("ai_tools.caveman", "juliusbrussee/caveman")):
             group, key = ident.split(".")
             old = self.respond(f"https://codeload.github.com/{repo}/tar.gz/refs/tags/v{self.pins[group][key]}",
                                "complete old archive")
@@ -218,13 +219,13 @@ sys.exit(item.get("status", 22))
 
     def candidate_fixture(self):
         self.pins["languages"].update(node="26.11.1", npm="12.0.0", typescript="7.0.0")
-        self.pins["ai_tools"].update(opencode="1.0.0", pix_optimizer="1.0.0")
+        self.pins["ai_tools"].update(opencode="1.0.0", ponytail_caveman="1.0.0")
         (self.source / "packages.yaml").write_text(yaml.safe_dump(self.pins, sort_keys=False))
         self.respond("https://nodejs.org/dist/index.json",
                      [{"version": "v" + value} for value in ("27.0.0", "26.12.0", "26.11.2")])
         for value in ("26.11.1", "26.11.2", "26.12.0", "27.0.0"):
             self.node_checksums(value)
-        for ident in ("ai_tools.opencode", "ai_tools.pix_optimizer"):
+        for ident in ("ai_tools.opencode", "ai_tools.ponytail_caveman"):
             self.npm(ident, {"1.0.0": ">=26", "1.1.0": ">=26", "2.0.0": ">=26.12",
                              "3.0.0": ">=27", "4.0.0": ">=26"}, "3.0.0")
         self.npm("languages.npm", {"12.0.0": ">=26", "12.0.1": ">=26",
@@ -239,10 +240,10 @@ sys.exit(item.get("status", 22))
 
     def test_selected_npm_uses_pinned_node(self):
         self.candidate_fixture()
-        self.assertEqual(self.run_updater("--apply", "ai_tools.opencode", "ai_tools.pix_optimizer", "languages.npm"), 0,
+        self.assertEqual(self.run_updater("--apply", "ai_tools.opencode", "ai_tools.ponytail_caveman", "languages.npm"), 0,
                          self.output)
         self.assert_pins(**{"languages.node": "26.11.1", "languages.npm": "12.0.1",
-                            "ai_tools.opencode": "1.1.0", "ai_tools.pix_optimizer": "1.1.0"})
+                            "ai_tools.opencode": "1.1.0", "ai_tools.ponytail_caveman": "1.1.0"})
         self.assertNotIn("https://nodejs.org/dist/index.json", self.calls.read_text())
         self.assertNotIn("/latest", self.calls.read_text())
 

@@ -84,7 +84,8 @@ Generated from `packages.yaml` and `packages.meta.yaml`. Update manifests first,
 | ai_tools | graphify | 0.9.104 | pypi | uv | pypi |
 | ai_tools | rtk | 0.51.0 | github | dotfiles-binary | pinned-sha256 |
 | ai_tools | ponytail | 5.3.3 | github | agent-skill | pinned-sha256 |
-| ai_tools | pix_optimizer | 1.3.5 | npm | omp-plugin | npm-registry |
+| ai_tools | caveman | 4.1.0 | github | agent-skill | pinned-sha256 |
+| ai_tools | ponytail_caveman | 0.3.4 | npm | omp-plugin | npm-registry |
 | media | yt_dlp | 2026.10.26 | uv | uv | pypi |
 | media | rmpc | 0.11.0 | github | dotfiles-binary | pinned-sha256 |
 | media | cava | distro | apt | apt | apt-signature |

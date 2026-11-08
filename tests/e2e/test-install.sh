@@ -279,11 +279,10 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
     DO_NOT_TRACK=1 OTEL_SDK_DISABLED=true CHECKPOINT_DISABLE=1 dot-privacy >/dev/null
   [[ -f "$HOME/.agents/skills/graphify/SKILL.md" ]]
   [[ -f "$HOME/.agents/skills/ponytail/SKILL.md" ]]
-  pix_manifest="$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json"
-  [[ -f "$pix_manifest" ]]
-  [[ "$(gojq -r '.version' "$pix_manifest")" == "$(manifest_version ai_tools pix_optimizer)" ]]
-  gojq -e '.optimizer | .caveman == "off" and .rtk == "off" and .ponytail == "off"' \
-    "$HOME/.pi/agent/pix.json" >/dev/null
+  [[ -f "$HOME/.agents/skills/caveman/SKILL.md" ]]
+  plugin_manifest="$HOME/.omp/plugins/node_modules/omp-ponytail-caveman/package.json"
+  [[ "$(gojq -r '.version' "$plugin_manifest")" == "$(manifest_version ai_tools ponytail_caveman)" ]]
+  [[ ! -e "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer" ]]
   [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null
   mcp_status="$(agent-mcp status all)"

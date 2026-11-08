@@ -316,11 +316,12 @@ if selected ai; then
   fi
   check_file "$HOME/.agents/skills/graphify/SKILL.md" graphify-skill
   check_file "$HOME/.agents/skills/ponytail/SKILL.md" ponytail-skill
-  check_file "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json" pix-optimizer
-  if omp_plugin_is_validated @xynogen/pix-optimizer; then
-    result pass pix-compatibility "native extension loading validated against the active OMP and current plugin files"
+  check_file "$HOME/.agents/skills/caveman/SKILL.md" caveman-skill
+  check_file "$HOME/.omp/plugins/node_modules/omp-ponytail-caveman/package.json" ponytail-caveman
+  if omp_plugin_is_validated omp-ponytail-caveman; then
+    result pass omp-plugin-compatibility "native extension loading validated against the active OMP and current plugin files"
   else
-    result warn pix-compatibility "active OMP/plugin pair lacks a current native-load validation receipt" \
+    result warn omp-plugin-compatibility "active OMP/plugin pair lacks a current native-load validation receipt" \
       "rerun the AI section for an owned plugin; review migration for an unowned plugin"
   fi
   check_file "$HOME/.config/agents/AGENTS.md" agent-instructions

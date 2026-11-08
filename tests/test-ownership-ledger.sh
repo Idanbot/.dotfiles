@@ -62,14 +62,14 @@ record_install ponytail 4.9.0 agent-skill:DietrichGebert/ponytail "$HOME/.agents
   grep -Fq "would remove $HOME/.agents/skills/ponytail"
 forget_install ponytail
 
-mkdir -p "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer"
-printf '{"name":"@xynogen/pix-optimizer","version":"1.1.26"}\n' \
-  >"$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer/package.json"
-record_install pix-optimizer 1.1.26 omp:@xynogen/pix-optimizer \
-  "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer"
-"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run pix-optimizer |
-  grep -Fq 'would omp plugin uninstall @xynogen/pix-optimizer'
-forget_install pix-optimizer
+mkdir -p "$HOME/.omp/plugins/node_modules/omp-ponytail-caveman"
+printf '{"name":"omp-ponytail-caveman","version":"1.1.26"}\n' \
+  >"$HOME/.omp/plugins/node_modules/omp-ponytail-caveman/package.json"
+record_install ponytail-caveman 1.1.26 omp:omp-ponytail-caveman \
+  "$HOME/.omp/plugins/node_modules/omp-ponytail-caveman"
+"$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run ponytail-caveman |
+  grep -Fq 'would omp plugin uninstall omp-ponytail-caveman'
+forget_install ponytail-caveman
 
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" --dry-run demo | grep -Fq 'would remove'
 "$DOTFILES_DIR/scripts/uninstall-tool.sh" demo >/dev/null
