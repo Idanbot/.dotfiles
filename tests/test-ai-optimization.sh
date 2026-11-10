@@ -20,6 +20,7 @@ source "$DOTFILES_DIR/scripts/lib.sh"
 
 download_verified() {
   local url="$1" destination="$2" _checksum="$3" _name="$4"
+  [[ "${DOWNLOAD_FORCE_FAIL:-false}" != true ]] || return 1
   case "$url" in
     */juliusbrussee/caveman/*) cp "$TMP_ROOT/caveman.tar.gz" "$destination" ;;
     */DietrichGebert/ponytail/*) cp "$TMP_ROOT/ponytail.tar.gz" "$destination" ;;
@@ -36,24 +37,48 @@ set -euo pipefail
   if [[ "$1 $2" == 'plugin uninstall' ]]; then
     [[ "${OMP_KEEP_PLUGIN:-false}" != true ]] || exit 0
     rm -rf "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$3"
+    if [[ -f "$DOTFILES_OMP_PLUGIN_ROOT/package.json" && "${OMP_KEEP_DECLARATION:-false}" != true ]]; then
+      jq --arg package "$3" 'del(.dependencies[$package])' "$DOTFILES_OMP_PLUGIN_ROOT/package.json" >"$DOTFILES_OMP_PLUGIN_ROOT/package.json.new"
+      mv "$DOTFILES_OMP_PLUGIN_ROOT/package.json.new" "$DOTFILES_OMP_PLUGIN_ROOT/package.json"
+    fi
     exit 0
   fi
   [[ "$1 $2" == 'plugin install' ]]
   package="${3%@*}" version="${3##*@}"
+  [[ "${OMP_WRONG_VERSION:-false}" != true ]] || version=0.0.0
   manifest=""
   manifest="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/$package/package.json"
   mkdir -p "$(dirname "$manifest")"
   jq -n --arg name "$package" --arg version "$version" \
     '{name: $name, version: $version, pi: {extensions: ["./src/index.ts"]}}' >"$manifest"
+  [[ "${OMP_PARTIAL_FAIL:-false}" != true ]] || exit 37
 OMP
 chmod +x "$HOME/.local/bin/omp"
 export PATH="$HOME/.local/bin:$PATH"
 
 mkdir -p "$HOME/.agents/skills/ponytail"
 printf '%s\n' keep >"$HOME/.agents/skills/ponytail/local-note"
+printf '%s\n' 'local configuration' >"$HOME/.agents/skills/ponytail/config.json"
+install_github_agent_skill ponytail DietrichGebert/ponytail 4.9.0 fixture-sha
+[[ ! -e "$HOME/.agents/skills/ponytail/SKILL.md" ]]
+grep -Fxq keep "$HOME/.agents/skills/ponytail/local-note"
+grep -Fxq 'local configuration' "$HOME/.agents/skills/ponytail/config.json"
+[[ ! -f "$DOTFILES_STATE_DIR/installed.tsv" ]]
+rm -rf "$HOME/.agents/skills/ponytail"
+mkdir -p "$TMP_ROOT/external-skill"
+ln -s "$TMP_ROOT/external-skill" "$HOME/.agents/skills/ponytail"
+install_github_agent_skill ponytail DietrichGebert/ponytail 4.9.0 fixture-sha
+[[ ! -e "$TMP_ROOT/external-skill/SKILL.md" ]]
+rm "$HOME/.agents/skills/ponytail"
+export DOWNLOAD_FORCE_FAIL=true
+if install_github_agent_skill ponytail DietrichGebert/ponytail 4.9.0 fixture-sha; then
+  printf 'Failed verified download was ignored\n' >&2
+  exit 1
+fi
+unset DOWNLOAD_FORCE_FAIL
+[[ ! -e "$HOME/.agents/skills/ponytail" ]]
 install_github_agent_skill ponytail DietrichGebert/ponytail 4.9.0 fixture-sha
 grep -Fq '# Ponytail fixture' "$HOME/.agents/skills/ponytail/SKILL.md"
-grep -Fxq keep "$HOME/.agents/skills/ponytail/local-note"
 grep -Fq $'ponytail\t4.9.0\tagent-skill:DietrichGebert/ponytail' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 
@@ -92,6 +117,24 @@ if omp_install_package omp-ponytail-caveman 0.3.5 ponytail-caveman; then
   exit 1
 fi
 unset OMP_FORCE_FAIL
+before="$(managed_target_digest "$DOTFILES_OMP_PLUGIN_ROOT")"
+export OMP_PARTIAL_FAIL=true
+if omp_install_package omp-ponytail-caveman 0.3.5 ponytail-caveman; then
+  printf 'Partial mutation failure was ignored\n' >&2
+  exit 1
+fi
+unset OMP_PARTIAL_FAIL
+[[ "$(managed_target_digest "$DOTFILES_OMP_PLUGIN_ROOT")" == "$before" ]]
+target_is_owned "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/omp-ponytail-caveman"
+omp_plugin_is_validated omp-ponytail-caveman
+export OMP_WRONG_VERSION=true
+if omp_install_package omp-ponytail-caveman 0.3.5 ponytail-caveman; then
+  printf 'Wrong-version candidate was accepted\n' >&2
+  exit 1
+fi
+unset OMP_WRONG_VERSION
+[[ "$(managed_target_digest "$DOTFILES_OMP_PLUGIN_ROOT")" == "$before" ]]
+target_is_owned "$DOTFILES_OMP_PLUGIN_ROOT/node_modules/omp-ponytail-caveman"
 grep -Fq $'ponytail-caveman\t0.3.4\tomp:omp-ponytail-caveman' \
   "$DOTFILES_STATE_DIR/installed.tsv"
 call_count="$(wc -l <"$OMP_CALLS")"
@@ -134,6 +177,18 @@ remove_retired_omp_optimizer
 [[ "$(managed_target_digest "$plugin_settings")" == "$settings_digest" ]]
 
 redirected="$TMP_ROOT/redirected-plugins"
+printf '%s\n' '{"dependencies":{"@xynogen/pix-optimizer":"1.3.7","other":"2.0.0"}}' >"$plugin_settings"
+settings_digest="$(managed_target_digest "$plugin_settings")"
+export OMP_KEEP_DECLARATION=true
+if remove_retired_omp_optimizer; then
+  printf 'Retained Pix declaration was accepted\n' >&2
+  exit 1
+fi
+unset OMP_KEEP_DECLARATION
+[[ "$(managed_target_digest "$plugin_settings")" == "$settings_digest" ]]
+remove_retired_omp_optimizer
+jq -e '.dependencies == {"other":"2.0.0"}' "$plugin_settings" >/dev/null
+call_count="$(wc -l <"$OMP_CALLS")"
 ln -s "$DOTFILES_OMP_PLUGIN_ROOT" "$redirected"
 if DOTFILES_OMP_PLUGIN_ROOT="$redirected" remove_retired_omp_optimizer; then
   printf 'Redirected plugin directory was accepted\n' >&2

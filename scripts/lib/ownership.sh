@@ -189,7 +189,7 @@ install_managed_tree() (
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   cp -a -- "$source" "$temporary/new" || return 1
-  "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
+  [[ "$probe" == - ]] || "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
   snapshot_publication "$temporary" "$destination" || return 1
   changed=true
   rm -rf -- "$destination" || return 1

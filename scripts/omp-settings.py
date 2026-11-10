@@ -66,8 +66,16 @@ def prepare(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", type=Path)
+    parser.add_argument("--has-retired", action="store_true")
     args = parser.parse_args()
     try:
+        if args.has_retired:
+            data = read_object(args.path.expanduser().absolute())
+            dependencies = data.get("dependencies", {})
+            if not isinstance(dependencies, dict):
+                raise ValueError("dependencies-not-object")
+            print("true" if "@xynogen/pix-optimizer" in dependencies else "false")
+            return
         changed = prepare(args.path)
     except (OSError, ValueError):
         parser.exit(

@@ -607,7 +607,10 @@ this repository.
 
 The AI profile also installs the canonical Ponytail skill into
 `~/.agents/skills/ponytail` only when that skill is missing, preserving any
-existing local copy. It also installs the checksum-pinned Caveman skill and
+existing local copy. Bootstrap preserves partial skill directories and redirected
+paths for manual review;
+fresh skill trees are published atomically without adopting local files.
+It also installs the checksum-pinned Caveman skill and
 OMP-native `omp-ponytail-caveman` plugin. Use `/ponytail` and `/caveman` in OMP
 to inspect or change modes; upstream defaults are Ponytail full and Caveman ultra.
 A verified Bun runtime is installed alongside OMP for plugin management.
@@ -615,6 +618,11 @@ Bootstrap uninstalls retired Pix Optimizer through OMP and removes its old
 bootstrap compatibility override. Historical Pix settings are left inert;
 unrelated plugins and user settings are preserved. Marketplace commands for
 Claude Code are not used to configure OMP.
+
+OMP manager operations snapshot the shared plugin tree, manifest, and receipts
+under the ownership lock. Handled failures restore that scope; failed recovery
+retains private recovery files. Do not run native plugin commands concurrently
+with bootstrap. Retirement checks both the installed payload and declaration.
 
 RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
 optional shell-output optimizer. Bootstrap does not install its agent hooks;

@@ -335,13 +335,59 @@ _npm_install_candidate() {
 }
 
 omp_install_package() {
+  managed_operation _omp_install_package "$@"
+}
+
+# Native OMP mutates a shared dependency tree and manifest as one manager scope.
+omp_plugin_transaction() (
+  local package="$1" tool="$2" callback="$3" root target validation temporary committed=false changed=false
+  shift 3
+  root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
+  [[ "$(realpath -m -- "$root")" == "$root" &&
+  "$(realpath -m -- "$root/node_modules")" == "$root/node_modules" ]] || return 1
+  target="$root/node_modules/$package"
+  local path
+  for path in "$target" "$root/package.json" "$root/bun.lock" "$root/bun.lockb" "$root/package-lock.json"; do
+    [[ ! -L "$path" && "$(realpath -m -- "$(dirname "$path")")" == "$(dirname "$path")" ]] || return 1
+  done
+  validation="$(omp_plugin_validation_path "$package")"
+  temporary="$(mktemp -d "$(managed_state_root)/.omp-transaction.XXXXXX")" || return 1
+  cleanup_omp() {
+    local status="$?" failed=false
+    trap '' HUP INT TERM
+    if [[ "$changed" == true && "$committed" == false ]]; then
+      restore_publication "$temporary/root" "$root" || failed=true
+      restore_publication_metadata "$temporary/package" "$target" || failed=true
+      restore_publication "$temporary/validation" "$validation" || failed=true
+    fi
+    if [[ "$failed" == true ]]; then
+      log_error "OMP recovery incomplete for $tool; retain recovery files at $temporary"
+      return 1
+    fi
+    rm -rf -- "$temporary"
+    return "$status"
+  }
+  trap cleanup_omp EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  mkdir "$temporary/root" "$temporary/package" "$temporary/validation" || return 1
+  snapshot_publication "$temporary/root" "$root" || return 1
+  snapshot_publication "$temporary/package" "$target" false || return 1
+  snapshot_publication "$temporary/validation" "$validation" || return 1
+  changed=true
+  "$callback" "$@" || return 1
+  committed=true
+)
+
+_omp_install_package() {
   local package="$1" version="$2" tool="$3"
-  local root manifest installed_version="" spec
+  local root manifest installed_version=""
   root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
   manifest="$root/node_modules/$package/package.json"
-  spec="${package}@${version}"
 
-  if [[ -f "$manifest" ]] && ! target_is_owned "$root/node_modules/$package"; then
+  if [[ -e "$root/node_modules/$package" || -L "$root/node_modules/$package" ]] &&
+    ! assert_owned_target "$root/node_modules/$package"; then
     log_warn "Preserving $tool: existing plugin is unowned or modified; compatibility validation requires a reviewed migration"
     ((_PRESERVED++)) || true
     return 0
@@ -355,11 +401,21 @@ omp_install_package() {
     return 0
   fi
 
+  omp_plugin_transaction "$package" "$tool" _omp_install_candidate "$package" "$version" "$tool" || return 1
+  ((_INSTALLED++)) || true
+}
+
+_omp_install_candidate() {
+  local package="$1" version="$2" tool="$3" root manifest spec installed_version
+  root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
+  manifest="$root/node_modules/$package/package.json"
+  spec="$package@$version"
+
   local omp_before omp_after
-  omp_before="$(managed_target_digest "$(command -v omp)")"
+  omp_before="$(managed_target_digest "$(command -v omp)")" || return 1
   log_info "Installing $tool $version for OMP"
   omp plugin install "$spec" || return 1
-  omp_after="$(managed_target_digest "$(command -v omp)")"
+  omp_after="$(managed_target_digest "$(command -v omp)")" || return 1
   [[ "$omp_before" == "$omp_after" ]] || {
     log_error "OMP changed during plugin validation; retry before certifying compatibility"
     return 1
@@ -368,22 +424,21 @@ omp_install_package() {
     log_error "$tool package manifest was not created at $manifest"
     return 1
   }
-  installed_version="$(jq -r '.version // empty' "$manifest")"
+  installed_version="$(jq -r '.version // empty' "$manifest")" || return 1
   version_equals "$installed_version" "$version" || {
     log_error "$tool expected version $version, found ${installed_version:-unknown}"
     return 1
   }
-  record_install "$tool" "$version" "omp:$package" "$root/node_modules/$package"
+  record_install "$tool" "$version" "omp:$package" "$root/node_modules/$package" || return 1
   local validation temporary
   validation="$(omp_plugin_validation_path "$package")"
-  temporary="$(mktemp "${validation}.XXXXXX")"
+  temporary="$(mktemp "${validation}.XXXXXX")" || return 1
   omp_plugin_signature "$package" >"$temporary" || {
     rm -f "$temporary"
     return 1
   }
-  chmod 600 "$temporary"
-  mv -f -- "$temporary" "$validation"
-  ((_INSTALLED++)) || true
+  chmod 600 "$temporary" || return 1
+  mv -f -- "$temporary" "$validation" || return 1
   log_success "$tool $version installed for OMP"
 }
 
@@ -412,6 +467,10 @@ omp_plugin_is_validated() {
 }
 
 remove_retired_omp_optimizer() {
+  managed_operation omp_plugin_transaction @xynogen/pix-optimizer pix-optimizer _remove_retired_omp_optimizer
+}
+
+_remove_retired_omp_optimizer() {
   local root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
   local package=@xynogen/pix-optimizer
   [[ "$(realpath -m -- "$root")" == "$root" &&
@@ -419,7 +478,9 @@ remove_retired_omp_optimizer() {
     log_error "Preserving redirected OMP plugin directory; review before removing Pix Optimizer"
     return 1
   }
-  if [[ -e "$root/node_modules/$package" || -L "$root/node_modules/$package" ]]; then
+  local declared
+  declared="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" "$root/package.json" --has-retired)" || return 1
+  if [[ "$declared" == true || -e "$root/node_modules/$package" || -L "$root/node_modules/$package" ]]; then
     log_info "Removing retired Pix Optimizer through OMP"
     omp plugin uninstall "$package" || return 1
     [[ ! -e "$root/node_modules/$package" && ! -L "$root/node_modules/$package" ]] || {
@@ -427,28 +488,52 @@ remove_retired_omp_optimizer() {
       return 1
     }
   fi
-  forget_install pix-optimizer
+  declared="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" "$root/package.json" --has-retired)" || return 1
+  [[ "$declared" == false ]] || {
+    log_error "OMP still declares Pix Optimizer; retirement was not completed"
+    return 1
+  }
   # Remove only the compatibility override previously introduced by bootstrap.
   /usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/omp-settings.py" \
-    "$root/package.json" >/dev/null
+    "$root/package.json" >/dev/null || return 1
+  forget_install pix-optimizer
 }
 
 install_github_agent_skill() {
+  managed_operation _install_github_agent_skill "$@"
+}
+
+_install_github_agent_skill() {
   local skill="$1" repo="$2" version="$3" expected_sha="$4"
-  local destination="$HOME/.agents/skills/$skill" tmpdir archive source
-  if [[ -f "$destination/SKILL.md" ]]; then
+  local destination="$HOME/.agents/skills/$skill"
+  if [[ -f "$destination/SKILL.md" && ! -L "$destination" &&
+    "$(realpath -m -- "$(dirname "$destination")")" == "$(dirname "$destination")" ]]; then
     log_skip "$skill agent skill already exists"
     return 0
   fi
+  if [[ -e "$destination" || -L "$destination" ||
+    "$(realpath -m -- "$(dirname "$destination")")" != "$(dirname "$destination")" ]]; then
+    log_warn "Preserving existing or redirected $skill skill destination; manual migration required"
+    return 0
+  fi
 
-  tmpdir="$(mktemp -d)"
+  _publish_github_agent_skill "$skill" "$repo" "$version" "$expected_sha" || return 1
+  ((_INSTALLED++)) || true
+  log_success "$skill agent skill $version installed"
+}
+
+_publish_github_agent_skill() (
+  local skill="$1" repo="$2" version="$3" expected_sha="$4"
+  local destination="$HOME/.agents/skills/$skill" tmpdir archive source
+  tmpdir="$(mktemp -d)" || return 1
+  trap 'rm -rf -- "$tmpdir"' EXIT
   archive="$tmpdir/source.tar.gz"
   log_info "Installing $skill agent skill $version"
   download_verified \
     "https://codeload.github.com/$repo/tar.gz/refs/tags/v$version" \
-    "$archive" "sha256:$expected_sha" "$skill-v$version.tar.gz"
-  mkdir -p "$tmpdir/source"
-  tar -xzf "$archive" -C "$tmpdir/source" --strip-components=1
+    "$archive" "sha256:$expected_sha" "$skill-v$version.tar.gz" || return 1
+  mkdir -p "$tmpdir/source" || return 1
+  tar -xzf "$archive" -C "$tmpdir/source" --strip-components=1 || return 1
   source="$tmpdir/source/skills/$skill"
   [[ -f "$source/SKILL.md" ]] || {
     rm -rf "$tmpdir"
@@ -460,10 +545,5 @@ install_github_agent_skill() {
     log_error "$skill destination exists and is not a directory: $destination"
     return 1
   }
-  mkdir -p "$destination"
-  cp -a "$source/." "$destination/"
-  rm -rf "$tmpdir"
-  record_install "$skill" "$version" "agent-skill:$repo" "$destination"
-  ((_INSTALLED++)) || true
-  log_success "$skill agent skill $version installed"
-}
+  install_managed_tree "$source" "$destination" "$skill" "$version" "agent-skill:$repo" - || return 1
+)
