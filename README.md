@@ -33,8 +33,9 @@ dot doctor
 
 ## Scope and Guarantees
 
-- One successful full run installs managed tools and deploys the shell, terminal,
-  editor, cloud helpers, and agent configuration.
+- A full run installs eligible tools and deploys the shell, terminal, editor,
+  cloud helpers, and agent configuration. Preserved installations can remain
+  older than the repository baselines.
 - SSH keys, secrets, cloud/agent logins, and Windows terminal/font setup remain
   manual. This public repository contains no credentials or encrypted secrets.
 - Existing histories, completion caches, credentials, and local overlays are
@@ -46,6 +47,8 @@ dot doctor
 
 Supported targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
 Docker cannot prove GUI, physical-device, or Windows interoperability behavior.
+A successful run means the selected health checks passed, not that every tool
+is current or every account is authenticated. Review the final warnings.
 
 ## Install Profiles
 
@@ -78,7 +81,7 @@ dot diff                           # Preview managed config changes
 dot sync                           # Pull fast-forward and run the installer
 dot tools sql                      # Find tools by name, purpose, or tags
 dot tools --available --pick        # fzf catalog with details and examples
-dot workspace "$PWD"                # Backend-aware agent workspace
+dot workspace "$PWD"                # tmux agent workspace
 dot-agent-status --check            # Agent readiness, without starting agents
 agent-mcp status                    # Inspect manually configured MCP integrations
 cloud-context --recent              # Recent saved cloud contexts
@@ -93,12 +96,25 @@ Standard `cat` and `ls` are not replaced by aliases.
 [SSH and Cloudflare](docs/handbook.md#ssh-and-cloudflare-access).
 A prompt context identifies selected configuration, not authenticated access.
 
+### Agent Defaults
+
+The `agent` and `full` profiles install coding CLIs, shared Ponytail/Caveman
+skills, and the OMP-native `omp-ponytail-caveman` plugin. Its upstream defaults
+are Ponytail full and Caveman ultra; inspect or change them with `/ponytail`
+and `/caveman` in OMP. Pix Optimizer is retired.
+
+Bootstrap does not install or enable MCP servers, including Serena and
+context-mode. Existing local MCP configurations are preserved. Install a trusted
+server manually before explicitly enabling it with `agent-mcp`.
+[Agent setup and boundaries](docs/handbook.md#agent-workspace).
+
 ## Configuration Conflicts
 
 Interactive runs offer skip, replace, reviewed merge, diff, and quit.
-`--yes` explicitly approves replacement after backup. Local customizations belong
-in overlays such as `~/.config/dotfiles/local.zsh`, `~/.config/git/config.local`,
-and `~/.ssh/config.local`.
+`--yes` approves managed configuration replacement after backup, not takeover of
+unowned software. Local customizations belong in overlays such as
+`~/.config/dotfiles/local.zsh`, `~/.config/git/config.local`, and
+`~/.ssh/config.local`.
 [Conflict choices and overlay behavior](docs/handbook.md#configuration-conflicts).
 
 ## Installation Preflight
@@ -148,6 +164,8 @@ the text log; warnings and error summaries remain visible. Use
 Successful runs end with text/event log paths. Timings separate prompt wait from
 remaining elapsed time; compact recaps retain complete advisories in the logs.
 Preserved older tools require reviewed migration, not blanket ownership adoption.
+Review logs before sharing: private permissions do not make their contents safe
+to publish. Prefer the [offline private review](docs/local-review.md) for diagnostics.
 
 Backup creation, restore, pruning, and reconciliation coordinate with bootstrap's
 state lock. Snapshots become visible only after verification and atomic
@@ -180,6 +198,18 @@ commands, examples, tags, and observed paths/versions.
 | media | `yt_dlp` 2026.10.26, `rmpc` 0.11.0, `cava` distro |
 <!-- tool-versions:end -->
 
+## Upgrade and CVE Advisories
+
+[Issue #34](https://github.com/Idanbot/.dotfiles/issues/34) stays open and is
+refreshed weekly with version, checksum, and pinned-version CVE recommendations.
+It distinguishes compatible-line upgrades from newer stable release lines.
+CVE checks also run on the other days; their reports are workflow artifacts,
+not daily edits to #34. Unknown coverage is not evidence of vulnerability-free tools.
+
+Monthly automation proposes one grouped upgrade PR with verified integrity and
+an explicit install canary; it never merges automatically.
+[Update policies and coverage](docs/handbook.md#versions-and-supply-chain).
+
 ## Verification
 
 From a checkout, with Docker and Compose v2 installed:
@@ -201,7 +231,7 @@ focused WSL checks, a native two-pass base install, and recovery acceptance.
 Extended WSL/resume tests and heavy profiles run weekly, on heavy manual dispatch,
 and for grouped upgrade canaries. [Verification reference](docs/handbook.md#verification).
 Outcome classification explains CI failures; it does not replace installation
-acceptance. CVE reports are advisory and do not certify tools as vulnerability-free.
+acceptance.
 
 ## Documentation
 
