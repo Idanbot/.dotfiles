@@ -20,6 +20,7 @@
           "tests/test-readiness.py",
           "scripts/manager-scope.py",
           "tests/test-manager-safety.py",
+          "tests/test-file-assets.py",
           "tests/e2e/test-manager-transactions.py",
           "tests/test-backup-lock.py",
           "tests/test-ci-graph.py",
@@ -83,6 +84,12 @@
     }
   },
   "tests": [
+    {
+      "path": "tests/test-file-assets.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [[]]
+    },
     {
       "path": "tests/test-kfzf.py",
       "kind": "suite",

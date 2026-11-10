@@ -112,6 +112,18 @@ print('isolated 1.2.3')
                     with self.subTest(script=script, flag=token):
                         self.assertIn(token.split("=", 1)[0], help_by_script[script])
 
+    def test_distro_yq_examples_execute_on_synthetic_yaml(self):
+        entry = next(item for item in catalog.catalog() if item["id"] == "core.yq")
+        fixture = Path(self.temp.name)
+        for filename in ("compose.yaml", "config.yaml"):
+            (fixture / filename).write_text("services: [api]\n")
+        for example in entry["examples"]:
+            with self.subTest(command=example["command"]):
+                completed = subprocess.run(shlex.split(example["command"]), cwd=fixture,
+                                           capture_output=True, text=True, timeout=5)
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertIn("api", completed.stdout)
+
     def test_coverage_and_tags(self):
         entries = catalog.catalog()
         ids = {entry["id"] for entry in entries}

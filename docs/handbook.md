@@ -623,6 +623,9 @@ OMP manager operations snapshot the shared plugin tree, manifest, and receipts
 under the ownership lock. Handled failures restore that scope; failed recovery
 retains private recovery files. Do not run native plugin commands concurrently
 with bootstrap. Retirement checks both the installed payload and declaration.
+Preserving an external or modified OMP plugin is a warning, not a failed install.
+Legacy Gemini cleanup uses the scoped ownership-checked uninstall path; unowned,
+modified, or unverifiable packages and stale receipts remain for manual review.
 
 RTK is checksum-pinned and installed by the `agent` and `full` profiles as an
 optional shell-output optimizer. Bootstrap does not install its agent hooks;
@@ -899,6 +902,11 @@ legacy version-only Python receipts require manual review, not a broad uninstall
 Manager directories are cached for the run; ownership checks remain fresh.
 Full installs keep native npm/uv progress in the text log while showing warnings
 and a short error tail. Use `DOTFILES_VERBOSE=1` for the full manager output.
+
+Kitty desktop launchers and downloaded theme files use the same locked, atomic
+file-publication and recovery primitives. Unowned, modified, redirected, and
+nonregular destinations are preserved without adoption. Unchanged owned files
+are no-ops; authorized updates retain checksum verification and scoped rollback.
 
 APT signing keys are verified by fingerprint. GitHub Actions are pinned by
 commit SHA. Every push and pull request publishes a non-mutating version and

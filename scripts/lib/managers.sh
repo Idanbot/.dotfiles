@@ -69,6 +69,36 @@ manager_preserved() {
   ((_PRESERVED++)) || true
 }
 
+retire_managed_npm_package() {
+  managed_operation _retire_managed_npm_package "$@"
+}
+
+_retire_managed_npm_package() {
+  local binary="$1" package="$2"
+  if ! manager_scope npm "$package" "$binary"; then
+    manager_preserved "$binary" npm 'retired package scope or command bindings are unverifiable'
+    return 0
+  fi
+  if [[ ! -d "$MANAGER_TARGET" ]]; then
+    if [[ -f "$(managed_state_root)/installed.tsv" ]] &&
+      awk -F '\t' -v tool="$binary" '$1 == tool { found=1 } END { exit !found }' "$(managed_state_root)/installed.tsv"; then
+      manager_preserved "$binary" npm 'retired payload is absent; receipts retained for manual review'
+    else
+      log_skip "Retired $binary is not installed"
+    fi
+    return 0
+  fi
+  if ! manager_assert_owned "npm:$package"; then
+    manager_preserved "$binary" npm 'retired package is unowned, legacy, or locally modified'
+    return 0
+  fi
+  log_info "Removing verified retired $binary package"
+  # Share the held descriptor with the authorized uninstall entrypoint.
+  MANAGED_OPERATION_FD="$MANAGED_OPERATION_FD" \
+    bash "$DOTFILES_SOURCE_DIR/scripts/uninstall-tool.sh" "$binary" || return 1
+  log_success "Retired $binary package removed"
+}
+
 manager_is_current() {
   local binary="$1" version="$2" active current="$MANAGER_VERSION"
   active="$(command -v "$binary" || true)"

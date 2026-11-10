@@ -70,6 +70,46 @@ assert_owned_target() {
   fi
 }
 
+# File assets may be created or replaced only at canonical, verified destinations.
+managed_file_can_update() {
+  local destination="$1"
+  [[ "$destination" == /* && ! -L "$destination" &&
+    "$(realpath -m -- "$(dirname "$destination")")" == "$(dirname "$destination")" ]] || return 1
+  [[ ! -e "$destination" ]] || { [[ -f "$destination" ]] && target_is_owned "$destination"; }
+}
+
+install_managed_file() (
+  local source="$1" destination="$2" tool="$3" version="$4" owner="$5" mode="${6:-600}" temporary
+  local changed=false committed=false
+  [[ "$mode" =~ ^[0-7]{3,4}$ && -f "$source" && ! -L "$source" ]] || return 1
+  mode="$(printf '%o' "$((8#$mode))")"
+  managed_operation_lock || return 1
+  managed_file_can_update "$destination" || {
+    log_error "File destination changed or is protected: $destination"
+    return 1
+  }
+  if [[ -f "$destination" && "$(stat -c '%a' "$destination")" == "$mode" ]] &&
+    cmp -s -- "$source" "$destination" &&
+    awk -F '\t' -v tool="$tool" -v version="$version" -v owner="$owner" -v path="$destination" \
+      '$1 == tool && $2 == version && $3 == owner && $4 == path { found=1 } END { exit !found }' \
+      "$(managed_state_root)/installed.tsv"; then
+    return 0
+  fi
+  mkdir -p "$(dirname "$destination")" || return 1
+  temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-file.XXXXXX")" || return 1
+  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+  install -m "$mode" -- "$source" "$temporary/new" || return 1
+  snapshot_publication "$temporary" "$destination" || return 1
+  managed_file_can_update "$destination" || return 1
+  changed=true
+  mv -Tf -- "$temporary/new" "$destination" || return 1
+  record_install "$tool" "$version" "$owner" "$destination" || return 1
+  committed=true
+)
+
 # Snapshot only this destination's records; rollback must retain unrelated writes.
 snapshot_publication() (
   local temporary="$1" destination="$2" root stamp ledger_fd

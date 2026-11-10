@@ -60,16 +60,8 @@ kitty_probe() {
 }
 install_managed_app "$NEW_APP" "$TARGET" kitty "$VERSION" github:kovidgoyal/kitty kitty_probe kitty kitten
 
-mkdir -p "$HOME/.local/share/applications"
 for desktop_file in kitty.desktop kitty-open.desktop; do
-  source_file="$TARGET/share/applications/$desktop_file"
-  target_file="$HOME/.local/share/applications/$desktop_file"
-  [[ -f "$source_file" ]] || continue
-  cp "$source_file" "$target_file"
-  sed -i \
-    -e "s|Icon=kitty|Icon=$TARGET/share/icons/hicolor/256x256/apps/kitty.png|g" \
-    -e "s|Exec=kitty|Exec=$TARGET/bin/kitty|g" \
-    "$target_file"
+  install_kitty_launcher "$TARGET" "$desktop_file" "$VERSION"
 done
 
 log_success "$("$TARGET/bin/kitty" --version) installed"

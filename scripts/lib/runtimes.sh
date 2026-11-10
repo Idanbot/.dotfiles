@@ -387,7 +387,9 @@ _omp_install_package() {
   manifest="$root/node_modules/$package/package.json"
 
   if [[ -e "$root/node_modules/$package" || -L "$root/node_modules/$package" ]] &&
-    ! assert_owned_target "$root/node_modules/$package"; then
+    { [[ -L "$root/node_modules/$package" ||
+      "$(realpath -m -- "$(dirname "$manifest")")" != "$(dirname "$manifest")" ]] ||
+      ! target_is_owned "$root/node_modules/$package"; }; then
     log_warn "Preserving $tool: existing plugin is unowned or modified; compatibility validation requires a reviewed migration"
     ((_PRESERVED++)) || true
     return 0
@@ -410,6 +412,7 @@ _omp_install_candidate() {
   root="${DOTFILES_OMP_PLUGIN_ROOT:-$HOME/.omp/plugins}"
   manifest="$root/node_modules/$package/package.json"
   spec="$package@$version"
+  assert_owned_target "$root/node_modules/$package" || return 1
 
   local omp_before omp_after
   omp_before="$(managed_target_digest "$(command -v omp)")" || return 1
@@ -546,4 +549,81 @@ _publish_github_agent_skill() (
     return 1
   }
   install_managed_tree "$source" "$destination" "$skill" "$version" "agent-skill:$repo" - || return 1
+)
+
+install_verified_file() {
+  managed_operation _install_verified_file "$@"
+}
+
+_install_verified_file() {
+  local url="$1" destination="$2" checksum="$3" tool="$4" version="$5" owner="$6"
+  if ! managed_file_can_update "$destination"; then
+    log_warn "Preserving $tool: file is unowned, modified, nonregular, or redirected; manual migration required"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
+  if [[ -f "$destination" ]] && sha256_matches "$destination" "$checksum"; then
+    log_skip "$tool already verified"
+    return 0
+  fi
+  _publish_verified_file "$url" "$destination" "$checksum" "$tool" "$version" "$owner" || return 1
+  ((_INSTALLED++)) || true
+  log_success "$tool installed"
+}
+
+_publish_verified_file() (
+  local url="$1" destination="$2" checksum="$3" tool="$4" version="$5" owner="$6" temporary
+  temporary="$(mktemp -d)" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  download_verified "$url" "$temporary/candidate" "sha256:$checksum" "${destination##*/}" || return 1
+  install_managed_file "$temporary/candidate" "$destination" "$tool" "$version" "$owner" 600
+)
+
+install_kitty_launcher() {
+  managed_operation _install_kitty_launcher "$@"
+}
+
+_install_kitty_launcher() {
+  local application="$1" name="$2" version="$3" source destination
+  [[ "$name" == kitty.desktop || "$name" == kitty-open.desktop ]] || return 2
+  source="$application/share/applications/$name"
+  destination="$HOME/.local/share/applications/$name"
+  [[ -f "$source" ]] || return 0
+  if ! managed_file_can_update "$destination"; then
+    log_warn "Preserving $name: desktop launcher is unowned, modified, nonregular, or redirected"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
+  _publish_kitty_launcher "$source" "$destination" "$application" "$version"
+}
+
+_publish_kitty_launcher() (
+  local source="$1" destination="$2" application="$3" version="$4" temporary
+  temporary="$(mktemp -d)" || return 1
+  trap 'rm -rf -- "$temporary"' EXIT
+  /usr/bin/python3 - "$source" "$temporary/candidate" "$application" <<'PY' || return 1
+import configparser
+from pathlib import Path
+import sys
+
+source, output, application = sys.argv[1:]
+config = configparser.ConfigParser(interpolation=None, strict=False)
+config.optionxform = str
+with open(source) as stream:
+    config.read_file(stream)
+binary = str(Path(application) / "bin/kitty").replace("%", "%%")
+for char in ("\\", '"', "`", "$"):
+    binary = binary.replace(char, "\\" + char)
+for section in config.values():
+    command = section.get("Exec", "")
+    if command == "kitty" or command.startswith("kitty "):
+        section["Exec"] = '"' + binary + '"' + command[len("kitty"):]
+    if section.get("TryExec") == "kitty":
+        section["TryExec"] = str(Path(application) / "bin/kitty")
+    if section.get("Icon") == "kitty":
+        section["Icon"] = str(Path(application) / "share/icons/hicolor/256x256/apps/kitty.png")
+with open(output, "w") as stream:
+    config.write(stream)
+PY
+  install_managed_file "$temporary/candidate" "$destination" kitty-launcher "$version" github:kovidgoyal/kitty 644
 )

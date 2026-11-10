@@ -217,3 +217,27 @@ done
 [[ "$rtk_calls" == 2 ]]
 
 printf 'AI optimization package test passed\n'
+
+for scenario in external modified; do
+  (
+    export HOME="$TMP_ROOT/omp-preserve-$scenario"
+    export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_OMP_PLUGIN_ROOT="$HOME/.omp/plugins"
+    source "$DOTFILES_DIR/scripts/lib.sh"
+    plugin="$DOTFILES_OMP_PLUGIN_ROOT/node_modules/omp-ponytail-caveman"
+    mkdir -p "$plugin"
+    printf '{"name":"omp-ponytail-caveman","version":"0.3.4"}\n' >"$plugin/package.json"
+    if [[ "$scenario" == modified ]]; then
+      record_install ponytail-caveman 0.3.4 omp:omp-ponytail-caveman "$plugin"
+      printf 'local note\n' >"$plugin/local-note"
+    fi
+    before="$(managed_target_digest "$plugin")"
+    ledger_before="$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")"
+    calls_before="$(wc -l <"$OMP_CALLS")"
+    omp_install_package omp-ponytail-caveman 0.3.5 ponytail-caveman
+    [[ "$(managed_target_digest "$plugin")" == "$before" ]]
+    [[ "$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger_before" ]]
+    [[ "$(wc -l <"$OMP_CALLS")" == "$calls_before" ]]
+    [[ "$_FAILED" == 0 && "$_PRESERVED" == 1 ]]
+    print_summary "Preserved OMP plugin"
+  )
+done

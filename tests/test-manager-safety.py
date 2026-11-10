@@ -172,6 +172,117 @@ class ManagerSafetyTests(unittest.TestCase):
             else []
         )
 
+    def seed_gemini(self):
+        self.env["COMMANDS"] = "gemini"
+        subprocess.run(
+            [str(self.mocks / "npm"), "install", "--prefix", str(self.prefix),
+             "@google/gemini-cli@1.0.0"], env=self.env, check=True,
+        )
+        self.target = self.prefix / "lib/node_modules/@google/gemini-cli"
+        (self.bin / "gemini").symlink_to(self.prefix / "bin/gemini")
+        self.shell(
+            'record_install gemini 1.0.0 npm:@google/gemini-cli "$TARGET"; '
+            'record_install gemini 1.0.0 symlink "$HOME/.local/bin/gemini"',
+            TARGET=str(self.target),
+        )
+        self.calls.unlink()
+
+    def retire_gemini(self, **environment):
+        section = (ROOT / ".chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl").read_text()
+        block = section[section.index("if ! is_installed npm;"):section.index("CLAUDE_VERSION=")]
+        return self.shell(block + '\nprint_summary "AI migration"', check=False, **environment)
+
+    def test_ai_migration_preserves_modified_gemini(self):
+        self.seed_gemini()
+        command = self.target / "bin/gemini"
+        command.write_text(command.read_text() + "# local edit\n")
+        before = command.read_bytes(), self.receipt_state()
+        result = self.retire_gemini()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertEqual((command.read_bytes(), self.receipt_state()), before)
+
+    def test_ai_migration_preserves_unowned_and_legacy_gemini(self):
+        self.seed_gemini()
+        self.shell('forget_install gemini "$TARGET"', TARGET=str(self.target))
+        before = self.receipt_state()
+        self.assertEqual(self.retire_gemini().returncode, 0)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertEqual(self.receipt_state(), before)
+
+    def test_ai_migration_preserves_changed_gemini_binding(self):
+        self.seed_gemini()
+        link = self.bin / "gemini"
+        link.unlink()
+        other = self.home / "external-command"
+        other.write_text("external fixture")
+        link.symlink_to(other)
+        before = self.receipt_state()
+        self.assertEqual(self.retire_gemini().returncode, 0)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertEqual(self.receipt_state(), before)
+        self.assertEqual(other.read_text(), "external fixture")
+
+    def test_ai_migration_removes_owned_gemini_once(self):
+        self.seed_gemini()
+        unrelated = self.prefix / "lib/node_modules/other/local-note"
+        unrelated.parent.mkdir(parents=True)
+        unrelated.write_text("preserve")
+        result = self.retire_gemini()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(self.target.exists())
+        self.assertFalse((self.bin / "gemini").is_symlink())
+        self.assertEqual(len(self.manager_calls()), 1)
+        self.assertNotIn("gemini", (self.state / "installed.tsv").read_text())
+        self.assertEqual(self.retire_gemini().returncode, 0)
+        self.assertEqual(len(self.manager_calls()), 1)
+        self.assertEqual(unrelated.read_text(), "preserve")
+
+    def test_ai_migration_keeps_receipts_on_incomplete_removal(self):
+        self.seed_gemini()
+        before = self.receipt_state()
+        result = self.retire_gemini(FAIL="no-remove")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(self.target.exists())
+        self.assertEqual(self.receipt_state(), before)
+
+    def test_ai_migration_preserves_legacy_gemini_without_stamp(self):
+        self.seed_gemini()
+        self.shell('rm "$(ownership_stamp "$TARGET")"', TARGET=str(self.target))
+        before = self.receipt_state()
+        self.assertEqual(self.retire_gemini().returncode, 0)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertEqual(self.receipt_state(), before)
+
+    def test_ai_migration_preserves_redirected_gemini_payload(self):
+        self.seed_gemini()
+        moved = self.home / "external-package"
+        self.target.rename(moved)
+        self.target.symlink_to(moved, target_is_directory=True)
+        before = self.receipt_state()
+        self.assertEqual(self.retire_gemini().returncode, 0)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertTrue((moved / "package.json").is_file())
+        self.assertEqual(self.receipt_state(), before)
+
+    def test_ai_migration_keeps_receipts_on_manager_failure(self):
+        self.seed_gemini()
+        before = self.receipt_state()
+        self.assertNotEqual(self.retire_gemini(FAIL="uninstall").returncode, 0)
+        self.assertTrue(self.target.exists())
+        self.assertEqual(self.receipt_state(), before)
+
+    def test_ai_migration_keeps_stale_receipts_for_manual_review(self):
+        self.seed_gemini()
+        self.shell('rm -rf "$TARGET"; rm "$HOME/.local/bin/gemini" "$DOTFILES_NPM_PREFIX/bin/gemini"',
+                   TARGET=str(self.target))
+        before = self.receipt_state()
+        result = self.retire_gemini()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("manual review", result.stdout)
+        self.assertEqual(self.manager_calls(), [])
+        self.assertEqual(self.receipt_state(), before)
+
     def uninstall(self, dry_run=False, check=True, **environment):
         return self.shell(
             'bash "$DOTFILES_SOURCE_DIR/scripts/uninstall-tool.sh" '

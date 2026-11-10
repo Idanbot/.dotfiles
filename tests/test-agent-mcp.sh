@@ -339,6 +339,7 @@ package_release_field() { printf 'fixture.tar.gz\n'; }
 get_arch() { printf 'amd64\n'; }
 set_json_boolean_preserving() { :; }
 npm_install_global() { record "npm-package $*"; }
+retire_managed_npm_package() { record "retire-npm $*"; }
 install_github_binary() { record "binary $*"; }
 install_github_archive() { record "archive $*"; }
 install_github_agent_skill() { record "skill $*"; }

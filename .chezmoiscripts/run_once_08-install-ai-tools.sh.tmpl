@@ -14,15 +14,7 @@ if ! is_installed npm; then
   exit 1
 fi
 
-LEGACY_GEMINI_PATH="$(npm_global_prefix)/lib/node_modules/@google/gemini-cli"
-if [[ -d "$LEGACY_GEMINI_PATH" ]]; then
-  log_info "Removing the deprecated managed Gemini CLI"
-  npm uninstall --global --prefix "$(npm_global_prefix)" @google/gemini-cli
-  forget_install gemini
-  log_success "Deprecated Gemini CLI removed"
-else
-  forget_install gemini
-fi
+retire_managed_npm_package gemini @google/gemini-cli
 
 CLAUDE_VERSION="$(package_version ai_tools claude_cli 2.1.206)"
 npm_install_global @anthropic-ai/claude-code "$CLAUDE_VERSION" claude @anthropic-ai/claude-code

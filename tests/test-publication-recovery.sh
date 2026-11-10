@@ -5,7 +5,7 @@ DOTFILES_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 TEMPORARY="$(mktemp -d)"
 trap 'rm -rf "$TEMPORARY"' EXIT
 
-for kind in binary tree link; do
+for kind in binary tree link file; do
   for failure in publication ledger rollback metadata-rollback snapshot stamp fresh-ledger unchanged-ledger INT TERM HUP; do
     (
       export HOME="$TEMPORARY/$kind-$failure" DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
@@ -19,6 +19,7 @@ for kind in binary tree link; do
       invoke() {
         case "$kind" in
           binary) install_managed_binary "$HOME/$1" fixture "$2" test 'fixture --version' ;;
+          file) install_managed_file "$HOME/$1" "$target" fixture "$2" test 600 ;;
           tree)
             install -m 755 "$HOME/$1" "$HOME/source/bin/fixture"
             install_managed_tree "$HOME/source" "$target" fixture "$2" test bin/fixture

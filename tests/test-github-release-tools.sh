@@ -207,4 +207,18 @@ kubecolor --kubecolor-version >/dev/null
 
 [[ "$(wc -l <"$DOTFILES_STATE_DIR/installed.tsv")" -ge 20 ]]
 
+# Validate real upstream desktop-entry parsing and managed theme convergence.
+DOTFILES_WSL=false bash "$DOTFILES_DIR/scripts/install-kitty.sh"
+DOTFILES_WSL=false bash "$DOTFILES_DIR/.chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl"
+for target in \
+  "$HOME/.local/share/applications/kitty.desktop" \
+  "$HOME/.config/btop/themes/catppuccin_mocha.theme" \
+  "$HOME/.config/kitty/themes/catppuccin_mocha.conf"; do
+  target_is_owned "$target"
+done
+asset_receipts="$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")"
+DOTFILES_WSL=false bash "$DOTFILES_DIR/scripts/install-kitty.sh"
+DOTFILES_WSL=false bash "$DOTFILES_DIR/.chezmoiscripts/run_once_13-apply-catppuccin-theme.sh.tmpl"
+[[ "$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")" == "$asset_receipts" ]]
+
 printf 'GitHub release tool smoke passed\n'
