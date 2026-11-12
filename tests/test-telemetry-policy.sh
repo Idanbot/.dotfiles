@@ -58,6 +58,68 @@ if set_json_boolean_preserving \
 fi
 [[ "$(sha256sum "$HOME/.gemini/antigravity-cli/settings.json")" == "$before" ]]
 
+settings="$HOME/.gemini/antigravity-cli/settings.json"
+for content in '' '[]' 'null' '42' 'true'; do
+  printf '%s' "$content" >"$settings"
+  before="$(sha256sum "$settings")"
+  if set_json_boolean_preserving "$settings" enableTelemetry false; then
+    echo 'Non-object settings accepted' >&2
+    exit 1
+  fi
+  [[ "$(sha256sum "$settings")" == "$before" ]]
+done
+
+for failure in filter write chmod rename; do
+  printf '{"model":"preserved"}\n' >"$settings"
+  before="$(sha256sum "$settings")"
+  (
+    case "$failure" in
+      filter) jq() {
+        [[ "$1" != --arg ]] || return 37
+        command jq "$@"
+      } ;;
+      write) mktemp() {
+        local stage
+        stage="$(command mktemp "$@")"
+        command chmod 400 "$stage"
+        printf '%s\n' "$stage"
+      } ;;
+      chmod) chmod() { return 37; } ;;
+      rename) mv() { return 37; } ;;
+    esac
+    if set_json_boolean_preserving "$settings" enableTelemetry false; then
+      echo "Failed $failure operation accepted" >&2
+      exit 1
+    fi
+  )
+  [[ "$(sha256sum "$settings")" == "$before" ]]
+  [[ "$(find "$(dirname "$settings")" -name 'settings.json.*' | wc -l)" == 0 ]]
+done
+
+mkdir "$HOME/external"
+chmod 755 "$HOME/external"
+printf '{"model":"external"}\n' >"$HOME/external/settings.json"
+before="$(sha256sum "$HOME/external/settings.json")"
+ln -s "$HOME/external" "$HOME/redirected"
+if set_json_boolean_preserving "$HOME/redirected/settings.json" enableTelemetry false; then
+  echo 'Redirected settings accepted' >&2
+  exit 1
+fi
+[[ "$(sha256sum "$HOME/external/settings.json")" == "$before" ]]
+[[ "$(stat -c '%a' "$HOME/external")" == 755 ]]
+for kind in link dangling fifo; do
+  target="$HOME/$kind.json"
+  case "$kind" in
+    link) ln -s "$HOME/external/settings.json" "$target" ;;
+    dangling) ln -s "$HOME/missing.json" "$target" ;;
+    fifo) mkfifo "$target" ;;
+  esac
+  if set_json_boolean_preserving "$target" enableTelemetry false; then
+    echo 'Nonregular settings accepted' >&2
+    exit 1
+  fi
+done
+
 installer="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
 grep -Fq 'set_json_boolean_preserving "$AGY_SETTINGS" enableTelemetry false' "$installer"
 grep -Fq 'Antigravity telemetry disabled without replacing other settings' "$installer"

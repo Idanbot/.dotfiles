@@ -252,25 +252,40 @@ install_github_binary() {
   fi
 }
 
-set_json_boolean_preserving() {
-  local target="$1" key="$2" value="$3" directory tmp
-  [[ "$value" == true || "$value" == false ]] || return 2
-  [[ ! -L "$target" ]] || return 1
-  [[ ! -e "$target" || -f "$target" ]] || return 1
-  [[ ! -s "$target" ]] || jq empty "$target" >/dev/null 2>&1 || return 1
-
-  directory="$(dirname "$target")"
-  ensure_private_directory "$directory"
-  tmp="$(mktemp "${target}.XXXXXX")"
-  if [[ -s "$target" ]]; then
-    jq --arg key "$key" --argjson value "$value" '.[$key] = $value' \
-      "$target" >"$tmp"
-  else
-    jq -n --arg key "$key" --argjson value "$value" '{($key): $value}' >"$tmp"
-  fi
-  chmod 600 "$tmp"
-  mv "$tmp" "$target"
+json_boolean_destination_safe() {
+  local target="$1" directory
+  directory="$(dirname "$target")" || return 1
+  [[ "$target" == /* && ! -L "$target" && (! -e "$target" || -f "$target") &&
+    "$(realpath -m -- "$directory")" == "$directory" ]]
 }
+
+set_json_boolean_preserving() (
+  local target="$1" key="$2" value="$3" directory tmp
+  umask 077
+  [[ "$value" == true || "$value" == false ]] || return 2
+  json_boolean_destination_safe "$target" || return 1
+  if [[ -e "$target" ]]; then
+    [[ -w "$target" ]] || return 1
+    jq -e 'type == "object"' "$target" >/dev/null 2>&1 || return 1
+  fi
+
+  directory="$(dirname "$target")" || return 1
+  mkdir -p -- "$directory" || return 1
+  tmp="$(mktemp "${target}.XXXXXX")" || return 1
+  trap 'rm -f -- "$tmp"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  if [[ -e "$target" ]]; then
+    jq --arg key "$key" --argjson value "$value" '.[$key] = $value' \
+      "$target" >"$tmp" 2>/dev/null || return 1
+  else
+    jq -n --arg key "$key" --argjson value "$value" '{($key): $value}' >"$tmp" 2>/dev/null || return 1
+  fi
+  jq -e 'type == "object"' "$tmp" >/dev/null 2>&1 || return 1
+  chmod 600 "$tmp" || return 1
+  json_boolean_destination_safe "$target" || return 1
+  mv -Tf -- "$tmp" "$target" || return 1
+)
 
 nerd_font_files_present() {
   local name="$1" directory="${2:-$HOME/.local/share/fonts/$1}"

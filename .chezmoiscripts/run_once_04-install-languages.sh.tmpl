@@ -84,8 +84,25 @@ esac
 NODE_ROOT="$HOME/.local/share/dotfiles/tools/node/$NODE_VERSION"
 NODE_ASSET="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
 NODE_PRESERVED=false
-if runtime_is_current node "$NODE_VERSION" "$(node --version 2>/dev/null || true)"; then
+NODE_CURRENT="$(node --version 2>/dev/null || true)"
+if runtime_is_current node "$NODE_VERSION" "$NODE_CURRENT"; then
   NODE_PRESERVED=true
+  # Complete interrupted link publication only for the exact verified runtime.
+  if [[ (! -e "$HOME/.local/bin/npm" && ! -L "$HOME/.local/bin/npm") ||
+    (! -e "$HOME/.local/bin/npx" && ! -L "$HOME/.local/bin/npx") ]] &&
+    [[ "$(command -v node)" == "$HOME/.local/bin/node" &&
+    "$(readlink -f "$HOME/.local/bin/node")" == "$NODE_ROOT/bin/node" &&
+    "$(extract_version "$NODE_CURRENT")" == "$NODE_VERSION" ]] &&
+    target_is_owned "$NODE_ROOT" && target_is_owned "$HOME/.local/bin/node"; then
+    assert_owned_target "$NODE_ROOT" || exit 1
+    assert_owned_target "$HOME/.local/bin/node" || exit 1
+    for binary in npm npx; do
+      if [[ ! -e "$HOME/.local/bin/$binary" && ! -L "$HOME/.local/bin/$binary" &&
+        -x "$NODE_ROOT/bin/$binary" ]]; then
+        managed_link "$NODE_ROOT/bin/$binary" "$HOME/.local/bin/$binary" node "$NODE_VERSION"
+      fi
+    done
+  fi
   NODE_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"
 else
   if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$($NODE_ROOT/bin/node --version 2>/dev/null || true)" "$NODE_VERSION"; then
@@ -136,7 +153,7 @@ for binary in node npm npx corepack; do
   [[ -x "$NODE_ROOT/bin/$binary" ]] && managed_link "$NODE_ROOT/bin/$binary" "$HOME/.local/bin/$binary" node "$NODE_VERSION"
 done
 if ! is_installed node || ! is_installed npm; then
-  log_error "Node.js/npm are unavailable; a preserved external Node.js installation must provide npm"
+  log_error "Node.js/npm are unavailable; verify the active runtime and its bundled npm before retrying"
   exit 1
 fi
 
