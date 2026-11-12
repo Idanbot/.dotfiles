@@ -34,7 +34,7 @@ case "$(get_arch)" in
     ;;
 esac
 RMPC_SHA="$(package_metadata media rmpc "sha256_$(get_arch)")"
-if runtime_is_current rmpc "$RMPC_VERSION" "$(rmpc --version 2>/dev/null || true)"; then
+if runtime_is_current rmpc "$RMPC_VERSION" "$(observe_version rmpc --version || true)"; then
   log_skip "rmpc is current or preserved"
 else
   tmpdir="$(mktemp -d)"

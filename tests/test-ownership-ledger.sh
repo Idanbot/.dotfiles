@@ -10,6 +10,22 @@ export DOTFILES_SOURCE_DIR="$DOTFILES_DIR"
 # shellcheck source=scripts/lib.sh
 source "$DOTFILES_DIR/scripts/lib.sh"
 
+mkdir -p "$HOME/.local/bin" "$HOME/candidates"
+printf '#!/bin/sh\necho fixture\n' >"$HOME/candidates/fdfind"
+chmod +x "$HOME/candidates/fdfind"
+ln -s "$HOME/candidates/fdfind" "$HOME/.local/bin/fd"
+managed_link "$HOME/candidates/fdfind" "$HOME/.local/bin/fd" fd 1.0
+PATH="$HOME/candidates:$PATH"
+source <(awk '/^if is_installed fdfind; then/ {block=1} block {print} block && /^fi$/ {exit}' \
+  "$DOTFILES_DIR/.chezmoiscripts/run_once_before_03-install-terminal-tools.sh.tmpl")
+! target_is_owned "$HOME/.local/bin/fd"
+bash "$DOTFILES_DIR/scripts/uninstall-tool.sh" fd >/dev/null 2>&1 || true
+[[ -L "$HOME/.local/bin/fd" ]]
+cp "$HOME/candidates/fdfind" "$HOME/.local/bin/identical"
+install_managed_binary "$HOME/candidates/fdfind" identical 1.0 fixture
+! target_is_owned "$HOME/.local/bin/identical"
+[[ -L "$HOME/.local/bin/fd" && -x "$HOME/.local/bin/identical" ]]
+
 mkdir -p "$HOME/.local/bin"
 printf 'one\n' >"$HOME/.local/bin/demo"
 record_install demo 1.0 test "$HOME/.local/bin/demo"

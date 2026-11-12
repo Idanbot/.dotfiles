@@ -24,7 +24,7 @@ Usage: cloud-context [command]
   -l, --load NAME           Activate a saved context profile through native CLIs
       --select PROVIDER     Pick a GCP project, AWS profile, or Azure subscription
       --recent              Pick one of the five most recent pre-clear profiles
-  -c, --clear [PROVIDER]    Clear one provider, or all providers when omitted
+  -c, --clear [PROVIDER]    Clear supported selections; Azure is preserved with an error
   -t, --test [PROVIDER] [--yes]
                             Clear old fakes, then add a prompt fixture (not a sandbox)
       --test-clear [PROVIDER]
@@ -469,6 +469,10 @@ validate_profile_contexts() {
       failed=true
     fi
   fi
+  if [[ -z "$azure" ]] && have az && [[ -n "$(az account show --query id -o tsv 2>/dev/null)" ]]; then
+    warn "An empty Azure selection cannot be restored safely; account cache preserved, profile not loaded"
+    failed=true
+  fi
   if [[ -n "$azure" ]]; then
     if ! have az; then
       warn "Azure CLI is required to load subscription '$azure'"
@@ -560,8 +564,6 @@ apply_profile_file() {
         warn "Azure subscription '$azure' could not be activated"
         failed=true
       }
-  elif have az; then
-    clear_provider azure || failed=true
   fi
   if [[ "$failed" == true ]]; then
     warn "Profile '$name' was only partially loaded; inspect cloud-context --status"
@@ -625,15 +627,8 @@ clear_provider() {
       write_aws_env "" ""
       ;;
     azure | az)
-      have az || {
-        warn "Azure CLI is unavailable"
-        return 1
-      }
-      az account clear ||
-        {
-          warn "Azure CLI is unavailable or has no cached account context"
-          return 1
-        }
+      warn "Azure clear is unsupported without resetting the account cache; selection preserved. Run az account clear manually only if you intend to sign in again"
+      return 1
       ;;
     *)
       printf 'Unknown provider: %s\n' "$1" >&2

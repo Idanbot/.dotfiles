@@ -208,4 +208,31 @@ if (assert_version_at_least Node 100.0.0 node --version); then
   exit 1
 fi
 
-printf 'Runtime preservation, signed downloads, and APT major-boundary tests passed\n'
+cat >"$HOME/.local/bin/probe-fixture" <<'EOF'
+#!/bin/sh
+echo call >> "$HOME/probe-calls"
+echo 1.0.0
+EOF
+chmod +x "$HOME/.local/bin/probe-fixture"
+[[ "$(observe_version "$HOME/.local/bin/probe-fixture")" == 1.0.0 ]]
+[[ "$(observe_version "$HOME/.local/bin/probe-fixture")" == 1.0.0 ]]
+[[ "$(wc -l <"$HOME/probe-calls")" == 1 ]]
+printf '\necho 2.0.0\n' >>"$HOME/.local/bin/probe-fixture"
+observe_version "$HOME/.local/bin/probe-fixture" >/dev/null
+[[ "$(wc -l <"$HOME/probe-calls")" == 2 ]]
+cat >"$HOME/.local/bin/hang-fixture" <<'EOF'
+#!/bin/sh
+sleep 30 &
+echo $! > "$HOME/probe-child"
+wait
+EOF
+chmod +x "$HOME/.local/bin/hang-fixture"
+record_install hang-fixture 1.0 fixture "$HOME/.local/bin/hang-fixture"
+before="$(sha256sum "$HOME/.local/bin/hang-fixture")"
+install_github_binary hang-fixture fixture/repo v2.0.0 fixture fixture sha256:unused
+[[ "$(sha256sum "$HOME/.local/bin/hang-fixture")" == "$before" ]]
+child="$(cat "$HOME/probe-child")"
+if [[ -r "/proc/$child/stat" ]]; then
+  [[ "$(awk '{print $3}' "/proc/$child/stat")" == Z ]]
+fi
+printf 'Runtime preservation, bounded probes, cache invalidation, and signed download tests passed\n'

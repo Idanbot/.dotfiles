@@ -28,7 +28,7 @@ else
 fi
 
 GCM_VERSION="$(package_version system git_credential_manager 2.8.0)"
-GCM_CURRENT="$(git-credential-manager --version 2>/dev/null || true)"
+GCM_CURRENT="$(observe_version git-credential-manager --version || true)"
 GCM_BIN_DIR="$(dirname "$(command -v git-credential-manager || printf '%s/git-credential-manager' "$HOME/.local/bin")")"
 if DOTFILES_BIN_DIR="$GCM_BIN_DIR" runtime_is_current git-credential-manager "$GCM_VERSION" "$GCM_CURRENT"; then
   log_info "Git Credential Manager is current or preserved; credentials and helper settings are unchanged"
@@ -50,7 +50,7 @@ else
     "$tmpdir/$asset" "sha256:$GCM_SHA" "$asset"
   sudo dpkg -i "$tmpdir/$asset" || apt_env apt-get -f -y install
   rm -rf "$tmpdir"
-  version_ge "$(git-credential-manager --version 2>/dev/null || true)" "$GCM_VERSION" || {
+  version_ge "$(observe_version git-credential-manager --version || true)" "$GCM_VERSION" || {
     log_error "Git Credential Manager installation did not reach $GCM_VERSION"
     exit 1
   }

@@ -347,6 +347,8 @@ omp_install_package() { record "omp-package $*"; }
 remove_retired_omp_optimizer() { :; }
 print_summary() { :; }
 '''
+helpers = (root / "scripts/lib/runtimes.sh").read_text()
+library += helpers[helpers.index("bounded_probe() {"):helpers.index("install_github_archive() {")]
 (fixture / "scripts/lib.sh").write_text(library)
 (fixture / "scripts/install-uv-tool.sh").write_text(
     'install_uv_tool() { record "uv-package $*"; }\n'

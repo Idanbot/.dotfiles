@@ -245,7 +245,7 @@ CONFLICT_AUTO_APPROVE=true
 dotfiles_apply_selected_conflicts
 grep -Fq -- "--force --no-tty $HOME/.zshrc $HOME/.config/other.conf" "$APPLY_LOG"
 ! grep -Fq -- '--force .config' "$APPLY_LOG"
-grep -Fq -- '--include=dirs,externals --force --no-tty' "$APPLY_LOG"
+grep -Fq -- '--include=dirs --force --no-tty' "$APPLY_LOG"
 
 export APPLY_FAILURE=true
 if dotfiles_apply_selected_conflicts; then

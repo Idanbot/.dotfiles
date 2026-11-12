@@ -182,8 +182,17 @@ install_managed_binary() (
   managed_operation_lock || return 1
   mkdir -p "$bin_dir" || return 1
   dest="$bin_dir/$binary"
+  [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
   if [[ -f "$dest" && -x "$dest" && ! -L "$dest" ]] && cmp -s "$src" "$dest"; then
-    unchanged=true
+    if target_is_owned "$dest"; then
+      unchanged=true
+    elif ! binary_replacement_requested "$binary"; then
+      log_warn "Preserving identical external $binary without adopting ownership"
+      return 0
+    fi
+  fi
+  if [[ "$unchanged" == true ]]; then
+    :
   elif binary_replacement_requested "$binary" && [[ -f "$dest" || -L "$dest" ]] &&
     ! target_is_owned "$dest"; then
     [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
@@ -201,7 +210,7 @@ install_managed_binary() (
   if [[ -n "${5:-}" ]]; then
     read -r -a smoke <<<"$5"
     smoke[0]="$temporary/new"
-    "${smoke[@]}" >/dev/null 2>&1 || return 1
+    bounded_probe "${smoke[@]}" >/dev/null 2>&1 || return 1
   fi
   snapshot_publication "$temporary" "$dest" || return 1
   if [[ "$takeover" == true ]]; then
@@ -229,7 +238,7 @@ install_managed_tree() (
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   cp -a -- "$source" "$temporary/new" || return 1
-  [[ "$probe" == - ]] || "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
+  [[ "$probe" == - ]] || bounded_probe "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
   snapshot_publication "$temporary" "$destination" || return 1
   changed=true
   rm -rf -- "$destination" || return 1
@@ -401,12 +410,21 @@ managed_link() (
   local target="$1" link="$2" tool="$3" version="$4"
   local temporary backup changed=false committed=false unchanged=false
   managed_operation_lock || return 1
+  [[ "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
   if [[ -f "$link" && -x "$link" && ! -L "$link" && "$(realpath -m -- "$target")" == "$(realpath -m -- "$link")" ]]; then
     log_skip "Preserving existing executable at $link; no self-link needed"
     return 0
   fi
   if [[ -L "$link" && "$(readlink "$link")" == "$target" ]]; then
-    unchanged=true
+    if target_is_owned "$link"; then
+      unchanged=true
+    elif ! binary_replacement_requested "$tool"; then
+      log_warn "Preserving matching external link at $link without adopting ownership"
+      return 0
+    fi
+  fi
+  if [[ "$unchanged" == true ]]; then
+    :
   elif binary_replacement_requested "$tool" && [[ -f "$link" || -L "$link" ]] && ! target_is_owned "$link"; then
     [[ "$link" == "$HOME/.local/bin/"* && "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
     [[ -x "$target" ]] || return 1

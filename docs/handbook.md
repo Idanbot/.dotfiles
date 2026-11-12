@@ -299,7 +299,9 @@ With the default `backup` policy in a terminal, the installer creates the
 transactional backup first, shows a redacted bounded diff for each existing
 modified destination, and asks for a decision:
 
-- `skip` / do nothing: preserve this destination and continue.
+- `skip` / do nothing: preserve this destination and continue. An external archive
+  containing a skipped or merged child is held unchanged as a subtree; other
+  external archives and regular files can still update.
 - `replace`: apply the managed version for this destination.
 - `merge` / append: for regular shell config only,
   apply the managed content first and retain the current local content after a
@@ -545,6 +547,11 @@ Tmux's right status bar shows Kubernetes context and the clock; use
 `dot-agent-status --check` for manual agent readiness checks.
 
 ## Agent Workspace
+
+Shared runtime version observations use a three-second noninteractive probe budget
+(plus one second for forced cleanup). Successful observations are cached within
+the run and invalidated when executable identity changes. Staged validation stays
+fresh; ownership and digest authorization are never cached.
 
 The `agent` profile installs or validates Claude Code, Codex, Antigravity CLI
 (`agy`), OpenCode, and OMP. Codex and Antigravity use their vendors' verified
@@ -1087,8 +1094,8 @@ cloud-context --select gcloud       # fzf-select a project through gcloud
 cloud-context --select aws          # fzf-select a local AWS profile
 cloud-context --select azure        # fzf-select an Azure subscription
 cloud-context --recent              # fzf-load one of five pre-clear snapshots
-cloud-context --clear               # clear all four contexts
-cloud-context --clear kubectl       # also: gcloud, aws, azure
+cloud-context --clear               # clear supported selections; Azure is preserved with a warning
+cloud-context --clear kubectl       # also: gcloud, aws
 cloud-context --test aws            # fake one prompt context without credentials
 cloud-context --test all            # fake every prompt context in isolated configs
 cloud-context --test-clear aws       # remove one fake context
@@ -1103,8 +1110,11 @@ AWS profile selection is shell-local, so the managed Zsh wrapper sources only
 Azure uses `az account`. Saved profiles are mode `0600` under
 `~/.config/dotfiles/cloud-contexts/`.
 
-Empty saved fields clear the corresponding selection through native commands;
-an empty GCP project clears the project without deleting a named configuration.
+Empty saved fields clear supported selections through native commands;
+an empty Azure field over an active subscription is rejected before any provider
+changes. Azure's account-cache reset is intentionally manual (`az account clear`)
+and may require signing in again; saved identifiers cannot undo that reset.
+An empty GCP project clears the project without deleting a named configuration.
 Unavailable providers with empty saved fields are left alone. Partial failures
 remain errors, but successful AWS shell changes take effect immediately.
 The AWS account prompt caches results for at most 30 seconds and invalidates on

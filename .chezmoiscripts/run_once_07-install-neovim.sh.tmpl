@@ -8,7 +8,7 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 log_step "Installing Neovim"
 
 NVIM_VERSION="$(package_version editor neovim 0.12.4)"
-NVIM_CURRENT="$(nvim --version 2>/dev/null | head -1 || true)"
+NVIM_CURRENT="$(observe_version nvim --version | head -1 || true)"
 if runtime_is_current nvim "$NVIM_VERSION" "$NVIM_CURRENT"; then
   log_info "Keeping the active Neovim installation unchanged"
   print_summary "Neovim"
@@ -29,7 +29,7 @@ NVIM_ROOT="$HOME/.local/share/dotfiles/tools/neovim/$NVIM_VERSION"
 nvim_probe() {
   "$1/bin/nvim" --clean --headless '+lua assert(vim.version().minor >= 12)' +qa
 }
-if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --version 2>/dev/null | head -1 || true)" "$NVIM_VERSION"; then
+if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$(bounded_probe "$NVIM_ROOT/bin/nvim" --version 2>/dev/null | head -1 || true)" "$NVIM_VERSION"; then
   tmpdir="$(mktemp -d)"
   trap 'rm -rf -- "$tmpdir"' EXIT
   asset="nvim-linux-${NVIM_ARCH}.tar.gz"
@@ -39,7 +39,7 @@ if [[ ! -x "$NVIM_ROOT/bin/nvim" ]] || ! version_ge "$($NVIM_ROOT/bin/nvim --ver
     "$tmpdir/$asset" "sha256:$NVIM_SHA" "$asset"
   mkdir -p "$tmpdir/app"
   tar -xzf "$tmpdir/$asset" -C "$tmpdir/app" --strip-components=1
-  if runtime_is_current nvim "$NVIM_VERSION" "$(nvim --version 2>/dev/null | head -1 || true)"; then
+  if runtime_is_current nvim "$NVIM_VERSION" "$(observe_version nvim --version | head -1 || true)"; then
     log_info "Neovim selection changed during staging; keeping the active installation"
     print_summary "Neovim"
     exit 0

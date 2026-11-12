@@ -8,6 +8,10 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 source "$DOTFILES_SOURCE_DIR/scripts/install-uv-tool.sh"
 
 log_step "Installing AI Coding Tools"
+declare -A existing_agents=()
+for agent in claude codex agy opencode omp; do
+  if is_installed "$agent"; then existing_agents["$agent"]=true; fi
+done
 activate_node_paths
 if ! is_installed npm; then
   log_error "npm is required for the pinned agent packages; include the languages section"
@@ -32,7 +36,7 @@ if [[ -z "$CODEX_PATH" || "$CODEX_PATH" == "$HOME/.nvm/"* ]]; then
     log_error "Codex standalone installer did not expose codex in PATH"
     exit 1
   }
-  record_install codex "$(codex --version 2>/dev/null | head -1 || printf standalone)" openai-installer "$(command -v codex)"
+  record_install codex "$(observe_version codex --version | head -1 || printf standalone)" openai-installer "$(command -v codex)"
   ((_INSTALLED++)) || true
   log_success "Codex standalone CLI installed"
 else
@@ -57,7 +61,7 @@ else
     log_error "Antigravity standalone installer did not expose agy in PATH"
     exit 1
   }
-  record_install antigravity "$(agy --version 2>/dev/null | head -1 || printf standalone)" \
+  record_install antigravity "$(observe_version agy --version | head -1 || printf standalone)" \
     google-installer "$(command -v agy)"
   ((_INSTALLED++)) || true
   log_success "Antigravity standalone CLI installed"
@@ -133,8 +137,10 @@ else
 fi
 
 for agent in claude codex agy opencode omp; do
-  if version_output="$("$agent" --version 2>&1)"; then
+  if version_output="$(observe_version "$agent" --version 2>&1)"; then
     log_success "$agent executable validation passed"
+  elif [[ "${existing_agents[$agent]:-false}" == true ]]; then
+    log_warn "Preserving existing $agent with unavailable version information; verify it manually"
   else
     log_error "$agent failed its noninteractive version check: ${version_output:-no output}"
   fi

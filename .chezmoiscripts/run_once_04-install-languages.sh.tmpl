@@ -12,7 +12,7 @@ ARCH="$(get_arch)"
 GO_VERSION="$(package_version languages go 1.26.5)"
 GO_ROOT="$HOME/.local/share/dotfiles/tools/go/$GO_VERSION"
 GO_PRESERVED=false
-if runtime_is_current go "$GO_VERSION" "$(go version 2>/dev/null || true)"; then
+if runtime_is_current go "$GO_VERSION" "$(observe_version go version || true)"; then
   GO_PRESERVED=true
 else
   tmpdir="$(mktemp -d)"
@@ -38,7 +38,7 @@ if [[ "$GO_PRESERVED" == false ]]; then
 fi
 
 RUST_CHANNEL="$(package_version languages rust 1.97.1)"
-if runtime_is_current rustc "$RUST_CHANNEL" "$(rustc --version 2>/dev/null || true)"; then
+if runtime_is_current rustc "$RUST_CHANNEL" "$(observe_version rustc --version || true)"; then
   log_info "Keeping the active Rust/Cargo toolchain and rustup default unchanged"
 else
   if ! is_installed rustup; then
@@ -84,7 +84,7 @@ esac
 NODE_ROOT="$HOME/.local/share/dotfiles/tools/node/$NODE_VERSION"
 NODE_ASSET="node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz"
 NODE_PRESERVED=false
-NODE_CURRENT="$(node --version 2>/dev/null || true)"
+NODE_CURRENT="$(observe_version node --version || true)"
 if runtime_is_current node "$NODE_VERSION" "$NODE_CURRENT"; then
   NODE_PRESERVED=true
   # Complete interrupted link publication only for the exact verified runtime.
@@ -105,7 +105,7 @@ if runtime_is_current node "$NODE_VERSION" "$NODE_CURRENT"; then
   fi
   NODE_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"
 else
-  if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$($NODE_ROOT/bin/node --version 2>/dev/null || true)" "$NODE_VERSION"; then
+  if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$(bounded_probe "$NODE_ROOT/bin/node" --version 2>/dev/null || true)" "$NODE_VERSION"; then
     tmpdir="$(mktemp -d)"
     log_info "Installing Node.js $NODE_VERSION into a stable user-local runtime"
     download_verified \
@@ -126,8 +126,8 @@ if [[ "$NODE_PRESERVED" == false ]]; then
   activate_node_paths
 fi
 NPM_VERSION="$(package_version languages npm 12.0.1)"
-NPM_CURRENT="$(npm --version 2>/dev/null || true)"
-[[ -n "$NPM_CURRENT" ]] || NPM_CURRENT="$("$NODE_ROOT/bin/npm" --version 2>/dev/null || true)"
+NPM_CURRENT="$(observe_version npm --version || true)"
+[[ -n "$NPM_CURRENT" ]] || NPM_CURRENT="$(bounded_probe "$NODE_ROOT/bin/npm" --version 2>/dev/null || true)"
 if ! version_ge "$NPM_CURRENT" "$NPM_VERSION"; then
   if ! target_is_owned "$NODE_ROOT"; then
     log_warn "Preserving externally managed Node.js/npm; npm ${NPM_CURRENT:-unknown} update to $NPM_VERSION skipped"
@@ -138,7 +138,7 @@ if ! version_ge "$NPM_CURRENT" "$NPM_VERSION"; then
     cp -a "$NODE_ROOT" "$tmpdir/runtime"
     PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" \
       install --global --prefix "$tmpdir/runtime" --engine-strict --no-audit --no-fund "npm@$NPM_VERSION"
-    [[ "$(PATH="$tmpdir/runtime/bin:$PATH" "$tmpdir/runtime/bin/npm" --version)" == "$NPM_VERSION" ]]
+    [[ "$(PATH="$tmpdir/runtime/bin:$PATH" bounded_probe "$tmpdir/runtime/bin/npm" --version)" == "$NPM_VERSION" ]]
     install_managed_tree "$tmpdir/runtime" "$NODE_ROOT" node "$NODE_VERSION" node-dist bin/node --version
     rm -rf "$tmpdir"
     record_install npm "$NPM_VERSION" npm "$NODE_ROOT/lib/node_modules/npm"
@@ -161,7 +161,7 @@ TYPESCRIPT_VERSION="$(package_version languages typescript 7.0.2)"
 npm_install_global typescript "$TYPESCRIPT_VERSION" tsc
 
 UV_VERSION="$(package_version languages uv 0.11.28)"
-if runtime_is_current uv "$UV_VERSION" "$(uv --version 2>/dev/null || true)"; then
+if runtime_is_current uv "$UV_VERSION" "$(observe_version uv --version || true)"; then
   :
 else
   case "$ARCH" in
@@ -184,7 +184,7 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 
 PYTHON_VERSION="$(package_version languages python 3.14.6)"
-PYTHON_CURRENT="$(python3 --version 2>/dev/null || true)"
+PYTHON_CURRENT="$(observe_version python3 --version || true)"
 if is_installed python3 && version_ge "$PYTHON_CURRENT" "$PYTHON_VERSION"; then
   log_skip "Python $(extract_version "$PYTHON_CURRENT") is at or above repository $PYTHON_VERSION; preserving system/project Python"
 elif uv python find "$PYTHON_VERSION" >/dev/null 2>&1; then
@@ -206,11 +206,11 @@ case "$ARCH" in
 esac
 JAVA_ROOT="$HOME/.local/share/dotfiles/tools/java/$JAVA_VERSION"
 JAVA_CURRENT="$HOME/.local/share/dotfiles/tools/java/current"
-if runtime_is_current java "$JAVA_VERSION" "$(java -version 2>&1 | head -1 || true)"; then
+if runtime_is_current java "$JAVA_VERSION" "$(observe_version java -version 2>&1 | head -1 || true)"; then
   log_info "Keeping the active Java installation and JAVA_HOME unchanged"
 else
   if [[ ! -x "$JAVA_ROOT/bin/java" ]] ||
-    ! version_major_matches "$("$JAVA_ROOT/bin/java" -version 2>&1 | head -1 || true)" "$JAVA_MAJOR"; then
+    ! version_major_matches "$(bounded_probe "$JAVA_ROOT/bin/java" -version 2>&1 | head -1 || true)" "$JAVA_MAJOR"; then
     tmpdir="$(mktemp -d)"
     asset="OpenJDK${JAVA_MAJOR}U-jdk_${JAVA_ARCH}_linux_hotspot_${JAVA_FILE_VERSION}.tar.gz"
     JAVA_SHA="$(package_metadata languages java "sha256_$ARCH")"

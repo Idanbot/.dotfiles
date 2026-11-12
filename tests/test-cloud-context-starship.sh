@@ -120,6 +120,8 @@ set -euo pipefail
 id=00000000-0000-0000-0000-000000000001
 other=00000000-0000-0000-0000-000000000002
 case "$*" in
+  "account show --query id -o tsv") jq -r '.subscriptions[] | select(.isDefault) | .id' "$HOME/.azure/azureProfile.json" ;;
+  "account show --query name -o tsv") jq -r '.subscriptions[] | select(.isDefault) | .name' "$HOME/.azure/azureProfile.json" ;;
   "account list --query [?id=='$id'].id -o tsv") printf '%s\n' "$id" ;;
   "account list --query [].[id,name] -o tsv")
     printf '%s\tEngineering\n%s\tSandbox\n' "$id" "$other"
@@ -217,19 +219,24 @@ sed -i "s/current-context: $long_context/current-context: lab/" "$KUBECONFIG"
 
 printf 'kubectl_context\t\ngcloud_configuration\t\ngcloud_project\t\naws_profile\t\naws_region\t\nazure_subscription\t\n' \
   >"${PROFILE%/*}/empty.tsv"
-load_context --load empty
-[[ -z "$(render_module custom.kubernetes_context)" ]]
-[[ -z "$(render_module gcloud)" ]]
-[[ -z "$(render_module aws)" ]]
-[[ -z "$(render_module custom.aws_account)" ]]
-[[ -z "$(render_module azure)" ]]
+if load_context --load empty; then
+  echo 'Unsafe empty Azure selection accepted' >&2
+  exit 1
+fi
+[[ "$(render_module custom.kubernetes_context)" == *lab* ]]
+[[ "$(render_module gcloud)" == *project-456* ]]
+[[ "$(render_module aws)" == *personal* ]]
+[[ "$(render_module azure)" == *Sandbox* ]]
 
 load_context --load work
-load_context --clear
+if load_context --clear; then
+  echo 'Partial clear reported success' >&2
+  exit 1
+fi
 [[ -z "$(render_module custom.kubernetes_context)" ]]
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
-[[ -z "$(render_module azure)" ]]
+[[ "$(render_module azure)" == *Engineering* ]]
 
 load_context --test all --yes
 cp -a "$XDG_STATE_HOME" "$TMP_ROOT/state-before-rejection"
@@ -253,7 +260,7 @@ load_context --test-clear
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
 [[ -z "$(render_module custom.aws_account)" ]]
-[[ -z "$(render_module azure)" ]]
+[[ "$(render_module azure)" == *Engineering* ]]
 
 mv "$MOCK_BIN/kubectl" "$MOCK_BIN/kubectl.disabled"
 printf '#!/usr/bin/env bash\nexit 127\n' >"$MOCK_BIN/kubectl"
@@ -264,19 +271,19 @@ if load_context --load work 2>/dev/null; then
 fi
 [[ -z "$(render_module gcloud)" ]]
 [[ -z "$(render_module aws)" ]]
-[[ -z "$(render_module azure)" ]]
+[[ "$(render_module azure)" == *Engineering* ]]
 
 printf 'Cloud context Starship integration test passed\n'
 
-# A partially failed clear must not apply its handoff, now or on a later read.
+# A partially failed clear applies successful shell changes immediately.
 zsh -f -c '
   source "$1"
   export AWS_PROFILE=work AWS_REGION=eu-west-1 AWS_DEFAULT_REGION=eu-west-1
   cloud-context --clear >/dev/null 2>&1
   result=$?
   [[ "$result" == 1 ]] || exit 1
-  [[ "$AWS_PROFILE" == work && "$AWS_REGION" == eu-west-1 ]] || exit 1
-  [[ "$(starship module aws)" == *work* ]] || exit 1
+  [[ -z "${AWS_PROFILE:-}" && -z "${AWS_REGION:-}" ]] || exit 1
+  [[ "$(starship module aws)" != *work* ]] || exit 1
   cloud-context --status >/dev/null
-  [[ "$AWS_PROFILE" == work && "$AWS_DEFAULT_REGION" == eu-west-1 ]]
+  [[ -z "${AWS_PROFILE:-}" && -z "${AWS_DEFAULT_REGION:-}" ]]
 ' _ "$TMP_ROOT/wrapper.zsh"

@@ -12,8 +12,11 @@ ARCH="$(get_arch)"
 # fzf source is a checksum-pinned chezmoi external; its installer is never run.
 FZF_VERSION="$(package_version core fzf 0.74.0)"
 FZF_BINARY="$HOME/.fzf/bin/fzf"
-if [[ -x "$FZF_BINARY" ]] && version_ge "$("$FZF_BINARY" --version)" "$FZF_VERSION"; then
+FZF_CURRENT="$(observe_version "$FZF_BINARY" --version || true)"
+if [[ -x "$FZF_BINARY" ]] && version_ge "$FZF_CURRENT" "$FZF_VERSION"; then
   log_skip "fzf already installed or newer"
+elif [[ -x "$FZF_BINARY" && -z "$(extract_version "$FZF_CURRENT" || true)" ]]; then
+  log_warn "Preserving fzf with an unknown or timed-out version"
 elif [[ -e "$FZF_BINARY" || -L "$FZF_BINARY" ]] &&
   ! target_is_owned "$FZF_BINARY" && ! binary_replacement_requested fzf; then
   log_warn "Preserving unowned or modified fzf at $FZF_BINARY; requested $FZF_VERSION was not applied"
@@ -35,7 +38,7 @@ else
       "$release/fzf_${FZF_VERSION}_checksums.txt" "$asset"
     tar --no-same-owner -xzf "$tmpdir/$asset" -C "$tmpdir" fzf
     chmod +x "$tmpdir/fzf"
-    version_ge "$("$tmpdir/fzf" --version)" "$FZF_VERSION"
+    version_ge "$(bounded_probe "$tmpdir/fzf" --version)" "$FZF_VERSION"
     DOTFILES_BIN_DIR="$HOME/.fzf/bin" install_managed_binary \
       "$tmpdir/fzf" fzf "$FZF_VERSION" github:junegunn/fzf 'fzf --version'
   )

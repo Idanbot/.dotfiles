@@ -238,7 +238,7 @@ dotfiles_conflict_prompt() {
 }
 
 dotfiles_apply_selected_conflicts() {
-  local -a apply_targets=()
+  local -a apply_targets=() protected_targets=() external_targets=() blocked_externals=() selected=()
   local line rel action all_action="" merge_status
   local had_conflict=false
 
@@ -282,13 +282,16 @@ dotfiles_apply_selected_conflicts() {
         apply_targets+=("$HOME/$rel")
         ;;
       skip)
+        protected_targets+=("$HOME/$rel")
         log_skip "Preserving ~/$rel"
         ;;
       skip-all)
+        protected_targets+=("$HOME/$rel")
         all_action=skip
         log_skip "Preserving ~/$rel and later conflicts"
         ;;
       merge | review)
+        protected_targets+=("$HOME/$rel")
         local merge_function=dotfiles_conflict_merge_append
         [[ "$action" == review ]] && merge_function=dotfiles_conflict_review_merge
         if "$merge_function" "$CHEZMOI_SOURCE" "$rel"; then
@@ -321,9 +324,32 @@ dotfiles_apply_selected_conflicts() {
     return 0
   fi
 
+  local external target blocked external_output
+  external_output="$(chezmoi_with_retry managed --source="$CHEZMOI_SOURCE" --include=externals --path-style=absolute)" || return 1
+  while IFS= read -r external; do
+    [[ -n "$external" ]] || continue
+    blocked=false
+    for target in "${protected_targets[@]}"; do
+      [[ "$target" != "$external" && "$target" != "$external/"* ]] || blocked=true
+    done
+    if [[ "$blocked" == true ]]; then
+      blocked_externals+=("$external")
+      log_skip "Preserving external subtree containing reviewed or skipped destinations: $external"
+    else
+      external_targets+=("$external")
+    fi
+  done <<<"$external_output"
+  for target in "${apply_targets[@]}"; do
+    blocked=false
+    for external in "${blocked_externals[@]}" "${external_targets[@]}"; do
+      [[ "$target" != "$external" && "$target" != "$external/"* ]] || blocked=true
+    done
+    [[ "$blocked" == true ]] || selected+=("$target")
+  done
+  apply_targets=("${selected[@]}")
   if [[ ${#apply_targets[@]} -gt 0 ]]; then
     log_info "Applying ${#apply_targets[@]} selected managed file(s)"
-    if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts --force --no-tty "${apply_targets[@]}"; then
+    if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts,externals --force --no-tty "${apply_targets[@]}"; then
       return 1
     fi
   else
@@ -331,7 +357,10 @@ dotfiles_apply_selected_conflicts() {
   fi
   # Keep directory creation and verified externals convergent without touching
   # any file that the user explicitly skipped or merged.
-  if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs,externals --force --no-tty; then
+  if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs --force --no-tty; then
     return 1
+  fi
+  if ((${#external_targets[@]})); then
+    chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=externals --force --no-tty "${external_targets[@]}" || return 1
   fi
 }

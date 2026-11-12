@@ -348,8 +348,10 @@ cloud-context() {
   # An absent per-call output means no shell change, even on success. Never
   # replay shared state written by another terminal or a previous invocation.
   CLOUD_CONTEXT_ENV_OUTPUT="$handoff_dir/env" command cloud-context "$@" || result=$?
-  if (( result == 0 )) && [[ -r "$handoff_dir/env" ]]; then
-    _cloud_context_source_env "$handoff_dir/env" "${1:-}" || result=$?
+  if [[ -r "$handoff_dir/env" ]]; then
+    local env_result=0
+    _cloud_context_source_env "$handoff_dir/env" "${1:-}" || env_result=$?
+    (( result != 0 )) || result=$env_result
   fi
   rm -rf -- "$handoff_dir"
   (( result == 0 )) || return "$result"

@@ -82,6 +82,50 @@ else:
 
 
 class ManagerSafetyTests(unittest.TestCase):
+    def command_inventory_transition(self, kind):
+        command = ("install_uv_tool review-cli review-package" if kind == "uv"
+                   else "npm_install_global review-package")
+        suffix = "" if kind == "uv" else " review-cli"
+        self.shell(f"{command} 1.0.0{suffix}")
+        retired = self.bin / "review-helper" if kind == "uv" else self.prefix / "bin/review-helper"
+        self.assertTrue(retired.is_symlink())
+        self.shell(f"{command} 2.0.0{suffix}", COMMANDS="review-cli,review-renamed")
+        self.assertFalse(retired.is_symlink())
+        self.assertNotIn(str(retired), (self.state / "installed.tsv").read_text())
+        self.uninstall(dry_run=True)
+        self.uninstall()
+
+    def test_uv_retired_command_receipts_do_not_block_uninstall(self):
+        self.command_inventory_transition("uv")
+
+    def test_npm_retired_command_receipts_do_not_block_uninstall(self):
+        self.command_inventory_transition("npm")
+
+    def test_retired_receipt_failure_rolls_back_the_complete_inventory(self):
+        self.shell("install_uv_tool review-cli review-package 1.0.0")
+        before = self.receipt_state()
+        result = self.shell(
+            "forget_install() { return 37; }; install_uv_tool review-cli review-package 2.0.0",
+            check=False, COMMANDS="review-cli,review-renamed",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.receipt_state(), before)
+        self.assertTrue((self.bin / "review-helper").is_symlink())
+        self.assertFalse((self.bin / "review-renamed").is_symlink())
+
+    def test_replaced_retired_command_is_preserved_without_stale_receipts(self):
+        self.shell("install_uv_tool review-cli review-package 1.0.0")
+        self.shell('''uv() {
+  command uv "$@" || return
+  if [[ "$1 $2" == "tool install" ]]; then
+    rm -f "$HOME/.local/bin/review-helper"
+    printf 'external replacement\n' >"$HOME/.local/bin/review-helper"
+  fi
+}; install_uv_tool review-cli review-package 2.0.0''', COMMANDS="review-cli")
+        retired = self.bin / "review-helper"
+        self.assertEqual(retired.read_text(), "external replacement\n")
+        self.assertNotIn(str(retired), (self.state / "installed.tsv").read_text())
+
     def iredis_block(self):
         source = (ROOT / ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl").read_text()
         return source[source.index('if ! is_installed uv; then'):source.index('# Pre-generate offline Zsh')]

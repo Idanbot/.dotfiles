@@ -2,11 +2,17 @@
 """Real Chezmoi decisions after source, content, permissions, or symlink drift."""
 
 import os
+import functools
+import hashlib
+import http.server
+import io
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
+import threading
 import unittest
 
 ROOT = (
@@ -18,6 +24,56 @@ ROOT = (
 
 @unittest.skipUnless(shutil.which("chezmoi"), "chezmoi required")
 class DriftTests(unittest.TestCase):
+    def test_skipped_external_archive_children_preserve_their_subtree(self):
+        archive = self.root / "fixture.tar.gz"
+        with tarfile.open(archive, "w:gz") as stream:
+            item = tarfile.TarInfo("file.txt")
+            payload = b"managed external\n"
+            item.size = len(payload)
+            stream.addfile(item, io.BytesIO(payload))
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(self.root))
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+        for exact in (False, True):
+            with self.subTest(exact=exact):
+                (self.source / ".chezmoiexternal.yaml").write_text(
+                    f'".fixture":\n  type: archive\n  url: "http://127.0.0.1:{server.server_port}/fixture.tar.gz"\n'
+                    f'  exact: {str(exact).lower()}\n  checksum:\n    sha256: "{checksum}"\n'
+                )
+                args = ["chezmoi", "apply", f"--source={self.source}", "--exclude=scripts", "--force"]
+                subprocess.run(args, env=self.env, capture_output=True, check=True)
+                child = self.home / ".fixture/file.txt"
+                child.write_text("local sentinel\n")
+                child.chmod(0o640)
+                extra = self.home / ".fixture/local-only.txt"
+                extra.write_text("keep exact-removal sentinel\n")
+                before = child.stat()
+                script = '''set -euo pipefail
+source "$1/scripts/conflicts.sh"
+log_info() { :; }; log_warn() { :; }; log_skip() { :; }; log_success() { :; }
+log_error() { printf '%s\\n' "$*" >&2; }
+read_user() { printf -v "$2" s; }
+CHEZMOI_STATUS_OUTPUT="$(chezmoi status --source="$CHEZMOI_SOURCE" --exclude=scripts)"
+dotfiles_apply_selected_conflicts
+'''
+                result = subprocess.run(["bash", "-c", script, "_", str(ROOT)], env=self.env,
+                                        capture_output=True, text=True, timeout=20)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(child.read_text(), "local sentinel\n")
+                self.assertEqual(child.stat().st_mode, before.st_mode)
+                self.assertEqual(child.stat().st_ino, before.st_ino)
+                self.assertTrue(extra.exists())
+                accepted = subprocess.run(
+                    ["bash", "-c", script.replace('read_user() { printf -v "$2" s; }',
+                                                 'read_user() { printf -v "$2" a; }'), "_", str(ROOT)],
+                    env=self.env, capture_output=True, text=True, timeout=20,
+                )
+                self.assertEqual(accepted.returncode, 0, accepted.stderr)
+                self.assertEqual(child.read_bytes(), payload)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

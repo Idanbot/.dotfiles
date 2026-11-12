@@ -89,11 +89,15 @@ case "$*" in
   "sts get-caller-identity --query Account --output text") printf "%s\n" "${MOCK_ACCOUNT:-123456789012}" ;;
 esac'
 make_mock az '
+if [[ -e "$HOME/azure-cache-cleared" && "$*" == "account "* ]]; then
+  exit 1
+fi
 if [[ "${AZ_FAIL_ONCE:-0}" == 1 && "$*" == "account set --subscription "* && ! -e "$HOME/az-failed" ]]; then
   touch "$HOME/az-failed"
   exit 7
 fi
 case "$*" in
+  "account clear") touch "$HOME/azure-cache-cleared" ;;
   "account show --query name -o tsv")
     [[ "${AZURE_CONFIG_DIR:-}" == *cloud-context-test* ]] &&
       printf "Cloud Context Test\n" || printf "Engineering\n"
@@ -227,11 +231,15 @@ grep -Fq 'GCloud project discovery timed out' "$TMP_ROOT/projects-timeout.out"
 ! grep -Fq $'fzf\t' "$CALLS"
 
 : >"$CALLS"
-"$SCRIPT" --clear >/dev/null
+if "$SCRIPT" --clear >"$TMP_ROOT/clear.out" 2>&1; then
+  echo 'Partial clear incorrectly succeeded' >&2
+  exit 1
+fi
 [[ "$(stat -c '%a' "$XDG_STATE_HOME/dotfiles")" == 700 ]]
 grep -Fq $'kubectl\tconfig unset current-context' "$CALLS"
 grep -Fq $'gcloud\tconfig unset project --quiet' "$CALLS"
-grep -Fq $'az\taccount clear' "$CALLS"
+! grep -Fq $'az\taccount clear' "$CALLS"
+[[ ! -e "$HOME/azure-cache-cleared" ]]
 grep -Fq 'unset AWS_PROFILE' "$HOME/.local/state/dotfiles/cloud-context.env"
 recent_root="$XDG_CONFIG_HOME/dotfiles/cloud-contexts/.recent-profiles"
 [[ "$(find "$recent_root" -maxdepth 1 -type f -name '*.tsv' | wc -l)" == 1 ]]

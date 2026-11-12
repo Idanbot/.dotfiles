@@ -112,7 +112,7 @@ else
 fi
 
 TERRAFORM_VERSION="$(package_version cloud terraform 1.15.8)"
-if runtime_is_current terraform "$TERRAFORM_VERSION" "$(terraform version 2>/dev/null | head -1 || true)"; then
+if runtime_is_current terraform "$TERRAFORM_VERSION" "$(observe_version terraform version | head -1 || true)"; then
   :
 else
   tmpdir="$(mktemp -d)"
@@ -138,7 +138,7 @@ install_github_archive \
   'k9s version --short'
 
 AWS_VERSION="$(package_version cloud aws_cli 2.36.7)"
-AWS_CURRENT="$(aws --version 2>/dev/null || true)"
+AWS_CURRENT="$(observe_version aws --version || true)"
 if runtime_is_current aws "$AWS_VERSION" "$AWS_CURRENT"; then
   :
 else
@@ -184,7 +184,7 @@ install_policy_apt gcloud google-cloud-cli cloud.gcloud "$GCLOUD_CURRENT"
 install_policy_apt az azure-cli cloud.azure_cli "$AZURE_CURRENT"
 
 CLOUDFLARED_VERSION="$(package_version cloud cloudflared 2026.7.3)"
-if runtime_is_current cloudflared "$CLOUDFLARED_VERSION" "$(cloudflared --version 2>/dev/null || true)"; then
+if runtime_is_current cloudflared "$CLOUDFLARED_VERSION" "$(observe_version cloudflared --version || true)"; then
   :
 else
   tmpdir="$(mktemp -d)"

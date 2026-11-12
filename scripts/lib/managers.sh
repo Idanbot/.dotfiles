@@ -117,8 +117,11 @@ manager_is_current() {
 manager_transaction() (
   local callback="$1" kind="$2" package="$3" binary="$4" version="$5" temporary path index committed=false
   local -a paths=("${MANAGER_PATHS[@]}")
-  local -A saved=()
+  local -A saved=() previous_digests=() accepted=()
   for path in "${paths[@]}"; do saved["$path"]=true; done
+  for path in "${paths[@]:1}"; do
+    previous_digests["$path"]="$(managed_target_digest "$path")" || return 1
+  done
   temporary="$(mktemp -d "$(managed_state_root)/.manager-transaction.XXXXXX")" || return 1
   printf '%s\n' "${paths[@]}" >"$temporary/targets"
   local bins="$MANAGER_BINS" target="$MANAGER_TARGET"
@@ -184,6 +187,23 @@ manager_transaction() (
   for path in "${MANAGER_PATHS[@]:1}"; do
     [[ "$kind" != npm || "$path" != "$HOME/.local/bin/$binary" ]] || continue
     record_install "$binary" "$version" "$kind:$package" "$path" || return 1
+  done
+  for path in "${MANAGER_PATHS[@]}"; do accepted["$path"]=true; done
+  for path in "${!previous_digests[@]}"; do
+    [[ -z "${accepted[$path]:-}" ]] || continue
+    local other_owner=false
+    if awk -F '\t' -v tool="$binary" -v target="$path" '$1 != tool && $4 == target { found=1 } END { exit !found }' \
+      "$(managed_state_root)/installed.tsv"; then other_owner=true; fi
+    if [[ "$other_owner" == false && (-e "$path" || -L "$path") ]]; then
+      if [[ "$(managed_target_digest "$path")" == "${previous_digests[$path]}" &&
+      (-L "$path" || -f "$path") ]]; then
+        rm -f -- "$path" || return 1
+      else
+        log_warn "Preserving replaced retired command: $path"
+      fi
+    fi
+    forget_install "$binary" "$path" || return 1
+    if [[ "$other_owner" == false ]]; then rm -f -- "$(ownership_stamp "$path")" || return 1; fi
   done
   committed=true
 )

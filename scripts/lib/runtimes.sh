@@ -82,6 +82,12 @@ runtime_activation_ready() {
 
 preserve_existing_release_binary() {
   local binary="$1" current="$2" target="${DOTFILES_BIN_DIR:-$HOME/.local/bin}/$1"
+  if command_exists "$binary" && [[ -z "$(extract_version "$current" || true)" ]] &&
+    ! binary_replacement_requested "$binary"; then
+    log_warn "Preserving existing $binary with an unknown or timed-out version"
+    ((_PRESERVED++)) || true
+    return 0
+  fi
   if ! runtime_activation_ready "$binary"; then
     log_warn "Preserving $binary: activation pointer is unowned or modified; manual migration required before an upgrade"
     ((_PRESERVED++)) || true
@@ -179,12 +185,46 @@ runtime_is_current() {
   preserve_existing_release_binary "$binary" "$current"
 }
 
+bounded_probe() {
+  timeout --kill-after=1 3 "$@" </dev/null
+}
+
+observe_version() (
+  local executable key cache="" temporary output
+  executable="$(command -v "$1")" || return 1
+  if [[ -n "${DOTFILES_VERSION_PLAN:-}" ]]; then
+    cache="$(dirname "$DOTFILES_VERSION_PLAN")/probe-cache"
+    [[ "$(realpath -m -- "$cache")" == "$cache" ]] || return 1
+    mkdir -p -- "$cache" || return 1
+    chmod 700 "$cache" || return 1
+    key="$({
+      printf '%s\0' "$@" "$PATH" "$HOME"
+      stat -Lc '%d:%i:%s:%y:%z:%a' "$executable"
+    } | sha256sum)"
+    cache="$cache/${key%% *}"
+    if [[ -f "$cache" ]]; then
+      cat "$cache"
+      return 0
+    fi
+  fi
+  output="$(bounded_probe "$@" 2>&1)" || return 1
+  if [[ -n "$cache" ]]; then
+    temporary="$(mktemp "${cache}.XXXXXX")" || return 1
+    printf '%s\n' "$output" >"$temporary" || return 1
+    chmod 600 "$temporary" || return 1
+    mv -Tf -- "$temporary" "$cache" || return 1
+  fi
+  printf '%s\n' "$output"
+)
+
 install_github_archive() {
   local binary="$1" repo="$2" requested_version="$3" asset_template="$4" member="$5" checksum_template="$6"
   local version_command="${7:-$binary --version}" tag arch asset checksum_url tmpdir archive current
 
   tag="$(resolve_tool_version "$repo" "$requested_version")"
-  current="$(bash -c "$version_command" 2>/dev/null || true)"
+  local -a probe
+  read -r -a probe <<<"$version_command"
+  current="$(observe_version "${probe[@]}" || true)"
   if is_installed "$binary" && version_ge "$current" "$tag"; then
     log_skip "$binary $tag already installed or newer"
     return 0
@@ -225,7 +265,9 @@ install_github_binary() {
   local version_command="${7:-$binary --version}" tag arch asset checksum_url tmpdir dest current
 
   tag="$(resolve_tool_version "$repo" "$requested_version")"
-  current="$(bash -c "$version_command" 2>/dev/null || true)"
+  local -a probe
+  read -r -a probe <<<"$version_command"
+  current="$(observe_version "${probe[@]}" || true)"
   if is_installed "$binary" && version_ge "$current" "$tag"; then
     log_skip "$binary $tag already installed or newer"
     return 0

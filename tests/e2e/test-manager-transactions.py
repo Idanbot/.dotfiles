@@ -115,7 +115,8 @@ class NativeManagerTests(unittest.TestCase):
                 )
                 wheel.writestr(
                     distribution + "entry_points.txt",
-                    f"[console_scripts]\n{BINARY} = manager_fixture:main\n",
+                    f"[console_scripts]\n{BINARY} = manager_fixture:main\n"
+                    f"{BINARY}-{'old' if version == '1.0.0' else 'new'} = manager_fixture:main\n",
                 )
                 wheel.writestr(distribution + "RECORD", "")
         self.shell(f"install_uv_tool {BINARY} {PACKAGE} 1.0.0 /usr/bin/python3")
@@ -128,6 +129,8 @@ class NativeManagerTests(unittest.TestCase):
         self.assertEqual(self.receipts(), before)
         self.shell(f"install_uv_tool {BINARY} {PACKAGE} 2.0.0 /usr/bin/python3")
         self.assertEqual(self.version(), "2.0.0")
+        self.assertFalse((self.bins / (BINARY + "-old")).is_symlink())
+        self.shell(f'bash "$DOTFILES_SOURCE_DIR/scripts/uninstall-tool.sh" {BINARY} --dry-run')
         before = self.receipts()
         self.shell(f"install_uv_tool {BINARY} {PACKAGE} 2.0.0 /usr/bin/python3")
         self.assertEqual(self.receipts(), before)
@@ -146,7 +149,8 @@ class NativeManagerTests(unittest.TestCase):
             stream = io.BytesIO()
             contents = {
                 "package.json": json.dumps(
-                    {"name": PACKAGE, "version": version, "bin": {BINARY: "cli.js"}}
+                    {"name": PACKAGE, "version": version, "bin": {
+                        BINARY: "cli.js", BINARY + ("-old" if version == "1.0.0" else "-new"): "cli.js"}}
                 ),
                 "cli.js": f"#!/usr/bin/env node\nconsole.log({version!r});\n",
             }
@@ -171,7 +175,7 @@ class NativeManagerTests(unittest.TestCase):
                         version: {
                             "name": PACKAGE,
                             "version": version,
-                            "bin": {BINARY: "cli.js"},
+                            "bin": {BINARY: "cli.js", BINARY + ("-old" if version == "1.0.0" else "-new"): "cli.js"},
                             "dist": {
                                 "tarball": f"http://127.0.0.1:{self.server.server_port}/{version}.tgz",
                                 "integrity": "sha512-"
@@ -219,6 +223,8 @@ class NativeManagerTests(unittest.TestCase):
         self.assertEqual(self.receipts(), before)
         self.shell(f"npm_install_global {PACKAGE} 2.0.0 {BINARY}")
         self.assertEqual(self.version(), "2.0.0")
+        self.assertFalse((self.home / "npm-prefix/bin" / (BINARY + "-old")).is_symlink())
+        self.shell(f'bash "$DOTFILES_SOURCE_DIR/scripts/uninstall-tool.sh" {BINARY} --dry-run')
         before = self.receipts()
         self.shell(f"npm_install_global {PACKAGE} 2.0.0 {BINARY}")
         self.assertEqual(self.receipts(), before)
