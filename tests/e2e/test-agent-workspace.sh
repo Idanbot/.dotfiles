@@ -202,6 +202,7 @@ ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-workspace" \
 ln -s "$DOTFILES_DIR/dot_local/bin/executable_agent-mcp" \
   "$HOME/bin/agent-mcp"
 cp "$DOTFILES_DIR/agents.yaml" "$DOTFILES_AGENT_REGISTRY"
+yq -r '.terminal.tmuxp' "$DOTFILES_DIR/packages.yaml" >"$XDG_CONFIG_HOME/dotfiles/tmuxp-version"
 cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" \
   "$XDG_CONFIG_HOME/tmuxp/agent-workspace.yaml"
 
@@ -252,7 +253,8 @@ test_tmuxp_backend() {
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\t%s\n' "$PWD" "$*" >>"${WORKSPACE_BACKEND_LOG:?}"
-[[ "${1:-}" == --from && "${2:-}" == tmuxp==1.74.0 && "${3:-}" == tmuxp && "${4:-}" == load && "${5:-}" == -y ]]
+expected="$(cat "$XDG_CONFIG_HOME/dotfiles/tmuxp-version")"
+[[ "${1:-}" == --from && "${2:-}" == "tmuxp==$expected" && "${3:-}" == tmuxp && "${4:-}" == load && "${5:-}" == -y ]]
 yaml="${!#}"
 start_directory="$(yq -r '.start_directory' "$yaml")"
 [[ "$start_directory" == "$WORKSPACE_DIR" ]]
@@ -265,7 +267,7 @@ EOF
   chmod 755 "$HOME/bin/uvx"
   dot-workspace "$WORKSPACE_DIR" --backend tmux --name docker-tmux
   [[ "$(wc -l <"$AGENT_RUN_LOG")" -eq 5 ]]
-  grep -Fq 'tmuxp==1.74.0 tmuxp load -y' "$WORKSPACE_BACKEND_LOG"
+  grep -Fq "tmuxp==$(cat "$XDG_CONFIG_HOME/dotfiles/tmuxp-version") tmuxp load -y" "$WORKSPACE_BACKEND_LOG"
 }
 
 test_directory_propagation() {

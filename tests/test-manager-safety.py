@@ -82,6 +82,57 @@ else:
 
 
 class ManagerSafetyTests(unittest.TestCase):
+    def iredis_block(self):
+        source = (ROOT / ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl").read_text()
+        return source[source.index('if ! is_installed uv; then'):source.index('# Pre-generate offline Zsh')]
+
+    def test_iredis_section_installs_pin_and_converges(self):
+        block = self.iredis_block()
+        self.shell(block + block, COMMANDS="iredis")
+        calls = self.manager_calls()
+        self.assertEqual(len(calls), 1)
+        version = self.shell("package_version database iredis").stdout.strip()
+        self.assertEqual(calls[0][-1], f"iredis=={version}")
+        self.assertTrue((self.bin / "iredis").is_symlink())
+        self.assertIn("iredis", (self.state / "installed.tsv").read_text())
+
+    def test_iredis_section_manager_failure_is_fatal(self):
+        result = self.shell(self.iredis_block(), check=False, COMMANDS="iredis", FAIL="before")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("iredis installed", result.stdout)
+        self.assertFalse((self.bin / "iredis").exists())
+
+    def test_cloud_acceptance_rejects_missing_iredis(self):
+        result = self.shell(
+            '"$DOTFILES_SOURCE_DIR/scripts/doctor.sh" --sections cloud --acceptance --quick --json',
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        report = json.loads(result.stdout)
+        self.assertIn({"name": "iredis", "state": "fail"}, [
+            {"name": row["name"], "state": row["state"]} for row in report["results"]
+        ])
+
+    def test_iredis_section_missing_manager_is_actionable(self):
+        result = self.shell('is_installed() { return 1; }; ' + self.iredis_block(), check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("include the languages section", result.stdout + result.stderr)
+        self.assertFalse(self.calls.exists())
+
+    def test_iredis_section_upgrades_owned_client_then_converges(self):
+        block = self.iredis_block()
+        self.shell("install_uv_tool iredis iredis 0.0.1; " + block + block, COMMANDS="iredis")
+        self.assertEqual(len(self.manager_calls()), 2)
+
+    def test_iredis_section_preserves_external_client(self):
+        command = self.bin / "iredis"
+        content = "#!/bin/sh\necho 0.0.1\n"
+        command.write_text(content)
+        command.chmod(0o755)
+        self.shell(self.iredis_block(), COMMANDS="iredis")
+        self.assertEqual(command.read_text(), content)
+        self.assertFalse(self.calls.exists())
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="manager home ")
         self.addCleanup(self.temporary.cleanup)

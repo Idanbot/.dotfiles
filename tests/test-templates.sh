@@ -109,6 +109,17 @@ for profile in native wsl; do
   done < <(find "$DOTFILES_DIR" -name '*.tmpl' -print0)
 done
 
+mkdir -p "$TMP_DIR/pin-source"
+for pin in "$(yq -r '.terminal.tmuxp' "$DOTFILES_DIR/packages.yaml")" 99.1.2; do
+  printf 'terminal:\n  tmuxp: "%s"\n' "$pin" >"$TMP_DIR/pin-source/packages.yaml"
+  actual="$(chezmoi execute-template --source="$TMP_DIR/pin-source" <"$DOTFILES_DIR/dot_config/dotfiles/tmuxp-version.tmpl")"
+  if [[ "$actual" == "$pin" ]]; then
+    pass "tmuxp runtime configuration renders manifest pin $pin"
+  else
+    fail "tmuxp runtime configuration differs from manifest"
+  fi
+done
+
 echo -e "\n${BOLD}── Results ──${NC}"
 echo -e "  ${GREEN}Passed:${NC}  $PASSED"
 echo -e "  ${YELLOW}Skipped:${NC} $SKIPPED"

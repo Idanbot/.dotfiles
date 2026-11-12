@@ -252,7 +252,7 @@ class RegistryTests(unittest.TestCase):
                     runtime, changed_by(filename, b"# changed runtime module\n")
                 )
             self.assertEqual(
-                {"ai", "media"},
+                {"ai", "media", "cloud"},
                 changed_by("scripts/install-uv-tool.sh", b"# uv helper change\n"),
             )
             self.assertEqual(

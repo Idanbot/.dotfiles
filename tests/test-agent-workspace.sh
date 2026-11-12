@@ -10,6 +10,7 @@ export DOTFILES_AGENT_REGISTRY="$HOME/.config/dotfiles/agents.yaml"
 mkdir -p "$HOME/.config/tmuxp" "$HOME/.config/dotfiles" "$HOME/bin" "$HOME/project with spaces"
 cp "$DOTFILES_DIR/dot_config/tmuxp/agent-workspace.yaml" "$HOME/.config/tmuxp/agent-workspace.yaml"
 cp "$DOTFILES_DIR/agents.yaml" "$DOTFILES_AGENT_REGISTRY"
+yq -r '.terminal.tmuxp' "$DOTFILES_DIR/packages.yaml" >"$HOME/.config/dotfiles/tmuxp-version"
 printf '#!/bin/sh\nexit 0\n' >"$HOME/bin/uvx"
 printf '#!/bin/sh\nexit 0\n' >"$HOME/bin/tmux"
 ln -s "$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch" \
@@ -18,6 +19,27 @@ chmod +x "$HOME/bin/uvx" "$HOME/bin/tmux"
 
 WORKSPACE="$DOTFILES_DIR/dot_local/bin/executable_dot-workspace"
 AGENT_LAUNCH="$DOTFILES_DIR/dot_local/bin/executable_dot-agent-launch"
+
+cat >"$HOME/bin/uvx" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$2" >"$HOME/requested-tmuxp"
+EOF
+chmod +x "$HOME/bin/uvx"
+pin_file="$HOME/.config/dotfiles/tmuxp-version"
+for pin in "$(yq -r '.terminal.tmuxp' "$DOTFILES_DIR/packages.yaml")" 99.1.2; do
+  printf '%s\n' "$pin" >"$pin_file"
+  env -u DOTFILES_TMUXP_VERSION "$WORKSPACE" "$HOME/project with spaces" --name pin-test
+  [[ "$(cat "$HOME/requested-tmuxp")" == "tmuxp==$pin" ]]
+done
+DOTFILES_TMUXP_VERSION=99.2.3 "$WORKSPACE" "$HOME/project with spaces" --name pin-test
+[[ "$(cat "$HOME/requested-tmuxp")" == tmuxp==99.2.3 ]]
+printf 'invalid\n' >"$pin_file"
+if env -u DOTFILES_TMUXP_VERSION "$WORKSPACE" --name pin-test >/dev/null 2>&1; then
+  echo 'Invalid tmuxp pin accepted' >&2
+  exit 1
+fi
+yq -r '.terminal.tmuxp' "$DOTFILES_DIR/packages.yaml" >"$pin_file"
+printf '#!/bin/sh\nexit 0\n' >"$HOME/bin/uvx"
 
 preview="$(env -u TMUX "$WORKSPACE" "$HOME/project with spaces" --backend tmux --preset review --plan)"
 jq -e '.agents == ["codex", "claude"] and .mutates == false and .preset == "review"' <<<"$preview" >/dev/null

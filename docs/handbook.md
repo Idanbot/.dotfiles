@@ -566,6 +566,8 @@ dot-workspace . --name project-agents --print
 The workspace uses tmux and pinned tmuxp through `uvx`. `--backend auto`
 and `--backend tmux` both select tmux. Existing named sessions are preserved;
 no additional multiplexer or agent integrations are installed.
+The deployed tmuxp version configuration comes from the package manifest;
+`DOTFILES_TMUXP_VERSION` explicitly overrides it for a local launch.
 
 The project sessionizer names new sessions by canonical directory, so projects
 with identical names remain separate. Matching legacy sessions are reused;

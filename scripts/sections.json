@@ -34,8 +34,8 @@
   },
   "cloud": {
     "order": 50, "description": "Docker, kubectl, Helm, Terraform, cloud CLIs", "dependencies": [],
-    "script": ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl", "manifest": ["cloud", "database"],
-    "commands": ["docker", "kubectl", "helm", "terraform", "ansible", "k9s", "aws", "gcloud", "az", "cloud-context", "kfzf", "s5cmd", "kcat", "stern", "helmfile", "kubectx", "kubens", "kubecolor", "pgloader", "cloudflare-ssh", "kubectl-radar"], "optional_commands": ["radar"],
+    "script": ".chezmoiscripts/run_once_05-install-containers-cloud.sh.tmpl", "manifest": ["cloud", "database"], "files": ["scripts/install-uv-tool.sh"],
+    "commands": ["docker", "kubectl", "helm", "terraform", "ansible", "k9s", "aws", "gcloud", "az", "cloud-context", "kfzf", "s5cmd", "kcat", "stern", "helmfile", "kubectx", "kubens", "kubecolor", "pgloader", "iredis", "cloudflare-ssh", "kubectl-radar"], "optional_commands": ["radar"],
     "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py", "scripts/keys/aws-cli.asc"]
   },
   "tmux": {

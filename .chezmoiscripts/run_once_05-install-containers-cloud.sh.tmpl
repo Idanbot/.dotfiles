@@ -277,15 +277,13 @@ install_github_archive \
   "sha256:$USQL_SHA" \
   'usql --version'
 
-if ! is_installed iredis; then
-  if is_installed uv; then
-    log_info "Installing iredis via uv..."
-    uv tool install iredis --quiet 2>/dev/null || pip install --user iredis 2>/dev/null || true
-    log_success "iredis installed"
-  fi
-else
-  log_skip "iredis already installed"
+if ! is_installed uv; then
+  log_error "uv is required to install iredis; include the languages section"
+  exit 1
 fi
+# shellcheck source=scripts/install-uv-tool.sh
+source "$DOTFILES_SOURCE_DIR/scripts/install-uv-tool.sh"
+install_uv_tool iredis iredis "$(package_version database iredis)"
 
 # Pre-generate offline Zsh completion definitions for kubectl, helm, docker
 mkdir -p "$HOME/.zsh/completions"

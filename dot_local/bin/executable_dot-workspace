@@ -4,7 +4,6 @@
 set -euo pipefail
 umask 077
 
-TMUXP_VERSION="${DOTFILES_TMUXP_VERSION:-1.74.0}"
 WORKDIR="$PWD"
 SESSION_NAME=""
 BACKEND=auto
@@ -308,8 +307,19 @@ run_tmux_workspace() {
     fi
   fi
   export TMUXP_PROGRESS=0
+  local version="${DOTFILES_TMUXP_VERSION:-}"
+  if [[ -z "$version" ]]; then
+    read -r version <"$config_root/dotfiles/tmuxp-version" || {
+      printf 'Missing tmuxp version configuration; apply dotfiles first\n' >&2
+      return 1
+    }
+  fi
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    printf 'Invalid tmuxp version configuration\n' >&2
+    return 1
+  }
   set +e
-  uvx --from "tmuxp==${TMUXP_VERSION}" tmuxp load -y "$TMUX_RENDERED"
+  uvx --from "tmuxp==$version" tmuxp load -y "$TMUX_RENDERED"
   status=$?
   set -e
   return "$status"
