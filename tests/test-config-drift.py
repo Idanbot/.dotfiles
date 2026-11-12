@@ -25,6 +25,9 @@ ROOT = (
 @unittest.skipUnless(shutil.which("chezmoi"), "chezmoi required")
 class DriftTests(unittest.TestCase):
     def test_skipped_external_archive_children_preserve_their_subtree(self):
+        overlay = self.source / "dot_fixture/overlay.txt"
+        overlay.parent.mkdir()
+        overlay.write_text("repository overlay\n")
         archive = self.root / "fixture.tar.gz"
         with tarfile.open(archive, "w:gz") as stream:
             item = tarfile.TarInfo("file.txt")
@@ -39,12 +42,17 @@ class DriftTests(unittest.TestCase):
         checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
         for exact in (False, True):
             with self.subTest(exact=exact):
+                # Chezmoi forbids source overlays beneath an exact archive.
+                if exact:
+                    overlay.unlink()
+                    overlay.parent.rmdir()
                 (self.source / ".chezmoiexternal.yaml").write_text(
                     f'".fixture":\n  type: archive\n  url: "http://127.0.0.1:{server.server_port}/fixture.tar.gz"\n'
                     f'  exact: {str(exact).lower()}\n  checksum:\n    sha256: "{checksum}"\n'
                 )
                 args = ["chezmoi", "apply", f"--source={self.source}", "--exclude=scripts", "--force"]
-                subprocess.run(args, env=self.env, capture_output=True, check=True)
+                initial = subprocess.run(args, env=self.env, capture_output=True, text=True)
+                self.assertEqual(initial.returncode, 0, initial.stderr)
                 child = self.home / ".fixture/file.txt"
                 child.write_text("local sentinel\n")
                 child.chmod(0o640)
@@ -73,6 +81,8 @@ dotfiles_apply_selected_conflicts
                 )
                 self.assertEqual(accepted.returncode, 0, accepted.stderr)
                 self.assertEqual(child.read_bytes(), payload)
+                if not exact:
+                    self.assertEqual((self.home / ".fixture/overlay.txt").read_text(), "repository overlay\n")
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

@@ -347,6 +347,11 @@ dotfiles_apply_selected_conflicts() {
     [[ "$blocked" == true ]] || selected+=("$target")
   done
   apply_targets=("${selected[@]}")
+  # Archives must precede managed overlays, including unchanged overlay files.
+  if ((${#external_targets[@]})); then
+    chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=externals --force --no-tty "${external_targets[@]}" || return 1
+    chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts,externals --force --no-tty "${external_targets[@]}" || return 1
+  fi
   if [[ ${#apply_targets[@]} -gt 0 ]]; then
     log_info "Applying ${#apply_targets[@]} selected managed file(s)"
     if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --exclude=scripts,externals --force --no-tty "${apply_targets[@]}"; then
@@ -359,8 +364,5 @@ dotfiles_apply_selected_conflicts() {
   # any file that the user explicitly skipped or merged.
   if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs --force --no-tty; then
     return 1
-  fi
-  if ((${#external_targets[@]})); then
-    chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=externals --force --no-tty "${external_targets[@]}" || return 1
   fi
 }

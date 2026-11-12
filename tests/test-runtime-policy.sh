@@ -41,6 +41,19 @@ for tool, command in [("go", "go"), ("rust", "rustc"), ("node", "node"), ("npm",
     assert "preserve" in entry["action"], entry
 PY
 source "$ROOT/scripts/lib.sh"
+(
+  require_sudo() { :; }
+  dpkg_package_installed() { return 1; }
+  apt_update() { printf 'update\n' >>"$HOME/runtime-prerequisites"; }
+  apt_install() { printf 'install %s\n' "$*" >>"$HOME/runtime-prerequisites"; }
+  source <(awk '/^log_step/ {block=1} /^GO_VERSION=/ {block=0} block' \
+    "$ROOT/.chezmoiscripts/run_once_04-install-languages.sh.tmpl")
+  [[ "$(cat "$HOME/runtime-prerequisites")" == $'update\ninstall libatomic1' ]]
+  dpkg_package_installed() { return 0; }
+  apt_update() { exit 99; }
+  source <(awk '/^log_step/ {block=1} /^GO_VERSION=/ {block=0} block' \
+    "$ROOT/.chezmoiscripts/run_once_04-install-languages.sh.tmpl")
+)
 for binary in go rustc cargo node npm java tsc uv; do
   [[ "$(command -v "$binary")" == "$HOME/external/bin/$binary" ]] || {
     printf 'Library changed preflight selection for %s\n' "$binary" >&2

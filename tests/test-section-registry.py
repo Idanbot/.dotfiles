@@ -230,7 +230,7 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(
                 {"core", "cloud", "zsh", "terminal", "tmux", "media", "desktop"} <= apt
             )
-            self.assertNotIn("languages", apt)
+            self.assertIn("languages", apt)
             self.assertEqual(
                 set(sections),
                 changed_by("scripts/lib/future-helper.sh", b"# new loaded helper\n"),

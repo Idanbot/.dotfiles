@@ -7,6 +7,8 @@ source "$DOTFILES_SOURCE_DIR/scripts/lib.sh"
 
 log_step "Installing Languages & Runtimes"
 require_sudo
+if ! dpkg_package_installed libatomic1; then apt_update; fi
+apt_install libatomic1
 ARCH="$(get_arch)"
 
 GO_VERSION="$(package_version languages go 1.26.5)"

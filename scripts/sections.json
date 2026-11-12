@@ -25,7 +25,7 @@
     "order": 40, "description": "Go, Rust, Node.js, TypeScript, Python, Java", "dependencies": [],
     "script": ".chezmoiscripts/run_once_04-install-languages.sh.tmpl", "manifest": ["languages"], "files": ["scripts/python-installer.sh"],
     "commands": ["go", "rustc", "cargo", "node", "npm", "tsc", "uv", "uvx", "java"], "stable_commands": ["go", "rustc", "cargo", "node", "npm", "tsc"],
-    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py"]
+    "shared_inputs": ["scripts/lib.sh", "scripts/environment.sh", "scripts/lib/*.sh", "scripts/dotfiles/*.py", "scripts/install-policy.py", "scripts/catalog.py", "scripts/hashicorp-keyrings.py"]
   },
   "history": {
     "order": 45, "description": "optional Atuin (activation remains local/manual)", "dependencies": [],
