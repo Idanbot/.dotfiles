@@ -63,9 +63,27 @@ if [[ "$AGENT_WORKSPACE" == true ]]; then
   exec dot-workspace "$SELECTED"
 fi
 
-session_name="$(basename "$SELECTED" | tr -cs '[:alnum:]_-' '_')"
+session_matches_directory() {
+  local directory
+  directory="$(timeout 3 tmux display-message -p -t "=$1:" '#{session_path}')" || return 1
+  [[ -n "$directory" ]] || return 1
+  directory="$(cd -- "$directory" && pwd -P)" || return 1
+  [[ "$directory" == "$SELECTED" ]]
+}
+
+legacy_name="$(basename "$SELECTED" | tr -cs '[:alnum:]_-' '_')"
+path_hash="$(printf '%s' "$SELECTED" | sha256sum)"
+session_name="${legacy_name}-${path_hash:0:12}"
+# Reuse matching legacy sessions without migrating or touching unrelated ones.
+if tmux has-session -t "=$legacy_name" 2>/dev/null &&
+  session_matches_directory "$legacy_name" 2>/dev/null; then
+  session_name="$legacy_name"
+fi
 if ! tmux has-session -t "=$session_name" 2>/dev/null; then
   tmux new-session -d -s "$session_name" -c "$SELECTED"
+elif ! session_matches_directory "$session_name"; then
+  printf 'Session directory could not be verified: %s\n' "$session_name" >&2
+  exit 1
 fi
 if [[ -n "${TMUX:-}" ]]; then
   exec tmux switch-client -t "=$session_name"

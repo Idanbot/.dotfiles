@@ -870,6 +870,13 @@
       ]
     },
     {
+      "path": "tests/test-tmux-project-identity.py",
+      "kind": "suite",
+      "suite": "behavior",
+      "timeout_seconds": 60,
+      "invocations": [["{root}"]]
+    },
+    {
       "path": "tests/test-sessionizer.sh",
       "kind": "suite",
       "suite": "behavior",

@@ -139,7 +139,11 @@ case "$1" in
     for file in "$WORKSPACE_STATE"/*.cwd; do
       name="${file##*/}"; printf '%s\n' "${name%.cwd}"
     done ;;
-  display-message) cat "$WORKSPACE_STATE/${4#=}.cwd" ;;
+  display-message)
+    target="${4#=}"
+    target="${target%:}"
+    cat "$WORKSPACE_STATE/$target.cwd"
+    ;;
   attach-session | switch-client) exit 0 ;;
   *) exit 90 ;;
 esac

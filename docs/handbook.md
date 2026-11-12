@@ -567,6 +567,10 @@ The workspace uses tmux and pinned tmuxp through `uvx`. `--backend auto`
 and `--backend tmux` both select tmux. Existing named sessions are preserved;
 no additional multiplexer or agent integrations are installed.
 
+The project sessionizer names new sessions by canonical directory, so projects
+with identical names remain separate. Matching legacy sessions are reused;
+unrelated sessions and their panes are never migrated or replaced.
+
 The registry defines a main terminal plus Codex, Antigravity, Claude, OpenCode and
 OMP in the same working directory. `--agents` selects a subset, `--check` validates
 commands, and `--restart-agents` explicitly restarts crashed agents. Missing optional

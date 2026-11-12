@@ -270,6 +270,10 @@ Path(destination).write_text(text, encoding="utf-8")
 PY
 }
 
+workspace_directory() {
+  timeout 3 tmux display-message -p -t "=$SESSION_NAME:" '#{session_path}'
+}
+
 run_tmux_workspace() {
   local status
   TMUX_RENDERED="$(mktemp "${TMPDIR:-/tmp}/dot-workspace.XXXXXX.yaml")"
@@ -292,7 +296,7 @@ run_tmux_workspace() {
   if tmux has-session 2>/dev/null; then
     sessions="$(tmux list-sessions -F '#{session_name}')" || return 1
     if grep -Fxq -- "$SESSION_NAME" <<<"$sessions"; then
-      existing="$(tmux display-message -p -t "=$SESSION_NAME" '#{session_path}')" || return 1
+      existing="$(workspace_directory)" || return 1
       verify_workspace_directory "$existing" || return 1
       [[ -z "$PRESET" ]] || printf 'Existing workspace preserved; use --plan to review preset drift\n'
       if [[ -n "${TMUX:-}" ]]; then
@@ -326,7 +330,7 @@ if [[ "$DRIFT_ONLY" == true ]]; then
   windows=""
   if [[ "$BACKEND" == tmux ]]; then
     if windows="$(timeout 3 tmux list-windows -t "=$SESSION_NAME" -F '#{window_name}' 2>/dev/null)"; then
-      existing="$(timeout 3 tmux display-message -p -t "=$SESSION_NAME" '#{session_path}' 2>/dev/null || true)"
+      existing="$(workspace_directory 2>/dev/null || true)"
       if [[ "$existing" == "$WORKDIR" ]]; then
         observed=available
       else
