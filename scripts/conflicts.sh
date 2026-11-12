@@ -238,7 +238,7 @@ dotfiles_conflict_prompt() {
 }
 
 dotfiles_apply_selected_conflicts() {
-  local -a apply_targets=() protected_targets=() external_targets=() blocked_externals=() selected=()
+  local -a apply_targets=() protected_targets=() external_targets=() blocked_externals=() selected=() directory_targets=()
   local line rel action all_action="" merge_status
   local had_conflict=false
 
@@ -347,6 +347,18 @@ dotfiles_apply_selected_conflicts() {
     [[ "$blocked" == true ]] || selected+=("$target")
   done
   apply_targets=("${selected[@]}")
+  external_output="$(chezmoi_with_retry managed --source="$CHEZMOI_SOURCE" --include=dirs --path-style=absolute)" || return 1
+  while IFS= read -r external; do
+    [[ -n "$external" ]] || continue
+    blocked=false
+    for target in "${protected_targets[@]}"; do
+      [[ "$external" != "$target" && "$external" != "$target/"* ]] || blocked=true
+    done
+    [[ "$blocked" == true ]] || directory_targets+=("$external")
+  done <<<"$external_output"
+  if ((${#directory_targets[@]})); then
+    chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs --recursive=false --force --no-tty "${directory_targets[@]}" || return 1
+  fi
   # Archives must precede managed overlays, including unchanged overlay files.
   if ((${#external_targets[@]})); then
     chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=externals --force --no-tty "${external_targets[@]}" || return 1
@@ -359,10 +371,5 @@ dotfiles_apply_selected_conflicts() {
     fi
   else
     log_info "No managed files selected for replacement"
-  fi
-  # Keep directory creation and verified externals convergent without touching
-  # any file that the user explicitly skipped or merged.
-  if ! chezmoi_with_retry apply --source="$CHEZMOI_SOURCE" --include=dirs --force --no-tty; then
-    return 1
   fi
 }

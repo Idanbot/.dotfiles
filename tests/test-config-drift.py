@@ -6,6 +6,7 @@ import functools
 import hashlib
 import http.server
 import io
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,8 +26,8 @@ ROOT = (
 @unittest.skipUnless(shutil.which("chezmoi"), "chezmoi required")
 class DriftTests(unittest.TestCase):
     def test_skipped_external_archive_children_preserve_their_subtree(self):
-        overlay = self.source / "dot_fixture/overlay.txt"
-        overlay.parent.mkdir()
+        overlay = self.source / "dot_fixture/custom/plugins/my-functions/overlay.txt"
+        overlay.parent.mkdir(parents=True)
         overlay.write_text("repository overlay\n")
         archive = self.root / "fixture.tar.gz"
         with tarfile.open(archive, "w:gz") as stream:
@@ -44,15 +45,19 @@ class DriftTests(unittest.TestCase):
             with self.subTest(exact=exact):
                 # Chezmoi forbids source overlays beneath an exact archive.
                 if exact:
-                    overlay.unlink()
-                    overlay.parent.rmdir()
-                (self.source / ".chezmoiexternal.yaml").write_text(
-                    f'".fixture":\n  type: archive\n  url: "http://127.0.0.1:{server.server_port}/fixture.tar.gz"\n'
-                    f'  exact: {str(exact).lower()}\n  checksum:\n    sha256: "{checksum}"\n'
-                )
+                    shutil.rmtree(self.source / "dot_fixture")
+                descriptor = {"type": "archive", "exact": exact,
+                              "url": f"http://127.0.0.1:{server.server_port}/fixture.tar.gz",
+                              "checksum": {"sha256": checksum}}
+                externals = {".fixture": descriptor,
+                             ".new-parent/plugins/plugin": {**descriptor, "exact": False}}
+                if not exact:
+                    externals[".fixture/custom/plugins/another"] = {**descriptor, "exact": False}
+                (self.source / ".chezmoiexternal.yaml").write_text(json.dumps(externals))
                 args = ["chezmoi", "apply", f"--source={self.source}", "--exclude=scripts", "--force"]
                 initial = subprocess.run(args, env=self.env, capture_output=True, text=True)
                 self.assertEqual(initial.returncode, 0, initial.stderr)
+                shutil.rmtree(self.home / ".new-parent")
                 child = self.home / ".fixture/file.txt"
                 child.write_text("local sentinel\n")
                 child.chmod(0o640)
@@ -74,6 +79,7 @@ dotfiles_apply_selected_conflicts
                 self.assertEqual(child.stat().st_mode, before.st_mode)
                 self.assertEqual(child.stat().st_ino, before.st_ino)
                 self.assertTrue(extra.exists())
+                self.assertEqual((self.home / ".new-parent/plugins/plugin/file.txt").read_bytes(), payload)
                 accepted = subprocess.run(
                     ["bash", "-c", script.replace('read_user() { printf -v "$2" s; }',
                                                  'read_user() { printf -v "$2" a; }'), "_", str(ROOT)],
@@ -82,7 +88,7 @@ dotfiles_apply_selected_conflicts
                 self.assertEqual(accepted.returncode, 0, accepted.stderr)
                 self.assertEqual(child.read_bytes(), payload)
                 if not exact:
-                    self.assertEqual((self.home / ".fixture/overlay.txt").read_text(), "repository overlay\n")
+                    self.assertEqual((self.home / ".fixture/custom/plugins/my-functions/overlay.txt").read_text(), "repository overlay\n")
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
