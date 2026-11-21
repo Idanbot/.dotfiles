@@ -33,6 +33,7 @@
           "tests/test-metadata.py",
           "tests/test-validator-cache.py",
           "tests/test-config-drift.py",
+          "tests/test-release-policy.py",
           "scripts/local-review.py",
           "scripts/omp-settings.py",
           "tests/test-omp-settings.py",
@@ -703,6 +704,12 @@
       "kind": "suite",
       "suite": "behavior",
       "invocations": [["{root}"]]
+    },
+    {
+      "path": "tests/test-release-policy.py",
+      "kind": "suite",
+      "suite": "upgrades",
+      "invocations": [[]]
     },
     {
       "path": "tests/test-package-metadata.sh",
