@@ -221,6 +221,27 @@ if (assert_version_at_least Node 100.0.0 node --version); then
   exit 1
 fi
 
+# The second run may fall back to its baseline after earlier rolling discovery.
+printf '{"tools":{"core.github_cli":{"target":"2.103.3"}}}\n' >"$latest_run"
+awk '/^if \[\[ ",\$selected_sections," == \*,core,\* \]\]; then/ {block = 1} block {print} block && /^fi$/ {exit}' \
+  "$ROOT/tests/e2e/test-install.sh" >"$temporary/e2e-core.sh"
+[[ -s "$temporary/e2e-core.sh" ]]
+gh() { printf 'gh version %s\n' "$gh_version"; }
+(
+  export selected_sections=core
+  gh_version=2.105.0
+  source "$temporary/e2e-core.sh"
+)
+if (
+  export selected_sections=core
+  gh_version=2.102.0
+  source "$temporary/e2e-core.sh"
+); then
+  printf 'Live harness accepted a GitHub CLI below its resolved target\n' >&2
+  exit 1
+fi
+unset -f gh
+
 cat >"$HOME/.local/bin/probe-fixture" <<'EOF'
 #!/bin/sh
 echo call >> "$HOME/probe-calls"

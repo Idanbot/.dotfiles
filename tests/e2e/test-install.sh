@@ -207,7 +207,7 @@ assert_version_at_least() {
 }
 
 if [[ ",$selected_sections," == *,core,* ]]; then
-  assert_version_contains GitHub-CLI "$(manifest_version core github_cli)" gh --version
+  assert_version_at_least GitHub-CLI "$(manifest_version core github_cli)" gh --version
 fi
 
 if [[ ",$selected_sections," == *,terminal,* ]]; then
@@ -234,11 +234,11 @@ fi
 
 if [[ ",$selected_sections," == *,cloud,* ]]; then
   assert_version_contains kubectl "$(manifest_version cloud kubectl)" kubectl version --client
-  assert_version_contains Helm "$(manifest_version cloud helm)" helm version --short
-  assert_version_contains Terraform "$(manifest_version cloud terraform)" terraform version
+  assert_version_at_least Helm "$(manifest_version cloud helm)" helm version --short
+  assert_version_at_least Terraform "$(manifest_version cloud terraform)" terraform version
   assert_version_contains k9s "$(manifest_version cloud k9s)" k9s version
-  assert_version_contains AWS "$(manifest_version cloud aws_cli)" aws --version
-  assert_version_contains cloudflared "$(manifest_version cloud cloudflared)" cloudflared --version
+  assert_version_at_least AWS "$(manifest_version cloud aws_cli)" aws --version
+  assert_version_at_least cloudflared "$(manifest_version cloud cloudflared)" cloudflared --version
   assert_version_contains s5cmd "$(manifest_version cloud s5cmd)" s5cmd version
   kcat -V >/dev/null
   assert_version_contains stern "$(manifest_version cloud stern)" stern --version
@@ -263,10 +263,12 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
     "$agent" --version >/dev/null
   done
   assert_version_at_least Bun "$(manifest_version ai_tools bun)" bun --version
-  assert_version_contains Serena "$(manifest_version ai_tools serena)" serena --version
-  context_mode_manifest="$HOME/.local/share/npm/lib/node_modules/context-mode/package.json"
-  [[ -f "$context_mode_manifest" ]]
-  [[ "$(gojq -r '.version' "$context_mode_manifest")" == "$(manifest_version ai_tools context_mode)" ]]
+  for server in serena context-mode; do
+    if command -v "$server" >/dev/null 2>&1; then
+      printf 'Optional MCP runtime installed by default: %s\n' "$server" >&2
+      exit 1
+    fi
+  done
   assert_version_contains Graphify "$(manifest_version ai_tools graphify)" graphify --version
   assert_version_contains RTK "$(manifest_version ai_tools rtk)" rtk --version
   grep -A2 '^\[telemetry\]' "$HOME/.config/rtk/config.toml" |
@@ -288,20 +290,6 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   mcp_status="$(agent-mcp status all)"
   if grep -Eq '[[:space:]]enabled$' <<<"$mcp_status"; then
     printf 'Optional MCP server was enabled without explicit user action:\n%s\n' "$mcp_status" >&2
-    exit 1
-  fi
-  agent-mcp enable all --agent codex,claude,agy,opencode,omp >/dev/null
-  mcp_status="$(agent-mcp status all)"
-  enabled_count="$(grep -Ec '[[:space:]]enabled$' <<<"$mcp_status" || true)"
-  if [[ "$enabled_count" -ne 10 ]]; then
-    printf 'Expected 10 enabled agent/MCP registrations, got %s:\n%s\n' \
-      "$enabled_count" "$mcp_status" >&2
-    exit 1
-  fi
-  agent-mcp disable all --agent codex,claude,agy,opencode,omp >/dev/null
-  mcp_status="$(agent-mcp status all)"
-  if grep -Eq '[[:space:]]enabled$' <<<"$mcp_status"; then
-    printf 'Optional MCP server remained enabled after cleanup:\n%s\n' "$mcp_status" >&2
     exit 1
   fi
 
