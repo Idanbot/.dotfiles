@@ -40,6 +40,49 @@ render_template "$DOTFILES_DIR/dot_zshrc.tmpl" "$TMP_HOME/.zshrc" false
 render_template "$DOTFILES_DIR/dot_tmux.conf.tmpl" "$TMP_HOME/.tmux.conf" false
 
 if command -v zsh >/dev/null 2>&1; then
+  mkdir -p "$TMP_HOME/.fzf/bin"
+  ln -s /usr/bin/fzf "$TMP_HOME/.fzf/bin/fzf"
+  cp "$DOTFILES_DIR/dot_fzf.zsh" "$TMP_HOME/.fzf.zsh"
+  cat >"$TMP_HOME/fzf-check.zsh" <<'EOF'
+source "$HOME/fzf-startup.zsh"
+[[ ${commands[fzf]} == "$HOME/.fzf/bin/fzf" ]] || exit 1
+(( $+widgets[fzf-history-widget] )) || exit 1
+source "$HOME/.fzf.zsh"
+[[ $(bindkey "\C-r") == *" fzf-history-widget" ]]
+EOF
+  for is_wsl in false true; do
+    render_template "$DOTFILES_DIR/dot_zshrc.tmpl" "$TMP_HOME/fzf-startup.zsh" "$is_wsl"
+    if ! HOME="$TMP_HOME" ZDOTDIR="$TMP_HOME" script -qec \
+      'zsh -dfi "$HOME/fzf-check.zsh" 2>"$HOME/fzf.err"' /dev/null </dev/null ||
+      [[ -s "$TMP_HOME/fzf.err" ]]; then
+      printf 'Distro fzf integration failed (WSL=%s)\n' "$is_wsl" >&2
+      cat "$TMP_HOME/fzf.err" >&2
+      exit 1
+    fi
+  done
+  rm "$TMP_HOME/.fzf/bin/fzf"
+  for mode in generated failed; do
+    cat >"$TMP_HOME/.fzf/bin/fzf" <<'EOF'
+#!/bin/sh
+[ "$1" = --zsh ] || exit 2
+printf '%s\n' 'fzf-test-widget() { :; }; zle -N fzf-history-widget fzf-test-widget'
+EOF
+    if [[ "$mode" == failed ]]; then
+      printf 'echo "probe failed" >&2\nexit 1\n' >>"$TMP_HOME/.fzf/bin/fzf"
+    fi
+    chmod +x "$TMP_HOME/.fzf/bin/fzf"
+    HOME="$TMP_HOME" ZDOTDIR="$TMP_HOME" PATH="$TMP_HOME/.fzf/bin:$PATH" \
+      zsh -dfi -c '
+        source "$HOME/.fzf.zsh" || exit 1
+        case "$1" in
+          generated) (( $+widgets[fzf-history-widget] )) ;;
+          failed) (( ! $+widgets[fzf-history-widget] )) ;;
+        esac
+      ' zsh "$mode" </dev/null 2>"$TMP_HOME/fzf.err"
+    [[ ! -s "$TMP_HOME/fzf.err" ]]
+  done
+  rm "$TMP_HOME/.fzf.zsh" "$TMP_HOME/.fzf/bin/fzf"
+
   wait_for_cache() {
     local previous="${1:-}" current
     for _ in {1..100}; do

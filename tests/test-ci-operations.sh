@@ -43,7 +43,7 @@ registry = json.loads((root / "tests/suites.json").read_text())
 entries = [entry for entry in registry["tests"] if entry.get("suite") == "upgrades"]
 assert {entry["path"] for entry in entries} == {
     "tests/test-package-metadata.sh", "tests/test-update-packages.sh",
-    "tests/test-update-integrity-failure.sh",
+    "tests/test-update-integrity-failure.sh", "tests/test-release-policy.py",
 }
 with tempfile.TemporaryDirectory() as directory:
     fixture = Path(directory)
@@ -52,9 +52,14 @@ with tempfile.TemporaryDirectory() as directory:
         "suites": {"upgrades": registry["suites"]["upgrades"]}, "tests": entries,
     }))
     for entry in entries:
-        (fixture / entry["path"]).write_text(
-            'if [[ "$FAIL_TEST" == "${0##*/}" ]]; then exit 37; fi\n'
-        )
+        path = fixture / entry["path"]
+        if path.suffix == ".py":
+            path.write_text(
+                'import os, sys\n'
+                'sys.exit(37 if os.environ["FAIL_TEST"] == os.path.basename(__file__) else 0)\n'
+            )
+        else:
+            path.write_text('if [[ "$FAIL_TEST" == "${0##*/}" ]]; then exit 37; fi\n')
     for failed in entries:
         completed = subprocess.run(
             ["python3", str(root / "scripts/ci/run-tests.py"), "upgrades",

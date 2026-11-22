@@ -58,6 +58,7 @@ USER 0:0
 ARG VALIDATOR_REFRESH=local
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      -o 'DPkg::Options::=--path-include=/usr/share/doc/fzf/examples/*' \
       python3 python3-venv python3-yaml yq gojq zsh tmux openssh-client openssh-server \
       xz-utils gnupg shellcheck yamllint gawk hyperfine fzf unzip pigz zstd \
       kcat pgloader \

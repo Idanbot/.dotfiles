@@ -261,12 +261,24 @@ if selected zsh; then
   if timeout 8 zsh -dfn "$HOME/.zshrc" </dev/null >/dev/null 2>&1; then
     result pass zsh-syntax "configuration syntax is valid"
     if [[ "$QUICK" == false ]]; then
-      if timeout 8 zsh -dfi -c 'source "$HOME/.zshrc"' </dev/null >/dev/null 2>&1; then
-        result pass zsh-startup "interactive config loaded"
-      else
-        result fail zsh-startup "interactive config failed or exceeded 8s" \
-          "run: timeout 8 zsh -dfi -c 'source ~/.zshrc'"
-      fi
+      startup_status=0
+      # shellcheck disable=SC2016
+      timeout 8 zsh -dfi -c '
+        source "$HOME/.zshrc" || exit 1
+        if [[ -r "$HOME/.fzf.zsh" ]] && (( $+commands[fzf] && ! $+widgets[fzf-history-widget] )); then
+          exit 42
+        fi
+      ' </dev/null >/dev/null 2>&1 || startup_status=$?
+      case "$startup_status" in
+        0) result pass zsh-startup "interactive config loaded" ;;
+        42)
+          result pass zsh-startup "interactive config loaded"
+          result warn zsh-fzf-history "fzf is available but its history widget did not load" \
+            "check ~/.fzf.zsh and the shell integration matching the active fzf executable"
+          ;;
+        *) result fail zsh-startup "interactive config failed or exceeded 8s" \
+          "run: timeout 8 zsh -dfi -c 'source ~/.zshrc'" ;;
+      esac
     fi
   else
     result fail zsh-syntax "configuration syntax check failed or exceeded 8s" \

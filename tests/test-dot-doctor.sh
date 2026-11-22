@@ -215,12 +215,18 @@ done
 mkdir -p "$HOME/.oh-my-zsh"
 printf ':\n' >"$HOME/.oh-my-zsh/oh-my-zsh.sh"
 startup_failures=0
-for scenario in valid syntax source quick-syntax; do
+for scenario in valid fzf-unavailable-widget syntax source quick-syntax; do
   options=(--sections zsh --json)
   expected=fail
   case "$scenario" in
     valid)
       printf ':\n' >"$HOME/.zshrc"
+      expected=pass
+      ;;
+    fzf-unavailable-widget)
+      printf ':\n' >"$HOME/.fzf.zsh"
+      # shellcheck disable=SC2016
+      printf 'source "$HOME/.fzf.zsh"\n' >"$HOME/.zshrc"
       expected=pass
       ;;
     syntax | quick-syntax)
@@ -233,12 +239,14 @@ for scenario in valid syntax source quick-syntax; do
   esac
   exit_code=0
   doctor "${options[@]}" >"$TMP_ROOT/startup.json" 2>"$TMP_ROOT/startup.err" || exit_code=$?
-  if ! /usr/bin/python3 - "$TMP_ROOT/startup.json" "$expected" "$exit_code" <<'PY'; then
+  if ! /usr/bin/python3 - "$TMP_ROOT/startup.json" "$expected" "$exit_code" "$scenario" <<'PY'; then
 import json
 import sys
 
 report = json.load(open(sys.argv[1]))
-expected, code = sys.argv[2:]
+expected, code, scenario = sys.argv[2:]
+fzf = [item["state"] for item in report["results"] if item["name"] == "zsh-fzf-history"]
+assert fzf == (["warn"] if scenario == "fzf-unavailable-widget" else []), report
 checks = [item for item in report["results"] if item["name"] in {"zsh-syntax", "zsh-startup"}]
 assert checks, report
 if expected == "pass":
