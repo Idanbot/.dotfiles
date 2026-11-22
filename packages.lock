@@ -3,7 +3,7 @@
 
 generated_from:
   packages: 4b2070a4c3988fc254126330b97480cb3851c98decba810bbacbb61029a9b1fd
-  metadata: e9c64fd17c48023912479b6bf199cd9de3d72430daea147a884b5c1dd42be208
+  metadata: b14fdf93a52189bdc24adebaab630990a29dfb177942e995009e34af6c01ddce
 
 tools:
   - section: bootstrap
@@ -664,7 +664,7 @@ tools:
     owner: vendor-installer
     binary: codex
     url: "https://releases.openai.com/codex/install.sh"
-    sha256: 44ac252c1b9a68c02bdf0de8e1c6cbfde36fc1afa8684624962eae7d4c461e70
+    sha256: b698d8eb50c0fbe0214ea57b5bf2af439054108404c6d2b872989db02f4bd574
     integrity: pinned-sha256
   - section: ai_tools
     name: antigravity_cli
