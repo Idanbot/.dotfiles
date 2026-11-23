@@ -274,6 +274,25 @@ def explicit_replacement(entry, check_package=True):
 
 
 def planned_action(entry):
+    if entry["id"] in {"languages.rust", "languages.cargo"}:
+        if entry["current"] and stable(entry["target"]) and order(entry["current"]) >= order(entry["target"]):
+            return "skip; preserve equal/newer version", "unchanged"
+        command = "rustc" if entry["id"] == "languages.rust" else "cargo"
+        try:
+            check = subprocess.run(
+                ["bash", "-c", 'source "$1/scripts/lib.sh"; rust_mutation_blocker "${@:2}"',
+                 "rust-ownership-check", str(ROOT), entry["target"], entry["current"], command, entry["path"] or ""],
+                capture_output=True, text=True, timeout=30)
+            reason = check.stdout.strip() if check.returncode == 0 else None
+        except (OSError, subprocess.TimeoutExpired):
+            reason = None
+        if reason is None:
+            reason = "Rust ownership could not be verified; manual Rust migration required"
+        if reason:
+            return "skip; preserve Rust/Cargo: " + reason, "unsupported-replacement"
+        if not entry["path"]:
+            return "install", "missing"
+        return "update verified Rust toolchain and default; recheck before activation", "verified-dotfiles"
     if not entry["path"]:
         return "install", "missing"
     if not version(entry["current"]):

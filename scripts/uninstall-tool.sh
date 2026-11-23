@@ -88,6 +88,10 @@ while IFS=$'\t' read -r tool _version owner target _section _installed_at; do
       package="${owner#omp:}"
       ;;
     uvx | apt | dpkg) continue ;;
+    rustup)
+      printf 'Refusing partial Rust uninstall: remove toolchains or the manager through rustup\n' >&2
+      exit 1
+      ;;
     agent-skill:*) [[ "$target" == "$HOME/.agents/skills/$tool" ]] && assert_owned_target "$target" || exit 1 ;;
     *) safe_target "$target" && assert_owned_target "$target" || exit 1 ;;
   esac

@@ -80,6 +80,82 @@ runtime_activation_ready() {
   [[ "$(realpath -m -- "$(dirname "$pointer")")" == "$(dirname "$pointer")" ]] && target_is_owned "$pointer"
 }
 
+rust_host_triple() {
+  case "$(get_arch)" in
+    amd64) printf 'x86_64-unknown-linux-gnu\n' ;;
+    arm64) printf 'aarch64-unknown-linux-gnu\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+rust_active_default() {
+  local active
+  active="$(RUSTUP_AUTO_INSTALL=0 bounded_probe "$HOME/.cargo/bin/rustup" show active-toolchain 2>/dev/null)" ||
+    return 1
+  [[ "$active" =~ ^([0-9]+\.[0-9]+\.[0-9]+-(x86_64|aarch64)-unknown-linux-gnu)\ \(default\)$ ]] ||
+    return 1
+  printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+# An empty result authorizes a fresh install or an upgrade of a verified scope.
+rust_mutation_blocker() {
+  local target="$1" current="$2" manager="$HOME/.cargo/bin/rustup" root="$HOME/.rustup"
+  local binary path default triple destination
+  if (($# == 4)) && [[ "$(command -v "$3" || true)" != "$4" ]]; then
+    printf 'active Rust executable changed during preflight; manual Rust migration required\n'
+    return
+  fi
+  if [[ "${CARGO_HOME:-$HOME/.cargo}" != "$HOME/.cargo" ||
+    "${RUSTUP_HOME:-$root}" != "$root" || -n "${RUSTUP_TOOLCHAIN:-}" ]]; then
+    printf 'custom Rust scope or toolchain override; manual Rust migration required\n'
+    return
+  fi
+  for path in "$HOME/.cargo" "$HOME/.cargo/bin" "$root" "$root/toolchains" \
+    "$root/downloads" "$root/tmp" "$root/update-hashes"; do
+    if [[ "$(realpath -m -- "$path")" != "$path" || (-e "$path" && ! -d "$path") ]]; then
+      printf 'redirected or invalid Rust scope; manual Rust migration required\n'
+      return
+    fi
+  done
+  if ! command_exists rustup && ! command_exists rustc && ! command_exists cargo &&
+    [[ ! -e "$HOME/.cargo" && ! -e "$root" ]]; then
+    return 0
+  fi
+  path="$(command -v rustup || true)"
+  if [[ ! "$current" =~ [0-9]+\.[0-9]+\.[0-9]+ ||
+    "$path" != /* || ! "$path" -ef "$manager" ||
+    ! -x "$manager" || -L "$manager" ]] || ! target_is_owned "$manager"; then
+    printf 'unowned or unverifiable Rust manager; manual Rust migration required\n'
+    return
+  fi
+  for binary in rustc cargo; do
+    path="$(command -v "$binary" || true)"
+    if [[ "$path" != /* || ! "$path" -ef "$manager" ]]; then
+      printf 'external Rust/Cargo executable; manual Rust migration required\n'
+      return
+    fi
+  done
+  if [[ ! -f "$root/settings.toml" || -L "$root/settings.toml" ]] ||
+    ! target_is_owned "$root/settings.toml" || ! default="$(rust_active_default)"; then
+    printf 'Rust default or settings are unowned, changed, or overridden; manual Rust migration required\n'
+    return
+  fi
+  path="$root/toolchains/$default"
+  if [[ ! -d "$path" || -L "$path" ]] || ! target_is_owned "$path"; then
+    printf 'active Rust toolchain is unowned or modified; manual Rust migration required\n'
+    return
+  fi
+  triple="$(rust_host_triple)" || return 1
+  destination="$root/toolchains/$target-$triple"
+  path="$root/update-hashes/$target-$triple"
+  if [[ -L "$path" || -L "$destination" ]] ||
+    { [[ -e "$destination" ]] && { [[ ! -d "$destination" ]] || ! target_is_owned "$destination"; }; } ||
+    { [[ ! -d "$destination" && -e "$path" ]]; }; then
+    printf 'requested Rust toolchain is unowned or modified; manual Rust migration required\n'
+  fi
+  return 0
+}
+
 preserve_existing_release_binary() {
   local binary="$1" current="$2" target="${DOTFILES_BIN_DIR:-$HOME/.local/bin}/$1"
   if command_exists "$binary" && [[ -z "$(extract_version "$current" || true)" ]] &&

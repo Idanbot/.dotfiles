@@ -40,38 +40,66 @@ if [[ "$GO_PRESERVED" == false ]]; then
 fi
 
 RUST_CHANNEL="$(package_version languages rust 1.97.1)"
-if runtime_is_current rustc "$RUST_CHANNEL" "$(observe_version rustc --version || true)"; then
-  log_info "Keeping the active Rust/Cargo toolchain and rustup default unchanged"
+RUST_CURRENT="$(RUSTUP_AUTO_INSTALL=0 observe_version rustc --version || true)"
+if version_ge "$RUST_CURRENT" "$RUST_CHANNEL"; then
+  log_skip "Keeping Rust $(extract_version "$RUST_CURRENT") and its default unchanged (repository: $RUST_CHANNEL)"
 else
-  if ! is_installed rustup; then
-    case "$ARCH" in
-      amd64) RUST_TARGET=x86_64-unknown-linux-gnu ;;
-      arm64) RUST_TARGET=aarch64-unknown-linux-gnu ;;
-      *)
-        log_error "Unsupported rustup architecture: $ARCH"
-        exit 1
-        ;;
-    esac
-    tmpdir="$(mktemp -d)"
-    rustup_url="https://static.rust-lang.org/rustup/dist/${RUST_TARGET}/rustup-init"
-    log_info "Installing Rust toolchain $RUST_CHANNEL"
-    download_verified "$rustup_url" "$tmpdir/rustup-init" "$rustup_url.sha256" rustup-init
-    chmod +x "$tmpdir/rustup-init"
-    "$tmpdir/rustup-init" -y --default-toolchain "$RUST_CHANNEL" --profile minimal
-    rm -rf "$tmpdir"
-    record_install rustup "$RUST_CHANNEL" rustup "$HOME/.cargo"
-    ((_INSTALLED++)) || true
-    log_success "Rust installed"
+  rust_blocker="$(rust_mutation_blocker "$RUST_CHANNEL" "$RUST_CURRENT")" ||
+    rust_blocker='Rust ownership could not be verified; manual Rust migration required'
+  if [[ -n "$rust_blocker" ]]; then
+    log_warn "Preserving Rust/Cargo: $rust_blocker"
+    ((_PRESERVED++)) || true
   else
-    log_skip "Rustup already installed"
+    RUST_TARGET="$(rust_host_triple)"
+    rust_toolchain="$RUST_CHANNEL-$RUST_TARGET"
+    rust_payload="$HOME/.rustup/toolchains/$rust_toolchain"
+    rust_manager="$HOME/.cargo/bin/rustup"
+    if ! command_exists rustup; then
+      tmpdir="$(mktemp -d)"
+      rustup_url="https://static.rust-lang.org/rustup/dist/${RUST_TARGET}/rustup-init"
+      log_info "Installing Rust toolchain $RUST_CHANNEL"
+      download_verified "$rustup_url" "$tmpdir/rustup-init" "$rustup_url.sha256" rustup-init
+      chmod +x "$tmpdir/rustup-init"
+      if [[ -n "$(rust_mutation_blocker "$RUST_CHANNEL" "$RUST_CURRENT" || printf blocked)" ]] ||
+        command_exists rustup; then
+        rm -rf "$tmpdir"
+        log_error "Rust scope changed before installation; rerun preflight"
+        exit 1
+      fi
+      "$tmpdir/rustup-init" -y --no-modify-path --default-toolchain "$rust_toolchain" --profile minimal
+      rm -rf "$tmpdir"
+      [[ -f "$rust_manager" && ! -L "$rust_manager" && -d "$rust_payload" && ! -L "$rust_payload" ]]
+      record_install rustup "$RUST_CHANNEL" rustup "$rust_manager"
+      record_install rust-toolchain "$RUST_CHANNEL" rustup "$rust_payload"
+      ((_INSTALLED++)) || true
+    else
+      if [[ ! -d "$rust_payload" ]]; then
+        "$rust_manager" toolchain install "$rust_toolchain" --profile minimal --no-self-update
+        [[ -d "$rust_payload" && ! -L "$rust_payload" ]]
+        record_install rust-toolchain "$RUST_CHANNEL" rustup "$rust_payload"
+      fi
+      if [[ -n "$(rust_mutation_blocker "$RUST_CHANNEL" "$RUST_CURRENT" || printf blocked)" ]]; then
+        log_error "Rust scope or default changed before activation; rerun preflight"
+        exit 1
+      fi
+      RUSTUP_AUTO_INSTALL=0 "$rust_manager" default "$rust_toolchain"
+      ((_UPGRADED++)) || true
+    fi
+    [[ -f "$HOME/.rustup/settings.toml" && ! -L "$HOME/.rustup/settings.toml" &&
+      "$(rust_active_default)" == "$rust_toolchain" ]]
+    record_install rust-default "$RUST_CHANNEL" rustup "$HOME/.rustup/settings.toml"
+    for binary in rustup cargo rustc rustdoc rustfmt clippy; do
+      if [[ "$HOME/.cargo/bin/$binary" -ef "$rust_manager" ]]; then
+        rust_shim="$HOME/.local/bin/$binary"
+        if [[ -e "$rust_shim" || -L "$rust_shim" ]] && ! target_is_owned "$rust_shim"; then
+          log_warn "Preserving unowned Rust shim at $rust_shim"
+          continue
+        fi
+        DOTFILES_REPLACE_BINARIES='' managed_link "$HOME/.cargo/bin/$binary" "$rust_shim" rust "$RUST_CHANNEL"
+      fi
+    done
+    log_success "Rust $RUST_CHANNEL ready"
   fi
-  [[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
-  rustup toolchain install "$RUST_CHANNEL" --profile minimal
-  rustup default "$RUST_CHANNEL"
-  for binary in rustup cargo rustc rustdoc rustfmt clippy; do
-    [[ -x "$HOME/.cargo/bin/$binary" ]] &&
-      managed_link "$HOME/.cargo/bin/$binary" "$HOME/.local/bin/$binary" rust "$RUST_CHANNEL"
-  done
 fi
 
 NODE_VERSION="$(package_version languages node 26.5.0)"

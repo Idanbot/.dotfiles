@@ -225,6 +225,9 @@ Unowned/locally modified executables are preserved with a warning and skipped,
 including executables elsewhere on PATH. APT updates are limited to package-owned
 Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
 `JAVA_HOME`, system Python, and project environments are not silently replaced.
+Rust upgrades require separate ownership records for the manager, active
+toolchain, and default settings. Older installs with only a managed shim or a
+legacy Cargo receipt stay under the user's control; update those through rustup.
 Python installs side-by-side through uv rather than replacing Ubuntu's Python.
 Existing explicit per-binary takeover remains opt-in, not an automatic policy.
 Usable legacy, modified, or redirected Nerd Font installations are also preserved

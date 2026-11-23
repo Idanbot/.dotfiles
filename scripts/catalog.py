@@ -262,7 +262,8 @@ def probe(entry, isolated=False):
                 text=True,
                 timeout=3,
                 env={"PATH": "/usr/bin:/bin", "NO_COLOR": "1"} if isolated else
-                    {**os.environ, "NO_COLOR": "1", "CHECKPOINT_DISABLE": "1"},
+                    {**os.environ, "NO_COLOR": "1", "CHECKPOINT_DISABLE": "1",
+                     **({"RUSTUP_AUTO_INSTALL": "0"} if command in {"rustc", "cargo"} else {})},
             )
             if output.returncode != 0:
                 record["probe"] = "isolation-or-probe-failed" if isolated else "failed"
