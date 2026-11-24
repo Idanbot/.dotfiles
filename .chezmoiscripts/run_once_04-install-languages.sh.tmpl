@@ -135,7 +135,8 @@ if runtime_is_current node "$NODE_VERSION" "$NODE_CURRENT"; then
   fi
   NODE_ROOT="$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"
 else
-  if [[ ! -x "$NODE_ROOT/bin/node" ]] || ! version_ge "$(bounded_probe "$NODE_ROOT/bin/node" --version 2>/dev/null || true)" "$NODE_VERSION"; then
+  check_runtime_candidate "$NODE_ROOT" node "$NODE_VERSION" || exit 1
+  if [[ ! -d "$NODE_ROOT" ]]; then
     tmpdir="$(mktemp -d)"
     log_info "Installing Node.js $NODE_VERSION into a stable user-local runtime"
     download_verified \
@@ -236,11 +237,13 @@ case "$ARCH" in
 esac
 JAVA_ROOT="$HOME/.local/share/dotfiles/tools/java/$JAVA_VERSION"
 JAVA_CURRENT="$HOME/.local/share/dotfiles/tools/java/current"
-if runtime_is_current java "$JAVA_VERSION" "$(observe_version java -version 2>&1 | head -1 || true)"; then
+JAVA_OBSERVED="$(observe_version java -XshowSettings:properties -version | java_runtime_version)" ||
+  JAVA_OBSERVED="$(observe_version java -version | head -1 || true)"
+if runtime_is_current java "$JAVA_VERSION" "$JAVA_OBSERVED"; then
   log_info "Keeping the active Java installation and JAVA_HOME unchanged"
 else
-  if [[ ! -x "$JAVA_ROOT/bin/java" ]] ||
-    ! version_major_matches "$(bounded_probe "$JAVA_ROOT/bin/java" -version 2>&1 | head -1 || true)" "$JAVA_MAJOR"; then
+  check_runtime_candidate "$JAVA_ROOT" java "$JAVA_VERSION" || exit 1
+  if [[ ! -d "$JAVA_ROOT" ]]; then
     tmpdir="$(mktemp -d)"
     asset="OpenJDK${JAVA_MAJOR}U-jdk_${JAVA_ARCH}_linux_hotspot_${JAVA_FILE_VERSION}.tar.gz"
     JAVA_SHA="$(package_metadata languages java "sha256_$ARCH")"

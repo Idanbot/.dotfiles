@@ -80,6 +80,46 @@ runtime_activation_ready() {
   [[ "$(realpath -m -- "$(dirname "$pointer")")" == "$(dirname "$pointer")" ]] && target_is_owned "$pointer"
 }
 
+java_runtime_version() {
+  awk '$1 == "java.runtime.version" && $2 == "=" && NF == 3 {
+    sub(/-LTS$/, "", $3)
+    print $3
+    matches++
+  } END { if (matches != 1) exit 1 }'
+}
+
+# A missing candidate can be installed. Only an unchanged, exact managed
+# payload may be reused; do not execute a candidate before verifying its tree.
+check_runtime_candidate() {
+  local root="$1" tool="$2" expected="$3" executable="$1/bin/$2" actual
+  if [[ "$(realpath -m -- "$root")" != "$root" || -L "$root" ]]; then
+    log_error "Preserving redirected $tool candidate path: $root"
+    return 1
+  fi
+  [[ -e "$root" ]] || return 0
+  assert_owned_target "$root" || return 1
+  if [[ ! -d "$root" || ! -f "$executable" || ! -x "$executable" ||
+    "$(realpath -m -- "$executable")" != "$executable" ]]; then
+    log_error "Preserving $tool candidate without a canonical executable: $root"
+    return 1
+  fi
+  case "$tool" in
+    node)
+      actual="$(bounded_probe "$executable" --version 2>/dev/null)" || actual=
+      actual="${actual#v}"
+      ;;
+    java)
+      actual="$(bounded_probe "$executable" -XshowSettings:properties -version 2>&1 |
+        java_runtime_version)" || actual=
+      ;;
+    *) return 1 ;;
+  esac
+  if [[ "$actual" != "$expected" ]]; then
+    log_error "Preserving $tool candidate at $root: could not verify exact version $expected; review or move it aside before retrying"
+    return 1
+  fi
+}
+
 rust_host_triple() {
   case "$(get_arch)" in
     amd64) printf 'x86_64-unknown-linux-gnu\n' ;;

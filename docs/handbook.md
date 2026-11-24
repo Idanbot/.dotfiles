@@ -228,6 +228,8 @@ Google/Azure CLIs. Rust's default, externally managed Node/npm/Java, existing
 Rust upgrades require separate ownership records for the manager, active
 toolchain, and default settings. Older installs with only a managed shim or a
 legacy Cargo receipt stay under the user's control; update those through rustup.
+Inactive Node and Java payloads can be reactivated only when their paths and
+ownership still verify and the executable reports the exact pinned release.
 Python installs side-by-side through uv rather than replacing Ubuntu's Python.
 Existing explicit per-binary takeover remains opt-in, not an automatic policy.
 Usable legacy, modified, or redirected Nerd Font installations are also preserved
