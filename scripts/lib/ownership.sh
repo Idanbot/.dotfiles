@@ -57,15 +57,62 @@ target_is_owned() {
       "$(managed_state_root)/installed.tsv" 2>/dev/null
 }
 
-assert_owned_target() {
+assert_canonical_parent() {
   local target="$1"
   if [[ "$(realpath -m -- "$(dirname "$target")")" != "$(dirname "$target")" ]]; then
     log_error "Preserving path with redirected or noncanonical ancestors: $target"
     return 1
   fi
+}
+
+assert_owned_target() {
+  local target="$1"
+  assert_canonical_parent "$target" || return 1
   [[ -e "$target" || -L "$target" ]] || return 0
   if ! target_is_owned "$target"; then
     log_error "Preserving unowned or locally modified path: $target; review and move it aside before retrying"
+    return 1
+  fi
+}
+
+publication_directory_id() {
+  [[ -d "$1" && "$(realpath -m -- "$1")" == "$1" ]] || return 1
+  stat -c '%d:%i' -- "$1"
+}
+
+# Bind approval to one parent and destination, not just to a name. The last
+# check rehashes owned payloads so in-place edits inside a tree are also seen.
+publication_state() {
+  local destination="$1" takeover="$2" parent identity digest stamp
+  parent="$(publication_directory_id "$(dirname "$destination")")" || return 1
+  if [[ ! -e "$destination" && ! -L "$destination" ]]; then
+    [[ "$takeover" == false ]] || return 1
+    printf '%s absent\n' "$parent"
+    return
+  fi
+  identity="$(stat -c '%d:%i:%z' -- "$destination")" || return 1
+  if [[ "$takeover" == true ]]; then
+    [[ -f "$destination" || -L "$destination" ]] || return 1
+    digest="$(managed_target_digest "$destination")" || return 1
+  else
+    assert_owned_target "$destination" || return 1
+    stamp="$(ownership_stamp "$destination")"
+    digest="$(<"$stamp")" || return 1
+  fi
+  printf '%s %s %s\n' "$parent" "$identity" "$digest"
+}
+
+assert_publication_state() {
+  local destination="$1" takeover="$2" authorized="$3" current
+  if ! current="$(publication_state "$destination" "$takeover")" || [[ "$current" != "$authorized" ]]; then
+    log_error "Destination changed before publication: $destination; preserving current contents"
+    return 1
+  fi
+}
+
+assert_publication_stage() {
+  if [[ "$(publication_directory_id "$1")" != "$2" ]]; then
+    log_error "Staging path changed before publication: $1"
     return 1
   fi
 }
@@ -80,6 +127,7 @@ managed_file_can_update() {
 
 install_managed_file() (
   local source="$1" destination="$2" tool="$3" version="$4" owner="$5" mode="${6:-600}" temporary
+  local authorized stage_id
   local changed=false committed=false
   [[ "$mode" =~ ^[0-7]{3,4}$ && -f "$source" && ! -L "$source" ]] || return 1
   mode="$(printf '%o' "$((8#$mode))")"
@@ -96,14 +144,18 @@ install_managed_file() (
     return 0
   fi
   mkdir -p "$(dirname "$destination")" || return 1
+  authorized="$(publication_state "$destination" false)" || return 1
   temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-file.XXXXXX")" || return 1
-  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed"' EXIT
+  stage_id="$(publication_directory_id "$temporary")" || return 1
+  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed" "$stage_id"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   install -m "$mode" -- "$source" "$temporary/new" || return 1
+  assert_publication_stage "$temporary" "$stage_id" || return 1
   snapshot_publication "$temporary" "$destination" || return 1
-  managed_file_can_update "$destination" || return 1
+  assert_publication_stage "$temporary" "$stage_id" || return 1
+  assert_publication_state "$destination" false "$authorized" || return 1
   changed=true
   mv -Tf -- "$temporary/new" "$destination" || return 1
   record_install "$tool" "$version" "$owner" "$destination" || return 1
@@ -160,6 +212,10 @@ restore_publication() {
 cleanup_publication() {
   local status="$1" temporary="$2" destination="$3" changed="$4" committed="$5" rollback_failed=false
   trap '' HUP INT TERM
+  if [[ -n "${6:-}" && "$(publication_directory_id "$temporary")" != "$6" ]]; then
+    log_error "Staging directory moved or was replaced; recovery files left in the original directory" || true
+    exit 1
+  fi
   if [[ "$changed" == true && "$committed" == false ]]; then
     restore_publication "$temporary" "$destination" || rollback_failed=true
     [[ "$status" != 0 ]] || status=1
@@ -177,12 +233,12 @@ cleanup_publication() {
 install_managed_binary() (
   local src="$1" binary="$2" version="${3:-unknown}" owner="${4:-managed-binary}"
   local bin_dir="${DOTFILES_BIN_DIR:-$HOME/.local/bin}" dest temporary backup="" takeover=false
-  local changed=false committed=false unchanged=false
+  local changed=false committed=false unchanged=false authorized stage_id
   local -a smoke
   managed_operation_lock || return 1
-  mkdir -p "$bin_dir" || return 1
   dest="$bin_dir/$binary"
-  [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
+  assert_canonical_parent "$dest" || return 1
+  mkdir -p "$bin_dir" || return 1
   if [[ -f "$dest" && -x "$dest" && ! -L "$dest" ]] && cmp -s "$src" "$dest"; then
     if target_is_owned "$dest"; then
       unchanged=true
@@ -197,11 +253,11 @@ install_managed_binary() (
     ! target_is_owned "$dest"; then
     [[ "$(realpath -m -- "$bin_dir")" == "$bin_dir" ]] || return 1
     takeover=true
-  else
-    assert_owned_target "$dest" || return 1
   fi
+  authorized="$(publication_state "$dest" "$takeover")" || return 1
   temporary="$(mktemp -d "$bin_dir/.dotfiles-binary.XXXXXX")" || return 1
-  trap 'cleanup_publication "$?" "$temporary" "$dest" "$changed" "$committed"' EXIT
+  stage_id="$(publication_directory_id "$temporary")" || return 1
+  trap 'cleanup_publication "$?" "$temporary" "$dest" "$changed" "$committed" "$stage_id"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
@@ -212,13 +268,18 @@ install_managed_binary() (
     smoke[0]="$temporary/new"
     bounded_probe "${smoke[@]}" >/dev/null 2>&1 || return 1
   fi
+  assert_publication_stage "$temporary" "$stage_id" || return 1
   snapshot_publication "$temporary" "$dest" || return 1
   if [[ "$takeover" == true ]]; then
+    assert_publication_stage "$temporary" "$stage_id" || return 1
+    assert_publication_state "$dest" true "$authorized" || return 1
     backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$binary"
     ensure_private_directory "$backup" || return 1
-    cp -a -- "$dest" "$backup/$binary" || return 1
+    cp -a -- "$temporary/previous" "$backup/$binary" || return 1
     log_warn "Backed up existing $binary to $backup/$binary before approved replacement"
   fi
+  assert_publication_stage "$temporary" "$stage_id" || return 1
+  assert_publication_state "$dest" "$takeover" "$authorized" || return 1
   changed=true
   [[ "$unchanged" == true ]] || mv -Tf -- "$temporary/new" "$dest" || return 1
   record_install "$binary" "$version" "$owner" "$dest" || return 1
@@ -227,19 +288,24 @@ install_managed_binary() (
 
 install_managed_tree() (
   local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6" temporary
-  local changed=false committed=false
+  local changed=false committed=false authorized stage_id
   shift 6
   managed_operation_lock || return 1
-  assert_owned_target "$destination" || return 1
+  assert_canonical_parent "$destination" || return 1
   mkdir -p "$(dirname "$destination")" || return 1
+  authorized="$(publication_state "$destination" false)" || return 1
   temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-tree.XXXXXX")" || return 1
-  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed"' EXIT
+  stage_id="$(publication_directory_id "$temporary")" || return 1
+  trap 'cleanup_publication "$?" "$temporary" "$destination" "$changed" "$committed" "$stage_id"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   cp -a -- "$source" "$temporary/new" || return 1
   [[ "$probe" == - ]] || bounded_probe "$temporary/new/$probe" "$@" >/dev/null 2>&1 || return 1
+  assert_publication_stage "$temporary" "$stage_id" || return 1
   snapshot_publication "$temporary" "$destination" || return 1
+  assert_publication_stage "$temporary" "$stage_id" || return 1
+  assert_publication_state "$destination" false "$authorized" || return 1
   changed=true
   rm -rf -- "$destination" || return 1
   mv -T -- "$temporary/new" "$destination" || return 1
@@ -252,9 +318,9 @@ install_managed_tree() (
 install_managed_app() (
   local source="$1" destination="$2" tool="$3" version="$4" owner="$5" probe="$6"
   shift 6
-  local temporary root path stamp index name backup committed=false changed=false ledger_fd
+  local temporary root path stamp index name backup stage_id takeover committed=false changed=false ledger_fd
   local -a paths=("$destination") names=("$tool")
-  local -a takeovers=()
+  local -a takeovers=() states=() approvals=()
   managed_operation_lock || return 1
   root="$(managed_state_root)"
   for name in "$@"; do
@@ -262,18 +328,28 @@ install_managed_app() (
     names+=("$name")
   done
   for path in "${paths[@]}"; do
-    if [[ "$path" == "$HOME/.local/bin/"* ]] && binary_replacement_requested "$tool" &&
-      [[ -f "$path" || -L "$path" ]] && ! target_is_owned "$path"; then
-      [[ "$(realpath -m -- "$(dirname "$path")")" == "$(dirname "$path")" ]] || return 1
-      takeovers+=("$path")
-    else
-      assert_owned_target "$path" || return 1
-    fi
+    assert_canonical_parent "$path" || return 1
   done
   mkdir -p "$(dirname "$destination")" "$HOME/.local/bin" || return 1
+  for index in "${!paths[@]}"; do
+    path="${paths[$index]}"
+    takeover=false
+    if [[ "$path" == "$HOME/.local/bin/"* ]] && binary_replacement_requested "$tool" &&
+      [[ -f "$path" || -L "$path" ]] && ! target_is_owned "$path"; then
+      takeover=true
+      takeovers+=("$index")
+    fi
+    approvals[$index]="$takeover"
+    states[$index]="$(publication_state "$path" "$takeover")" || return 1
+  done
   temporary="$(mktemp -d "$(dirname "$destination")/.dotfiles-app.XXXXXX")" || return 1
+  stage_id="$(publication_directory_id "$temporary")" || return 1
   cleanup_app() {
     local rollback_failed=false
+    if [[ "$(publication_directory_id "$temporary")" != "$stage_id" ]]; then
+      log_error "Staging directory moved or was replaced; recovery files left in the original directory"
+      return 1
+    fi
     if [[ "$changed" == true && "$committed" == false ]]; then
       for index in "${!paths[@]}"; do
         path="${paths[$index]}"
@@ -303,14 +379,7 @@ install_managed_app() (
   trap cleanup_app EXIT
   cp -a -- "$source" "$temporary/new" || return 1
   "$probe" "$temporary/new" || return 1
-  if ((${#takeovers[@]})); then
-    backup="$root/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
-    ensure_private_directory "$backup" || return 1
-    for path in "${takeovers[@]}"; do
-      cp -a -- "$path" "$backup/$(basename "$path")" || return 1
-    done
-    log_warn "Backed up approved $tool command paths to $backup before replacement"
-  fi
+  assert_publication_stage "$temporary" "$stage_id" || return 1
   printf '%s\n' "${paths[@]}" >"$temporary/paths"
   touch "$temporary/records"
   for index in "${!paths[@]}"; do
@@ -323,6 +392,22 @@ install_managed_app() (
     if [[ -f "$root/installed.tsv" ]]; then
       awk -F '\t' -v path="$path" '$4 == path' "$root/installed.tsv" >>"$temporary/records"
     fi
+  done
+  if ((${#takeovers[@]})); then
+    assert_publication_stage "$temporary" "$stage_id" || return 1
+    for index in "${takeovers[@]}"; do
+      assert_publication_state "${paths[$index]}" true "${states[$index]}" || return 1
+    done
+    backup="$root/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
+    ensure_private_directory "$backup" || return 1
+    for index in "${takeovers[@]}"; do
+      cp -a -- "$temporary/old-$index" "$backup/${names[$index]}" || return 1
+    done
+    log_warn "Backed up approved $tool command paths to $backup before replacement"
+  fi
+  assert_publication_stage "$temporary" "$stage_id" || return 1
+  for index in "${!paths[@]}"; do
+    assert_publication_state "${paths[$index]}" "${approvals[$index]}" "${states[$index]}" || return 1
   done
   changed=true
   rm -rf -- "$destination" || return 1
@@ -408,9 +493,9 @@ forget_install() (
 
 managed_link() (
   local target="$1" link="$2" tool="$3" version="$4"
-  local temporary backup changed=false committed=false unchanged=false
+  local temporary backup changed=false committed=false unchanged=false takeover=false authorized stage_id
   managed_operation_lock || return 1
-  [[ "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
+  assert_canonical_parent "$link" || return 1
   if [[ -f "$link" && -x "$link" && ! -L "$link" && "$(realpath -m -- "$target")" == "$(realpath -m -- "$link")" ]]; then
     log_skip "Preserving existing executable at $link; no self-link needed"
     return 0
@@ -428,21 +513,29 @@ managed_link() (
   elif binary_replacement_requested "$tool" && [[ -f "$link" || -L "$link" ]] && ! target_is_owned "$link"; then
     [[ "$link" == "$HOME/.local/bin/"* && "$(realpath -m -- "$(dirname "$link")")" == "$(dirname "$link")" ]] || return 1
     [[ -x "$target" ]] || return 1
-    backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
-    ensure_private_directory "$backup" || return 1
-    cp -a -- "$link" "$backup/$(basename "$link")" || return 1
-    log_warn "Backed up approved $tool command path to $backup before replacement"
-  else
-    assert_owned_target "$link" || return 1
+    takeover=true
   fi
   mkdir -p "$(dirname "$link")" || return 1
+  authorized="$(publication_state "$link" "$takeover")" || return 1
   temporary="$(mktemp -d "$(dirname "$link")/.dotfiles-link.XXXXXX")" || return 1
-  trap 'cleanup_publication "$?" "$temporary" "$link" "$changed" "$committed"' EXIT
+  stage_id="$(publication_directory_id "$temporary")" || return 1
+  trap 'cleanup_publication "$?" "$temporary" "$link" "$changed" "$committed" "$stage_id"' EXIT
   trap 'exit 130' INT
   trap 'exit 143' TERM
   trap 'exit 129' HUP
   ln -s -- "$target" "$temporary/new" || return 1
+  assert_publication_stage "$temporary" "$stage_id" || return 1
   snapshot_publication "$temporary" "$link" || return 1
+  if [[ "$takeover" == true ]]; then
+    assert_publication_stage "$temporary" "$stage_id" || return 1
+    assert_publication_state "$link" true "$authorized" || return 1
+    backup="$(managed_state_root)/binary-backups/$(date -u '+%Y%m%dT%H%M%S%NZ')-$tool"
+    ensure_private_directory "$backup" || return 1
+    cp -a -- "$temporary/previous" "$backup/$(basename "$link")" || return 1
+    log_warn "Backed up approved $tool command path to $backup before replacement"
+  fi
+  assert_publication_stage "$temporary" "$stage_id" || return 1
+  assert_publication_state "$link" "$takeover" "$authorized" || return 1
   changed=true
   [[ "$unchanged" == true ]] || mv -Tf -- "$temporary/new" "$link" || return 1
   record_install "$tool" "$version" symlink "$link" || return 1

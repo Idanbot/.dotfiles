@@ -707,6 +707,13 @@
       ]
     },
     {
+      "path": "tests/test-publication-drift.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "timeout_seconds": 45,
+      "invocations": [["{root}"]]
+    },
+    {
       "path": "tests/test-publication-recovery.sh",
       "kind": "suite",
       "suite": "behavior",
