@@ -16,10 +16,21 @@ and standalone package managers may cross majors. npm candidates must support
 the proposed Node runtime and installs enforce the engine requirement. Explicit
 version acceptance remains available to change a release line.
 
-The explicit kubectl pin remains. GCloud uses a vendor SDK train and cloudflared
-calendar releases, declared in `scripts/update-policy.json`; stable SDK increments
-and year rollovers are eligible without claiming backward compatibility. Other
-rolling tools retain their same-major boundary. All retain integrity and ownership checks.
+Latest stable is the default grouped proposal for versioned packages. Every
+manifest entry is accounted for in the standing advisory, including packages
+that cannot be advanced by changing a pin. Distro and signed vendor APT
+packages follow their repositories; some also show upstream freshness for
+reference. Mutable vendor installers propose checksum changes, not runtime
+versions. Font family selection is separate from the tracked font release.
+
+The installer still uses an explicit kubectl pin. Grouped proposals advance
+only its current minor line to avoid unreviewed
+[client/server skew](https://kubernetes.io/releases/version-skew-policy/#kubectl). GitHub CLI,
+AWS CLI, Helm, and Terraform retain their current majors in grouped proposals
+and at install time. New lines appear in the advisory and require explicit
+review. GCloud uses a vendor SDK train and cloudflared calendar releases;
+SDK increments and year rollovers do not imply backwards compatibility.
+All installation paths still enforce integrity and ownership.
 Optional freshness lookup failures warn if the installed version already meets
 the baseline. Required capability, checksum, signature, and APT authentication
 failures remain blocking; there is no unverified or silently downgraded fallback.

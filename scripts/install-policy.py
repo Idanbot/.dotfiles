@@ -122,10 +122,8 @@ def upstream(entry, meta, major=None):
         return max(versions, key=order), {}
     if meta.get("repo"):
         return github(meta["repo"], major)
-    advisory_repos = {"core.bat": "sharkdp/bat", "core.btop": "aristocratos/btop",
-                      "core.fd": "sharkdp/fd", "core.ripgrep": "BurntSushi/ripgrep"}
-    if ident in advisory_repos:
-        return github(advisory_repos[ident], major)
+    if ident in releases.DISTRO_ADVISORIES:
+        return github(releases.DISTRO_ADVISORIES[ident], major)
     raise ValueError("No stable upstream resolver; use the version audit report")
 
 
@@ -139,17 +137,21 @@ def checksum(text, asset):
 
 
 def upgrade_candidate(ident, baseline, node, meta, requested=None):
-    policies = json.loads((ROOT / "scripts/update-policy.json").read_text())
+    policies = releases.update_rules(ROOT / "scripts/update-policy.json")
     rule = policies.get(ident, "stable")
     entry = {"id": ident, "requested": baseline}
     if ident == "languages.java":
         feature = order(baseline)[0]
         data = get_json(f"https://api.adoptium.net/v3/assets/latest/{feature}/hotspot?architecture=x64&image_type=jdk&os=linux")
         candidates = [item["release_name"].removeprefix("jdk-") for item in data]
+    elif ident == "cloud.kubectl" and rule == "minor":
+        line = ".".join(str(part) for part in order(baseline)[:2])
+        candidates = [fetch(f"https://dl.k8s.io/release/stable-{line}.txt").strip().removeprefix("v")]
     else:
         candidates = releases.release_versions(ident, meta, get_json, node=node)
         if candidates is None:
-            candidates = [upstream(entry, meta)[0]]
+            candidates = [upstream(entry, meta, major=order(baseline)[0])[0]
+                          if rule == "major" else upstream(entry, meta)[0]]
     return releases.latest_compatible(candidates, baseline, rule, requested=requested)
 
 
@@ -363,50 +365,70 @@ def backend_decision(entry, meta):
 def recommendations(root):
     """Global stable advisories, including versions outside automatic compatibility lines."""
     packages, metadata = load_repository(root)
-    policies = json.loads((root / "scripts/update-policy.json").read_text())
+    policies = releases.update_rules(root / "scripts/update-policy.json")
     node = str(packages["languages"]["node"])
     lines = ["## Latest Stable Recommendations", "",
              "Repository pins remain authoritative until reviewed and tested. The compatible column follows the configured upgrade policy; the latest-stable column can cross major versions.", "",
-             "| Component | Repository pin | Latest compatible | Latest stable | Available update |", "|---|---|---|---|---|"]
-    entries = [entry for entry in software.catalog() if stable(entry["requested"]) or entry["id"] in ROLLING]
+             "| Component | Repository pin | Latest compatible | Latest stable | Available update | Upgrade policy |",
+             "|---|---|---|---|---|---|"]
+    manifest_ids = {f"{group}.{key}" for group, tools in packages.items() for key in tools}
+    entries = [entry for entry in software.catalog() if entry["id"] in manifest_ids]
+    unavailable = (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.TimeoutExpired)
     def recommend(entry):
-        group, key = entry["id"].split(".")
+        ident = entry["id"]
+        group, key = ident.split(".")
         baseline = entry["requested"]
+        meta = metadata.get(group, {}).get(key, {})
+        rule = policies.get(ident, "stable")
+        route, _ = releases.upgrade_route(ident, baseline, meta, rule)
+        if route in {"apt", "install_script", "selection", "manual"}:
+            reason = {
+                "apt": "Signed package repository; no upstream version pin",
+                "install_script": "Vendor installer; grouped review verifies script content, not runtime version",
+                "selection": "Font family selection; release tracked by fonts.nerd_font_version",
+                "manual": "No automatic resolver; manual review required",
+            }[route]
+            return f"| {ident} | {baseline} | n/a | n/a | {reason} | {route} |"
         try:
-            meta = metadata.get(group, {}).get(key, {})
             latest, _ = upstream(entry, meta)
-            compatible = upgrade_candidate(entry["id"], baseline, node, meta)
-            rule = policies.get(entry["id"], "stable")
+            if not stable(latest):
+                raise ValueError("Unstable upstream release")
+        except unavailable:
+            latest = "unknown"
+        if route == "apt-advisory":
+            return f"| {ident} | {baseline} | APT | {latest} | Upstream advisory only; signed APT controls installation | {route} |"
+        try:
+            compatible = upgrade_candidate(ident, baseline, node, meta)
+        except unavailable:
+            compatible = "unknown"
 
-            def delta(target):
-                if order(target) <= order(baseline):
-                    return ""
-                if rule in {"vendor-sdk", "calendar"}:
-                    return f"{rule} release update available"
-                if order(target)[0] != order(baseline)[0]:
-                    unit = "major"
-                elif order(target)[1] != order(baseline)[1]:
-                    unit = "minor"
-                else:
-                    unit = "patch"
-                return f"{unit} update available"
+        def delta(target):
+            if order(target) <= order(baseline):
+                return ""
+            if rule in {"vendor-sdk", "calendar"}:
+                return f"{rule} release"
+            if order(target)[0] != order(baseline)[0]:
+                return "major"
+            if order(target)[1] != order(baseline)[1]:
+                return "minor"
+            return "patch"
 
-            compatible_note = delta(compatible)
-            latest_note = delta(latest)
-            status_parts = []
-            if compatible_note:
-                status_parts.append(f"within policy: {compatible_note.removesuffix(' update available')}")
-            if latest_note:
-                if rule == "major" and order(latest)[0] != order(baseline)[0]:
-                    status_parts.append(f"newer major {order(latest)[0]} available")
-                elif rule == "minor" and order(latest)[:2] != order(baseline)[:2]:
-                    status_parts.append("newer minor line available")
-                elif order(latest) > order(compatible):
-                    status_parts.append(f"outside policy: {latest_note.removesuffix(' update available')}")
-            status = "; ".join(status_parts) or "pin current"
-        except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.TimeoutExpired):
-            compatible, latest, status = "unknown", "unknown", "manual upstream review needed"
-        return f"| {entry['id']} | {baseline} | {compatible} | {latest} | {status} |"
+        compatible_note = delta(compatible)
+        latest_note = delta(latest)
+        status_parts = []
+        if compatible_note:
+            status_parts.append(f"within policy: {compatible_note}")
+        if latest_note:
+            if rule == "major" and order(latest)[0] != order(baseline)[0]:
+                status_parts.append(f"newer major {order(latest)[0]} available")
+            elif rule == "minor" and order(latest)[:2] != order(baseline)[:2]:
+                status_parts.append("newer minor line available")
+            elif compatible != "unknown" and order(latest) > order(compatible):
+                status_parts.append(f"outside policy: {latest_note}")
+        if "unknown" in {latest, compatible}:
+            status_parts.append("manual upstream review needed")
+        status = "; ".join(status_parts) or "pin current"
+        return f"| {ident} | {baseline} | {compatible} | {latest} | {status} | {rule} |"
     with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
         lines.extend(pool.map(recommend, entries))
     return "\n".join(lines) + "\n"

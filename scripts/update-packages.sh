@@ -173,7 +173,11 @@ npm_integrity() {
   local package="$1" version="$2" encoded
   encoded="${package//\//%2F}"
   curl "${CURL_ARGS[@]}" "https://registry.npmjs.org/$encoded/$version" |
-    jq -r '.dist.integrity // ("sha1:" + .dist.shasum)'
+    jq -er '
+      if (.dist.integrity | type == "string" and length > 0) then .dist.integrity
+      elif (.dist.shasum | type == "string" and test("^[a-fA-F0-9]{40}$")) then
+        "sha1:" + .dist.shasum
+      else error("Missing npm release integrity") end'
 }
 
 pypi_integrity() {
@@ -461,32 +465,20 @@ run_live_audit() {
   local latest section key source reference node proposed_node targets="$WORK_DIR/audit-targets.tsv"
   node="$(package_version languages node)"
   PYTHONPATH="$DOTFILES_SOURCE_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}" \
-    /usr/bin/python3 - "$PACKAGES_FILE" "$META_FILE" >"$targets" <<'PYTARGETS'
-import re
+    /usr/bin/python3 -B - "$PACKAGES_FILE" "$META_FILE" "$DOTFILES_SOURCE_DIR/scripts/update-policy.json" >"$targets" <<'PYTARGETS'
 import sys
 from dotfiles.metadata import load_metadata, load_versions
+from dotfiles.releases import upgrade_route, update_rules
 
 versions = load_versions(sys.argv[1])
 metadata = load_metadata(sys.argv[2])
+rules = update_rules(sys.argv[3])
 targets = []
 for section, tools in versions.items():
     for key, pin in tools.items():
+        ident = f"{section}.{key}"
         meta = metadata.get(section, {}).get(key, {})
-        source = meta.get("source", "")
-        if source == "install_script":
-            reference = meta["url"]
-        elif not re.match(r"^\d", pin):
-            continue
-        elif source == "npm":
-            reference = meta["package"]
-        elif section == "languages" or source == "direct":
-            source, reference = "candidate", "-"
-        elif source in {"github", "apt_or_github", "external"} and meta.get("repo"):
-            source, reference = "github", meta["repo"]
-        elif source in {"pypi", "uv", "uvx"} and meta.get("package"):
-            source, reference = "pypi", meta["package"]
-        else:
-            continue
+        source, reference = upgrade_route(ident, pin, meta, rules.get(ident, "stable"))
         targets.append((section, key, source, reference))
 # npm eligibility depends on the selected Node proposal, not YAML ordering.
 for target in sorted(targets, key=lambda item: item[:2] != ("languages", "node")):
@@ -498,6 +490,7 @@ PYTARGETS
       github) audit_github "$section" "$key" "$reference" ;;
       npm | pypi) audit_registry "$section" "$key" "$node" ;;
       install_script) audit_mutable_url "$section" "$key" "$reference" ;;
+      manual) warn "No automatic upgrade route for $section.$key; review its source manually" ;;
       candidate)
         latest="$(/usr/bin/python3 "$DOTFILES_SOURCE_DIR/scripts/install-policy.py" candidate \
           --source "$DOTFILES_SOURCE_DIR" --tool "$section.$key" 2>/dev/null)" || latest=""

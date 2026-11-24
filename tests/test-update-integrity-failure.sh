@@ -247,11 +247,36 @@ sys.exit(item.get("status", 22))
         self.assertNotIn("https://nodejs.org/dist/index.json", self.calls.read_text())
         self.assertNotIn("/latest", self.calls.read_text())
 
+    def test_npm_candidate_without_registry_integrity_is_rejected(self):
+        self.candidate_fixture()
+        url = "https://registry.npmjs.org/opencode-ai/1.1.0"
+        for integrity in (None, ""):
+            with self.subTest(integrity=integrity):
+                self.respond(url, {"dist": {"integrity": integrity}})
+                self.reject("ai_tools.opencode@1.1.0")
+
     def test_apply_all_uses_proposed_node_and_release_lines(self):
         self.candidate_fixture()
+        self.pins["cloud"].update(kubectl="1.37.1", terraform="1.17.1")
+        (self.source / "packages.yaml").write_text(yaml.safe_dump(self.pins, sort_keys=False))
+        self.respond("https://dl.k8s.io/release/stable-1.37.txt", "v1.37.3\n")
+        self.respond("https://dl.k8s.io/release/stable.txt", "v1.38.0\n")
+        for value in ("1.37.1", "1.37.3", "1.38.0"):
+            for arch in ("amd64", "arm64"):
+                self.respond(f"https://dl.k8s.io/release/v{value}/bin/linux/{arch}/kubectl.sha256", SHA)
+        terraform = "https://api.github.com/repos/hashicorp/terraform/releases"
+        self.respond(terraform + "/latest", {"tag_name": "v2.0.0"})
+        self.respond(terraform + "?per_page=100&page=1",
+                     [{"tag_name": tag} for tag in ("v2.0.0", "v1.18.0-rc1", "v1.17.2")])
+        for value in ("1.17.1", "1.17.2"):
+            self.respond(f"https://releases.hashicorp.com/terraform/{value}/terraform_{value}_SHA256SUMS",
+                         "".join(f"{SHA}  terraform_{value}_linux_{arch}.zip\n" for arch in ("amd64", "arm64")))
         self.assertEqual(self.run_updater("--apply-all"), 0, self.output)
         self.assert_pins(**{"languages.node": "26.12.0", "languages.npm": "13.0.0",
-                            "languages.typescript": "7.1.0", "ai_tools.opencode": "2.0.0"})
+                            "languages.typescript": "7.1.0", "ai_tools.opencode": "2.0.0",
+                            "cloud.kubectl": "1.37.3", "cloud.terraform": "1.17.2"})
+        self.assertEqual(self.run_updater("--apply", "cloud.kubectl@1.38.0"), 0, self.output)
+        self.assert_pins(**{"cloud.kubectl": "1.38.0"})
 
     def test_apply_all_skips_candidate_with_unresolved_integrity(self):
         self.candidate_fixture()

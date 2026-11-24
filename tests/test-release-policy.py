@@ -8,9 +8,38 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from dotfiles import releases
+from dotfiles.metadata import load_repository
 
 
 class ReleasePolicyTests(unittest.TestCase):
+    def test_every_manifest_entry_has_a_release_or_passthrough_route(self):
+        root = Path(__file__).resolve().parents[1]
+        versions, metadata = load_repository(root)
+        rules = releases.update_rules(root / "scripts/update-policy.json")
+        routes = {}
+        for section, tools in versions.items():
+            for name, pin in tools.items():
+                ident = f"{section}.{name}"
+                routes[ident] = releases.upgrade_route(
+                    ident, pin, metadata[section][name], rules.get(ident, "stable")
+                )[0]
+        self.assertNotIn("manual", routes.values(), routes)
+        self.assertLessEqual(rules.keys(), routes.keys())
+        for ident, route in {
+            "core.jq": "apt",
+            "core.fd": "apt-advisory",
+            "cloud.gcloud": "apt-advisory",
+            "ai_tools.codex_cli": "install_script",
+            "fonts.nerd_font": "selection",
+            "core.starship": "github",
+            "cloud.kubectl": "candidate",
+            "cloud.helm": "candidate",
+            "cloud.terraform": "candidate",
+            "languages.npm": "npm",
+        }.items():
+            with self.subTest(ident=ident):
+                self.assertEqual(routes[ident], route)
+
     def test_advisory_distinguishes_java_feature_lines(self):
         versions = ["27.0.1+1", "25.0.5+8", "26.0.2+1", "28.0.0-ea", "25.0.5+11"]
         self.assertEqual(

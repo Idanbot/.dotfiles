@@ -1,4 +1,9 @@
 {
+  "core.github_cli": "major",
+  "cloud.aws_cli": "major",
+  "cloud.helm": "major",
+  "cloud.kubectl": "minor",
+  "cloud.terraform": "major",
   "cloud.gcloud": "vendor-sdk",
   "cloud.cloudflared": "calendar",
   "languages.node": "major",

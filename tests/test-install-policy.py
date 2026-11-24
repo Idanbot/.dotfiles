@@ -374,6 +374,29 @@ class PolicyTests(unittest.TestCase):
         self.assertIn("| languages.npm | 12.0.0 | 12.1.0 | 13.0.0 |", report)
         self.assertIn("outside policy: major", report)
 
+    def test_advisory_explains_non_pin_routes_and_shows_kubectl_skew_hold(self):
+        ids = {"core.jq", "ai_tools.codex_cli", "fonts.nerd_font", "cloud.kubectl"}
+        entries = [entry for entry in policy.software.catalog() if entry["id"] in ids]
+        kubectl = next(entry for entry in entries if entry["id"] == "cloud.kubectl")
+        kubectl["requested"] = "1.37.1"
+        upstream = {
+            "https://dl.k8s.io/release/stable.txt": "v1.38.0",
+            "https://dl.k8s.io/release/stable-1.37.txt": "v1.37.3",
+        }
+        with patch.object(policy.software, "catalog", return_value=entries), \
+                patch.object(policy, "fetch", side_effect=upstream.__getitem__):
+            report = policy.recommendations(ROOT)
+        self.assertIn("| cloud.kubectl | 1.37.1 | 1.37.3 | 1.38.0 |", report)
+        self.assertIn("newer minor line available", report)
+        self.assertIn("| core.jq | distro | n/a | n/a | Signed package repository", report)
+        self.assertIn("| ai_tools.codex_cli | standalone | n/a | n/a | Vendor installer", report)
+        self.assertIn("| fonts.nerd_font | FiraMono | n/a | n/a | Font family selection", report)
+        with patch.object(policy.software, "catalog", return_value=[kubectl]), \
+                patch.object(policy, "upstream", return_value=("1.38.0", {})), \
+                patch.object(policy, "fetch", side_effect=ValueError("line unavailable")):
+            report = policy.recommendations(ROOT)
+        self.assertIn("| cloud.kubectl | 1.37.1 | unknown | 1.38.0 |", report)
+
     def test_pypi_candidates_skip_yanked_empty_and_prerelease_versions(self):
         data = {"info": {"version": "9.0.0"}, "releases": {
             "1.1.0": [{"yanked": False}],

@@ -11,6 +11,38 @@ from pathlib import Path
 from urllib.parse import quote
 
 
+DISTRO_ADVISORIES = {
+    "core.bat": "sharkdp/bat",
+    "core.btop": "aristocratos/btop",
+    "core.fd": "sharkdp/fd",
+    "core.ripgrep": "BurntSushi/ripgrep",
+}
+
+
+def upgrade_route(ident, pin, meta, rule="stable"):
+    """Classify the manifest entry independently of network availability."""
+    source = meta.get("source")
+    if source == "install_script":
+        return "install_script", meta["url"]
+    if source in {"apt", "apt_repo"}:
+        if ident in DISTRO_ADVISORIES or ident in {"cloud.gcloud", "cloud.azure_cli"}:
+            return "apt-advisory", "-"
+        return "apt", "-"
+    if ident == "fonts.nerd_font" and not stable(pin):
+        return "selection", "-"
+    if not stable(pin):
+        return "manual", "-"
+    if source == "npm" and meta.get("package"):
+        return "npm", meta["package"]
+    if source in {"pypi", "uv", "uvx"} and meta.get("package"):
+        return "pypi", meta["package"]
+    if ident.startswith("languages.") or source == "direct" or rule in {"major", "minor"}:
+        return "candidate", "-"
+    if source in {"github", "apt_or_github", "external"} and meta.get("repo"):
+        return "github", meta["repo"]
+    return "manual", "-"
+
+
 @lru_cache(maxsize=8)
 def update_rules(path=None):
     return json.loads(Path(path or Path(__file__).resolve().parents[1] / "update-policy.json").read_text())
