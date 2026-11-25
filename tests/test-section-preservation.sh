@@ -49,8 +49,19 @@ for tool in kubectl graphify yt-dlp git-credential-manager; do
       export PATH="$HOME/.local/bin:$HOME/external/bin:$PATH"
       if [[ "$scenario" == distro ]]; then
         export DOTFILES_REPLACE_BINARIES=git-credential-manager
-        dpkg-query() { printf 'gcm: %s\n' "$2"; }
+        printf '#!/bin/sh\n[ "$1" = -S ] || exit 1\nprintf "gcm: %%s\\n" "$2"\n' >"$HOME/external/bin/dpkg-query"
+        chmod +x "$HOME/external/bin/dpkg-query"
+        /usr/bin/python3 "$ROOT/scripts/install-policy.py" preflight --source "$ROOT" \
+          --sections system --reviewed-baseline --plan "$DOTFILES_VERSION_PLAN" >"$HOME/preflight.log"
+        grep -Fq 'distro: preserve distro package' "$HOME/preflight.log"
+        jq -e '.tools["system.git_credential_manager"].decision |
+          .backend == "dpkg" and .operation == "preserve" and .evidence.ownership == "distro"' \
+          "$DOTFILES_VERSION_PLAN" >/dev/null
       fi
+      sudo() {
+        printf 'unexpected privileged mutation: %s\n' "$*" >&2
+        return 99
+      }
       download_verified() {
         printf 'unexpected download for %s/%s\n' "$tool" "$scenario" >&2
         return 99
@@ -75,7 +86,12 @@ for tool in kubectl graphify yt-dlp git-credential-manager; do
       }
       before="$(managed_target_digest "$target")"
       ledger_before="$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")"
-      source "$temporary/$tool.sh"
+      if [[ "$scenario" == distro ]]; then
+        source "$temporary/$tool.sh" >"$HOME/section.log"
+        grep -Fq 'Preserving git-credential-manager: preserve distro package' "$HOME/section.log"
+      else
+        source "$temporary/$tool.sh"
+      fi
       source "$temporary/$tool.sh"
       [[ "$(managed_target_digest "$target")" == "$before" ]]
       [[ "$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger_before" ]]
@@ -85,29 +101,58 @@ for tool in kubectl graphify yt-dlp git-credential-manager; do
   done
 done
 
+# A previously approved GCM update must stop if the executable changes while downloading.
+(
+  export HOME="$temporary/gcm-drift"
+  export DOTFILES_STATE_DIR="$HOME/state" DOTFILES_VERSION_PLAN="$HOME/versions.json"
+  export PATH="$HOME/.local/bin:$PATH"
+  source "$ROOT/scripts/lib.sh"
+  mkdir -p "$HOME/.local/bin"
+  target="$HOME/.local/bin/git-credential-manager"
+  printf '#!/bin/sh\necho 2.8.0\n' >"$target"
+  chmod +x "$target"
+  record_install git-credential-manager 2.8.0 fixture "$target"
+  /usr/bin/python3 "$ROOT/scripts/install-policy.py" preflight --source "$ROOT" \
+    --sections system --reviewed-baseline --plan "$DOTFILES_VERSION_PLAN" >"$HOME/preflight.log"
+  jq -e '.tools["system.git_credential_manager"].decision.operation == "update"' "$DOTFILES_VERSION_PLAN" >/dev/null
+  download_verified() {
+    printf '# changed during download\n' >>"$target"
+    touch "$2"
+  }
+  sudo() {
+    printf 'unexpected privileged mutation: %s\n' "$*" >&2
+    return 99
+  }
+  ledger_before="$(sha256sum "$DOTFILES_STATE_DIR/installed.tsv")"
+  source "$temporary/git-credential-manager.sh" >"$HOME/section.log"
+  grep -Fq 'upgrade skipped' "$HOME/section.log"
+  grep -Fxq '# changed during download' "$target"
+  [[ "$(sha256sum "$DOTFILES_STATE_DIR/installed.tsv")" == "$ledger_before" ]]
+)
+
 # The shared decision can veto mutation even when live ownership allows it.
-for binary in git-credential-manager nvim; do
+for decision_binary in git-credential-manager nvim; do
   (
-    export HOME="$temporary/decision-$binary" DOTFILES_STATE_DIR="$temporary/decision-$binary-state"
-    export DOTFILES_VERSION_PLAN="$temporary/decision-$binary.json"
+    export HOME="$temporary/decision-$decision_binary" DOTFILES_STATE_DIR="$temporary/decision-$decision_binary-state"
+    export DOTFILES_VERSION_PLAN="$temporary/decision-$decision_binary.json"
     mkdir -p "$HOME/.local/bin"
     export PATH="$HOME/.local/bin:$PATH"
     source "$ROOT/scripts/lib.sh"
-    printf '#!/bin/sh\necho 0.0.1\n' >"$HOME/.local/bin/$binary"
-    chmod +x "$HOME/.local/bin/$binary"
-    record_install "$binary" 0.0.1 fixture "$HOME/.local/bin/$binary"
+    printf '#!/bin/sh\necho 0.0.1\n' >"$HOME/.local/bin/$decision_binary"
+    chmod +x "$HOME/.local/bin/$decision_binary"
+    record_install "$decision_binary" 0.0.1 fixture "$HOME/.local/bin/$decision_binary"
     id=editor.neovim
-    [[ "$binary" != git-credential-manager ]] || id=system.git_credential_manager
-    jq -n --arg id "$id" --arg path "$HOME/.local/bin/$binary" \
+    [[ "$decision_binary" != git-credential-manager ]] || id=system.git_credential_manager
+    jq -n --arg id "$id" --arg path "$HOME/.local/bin/$decision_binary" \
       '{schema:1,tools:{($id):{decision:{schema:1,operation:"preserve",target:"99.0.0",evidence:{path:$path}}}}}' >"$DOTFILES_VERSION_PLAN"
     before="$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")"
-    runtime_is_current "$binary" 99.0.0 0.0.1
+    runtime_is_current "$decision_binary" 99.0.0 0.0.1
     # Stale target/path inputs also fail closed rather than broadening approval.
-    runtime_is_current "$binary" 100.0.0 0.0.1
+    runtime_is_current "$decision_binary" 100.0.0 0.0.1
     jq --arg id "$id" '.tools[$id].decision.evidence.path = "/changed/fixture"' \
       "$DOTFILES_VERSION_PLAN" >"$DOTFILES_VERSION_PLAN.tmp"
     mv "$DOTFILES_VERSION_PLAN.tmp" "$DOTFILES_VERSION_PLAN"
-    runtime_is_current "$binary" 99.0.0 0.0.1
+    runtime_is_current "$decision_binary" 99.0.0 0.0.1
     [[ "$(managed_target_digest "$DOTFILES_STATE_DIR/installed.tsv")" == "$before" ]]
   )
 done

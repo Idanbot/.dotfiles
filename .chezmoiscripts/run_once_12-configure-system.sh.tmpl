@@ -48,15 +48,20 @@ else
   download_verified \
     "https://github.com/git-ecosystem/git-credential-manager/releases/download/v${GCM_VERSION}/$asset" \
     "$tmpdir/$asset" "sha256:$GCM_SHA" "$asset"
-  sudo dpkg -i "$tmpdir/$asset" || apt_env apt-get -f -y install
+  # A verified download does not authorize replacing a changed executable.
+  if ! DOTFILES_BIN_DIR="$GCM_BIN_DIR" runtime_is_current git-credential-manager "$GCM_VERSION" \
+    "$(observe_version git-credential-manager --version || true)"; then
+    sudo dpkg -i "$tmpdir/$asset" || apt_env apt-get -f -y install
+    version_ge "$(observe_version git-credential-manager --version || true)" "$GCM_VERSION" || {
+      rm -rf "$tmpdir"
+      log_error "Git Credential Manager installation did not reach $GCM_VERSION"
+      exit 1
+    }
+    record_install git-credential-manager "$GCM_VERSION" dpkg gcm
+    ((_INSTALLED++)) || true
+    log_success "Git Credential Manager $GCM_VERSION installed"
+  fi
   rm -rf "$tmpdir"
-  version_ge "$(observe_version git-credential-manager --version || true)" "$GCM_VERSION" || {
-    log_error "Git Credential Manager installation did not reach $GCM_VERSION"
-    exit 1
-  }
-  record_install git-credential-manager "$GCM_VERSION" dpkg gcm
-  ((_INSTALLED++)) || true
-  log_success "Git Credential Manager $GCM_VERSION installed"
 fi
 
 if is_native && is_installed kitty; then
