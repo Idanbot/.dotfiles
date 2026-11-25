@@ -854,9 +854,11 @@ follow the shared vendor-specific policy, not SemVer-major warning heuristics.
 CI advisory discovery runs independently of verified release/installation acceptance.
 
 The Docker behavior suite includes `tests/e2e/test-seeded-upgrade.sh`: synthetic older
-Neovim (owned 0.12.0) and GCM (legacy 1.0.0), interrupted archive transfer, two real
-section passes, preservation of newer/modified tools and local overlay/history, and
-owner-death lock recovery. It uses no live downloads, credentials or host inventory.
+Neovim (unstamped, then owned 0.12.0) and GCM (legacy 1.0.0), interrupted archive
+transfer, two real section passes, and owner-death lock recovery. It also migrates
+legacy distro fzf integration, verifies history bindings in a fresh Zsh login,
+and checks that the local shell edit, overlay, history, and existing agent skill
+survive both passes. The fixture itself uses no live downloads, credentials or host inventory.
 This representative migration fixture is not a full archived historical installation.
 Its section logs and duration summary are retained under the suite's
 `seeded-upgrade/` artifact directory; the existing image is reused with a 120s limit.
