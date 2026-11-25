@@ -197,7 +197,7 @@ fi
 [[ "$(wc -l <"$OMP_CALLS")" -eq "$call_count" ]]
 
 # Exercise the actual installer block so metadata migrations cannot empty its asset.
-awk '/^RTK_VERSION=/ { block = 1 } /^PONYTAIL_VERSION=/ { exit } block' \
+awk '/^RTK_VERSION=/ { block = 1 } /^# RTK is installed/ { exit } block' \
   "$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl" >"$TMP_ROOT/rtk.sh"
 rtk_calls=0
 install_github_archive() {

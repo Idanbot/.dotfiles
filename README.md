@@ -98,14 +98,10 @@ A prompt context identifies selected configuration, not authenticated access.
 
 ### Agent Defaults
 
-The `agent` and `full` profiles install coding CLIs, shared Ponytail/Caveman
-skills, and the OMP-native `omp-ponytail-caveman` plugin. Its upstream defaults
-are Ponytail full and Caveman ultra; inspect or change them with `/ponytail`
-and `/caveman` in OMP. Pix Optimizer is retired.
-
-Bootstrap does not install or enable MCP servers, including Serena and
-context-mode. Existing local MCP configurations are preserved. Install a trusted
-server manually before explicitly enabling it with `agent-mcp`.
+The `agent` and `full` profiles install coding CLIs without adding plugins,
+skills, hooks, or MCP servers. Existing add-ons are left alone.
+Use `dot agent-addons <addon> --agent <harness|all>` to opt in. Shared skills
+require `--agent all`; MCP registration requires an already-installed server.
 [Agent setup and boundaries](docs/handbook.md#agent-workspace).
 
 ## Configuration Conflicts

@@ -590,22 +590,27 @@ OMP in the same working directory. `--agents` selects a subset, `--check` valida
 commands, and `--restart-agents` explicitly restarts crashed agents. Missing optional
 agents leave a usable shell. The tmux prefix remains `Ctrl+S`.
 
-Bootstrap does not install MCP servers, including Serena and context-mode, or
-register MCPs with Codex, Cursor, Claude, or any other agent. Existing local
-servers/configurations are preserved, not silently disabled or uninstalled.
-To opt in, manually install a server you trust, then explicitly enable it for
-the intended agents. `agent-mcp` never installs servers and preserves unrelated
-configuration:
+Neither `--full` nor any other bootstrap profile installs or registers agent
+skills, plugins, hooks, or MCP servers. Existing integrations remain untouched.
+The separate script (`scripts/install-agent-addons.sh`, also exposed as
+`dot agent-addons`) requires both an add-on and a target:
 
 ```bash
+dot agent-addons ponytail --agent all
+dot agent-addons caveman --agent all
+dot agent-addons graphify --agent all
+dot agent-addons omp-ponytail-caveman --agent omp
+dot agent-addons context-mode --agent codex
 agent-mcp status all
-agent-mcp enable serena --agent omp
-agent-mcp enable context-mode --agent codex,claude
-agent-mcp disable serena --agent agy,opencode,omp
-agent-mcp disable all
+agent-mcp disable all --agent all
 ```
 
-Supported agent names are `codex`, `claude`, `agy`, `opencode`, and `omp`.
+Ponytail, Caveman, and Graphify skills use `~/.agents/skills`, which can be
+discovered by multiple harnesses, so the script requires explicit `--agent all`.
+The Ponytail/Caveman plugin is native to OMP. For Context Mode and Serena,
+install a server you trust separately; the script delegates registration to
+`agent-mcp`, which never installs server binaries. Its supported agent names
+are `codex`, `claude`, `agy`, `opencode`, and `omp`.
 Restart active agent sessions after a change. Codex and Claude are configured
 through their native MCP commands; Antigravity, OpenCode, and OMP receive
 atomic JSON updates. Serena resolves the project from each agent's working
@@ -616,31 +621,16 @@ extra permissions. JSON configuration writes reject symlinks, redirected parent
 directories, and nonregular files. They preserve unrelated settings and publish
 with private permissions; a rejected path must be reviewed manually.
 
-Graphify is installed as a separate, on-demand code knowledge-graph skill for
-OMP through the standard `~/.agents/skills/graphify` location. It does not run
-during bootstrap, index repositories automatically, enable an MCP server, or
-configure an external model backend. In an OMP session, run `/graphify .` for a
-large or unfamiliar repository; generated `graphify-out/` data is ignored in
-this repository.
-
-The AI profile also installs the canonical Ponytail skill into
-`~/.agents/skills/ponytail` only when that skill is missing, preserving any
-existing local copy. Bootstrap preserves partial skill directories and redirected
-paths for manual review;
-fresh skill trees are published atomically without adopting local files.
-It also installs the checksum-pinned Caveman skill and
-OMP-native `omp-ponytail-caveman` plugin. Use `/ponytail` and `/caveman` in OMP
-to inspect or change modes; upstream defaults are Ponytail full and Caveman ultra.
-A verified Bun runtime is installed alongside OMP for plugin management.
-Bootstrap uninstalls retired Pix Optimizer through OMP and removes its old
-bootstrap compatibility override. Historical Pix settings are left inert;
-unrelated plugins and user settings are preserved. Marketplace commands for
-Claude Code are not used to configure OMP.
+Bootstrap installs the standalone Graphify and RTK CLIs, but does not run
+Graphify registration or install RTK hooks. Explicit shared skill installation
+preserves existing skill directories. After opting in to the OMP plugin, use
+`/ponytail` and `/caveman` in OMP to inspect or change modes. Retired Pix Optimizer
+is not installed or removed by bootstrap.
 
 OMP manager operations snapshot the shared plugin tree, manifest, and receipts
 under the ownership lock. Handled failures restore that scope; failed recovery
 retains private recovery files. Do not run native plugin commands concurrently
-with bootstrap. Retirement checks both the installed payload and declaration.
+with the add-on installer.
 Preserving an external or modified OMP plugin is a warning, not a failed install.
 Legacy Gemini cleanup uses the scoped ownership-checked uninstall path; unowned,
 modified, or unverifiable packages and stale receipts remain for manual review.

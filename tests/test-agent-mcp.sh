@@ -152,10 +152,19 @@ status_output="$("$SCRIPT" status all --agent agy,opencode,omp)"
 grep -Eq '^serena[[:space:]]+agy[[:space:]]+disabled$' <<<"$status_output"
 status_output="$("$SCRIPT" status --agent agy)"
 grep -Eq '^context-mode[[:space:]]+agy[[:space:]]+disabled$' <<<"$status_output"
-if "$SCRIPT" enable >/dev/null 2>&1; then
-  printf 'agent-mcp enable accepted a missing server selection\n' >&2
-  exit 1
-fi
+for args in 'enable' 'enable context-mode' 'disable all'; do
+  read -r -a arguments <<<"$args"
+  if "$SCRIPT" "${arguments[@]}" >/dev/null 2>&1; then
+    printf 'agent-mcp accepted an incomplete request: %s\n' "$args" >&2
+    exit 1
+  fi
+done
+other_agents=claude,agy,opencode,omp
+other_status="$("$SCRIPT" status context-mode --agent "$other_agents")"
+DOTFILES_SOURCE_DIR="$DOTFILES_DIR" bash "$DOTFILES_DIR/scripts/install-agent-addons.sh" context-mode --agent codex >/dev/null
+grep -Eq '^context-mode[[:space:]]+codex[[:space:]]+enabled$' <<<"$("$SCRIPT" status context-mode --agent codex)"
+[[ "$("$SCRIPT" status context-mode --agent "$other_agents")" == "$other_status" ]]
+"$SCRIPT" disable context-mode --agent codex >/dev/null
 
 for agent in codex claude; do
   touch "$NATIVE_STATE/$agent-serena"
@@ -344,7 +353,9 @@ install_github_binary() { record "binary $*"; }
 install_github_archive() { record "archive $*"; }
 install_github_agent_skill() { record "skill $*"; }
 omp_install_package() { record "omp-package $*"; }
-remove_retired_omp_optimizer() { :; }
+remove_retired_omp_optimizer() { record "retire-omp $*"; }
+assert_canonical_parent() { :; }
+command_exists() { command -v "$1" >/dev/null 2>&1; }
 print_summary() { :; }
 '''
 helpers = (root / "scripts/lib/runtimes.sh").read_text()
@@ -355,7 +366,9 @@ library += helpers[helpers.index("bounded_probe() {"):helpers.index("install_git
 )
 paths = (".codex/config.toml", ".claude.json", ".cursor/mcp.json",
          ".gemini/config/mcp_config.json", ".config/opencode/opencode.json",
-         ".omp/agent/mcp.json")
+         ".omp/agent/mcp.json", ".omp/plugins/package.json",
+         ".agents/skills/ponytail/SKILL.md", ".agents/skills/caveman/SKILL.md",
+         ".agents/skills/graphify/SKILL.md")
 for existing in (False, True):
     home = fixture / ("existing-home" if existing else "fresh-home")
     binary = home / "bin"
@@ -383,11 +396,32 @@ for existing in (False, True):
     observations = calls.read_text()
     assert "serena" not in observations and "context-mode" not in observations, observations
     assert " mcp " not in observations and "agent-mcp " not in observations, observations
-    assert "omp-package omp-ponytail-caveman" in observations, observations
+    for unwanted in ("omp-package ", "retire-omp ", "skill ", "graphify install"):
+        assert unwanted not in observations, observations
     for name, previous in before.items():
         current = (home / name).read_bytes() if (home / name).exists() else None
         assert current == previous, name
-print("Default AI installation never installs/enables MCPs and preserves existing configurations")
+    calls.write_text("")
+    env = {**os.environ, "HOME": str(home), "DOTFILES_SOURCE_DIR": str(fixture),
+           "PATH": f"{binary}:/usr/bin:/bin", "BOOTSTRAP_CALLS": str(calls)}
+    installer = ["bash", str(root / "scripts/install-agent-addons.sh")]
+    for args in (["ponytail"], ["ponytail", "--agent", "codex"],
+                 ["omp-ponytail-caveman", "--agent", "claude"]):
+        rejected = subprocess.run(installer + args, env=env, capture_output=True, timeout=10)
+        assert rejected.returncode == 2 and not calls.read_text(), args
+    for name, agent in (("ponytail", "all"), ("caveman", "all"),
+                        ("omp-ponytail-caveman", "omp"), ("graphify", "all")):
+        opted_in = subprocess.run(installer + [name, "--agent", agent], env=env,
+                                  capture_output=True, text=True, timeout=10)
+        assert opted_in.returncode == 0, opted_in.stderr
+    observed = calls.read_text().splitlines()
+    expected = ["skill ponytail DietrichGebert/ponytail 1.0.0 fixture",
+                "skill caveman juliusbrussee/caveman 1.0.0 fixture",
+                "omp-package omp-ponytail-caveman 1.0.0 ponytail-caveman"]
+    if not existing:
+        expected.append("graphify install --platform agents")
+    assert observed == expected, observed
+print("Default AI installation preserves add-ons; opt-in requires a supported target")
 PY
 
 printf 'Agent MCP manager test passed\n'

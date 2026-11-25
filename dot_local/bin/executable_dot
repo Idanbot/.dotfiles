@@ -20,6 +20,7 @@ Usage: dot <command> [args]
   doctor [args]       Run the post-install acceptance checks
   preflight [args]    Preview installation readiness, version targets, and paths
   privacy             Audit managed telemetry and nonessential traffic controls
+  agent-addons [args] Opt in to one agent add-on for an explicit harness
   tools [args]        Search the tools, languages, and agent catalog
   catalog [args]      Alias for tools; use --pick for an fzf details picker
   check-local [args]  Offline local checks; diagnostic codes only, never uploaded
@@ -38,6 +39,10 @@ USAGE
 }
 
 case "${1:-}" in
+  agent-addons)
+    shift
+    DOTFILES_SOURCE_DIR="$SOURCE" exec bash "$SOURCE/scripts/install-agent-addons.sh" "$@"
+    ;;
   check-local | receipt | capture | audit)
     review_command="$1"
     [[ "$review_command" != check-local ]] || review_command=check

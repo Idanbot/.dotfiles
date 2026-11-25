@@ -117,25 +117,6 @@ install_github_archive rtk rtk-ai/rtk "v$RTK_VERSION" "$RTK_ASSET" rtk \
 # RTK is installed as an opt-in optimizer. Agent hooks remain untouched until
 # the user explicitly runs the appropriate `rtk init` command.
 
-PONYTAIL_VERSION="$(package_version ai_tools ponytail 4.9.0)"
-PONYTAIL_SHA256="$(package_metadata ai_tools ponytail sha256)"
-install_github_agent_skill ponytail DietrichGebert/ponytail \
-  "$PONYTAIL_VERSION" "$PONYTAIL_SHA256"
-
-install_github_agent_skill caveman juliusbrussee/caveman \
-  "$(package_version ai_tools caveman 4.1.0)" "$(package_metadata ai_tools caveman sha256)"
-remove_retired_omp_optimizer
-omp_install_package omp-ponytail-caveman \
-  "$(package_version ai_tools ponytail_caveman 0.3.4)" ponytail-caveman
-
-# OMP discovers the standard Agent Skills location. Registration is passive:
-# no repository graph, hook, MCP server, or external backend is configured.
-if graphify install --platform agents >/dev/null; then
-  log_success "Graphify skill registered for OMP"
-else
-  log_error "Graphify skill registration failed"
-fi
-
 for agent in claude codex agy opencode omp; do
   if version_output="$(observe_version "$agent" --version 2>&1)"; then
     log_success "$agent executable validation passed"
@@ -153,11 +134,8 @@ for runtime in graphify rtk agent-mcp; do
     log_error "$runtime optional runtime is unavailable"
   fi
 done
-log_info "MCP servers are not installed or enabled; existing local MCP settings are preserved"
-log_info "Graphify is available on demand in OMP; run '/graphify .' inside an agent session"
+log_info "Agent add-ons are opt-in: dot agent-addons --help"
 log_info "RTK is installed without hooks; its telemetry is disabled by policy"
-log_info "Ponytail is available as an on-demand shared skill"
-log_info "Ponytail/Caveman is available in OMP; use '/ponytail' and '/caveman' to choose modes"
 
 log_info "Agent authentication and session state are intentionally left to the user"
 

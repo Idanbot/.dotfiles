@@ -11,8 +11,8 @@ usage() {
   cat <<'EOF'
 Usage:
   agent-mcp status [serena|context-mode|all] [--agent AGENT[,AGENT...]]
-  agent-mcp enable <serena|context-mode|all> [--agent AGENT[,AGENT...]]
-  agent-mcp disable <serena|context-mode|all> [--agent AGENT[,AGENT...]]
+  agent-mcp enable <serena|context-mode|all> --agent AGENT[,AGENT...]
+  agent-mcp disable <serena|context-mode|all> --agent AGENT[,AGENT...]
 
 Agents: codex, claude, agy, opencode, omp, all
 
@@ -328,7 +328,7 @@ contains "$server_arg" serena context-mode all || {
   exit 2
 }
 
-agent_arg=all
+agent_arg=
 while (($#)); do
   case "$1" in
     --agent | -a)
@@ -341,6 +341,10 @@ while (($#)); do
       ;;
   esac
 done
+if [[ -z "$agent_arg" ]]; then
+  [[ "$action" == status ]] || die "$action requires --agent AGENT or --agent all"
+  agent_arg=all
+fi
 
 if [[ "$server_arg" == all ]]; then
   servers=("${ALL_SERVERS[@]}")
@@ -351,6 +355,8 @@ fi
 if [[ "$agent_arg" == all ]]; then
   agents=("${ALL_AGENTS[@]}")
 else
+  [[ "$agent_arg" != ,* && "$agent_arg" != *, && "$agent_arg" != *,,* ]] ||
+    die "invalid agent list: $agent_arg"
   IFS=, read -r -a agents <<<"$agent_arg"
   for agent in "${agents[@]}"; do
     contains "$agent" "${ALL_AGENTS[@]}" || die "unsupported agent: $agent"

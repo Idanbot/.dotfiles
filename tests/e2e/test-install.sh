@@ -279,11 +279,10 @@ if [[ ",$selected_sections," == *,ai,* ]]; then
   RTK_TELEMETRY_DISABLED=1 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
     DISABLE_TELEMETRY=1 DISABLE_ERROR_REPORTING=1 DISABLE_BUG_COMMAND=1 \
     DO_NOT_TRACK=1 OTEL_SDK_DISABLED=true CHECKPOINT_DISABLE=1 dot-privacy >/dev/null
-  [[ -f "$HOME/.agents/skills/graphify/SKILL.md" ]]
-  [[ -f "$HOME/.agents/skills/ponytail/SKILL.md" ]]
-  [[ -f "$HOME/.agents/skills/caveman/SKILL.md" ]]
-  plugin_manifest="$HOME/.omp/plugins/node_modules/omp-ponytail-caveman/package.json"
-  [[ "$(gojq -r '.version' "$plugin_manifest")" == "$(manifest_version ai_tools ponytail_caveman)" ]]
+  for skill in graphify ponytail caveman; do
+    [[ ! -e "$HOME/.agents/skills/$skill" ]]
+  done
+  [[ ! -e "$HOME/.omp/plugins/node_modules/omp-ponytail-caveman" ]]
   [[ ! -e "$HOME/.omp/plugins/node_modules/@xynogen/pix-optimizer" ]]
   [[ ! -e "$HOME/graphify-out" ]]
   command -v agent-mcp >/dev/null

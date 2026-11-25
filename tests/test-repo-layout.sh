@@ -230,16 +230,17 @@ else
 fi
 
 AI_INSTALLER="$DOTFILES_DIR/.chezmoiscripts/run_once_08-install-ai-tools.sh.tmpl"
-if ! grep -Eq 'SERENA_VERSION|CONTEXT_MODE_VERSION|agent-mcp enable|mcp add' "$AI_INSTALLER" &&
+ADDON_INSTALLER="$DOTFILES_DIR/scripts/install-agent-addons.sh"
+if ! grep -Eq 'SERENA_VERSION|CONTEXT_MODE_VERSION|agent-mcp enable|mcp add|install_github_agent_skill|graphify install|omp_install_package|remove_retired_omp_optimizer' "$AI_INSTALLER" &&
   grep -Fq 'package_version ai_tools graphify' "$AI_INSTALLER" &&
   grep -Fq 'install_uv_tool graphify graphifyy "$GRAPHIFY_VERSION" 3.13' "$AI_INSTALLER" &&
-  grep -Fq 'graphify install --platform agents' "$AI_INSTALLER" &&
+  grep -Fq 'graphify install --platform agents' "$ADDON_INSTALLER" &&
   grep -Fq 'package_version ai_tools rtk' "$AI_INSTALLER" &&
   grep -Fq 'install_github_archive rtk rtk-ai/rtk' "$AI_INSTALLER" &&
   grep -Fq 'install_github_archive bun oven-sh/bun' "$AI_INSTALLER" &&
-  grep -Fq 'install_github_agent_skill ponytail DietrichGebert/ponytail' "$AI_INSTALLER" &&
-  grep -Fq 'omp_install_package omp-ponytail-caveman' "$AI_INSTALLER"; then
-  pass "standalone agent tools are versioned without installing or enabling MCPs"
+  grep -Fq 'install_github_agent_skill ponytail DietrichGebert/ponytail' "$ADDON_INSTALLER" &&
+  grep -Fq 'omp_install_package omp-ponytail-caveman' "$ADDON_INSTALLER"; then
+  pass "standalone agent tools are separate from optional integrations"
 else
   fail "optional agent context or optimization tool installation contracts are incomplete"
 fi

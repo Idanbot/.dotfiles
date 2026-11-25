@@ -166,16 +166,11 @@ install_github_archive bun oven-sh/bun "bun-v$BUN_VERSION" \
   "bun-linux-$BUN_ARCH.zip" "bun-linux-$BUN_ARCH/bun" \
   "sha256:$(package_metadata ai_tools bun "sha256_$ARCH")" 'bun --version'
 
-PONYTAIL_VERSION="$(package_version ai_tools ponytail 4.9.0)"
-install_github_agent_skill ponytail DietrichGebert/ponytail "$PONYTAIL_VERSION" \
-  "$(package_metadata ai_tools ponytail sha256)"
-
-install_github_agent_skill caveman juliusbrussee/caveman \
-  "$(package_version ai_tools caveman 4.1.0)" "$(package_metadata ai_tools caveman sha256)"
-remove_retired_omp_optimizer
+"$DOTFILES_SOURCE_DIR/scripts/install-agent-addons.sh" ponytail --agent all
+"$DOTFILES_SOURCE_DIR/scripts/install-agent-addons.sh" caveman --agent all
 PONYTAIL_CAVEMAN_VERSION="$(package_version ai_tools ponytail_caveman 0.3.4)"
 skill_digest="$(managed_target_digest "$HOME/.agents/skills")"
-omp_install_package omp-ponytail-caveman "$PONYTAIL_CAVEMAN_VERSION" ponytail-caveman
+"$DOTFILES_SOURCE_DIR/scripts/install-agent-addons.sh" omp-ponytail-caveman --agent omp
 [[ "$(managed_target_digest "$HOME/.agents/skills")" == "$skill_digest" ]]
 [[ "$(jq -r .version "$HOME/.omp/plugins/node_modules/omp-ponytail-caveman/package.json")" == "$PONYTAIL_CAVEMAN_VERSION" ]]
 omp plugin list | grep -Fq "omp-ponytail-caveman@$PONYTAIL_CAVEMAN_VERSION"
