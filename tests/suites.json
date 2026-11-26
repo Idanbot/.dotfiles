@@ -222,6 +222,12 @@
       ]
     },
     {
+      "path": "tests/test-apt-receipts.sh",
+      "kind": "suite",
+      "suite": "behavior",
+      "invocations": [["{root}"]]
+    },
+    {
       "path": "tests/test-apt-key-repair.sh",
       "kind": "suite",
       "suite": "behavior",

@@ -99,7 +99,7 @@ refresh_hashicorp_apt_keys() {
 }
 
 apt_install() {
-  local packages=("$@") to_install=() pkg
+  local packages=("$@") to_install=() pkg version
   for pkg in "${packages[@]}"; do
     if dpkg_package_installed "$pkg"; then
       log_skip "$pkg (apt) already installed"
@@ -118,8 +118,12 @@ apt_install() {
     -o Dpkg::Options::=--force-confold \
     -y --no-install-recommends install "${to_install[@]}"
   for pkg in "${to_install[@]}"; do
+    if ! version="$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null)" || [[ -z "$version" ]]; then
+      log_warn "APT resolved $pkg without a concrete installed version; not recording a receipt"
+      continue
+    fi
     log_success "$pkg installed"
-    record_install "$pkg" "$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || printf unknown)" apt "$pkg"
+    record_install "$pkg" "$version" apt "$pkg"
     ((_INSTALLED++)) || true
   done
 }

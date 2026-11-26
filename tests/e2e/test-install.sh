@@ -83,6 +83,15 @@ finalize_e2e() {
 }
 trap finalize_e2e EXIT
 
+expect() {
+  local message="$1"
+  shift
+  if ! "$@"; then
+    printf 'E2E pass %s: %s\n' "$CURRENT_PASS" "$message" >&2
+    return 1
+  fi
+}
+
 printf 'profile=%s\nwsl=%s\npasses=%s\n' "$PROFILE" "${DOTFILES_WSL:-auto}" "$PASSES" >"$ARTIFACT_DIR/context.txt"
 env | sed -E 's/((TOKEN|PASSWORD|SECRET|KEY)=).*/\1[REDACTED]/I' | sort >"$ARTIFACT_DIR/environment.txt"
 printf 'phase\telapsed_ms\telapsed_seconds\telapsed_human\n' >"$ARTIFACT_DIR/install-timings.tsv"
@@ -97,24 +106,26 @@ for pass in $(seq 1 "$PASSES"); do
     "${INSTALL_PROFILE_ARGS[@]}" \
     --conflict-policy backup \
     --yes
-  sha256sum --check --status "$ARTIFACT_DIR/preserved-before.sha256"
+  expect 'Installer changed a preserved file' sha256sum --check --quiet "$ARTIFACT_DIR/preserved-before.sha256"
   for preserved_path in "${PRESERVED_PATHS[@]}"; do
-    [[ "$(stat -c '%a' "$preserved_path")" == 600 ]]
+    expect "Expected mode 600 on ${preserved_path#"$HOME"/}" test "$(stat -c '%a' "$preserved_path")" = 600
   done
 
   latest_run="$(find "$STATE_DIR/runs" -mindepth 2 -maxdepth 2 -name versions.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
-  [[ -s "$latest_run" && "$(stat -c '%a' "$latest_run")" == 600 ]]
+  expect 'Run version plan is missing or empty' test -s "$latest_run"
+  expect 'Expected mode 600 on the version plan' test "$(stat -c '%a' "$latest_run")" = 600
   if [[ -n "${E2E_EXPECT_PLATFORM:-}" ]]; then
-    jq -e --arg platform "$E2E_EXPECT_PLATFORM" --arg profile "$PROFILE" \
+    expect 'Run plan has an unexpected platform or profile' jq -e --arg platform "$E2E_EXPECT_PLATFORM" --arg profile "$PROFILE" \
       '.platform == $platform and .profile == $profile' "${latest_run%/*}/plan.json" >/dev/null
     if [[ "$PROFILE" == full && "$E2E_EXPECT_PLATFORM" == ubuntu-26.04-native ]]; then
-      grep -Fxq 'Suites: resolute' /etc/apt/sources.list.d/azure-cli.sources
+      expect 'Azure CLI APT source must use Resolute' grep -Fxq 'Suites: resolute' /etc/apt/sources.list.d/azure-cli.sources
     fi
   fi
-  jq -e '.schema == 1 and (.tools | type == "object")' "$latest_run" >/dev/null
-  [[ -f "${latest_run%/*}/checkpoints/preflight.done" ]]
-  [[ -f "${latest_run%/*}/update-warnings.json" ]]
-  jq -e 'all(.tools[]; if .id == "cloud.kubectl" then .policy == "repo-minimum" else true end)' "$latest_run" >/dev/null
+  expect 'Invalid version plan schema' jq -e '.schema == 1 and (.tools | type == "object")' "$latest_run" >/dev/null
+  expect 'Preflight checkpoint is missing' test -f "${latest_run%/*}/checkpoints/preflight.done"
+  expect 'Update warnings report is missing' test -f "${latest_run%/*}/update-warnings.json"
+  expect 'kubectl must remain on the repository policy' jq -e \
+    'all(.tools[]; if .id == "cloud.kubectl" then .policy == "repo-minimum" else true end)' "$latest_run" >/dev/null
   pass_ended="$(date +%s%N)"
   pass_elapsed_ms="$(((pass_ended - pass_started) / 1000000))"
   printf '%s\t%s\t%s\t%s\n' "$pass" "$pass_elapsed_ms" \
@@ -124,7 +135,7 @@ for pass in $(seq 1 "$PASSES"); do
   printf '[E2E] %s pass %s completed in %s\n' "$PROFILE" "$pass" \
     "$(format_duration_ms "$pass_elapsed_ms")"
   jq empty "$STATE_DIR/runs"/*/summary.json
-  /usr/bin/python3 /dotfiles/scripts/convergence.py snapshot \
+  expect 'Could not snapshot managed state for convergence' /usr/bin/python3 /dotfiles/scripts/convergence.py snapshot \
     --home "$HOME" --state "$STATE_DIR" --source /dotfiles \
     --output "$ARTIFACT_DIR/convergence-pass-$pass.json"
   if ((pass > 1)); then
