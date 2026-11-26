@@ -50,6 +50,24 @@ Docker cannot prove GUI, physical-device, or Windows interoperability behavior.
 A successful run means the selected health checks passed, not that every tool
 is current or every account is authenticated. Review the final warnings.
 
+## Termux
+
+For remote access from native Termux (including an Android emulator), deploy
+the shared SSH aliases without running the Ubuntu bootstrap:
+
+```bash
+pkg install git chezmoi openssh cloudflared
+git clone https://github.com/Idanbot/.dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+bash scripts/install.sh --profile termux
+```
+
+The profile writes only a missing `~/.ssh/config`. It uses Termux's
+`cloudflared` for the repo's Access hosts, keeps `~/.ssh/config.local` available
+for personal hosts or overrides, and never provisions keys or signs in. If
+you already have a config, use `bash scripts/install.sh --profile termux --print`
+to review and merge the aliases. Verify with `ssh -G rpi4` before connecting.
+
 ## Install Profiles
 
 | Profile | Scope |
