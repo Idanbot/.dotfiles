@@ -182,16 +182,19 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/install.sh [options]
 
-Profiles and selectors:
+Ubuntu profiles and selectors (24.04 or 26.04 LTS; release detected automatically):
   --profile <name>          minimal, base, developer, agent, cloud, or full
-  --profile termux          Local checkout only; deploy SSH config without packages
-  --full                    Alias for --profile full
+  --full                    All applicable sections for the current Ubuntu release
   --base-only               Alias for --profile base
   --with <a,b>              Base plus selected optional sections
   --sections <a,b>          Exactly these sections
   --without <a,b>           Remove sections from the selected profile
   --menu                    Force the interactive selector
   -y, --yes                 Accept defaults and never prompt
+
+Termux (local checkout, no Ubuntu setup):
+  --profile termux          Deploy SSH aliases without installing packages
+  --profile termux --print  Preview SSH config without writing files
 
 Reliability:
   --resume[=<run-id>]       Resume the latest or named interrupted run
@@ -208,7 +211,7 @@ pending destinations after the backup without prompting.
 
 Inspection:
   --list-options            Print profiles and sections
-  --print-plan              Resolve the selection without installing
+  --print-plan              Preview Ubuntu section selection without installing
   -h, --help                Show this help
 
 Examples:
@@ -428,11 +431,13 @@ resolve_selection() {
 
 print_options() {
   local profile
-  printf 'Profiles:\n'
+  printf 'Ubuntu profiles (24.04 or 26.04 LTS; detected automatically):\n'
   for profile in minimal base developer agent cloud full; do
     printf '  %-10s %s\n' "$profile" "$(profile_sections "$profile")"
   done
   printf 'All sections: %s\n' "$(join_by_comma "${SECTION_ORDER[@]}")"
+  printf '\nTermux profile (local checkout only):\n'
+  printf '  %-10s %s\n' termux 'SSH config only; use --profile termux --print to preview'
 }
 
 print_plan() {

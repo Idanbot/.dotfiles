@@ -90,7 +90,7 @@ assert_output_contains() {
     FAILED=1
     return
   fi
-  if grep -Fq "$expected" <<<"$output"; then
+  if grep -Fq -- "$expected" <<<"$output"; then
     echo -e "  ${GREEN}✓${NC} $label"
   else
     echo -e "  ${RED}✗${NC} $label missing expected output: $expected"
@@ -130,7 +130,11 @@ assert_output_contains "backup conflict policy" "conflict_policy=backup" --profi
 assert_output_contains "skip conflict policy equals syntax" "conflict_policy=skip" --profile base --conflict-policy=skip --print-plan
 assert_output_contains "abort conflict policy" "conflict_policy=abort" --profile base --conflict-policy abort --print-plan
 assert_output_contains "list options" "All sections: $FULL_SECTIONS" --list-options
+assert_output_contains "list Ubuntu releases" "24.04 or 26.04 LTS" --list-options
+assert_output_contains "list Termux preview" "--profile termux --print" --list-options
 assert_output_contains "help" "Usage: scripts/install.sh [options]" --help
+assert_output_contains "help lists Termux preview" "Preview SSH config without writing files" --help
+assert_output_contains "Termux help" "Existing SSH configs are preserved." --profile=termux --help
 assert_failure "missing only section rejected" --only
 assert_failure "unknown section rejected" --sections nope
 assert_failure "unknown option rejected" --bogus

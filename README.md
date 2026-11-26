@@ -8,6 +8,10 @@ backups, and recovery.
 
 ## Quick Start
 
+On Ubuntu, the same commands work on 24.04 (Noble) or 26.04 (Resolute).
+The installer reads `/etc/os-release` and does not upgrade the OS.
+On Android, use the [Termux SSH profile](#termux) instead.
+
 Interactive setup:
 
 ```bash
@@ -45,9 +49,7 @@ dot doctor
 - Two-pass Docker tests check managed-state convergence. Reruns can still apply
   approved or policy-allowed updates; the environment is not frozen forever.
 
-Use the same `--full` command on Ubuntu 24.04 and 26.04 (amd64/arm64).
-The installer detects the release from `/etc/os-release` and uses the host's
-APT suite. It does not upgrade Ubuntu itself.
+The Ubuntu installer supports amd64 and arm64 and uses the host's APT suite.
 Docker cannot prove GUI, physical-device, or Windows interoperability behavior.
 A successful run means the selected health checks passed, not that every tool
 is current or every account is authenticated. Review the final warnings.
@@ -79,7 +81,8 @@ to review and merge the aliases. Verify with `ssh -G rpi4` before connecting.
 | `developer` | Languages, history, tmux, Neovim, system and theme |
 | `agent` | Developer setup plus AI tools |
 | `cloud` | Developer setup plus container/cloud tools |
-| `full` | All applicable sections |
+| `full` | All applicable sections for the detected Ubuntu release |
+| `termux` | [SSH aliases only](#termux), from a local checkout; no package install |
 
 From a checkout:
 
@@ -90,6 +93,8 @@ From a checkout:
 ./scripts/install.sh --list-options
 ```
 
+`--print-plan` previews Ubuntu sections without installing. For Termux, use
+`--profile termux --print` to preview the SSH config instead.
 `--with` starts from `base`; dependencies are added automatically.
 [Selector details](docs/handbook.md#install-profiles).
 
@@ -240,7 +245,9 @@ cd .dotfiles
 The wrapper runs installation and acceptance, then opens an interactive shell.
 Check `DOTFILES_E2E_STATUS`; zero means validation passed. Exit to remove the
 container. Logs, convergence reports, and timings remain under `artifacts/`.
-WSL here is simulated; real WSL uses the separate opt-in Windows workflow.
+The interactive wrapper uses Ubuntu 24.04. WSL here is simulated; real WSL
+uses the separate opt-in Windows workflow. For a non-interactive, two-pass
+Ubuntu 26.04 check, run `./scripts/ci/e2e.sh full-native-resolute`.
 
 Every push/PR runs security/static checks, parallel native behavior shards,
 focused WSL checks, a native two-pass base install, and recovery acceptance.

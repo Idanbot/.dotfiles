@@ -4,7 +4,10 @@ set -euo pipefail
 
 case "${1:-}" in
   -h | --help)
-    printf '%s\n' 'Usage: install.sh --profile termux [--print]'
+    printf '%s\n' 'Usage: install.sh --profile termux [--print]' \
+      'Deploy the shared SSH aliases from a local checkout in native Termux.' \
+      'Existing SSH configs are preserved. No packages are installed.' \
+      '  --print  Preview the SSH configuration without writing files.'
     exit 0
     ;;
   '' | --print) ;;
