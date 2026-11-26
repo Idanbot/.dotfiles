@@ -1148,7 +1148,7 @@ Verification is tiered so a green result has a precise meaning:
 
 | Tier | Trigger | Coverage |
 | --- | --- | --- |
-| Push/PR CI | Every change | Parallel security/static, two native behavior shards, focused WSL contracts, selectors, native two-pass base install, and cold recovery/restore |
+| Push/PR CI | Every change | Parallel security/static, two native behavior shards, focused WSL contracts, selectors, and Ubuntu 26.04 native two-pass base install and recovery/restore |
 | Agent workspace Docker E2E | Every push/PR | tmux, all registered agent launchers, explicit MCP toggle fixtures, working-directory propagation, and failure recovery |
 | Extended/heavy Docker E2E | Weekly, explicit heavy dispatch, or grouped-upgrade canary | Two-pass WSL base, interrupted-install resume, full native on both Ubuntu LTS releases, full simulated WSL, and performance history outside PRs |
 | Native ARM64 smoke | Monthly or manual, public-repo ARM64 runner | Real checksummed release binaries from a cold base; not full-install acceptance |

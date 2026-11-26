@@ -105,9 +105,9 @@ for pass in $(seq 1 "$PASSES"); do
   latest_run="$(find "$STATE_DIR/runs" -mindepth 2 -maxdepth 2 -name versions.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
   [[ -s "$latest_run" && "$(stat -c '%a' "$latest_run")" == 600 ]]
   if [[ -n "${E2E_EXPECT_PLATFORM:-}" ]]; then
-    jq -e --arg platform "$E2E_EXPECT_PLATFORM" \
-      '.platform == $platform and .profile == "full"' "${latest_run%/*}/plan.json" >/dev/null
-    if [[ "$E2E_EXPECT_PLATFORM" == ubuntu-26.04-native ]]; then
+    jq -e --arg platform "$E2E_EXPECT_PLATFORM" --arg profile "$PROFILE" \
+      '.platform == $platform and .profile == $profile' "${latest_run%/*}/plan.json" >/dev/null
+    if [[ "$PROFILE" == full && "$E2E_EXPECT_PLATFORM" == ubuntu-26.04-native ]]; then
       grep -Fxq 'Suites: resolute' /etc/apt/sources.list.d/azure-cli.sources
     fi
   fi

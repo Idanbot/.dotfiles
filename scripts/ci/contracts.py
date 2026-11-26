@@ -254,10 +254,16 @@ def check(root):
     for name in ("base-native", "base-wsl-simulated", "full", "full-native", "full-native-resolute"):
         assert services[name]["environment"]["E2E_PASSES"] == "2"
         assert services[name]["build"]["target"] == "base"
+    for name in ("base-native", "developer", "recovery", "failure-resume", "full-native-resolute"):
+        service = services[name]
+        assert service["build"]["args"]["UBUNTU_VERSION"] == "26.04"
+        assert service["build"]["target"] == "base"
+        assert service["environment"]["DOTFILES_WSL"] == "false"
+    for name in ("base-native", "developer", "full-native-resolute"):
+        assert services[name]["environment"]["E2E_EXPECT_PLATFORM"] == "ubuntu-26.04-native"
+    for name in ("base-wsl-simulated", "agent", "cloud", "full", "full-native"):
+        assert "UBUNTU_VERSION" not in services[name]["build"].get("args", {})
     assert services["full-native"]["environment"]["DOTFILES_WSL"] == "false"
-    resolute = services["full-native-resolute"]
-    assert resolute["build"]["args"]["UBUNTU_VERSION"] == "26.04"
-    assert resolute["environment"]["E2E_EXPECT_PLATFORM"] == "ubuntu-26.04-native"
     assert services["full"]["environment"]["DOTFILES_WSL"] == "true"
 
     acceptance_steps = load(root / ".github/actions/e2e/action.yml")["runs"]["steps"]

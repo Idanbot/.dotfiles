@@ -250,7 +250,8 @@ uses the separate opt-in Windows workflow. For a non-interactive, two-pass
 Ubuntu 26.04 check, run `./scripts/ci/e2e.sh full-native-resolute`.
 
 Every push/PR runs security/static checks, parallel native behavior shards,
-focused WSL checks, a native two-pass base install, and recovery acceptance.
+focused WSL checks, and Ubuntu 26.04 native two-pass base and recovery tests.
+Ubuntu 24.04 remains covered by the full-native compatibility job and WSL tests.
 Extended WSL/resume tests and heavy profiles run weekly, on heavy manual dispatch,
 and for grouped upgrade canaries. [Verification reference](docs/handbook.md#verification).
 Outcome classification explains CI failures; it does not replace installation

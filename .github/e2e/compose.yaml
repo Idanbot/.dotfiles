@@ -15,6 +15,15 @@ x-e2e-base: &e2e-base
     - ../..:/dotfiles:ro
     - ../../artifacts:/artifacts
 
+x-e2e-resolute: &e2e-resolute
+  <<: *e2e-base
+  build:
+    context: ../..
+    dockerfile: .github/e2e/Dockerfile.ubuntu-24.04
+    target: base
+    args:
+      UBUNTU_VERSION: "26.04"
+
 services:
   selectors:
     <<: *e2e-base
@@ -26,13 +35,14 @@ services:
     command: [python3, /dotfiles/scripts/ci/run-tests.py, selectors]
 
   base-native:
-    <<: *e2e-base
+    <<: *e2e-resolute
     profiles: [base]
     environment:
       <<: *e2e-env
       DOTFILES_WSL: "false"
       E2E_PROFILE: base
       E2E_PASSES: "2"
+      E2E_EXPECT_PLATFORM: ubuntu-26.04-native
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
   base-wsl-simulated:
@@ -46,13 +56,14 @@ services:
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
   developer:
-    <<: *e2e-base
+    <<: *e2e-resolute
     profiles: [developer]
     environment:
       <<: *e2e-env
       DOTFILES_WSL: "false"
       E2E_PROFILE: developer
       E2E_PASSES: "1"
+      E2E_EXPECT_PLATFORM: ubuntu-26.04-native
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
   agent:
@@ -96,13 +107,7 @@ services:
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
   full-native-resolute:
-    <<: *e2e-base
-    build:
-      context: ../..
-      dockerfile: .github/e2e/Dockerfile.ubuntu-24.04
-      target: base
-      args:
-        UBUNTU_VERSION: "26.04"
+    <<: *e2e-resolute
     profiles: [full-native-resolute]
     environment:
       <<: *e2e-env
@@ -125,7 +130,7 @@ services:
     command: [python3, /dotfiles/scripts/ci/run-tests.py, workspace]
 
   recovery:
-    <<: *e2e-base
+    <<: *e2e-resolute
     profiles: [recovery]
     environment:
       <<: *e2e-env
@@ -133,7 +138,7 @@ services:
     command: [bash, -lc, "/dotfiles/tests/test-recovery.sh /dotfiles"]
 
   failure-resume:
-    <<: *e2e-base
+    <<: *e2e-resolute
     profiles: [recovery]
     environment:
       <<: *e2e-env
