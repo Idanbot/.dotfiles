@@ -109,7 +109,9 @@ class CloudflareSSHTests(unittest.TestCase):
         self.calls = self.home / "calls.jsonl"
         self.cache = self.home / "cache"
         self.config = self.home / "ssh_config"
-        config = (ROOT / "private_dot_ssh/private_config.tmpl").read_text()
+        config = subprocess.check_output(
+            ["bash", str(ROOT / "tests/fixtures/render-ssh-config.sh"), str(ROOT)], text=True
+        )
         config = config.replace("Host rpi4 t420", "Host rpi4 t420 access-fixture")
         self.config.write_text(
             config + "\nHost access-fixture\n  HostName ssh.example.invalid\n"

@@ -111,7 +111,8 @@ if grep -R -E 'gh[[:space:]]+auth[[:space:]]+(login|setup-git)' \
   exit 1
 fi
 
-SSH_CONFIG="$DOTFILES_DIR/private_dot_ssh/private_config.tmpl"
+SSH_CONFIG="$TMP_ROOT/home/.ssh/config"
+bash "$DOTFILES_DIR/tests/fixtures/render-ssh-config.sh" "$DOTFILES_DIR" >"$SSH_CONFIG"
 ! grep -Eq '^[[:space:]]*IdentityFile[[:space:]]' "$SSH_CONFIG"
 HOME="$TMP_ROOT/home" ssh -G -F "$SSH_CONFIG" github.com >/dev/null 2>&1
 HOME="$TMP_ROOT/home" ssh -G -F "$SSH_CONFIG" rpi4 >/dev/null 2>&1

@@ -18,7 +18,7 @@ path = Path(sys.argv[1])
 data = yaml.safe_load(path.read_text())
 data['core']['github_cli'].update({
     'repo': 'example/review-fixture',
-    'tag_template': 'release-{version}',
+    'tag_template': 'release-{version}-stable',
     'asset_template': 'tool-{version}-{arch}.tar.gz',
     'arch_amd64': 'x64',
     'arch_arm64': 'a64',
@@ -35,9 +35,12 @@ url="${!#}"
 printf '%s\n' "$url" >>"$MOCK_REQUESTS"
 case "$url" in
   https://api.github.com/repos/example/review-fixture/releases/latest)
-    printf '{"tag_name":"release-2.999.0"}\n'
+    printf '{"tag_name":"release-3.0.0-stable"}\n'
     ;;
-  https://api.github.com/repos/example/review-fixture/releases/tags/release-2.999.0)
+  'https://api.github.com/repos/example/review-fixture/releases?per_page=100&page=1')
+    printf '[{"tag_name":"release-3.0.0-stable"},{"tag_name":"release-2.999.0-stable"},{"tag_name":"release-2.999.1-stable","prerelease":true},{"tag_name":"v2.999.2"}]\n'
+    ;;
+  https://api.github.com/repos/example/review-fixture/releases/tags/release-2.999.0-stable)
     printf '{"assets":[{"name":"tool-2.999.0-x64.tar.gz","digest":"sha256:%064d"},{"name":"tool-2.999.0-a64.tar.gz","digest":"sha256:%064d"}]}\n' 1 2
     ;;
   *) exit 22 ;;
@@ -47,8 +50,11 @@ chmod +x "$temporary/bin/curl"
 export PATH="$temporary/bin:$PATH" GITHUB_TOKEN=fixture-token
 export MOCK_REQUESTS="$temporary/requests"
 "$DOTFILES_SOURCE_DIR/scripts/update-packages.sh" --apply core.github_cli \
-  --report "$temporary/report.md" >"$temporary/output.log" 2>&1
-grep -Fq 'release-2.999.0' "$MOCK_REQUESTS"
+  --report "$temporary/report.md" >"$temporary/output.log" 2>&1 || {
+  cat "$temporary/output.log" >&2
+  exit 1
+}
+grep -Fq '/releases/tags/release-2.999.0-stable' "$MOCK_REQUESTS"
 grep -Fq 'example/review-fixture' "$MOCK_REQUESTS"
 grep -Fq 'github_cli: "2.999.0"' "$DOTFILES_SOURCE_DIR/packages.yaml"
 grep -Fq '0000000000000000000000000000000000000000000000000000000000000002' \

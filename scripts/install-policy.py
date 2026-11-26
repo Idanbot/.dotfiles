@@ -59,10 +59,10 @@ def get_json(url):
     return json.loads(fetch(url))
 
 
-def github(repo, major=None):
+def github(repo, major=None, tag_template=None):
     base = f"https://api.github.com/repos/{repo}/releases"
     latest = get_json(base + "/latest")
-    newest = release_version(latest)
+    newest = release_version(latest, tag_template)
     if not newest:
         raise ValueError(f"No stable latest release for {repo}")
     if major is None or order(newest)[0] == major:
@@ -70,7 +70,7 @@ def github(repo, major=None):
     # Search older maintained majors rather than accepting a breaking upgrade.
     for page in range(1, 11):
         releases = get_json(f"{base}?per_page=100&page={page}")
-        candidates = [(release_version(item), item) for item in releases]
+        candidates = [(release_version(item, tag_template), item) for item in releases]
         candidates = [(v, item) for v, item in candidates if v and order(v)[0] == major]
         if candidates:
             return max(candidates, key=lambda item: order(item[0]))
@@ -122,7 +122,7 @@ def upstream(entry, meta, major=None):
             raise ValueError(f"No installable stable release for {ident}")
         return max(versions, key=order), {}
     if meta.get("repo"):
-        return github(meta["repo"], major)
+        return github(meta["repo"], major, meta.get("tag_template"))
     if ident in releases.DISTRO_ADVISORIES:
         return github(releases.DISTRO_ADVISORIES[ident], major)
     raise ValueError("No stable upstream resolver; use the version audit report")

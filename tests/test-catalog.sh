@@ -324,9 +324,11 @@ print('isolated 1.2.3')
         overlay.write_text("Host rpi4\n    User local-user\n    Port 2222\n")
         overlay.chmod(0o600)
         config = directory / "config"
-        template = (root / "private_dot_ssh/private_config.tmpl").read_text()
+        rendered = subprocess.check_output(
+            ["bash", str(root / "tests/fixtures/render-ssh-config.sh"), str(root)], text=True
+        )
         self.assertIn(".ssh/config.local", (root / ".chezmoiignore").read_text())
-        config.write_text(template.replace("Include ~/.ssh/config.local", f"Include {overlay}"))
+        config.write_text(rendered.replace("Include ~/.ssh/config.local", f"Include {overlay}"))
         result = subprocess.run([ssh, "-G", "-F", str(config), "rpi4"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("user local-user\n", result.stdout)

@@ -111,13 +111,15 @@ def candidate_options(versions, baseline, rule="stable"):
     return [{"version": value, "labels": labels} for value, labels in selected.items()]
 
 
-def release_version(release):
-    tag = (
-        release.get("tag_name", "")
-        .removeprefix("bun-")
-        .removeprefix("azure-cli-")
-        .removeprefix("v")
-    )
+def release_version(release, tag_template=None):
+    tag = release.get("tag_name", "")
+    if tag_template is not None:
+        prefix, marker, suffix = tag_template.partition("{version}")
+        if not marker or not tag.startswith(prefix) or not tag.endswith(suffix):
+            return ""
+        tag = tag[len(prefix) : -len(suffix) if suffix else None]
+    else:
+        tag = tag.removeprefix("bun-").removeprefix("azure-cli-").removeprefix("v")
     return (
         tag
         if stable(tag) and not release.get("prerelease") and not release.get("draft")
