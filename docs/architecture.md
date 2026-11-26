@@ -3,9 +3,10 @@
 ## Purpose
 
 This repository backs up and deploys one personal Ubuntu development
-environment. The supported production targets are Ubuntu 24.04 native and
-Ubuntu 24.04 under WSL2. Reliability, repeatability, and understandable failure
-handling take precedence over supporting more platforms.
+environment. The Ubuntu installer targets 24.04 and 26.04 on native Linux
+and WSL2. Termux has a separate config-only SSH entry point. Reliability,
+repeatability, and understandable failure handling take precedence over
+supporting more platforms.
 
 ## Ownership Boundaries
 

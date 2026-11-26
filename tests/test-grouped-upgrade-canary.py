@@ -54,7 +54,7 @@ def mock_gh():
     elif args[-1].endswith("/jobs?per_page=100"):
         assert "--paginate" in args and "--slurp" in args
         jobs = [{"name": f"Live {profile} E2E", "conclusion": "success"}
-                for profile in ("developer", "agent", "cloud", "full", "full-native")]
+                for profile in ("developer", "agent", "cloud", "full", "full-native", "full-native-resolute")]
         if scenario == "prefixed":
             jobs = [{**job, "name": "Gated acceptance / " + job["name"]} for job in jobs]
         if scenario == "duplicate-heavy":

@@ -129,7 +129,7 @@ jobs:
       fail-fast: true
       max-parallel: 3
       matrix:
-        service: [full-native, full, developer, agent, cloud]
+        service: [full-native, full-native-resolute, full, developer, agent, cloud]
     steps:
       - name: Harden runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2

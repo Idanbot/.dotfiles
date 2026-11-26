@@ -8,6 +8,10 @@ Support Ubuntu 24.04 native and WSL2. Run native and WSL-branch simulation in
 Docker for every base E2E cycle, heavy profiles on schedule/manual dispatch,
 and real WSL only on a labeled private Windows runner.
 
+Amendment: Accept Ubuntu 26.04 with the same profiles and select APT sources
+from the installed OS release. Add a cold, two-pass 26.04 native-mode container
+to heavy acceptance. Real WSL and VM coverage still use 24.04.
+
 ## Consequences
 
 Docker provides fast deterministic branch coverage but is never represented as

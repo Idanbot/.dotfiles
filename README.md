@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
 
-A personal development-environment bootstrap for Ubuntu 24.04, native or WSL2.
+A personal development-environment bootstrap for Ubuntu 24.04 and 26.04 LTS, native or WSL2.
 Chezmoi deploys configuration; one installer handles tools, verification, logs,
 backups, and recovery.
 
@@ -45,7 +45,9 @@ dot doctor
 - Two-pass Docker tests check managed-state convergence. Reruns can still apply
   approved or policy-allowed updates; the environment is not frozen forever.
 
-Supported targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
+Use the same `--full` command on Ubuntu 24.04 and 26.04 (amd64/arm64).
+The installer detects the release from `/etc/os-release` and uses the host's
+APT suite. It does not upgrade Ubuntu itself.
 Docker cannot prove GUI, physical-device, or Windows interoperability behavior.
 A successful run means the selected health checks passed, not that every tool
 is current or every account is authenticated. Review the final warnings.

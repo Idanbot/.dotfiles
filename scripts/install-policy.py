@@ -22,6 +22,7 @@ sys.dont_write_bytecode = True
 import catalog as software  # noqa: E402
 from dotfiles import releases  # noqa: E402
 from dotfiles.metadata import load_metadata, load_repository, load_versions  # noqa: E402
+from dotfiles.platforms import ubuntu_label  # noqa: E402
 from dotfiles.replacements import replacement_blocker  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -436,10 +437,8 @@ def recommendations(root):
 
 def host_checks(home, sections):
     checks = []
-    os_release = platform.freedesktop_os_release()
-    supported = os_release.get("ID") == "ubuntu" and os_release.get("VERSION_ID") == "24.04"
-    if not supported and os.environ.get("DOTFILES_ALLOW_UNSUPPORTED") != "1":
-        checks.append(("FAIL", "Supported host required: Ubuntu 24.04 native or WSL"))
+    if ubuntu_label(platform.freedesktop_os_release()) == "unsupported" and os.environ.get("DOTFILES_ALLOW_UNSUPPORTED") != "1":
+        checks.append(("FAIL", "Supported host required: Ubuntu 24.04 or 26.04 native or WSL"))
     if platform.machine() not in {"x86_64", "aarch64", "arm64"}:
         checks.append(("FAIL", "Only amd64 and arm64 release assets are supported"))
     if not home.is_dir() or not os.access(home, os.W_OK | os.X_OK):

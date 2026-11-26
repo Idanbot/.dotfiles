@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml/badge.svg)](https://github.com/Idanbot/.dotfiles/actions/workflows/ci.yml)
 
-A repeatable, observable development-environment bootstrap for Ubuntu 24.04,
+A repeatable, observable development-environment bootstrap for Ubuntu LTS,
 both native and WSL2. Chezmoi owns configuration deployment; one explicit
 orchestrator owns package installation, recovery, logging, and acceptance.
 
@@ -11,7 +11,7 @@ keys, tokens, or encrypted secret payloads.
 
 ## Scope and Guarantees
 
-Current targets are Ubuntu 24.04 amd64/arm64 on native Linux and WSL2.
+Current Ubuntu targets are 24.04 and 26.04 amd64/arm64 on native Linux and WSL2.
 Unsupported platforms fail before configuration is applied.
 
 On a fresh supported Ubuntu machine, one successful `--full` run installs the
@@ -1150,7 +1150,7 @@ Verification is tiered so a green result has a precise meaning:
 | --- | --- | --- |
 | Push/PR CI | Every change | Parallel security/static, two native behavior shards, focused WSL contracts, selectors, native two-pass base install, and cold recovery/restore |
 | Agent workspace Docker E2E | Every push/PR | tmux, all registered agent launchers, explicit MCP toggle fixtures, working-directory propagation, and failure recovery |
-| Extended/heavy Docker E2E | Weekly, explicit heavy dispatch, or grouped-upgrade canary | Two-pass WSL base, interrupted-install resume, all five heavy profiles including full native/WSL, and performance history outside PRs |
+| Extended/heavy Docker E2E | Weekly, explicit heavy dispatch, or grouped-upgrade canary | Two-pass WSL base, interrupted-install resume, full native on both Ubuntu LTS releases, full simulated WSL, and performance history outside PRs |
 | Native ARM64 smoke | Monthly or manual, public-repo ARM64 runner | Real checksummed release binaries from a cold base; not full-install acceptance |
 | Real WSL2 | Manual, private self-hosted Windows runner | Disposable imported WSL2 distro; requires trusted Ubuntu 24.04 rootfs via `WSL_E2E_ROOTFS` |
 

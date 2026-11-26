@@ -43,6 +43,17 @@ class PolicyTests(unittest.TestCase):
                                          "cloud.helm", "cloud.terraform", "cloud.azure_cli", "cloud.cloudflared"})
         self.assertNotIn("cloud.kubectl", policy.ROLLING)
 
+    def test_host_checks_accept_supported_ubuntu_releases_only(self):
+        with patch.dict(os.environ, {"DOTFILES_ALLOW_UNSUPPORTED": "0"}), \
+                patch.object(policy.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")):
+            for distro, release, supported in [("ubuntu", "24.04", True), ("ubuntu", "26.04", True),
+                                               ("ubuntu", "25.10", False), ("debian", "26.04", False)]:
+                with self.subTest(distro=distro, release=release), patch.object(
+                        policy.platform, "freedesktop_os_release", return_value={"ID": distro, "VERSION_ID": release}):
+                    checks = policy.host_checks(self.home, [])
+                    self.assertEqual(any(message.startswith("Supported host required") for _, message in checks),
+                                     not supported)
+
     def test_default_ai_plan_has_no_mcp_install_targets_or_requirements(self):
         targets = {entry["id"] for entry in policy.selected(ROOT, ["ai"])}
         self.assertNotIn("ai_tools.serena", targets)

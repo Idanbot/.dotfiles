@@ -239,7 +239,7 @@ def check(root):
     assert not needs(live["heavy-e2e"])
     assert live["heavy-e2e"]["if"] == "inputs.heavy"
     assert live["heavy-e2e"]["name"] == "Live ${{ matrix.service }} E2E"
-    assert {"full", "full-native"} <= set(
+    assert {"full", "full-native", "full-native-resolute"} <= set(
         live["heavy-e2e"]["strategy"]["matrix"]["service"]
     )
     assert live["heavy-e2e"]["strategy"]["max-parallel"] == 3
@@ -251,10 +251,13 @@ def check(root):
     assert "optional+=(heavy-e2e extended-e2e)" in result_run
     assert '"$HEAVY_REQUIRED" == true && "$EVENT_NAME" != pull_request' in result_run
     services = load(root / ".github/e2e/compose.yaml")["services"]
-    for name in ("base-native", "base-wsl-simulated", "full", "full-native"):
+    for name in ("base-native", "base-wsl-simulated", "full", "full-native", "full-native-resolute"):
         assert services[name]["environment"]["E2E_PASSES"] == "2"
         assert services[name]["build"]["target"] == "base"
     assert services["full-native"]["environment"]["DOTFILES_WSL"] == "false"
+    resolute = services["full-native-resolute"]
+    assert resolute["build"]["args"]["UBUNTU_VERSION"] == "26.04"
+    assert resolute["environment"]["E2E_EXPECT_PLATFORM"] == "ubuntu-26.04-native"
     assert services["full"]["environment"]["DOTFILES_WSL"] == "true"
 
     acceptance_steps = load(root / ".github/actions/e2e/action.yml")["runs"]["steps"]

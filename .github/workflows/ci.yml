@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       run_heavy_e2e:
-        description: Run extended WSL/recovery checks and all five heavy install profiles
+        description: Run extended WSL/recovery checks and all heavy install profiles
         required: false
         default: false
         type: boolean

@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 import catalog as software
+from dotfiles.platforms import SUPPORTED_UBUNTU, ubuntu_label
 
 
 class ReviewError(ValueError):
@@ -90,12 +91,7 @@ def selection(root):
 
 
 def host_platform():
-    release = platform.freedesktop_os_release()
-    os_name = (
-        "ubuntu-24.04"
-        if release.get("ID") == "ubuntu" and release.get("VERSION_ID") == "24.04"
-        else "unsupported"
-    )
+    os_name = ubuntu_label(platform.freedesktop_os_release())
     wsl = os.environ.get("DOTFILES_WSL", "auto")
     simulated = wsl in {"true", "1", "yes"}
     detected = (
@@ -227,7 +223,7 @@ def validate_receipt(data, root):
     if (
         not isinstance(host, dict)
         or set(host) != {"os", "mode", "arch"}
-        or host["os"] not in {"ubuntu-24.04", "unsupported"}
+        or host["os"] not in SUPPORTED_UBUNTU | {"unsupported"}
         or host["mode"] not in {"native", "wsl"}
         or host["arch"] not in {"amd64", "arm64", "unknown"}
     ):

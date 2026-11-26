@@ -12,7 +12,7 @@ PROFILE="${E2E_PROFILE:-base}"
 PASSES="${E2E_PASSES:-2}"
 INSTALL_PROFILE_ARGS=(--profile "$PROFILE")
 [[ "$PROFILE" != full ]] || INSTALL_PROFILE_ARGS=(--full)
-ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}"
+ARTIFACT_DIR="/artifacts/${PROFILE}-${DOTFILES_WSL:-false}${E2E_EXPECT_PLATFORM:+-$E2E_EXPECT_PLATFORM}"
 STATE_DIR="$HOME/.local/state/dotfiles"
 CURRENT_PASS=0
 if [[ "${DOTFILES_WSL:-false}" == true ]]; then
@@ -104,6 +104,13 @@ for pass in $(seq 1 "$PASSES"); do
 
   latest_run="$(find "$STATE_DIR/runs" -mindepth 2 -maxdepth 2 -name versions.json -printf '%T@ %p\n' | sort -nr | head -1 | cut -d' ' -f2-)"
   [[ -s "$latest_run" && "$(stat -c '%a' "$latest_run")" == 600 ]]
+  if [[ -n "${E2E_EXPECT_PLATFORM:-}" ]]; then
+    jq -e --arg platform "$E2E_EXPECT_PLATFORM" \
+      '.platform == $platform and .profile == "full"' "${latest_run%/*}/plan.json" >/dev/null
+    if [[ "$E2E_EXPECT_PLATFORM" == ubuntu-26.04-native ]]; then
+      grep -Fxq 'Suites: resolute' /etc/apt/sources.list.d/azure-cli.sources
+    fi
+  fi
   jq -e '.schema == 1 and (.tools | type == "object")' "$latest_run" >/dev/null
   [[ -f "${latest_run%/*}/checkpoints/preflight.done" ]]
   [[ -f "${latest_run%/*}/update-warnings.json" ]]

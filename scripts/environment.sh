@@ -87,5 +87,9 @@ terminal_supports_color() {
 
 assert_supported_platform() {
   [[ "${DOTFILES_ALLOW_UNSUPPORTED:-0}" == "1" ]] && return 0
-  [[ "$(dotfiles_os_id)" == "ubuntu" && "$(dotfiles_os_version)" == "24.04" ]]
+  [[ "$(dotfiles_os_id)" == "ubuntu" ]] || return 1
+  case "$(dotfiles_os_version)" in
+    24.04 | 26.04) return 0 ;;
+    *) return 1 ;;
+  esac
 }

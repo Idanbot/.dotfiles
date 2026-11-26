@@ -1,3 +1,4 @@
+ARG UBUNTU_VERSION=24.04
 FROM ubuntu:24.04 AS validator-build
 ARG VALIDATOR_REFRESH=local
 # hadolint ignore=DL3008
@@ -10,14 +11,14 @@ RUN --mount=type=cache,target=/root/go/pkg/mod \
     go install -trimpath -ldflags="-s -w" mvdan.cc/sh/v3/cmd/shfmt@v3.13.1 && \
     go install -trimpath -ldflags="-s -w" github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
-FROM ubuntu:24.04 AS base
+FROM ubuntu:${UBUNTU_VERSION} AS base
 
 # Avoid interactive prompts during build
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
 # Install base dependencies
-# Package versions intentionally follow ubuntu:24.04 patch updates in CI.
+# Package versions intentionally follow Ubuntu patch updates in CI.
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

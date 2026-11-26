@@ -4,7 +4,7 @@ service="${1:?usage: e2e.sh SERVICE}"
 case "$service" in
   base-native | base-wsl-simulated) profile=base ;;
   recovery | failure-resume) profile=recovery ;;
-  developer | agent | cloud | full | full-native) profile="$service" ;;
+  developer | agent | cloud | full | full-native | full-native-resolute) profile="$service" ;;
   *)
     printf 'Unsupported E2E service: %s\n' "$service" >&2
     exit 2

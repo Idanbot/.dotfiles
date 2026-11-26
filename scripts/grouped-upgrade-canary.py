@@ -13,7 +13,7 @@ import time
 BRANCH = "automation/grouped-tool-upgrades"
 WORKFLOW = "ci.yml"
 HEAVY_JOBS = {f"Live {profile} E2E" for profile in
-              ("developer", "agent", "cloud", "full", "full-native")}
+              ("developer", "agent", "cloud", "full", "full-native", "full-native-resolute")}
 
 
 def gh(*args):

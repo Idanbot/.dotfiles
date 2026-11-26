@@ -95,6 +95,23 @@ services:
       E2E_PASSES: "2"
     command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
 
+  full-native-resolute:
+    <<: *e2e-base
+    build:
+      context: ../..
+      dockerfile: .github/e2e/Dockerfile.ubuntu-24.04
+      target: base
+      args:
+        UBUNTU_VERSION: "26.04"
+    profiles: [full-native-resolute]
+    environment:
+      <<: *e2e-env
+      DOTFILES_WSL: "false"
+      E2E_PROFILE: full
+      E2E_PASSES: "2"
+      E2E_EXPECT_PLATFORM: ubuntu-26.04-native
+    command: [bash, -lc, "/dotfiles/tests/e2e/test-install.sh"]
+
   agent-workspace:
     <<: *e2e-base
     build:

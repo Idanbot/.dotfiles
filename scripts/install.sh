@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reliable bootstrap for Ubuntu 24.04, native or WSL.
+# Reliable bootstrap for Ubuntu 24.04 and 26.04, native or WSL.
 # shellcheck disable=SC2317
 
 set -Eeuo pipefail
@@ -1316,7 +1316,7 @@ source "$CHEZMOI_SOURCE/scripts/environment.sh"
 # shellcheck source=scripts/conflicts.sh
 source "$CHEZMOI_SOURCE/scripts/conflicts.sh"
 if ! assert_supported_platform; then
-  log_error "Unsupported platform $(get_platform); this repository supports Ubuntu 24.04 native and WSL"
+  log_error "Unsupported platform $(get_platform); use Ubuntu 24.04 or 26.04 (native or WSL)"
   exit 1
 fi
 log_info "Platform: $(get_platform) ($(get_arch))"
